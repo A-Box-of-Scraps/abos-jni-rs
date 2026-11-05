@@ -1,0 +1,11 @@
+[versions]
+agp = "9.1.0"
+buildTools = "36.0.0"
+compileSdk = "35"
+java = "17"
+minSdk = "31"
+ndk = "28.2.13676358"
+targetSdk = "35"
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }

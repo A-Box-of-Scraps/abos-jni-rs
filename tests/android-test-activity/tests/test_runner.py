@@ -3,7 +3,7 @@ import contextlib
 import io
 import json
 import os
-import subprocess
+from pathlib import Path
 import tomllib
 import unittest
 from unittest.mock import patch
@@ -38,9 +38,16 @@ class AndroidRunnerTests(unittest.TestCase):
                 return log
             return ""
 
+        def package(sdk, target, features):
+            calls.append(("package", str(sdk), target, *features))
+            return Path("verified.apk")
+
         env = {"ANDROID_HOME": "/sdk", "ANDROID_TEST_SERIAL": "device"} if environment is None else environment
         with patch.dict(os.environ, env, clear=True), patch("sys.argv", ["run.py", *extra]), \
                 patch.object(runner, "run", side_effect=execute), patch.object(runner.uuid, "uuid4") as uuid, \
+                patch.object(runner.environment, "adb", return_value=Path("adb")), \
+                patch.object(runner.environment, "check_environment"), \
+                patch.object(runner.build_apk, "package", side_effect=package), \
                 patch.object(runner.time, "sleep"), contextlib.redirect_stdout(io.StringIO()), \
                 contextlib.redirect_stderr(io.StringIO()):
             uuid.return_value.hex = "current-run"
@@ -49,25 +56,23 @@ class AndroidRunnerTests(unittest.TestCase):
 
     def test_builds_selected_abi_and_accepts_current_success(self):
         calls = self.invoke(report(["sdk_os_build"]), extra=("--features", "sdk_os_build"))
-        build = next(call for call in calls if call[:2] == ("cargo", "ndk"))
-        self.assertIn("aarch64-linux-android", build)
-        self.assertIn("--no-default-features", build)
-        self.assertEqual(build[-2:], ("--features", "sdk_os_build"))
+        build = next(call for call in calls if call[0] == "package")
+        self.assertEqual(build[2:], ("aarch64-linux-android", "sdk_os_build"))
         launch = next(call for call in calls if "start" in call)
         self.assertEqual(launch[-3:], ("--es", "abos.test.run-id", "current-run"))
         self.assertFalse(any("-c" in call for call in calls))
 
     def test_default_suite_enables_every_sdk_feature(self):
         calls = self.invoke(report(runner.SDK_TESTS))
-        build = next(call for call in calls if call[:2] == ("cargo", "ndk"))
-        self.assertEqual(build[-1], ",".join(sorted(runner.SDK_TESTS)))
+        build = next(call for call in calls if call[0] == "package")
+        self.assertEqual(build[3:], tuple(sorted(runner.SDK_TESTS)))
         features = tomllib.loads((runner.PROJECT / "Cargo.toml").read_text())["features"]
         self.assertEqual(set(runner.SDK_TESTS), set(features))
 
     def test_smoke_selection_excludes_sdk_features(self):
         calls = self.invoke(report(), extra=("--suite", "smoke"))
-        build = next(call for call in calls if call[:2] == ("cargo", "ndk"))
-        self.assertNotIn("--features", build)
+        build = next(call for call in calls if call[0] == "package")
+        self.assertEqual(len(build), 3)
 
     def test_compile_only_does_not_require_or_touch_a_device(self):
         calls = self.invoke("", extra=("--compile-only",), environment={"ANDROID_HOME": "/sdk"})
@@ -89,13 +94,19 @@ class AndroidRunnerTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Android test failed"):
             self.invoke(report() + "\n" + event(type="result", name="setup", status="failed"), extra=("--suite", "smoke"))
 
-    def test_requires_explicit_device_and_sdk(self):
-        for environment in [{}, {"ANDROID_TEST_SERIAL": "device"}]:
-            with self.subTest(environment=environment), self.assertRaises(SystemExit):
-                self.invoke("", environment=environment)
+    def test_requires_explicit_device(self):
+        with self.assertRaises(SystemExit):
+            self.invoke("", environment={})
+
+    def test_package_mode_does_not_touch_devices(self):
+        calls = self.invoke("", extra=("--package-only", "--target", "x86_64-linux-android"), environment={})
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0], "package")
+        self.assertEqual(calls[0][2], "x86_64-linux-android")
+        self.assertEqual(calls[0][3:], tuple(sorted(runner.SDK_TESTS)))
 
     def test_rejects_invalid_options(self):
-        for extra in [("--timeout", "0"), ("--features", ""), ("--features", "typo"),
+        for extra in [("--compile-only", "--package-only"), ("--timeout", "0"), ("--features", ""), ("--features", "typo"),
                       ("--features", "sdk_os_build,sdk_os_build"), ("--suite", "smoke", "--features", "sdk_os_build")]:
             with self.subTest(extra=extra), self.assertRaises(SystemExit):
                 self.invoke("", extra=extra)
@@ -123,6 +134,6 @@ class AndroidRunnerTests(unittest.TestCase):
         self.assertIsNotNone(runner.read_report(report(), "current-run", runner.SMOKE_TESTS))
 
     def test_command_failures_propagate(self):
-        with patch.object(subprocess, "run", side_effect=subprocess.CalledProcessError(1, ["adb"])):
-            with self.assertRaises(subprocess.CalledProcessError):
+        with patch.object(runner.tools, "execute", side_effect=RuntimeError("command failed")):
+            with self.assertRaises(RuntimeError):
                 runner.run("adb", "devices")

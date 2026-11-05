@@ -5,9 +5,12 @@ import argparse
 import json
 import os
 from pathlib import Path
-import subprocess
 import time
 import uuid
+
+import android_env as environment
+import android_tools as tools
+import build_apk
 
 
 PROJECT = Path(__file__).resolve().parents[1]
@@ -22,16 +25,11 @@ SDK_TESTS = {
     "sdk_os_build": "sdk_os_build",
     "sdk_util_time_utils": "sdk_util_time_utils",
 }
-TARGETS = {
-    "arm64-v8a": "aarch64-linux-android",
-    "armeabi-v7a": "armv7-linux-androideabi",
-    "x86_64": "x86_64-linux-android",
-    "x86": "i686-linux-android",
-}
+TARGETS = environment.TARGETS
 
 
 def run(*args):
-    return subprocess.run(args, cwd=PROJECT, check=True, text=True, capture_output=True, timeout=600).stdout
+    return tools.execute(*args)
 
 
 def selected_features(args, parser):
@@ -87,26 +85,29 @@ def main():
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--suite", choices=["smoke", "full"], default="full")
     selection.add_argument("--features", help="comma-separated SDK feature names; always includes JNI smoke tests")
-    parser.add_argument("--compile-only", action="store_true", help="check Rust bindings without installing an APK")
-    parser.add_argument("--target", choices=sorted(TARGETS.values()), default="aarch64-linux-android",
-                        help="Rust target for --compile-only; device runs detect the ABI")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--compile-only", action="store_true", help="check Rust bindings without linking or packaging")
+    mode.add_argument("--package-only", action="store_true", help="cross-build and validate an APK without a device")
+    parser.add_argument("--sdk-root", help="SDK directory; otherwise uses ANDROID_HOME or a user-owned default")
+    parser.add_argument("--target", choices=sorted(TARGETS.values()), default=environment.DEFAULT_TARGET,
+                        help="Rust target for no-device modes; device runs detect the ABI")
     parser.add_argument("--timeout", type=int, default=120)
     args = parser.parse_args()
     features = selected_features(args, parser)
-    if not args.compile_only and not args.serial:
+    if not (args.compile_only or args.package_only) and not args.serial:
         parser.error("select a device or running emulator using --serial or ANDROID_TEST_SERIAL")
     if args.timeout <= 0:
         parser.error("--timeout must be positive")
-    sdk = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
-    if not sdk:
-        parser.error("set ANDROID_HOME or ANDROID_SDK_ROOT")
-    feature_args = ["--no-default-features"]
-    if features:
-        feature_args.extend(["--features", ",".join(features)])
+    sdk = environment.sdk_root(args.sdk_root)
+    environment.configure(sdk)
     if args.compile_only:
-        print(run("cargo", "ndk", "-t", args.target, "-p", "31", "check", *feature_args))
+        environment.check_environment(sdk, args.target)
+        print(run(*build_apk.native_command(args.target, features)))
         return
-    adb = str(Path(sdk) / "platform-tools" / ("adb.exe" if os.name == "nt" else "adb"))
+    if args.package_only:
+        build_apk.package(sdk, args.target, features)
+        return
+    adb = str(environment.adb(sdk))
     device = [adb, "-s", args.serial]
     api = run(*device, "shell", "getprop", "ro.build.version.sdk").strip()
     minimum_api = 35 if features else 31
@@ -115,11 +116,7 @@ def main():
     abi = run(*device, "shell", "getprop", "ro.product.cpu.abi").strip()
     if abi not in TARGETS:
         parser.error(f"unsupported device ABI: {abi}")
-    # Match the native library's minimum API to the APK's minSdk.
-    print(run("cargo", "ndk", "-t", TARGETS[abi], "-p", "31", "-o", "app/src/main/jniLibs", "build", *feature_args))
-    wrapper = PROJECT / ("gradlew.bat" if os.name == "nt" else "gradlew")
-    print(run(str(wrapper), "--no-daemon", ":app:assembleDebug"))
-    apk = PROJECT / "app/build/outputs/apk/debug/app-debug.apk"
+    apk = build_apk.package(sdk, TARGETS[abi], features)
     print(run(*device, "install", "-r", str(apk)))
     run(*device, "shell", "am", "force-stop", APPLICATION)
     run_id = uuid.uuid4().hex
@@ -140,5 +137,5 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except subprocess.CalledProcessError as error:
-        raise SystemExit(f"Command failed: {error.cmd}\n{error.stdout}\n{error.stderr}") from error
+    except (OSError, RuntimeError, ValueError) as error:
+        raise SystemExit(str(error)) from error
