@@ -1,4 +1,4 @@
-//! Integration tests against real compiler output. Requires a JDK 17 or newer.
+//! Integration tests against real compiler output. Requires a JDK 25 or newer.
 use abos_cafebabe::{ClassFile, parse_class};
 use std::{fs, path::PathBuf};
 use tempfile::TempDir;
@@ -53,12 +53,14 @@ fn records_sealed_classes_and_modules() -> TestResult {
 			fixture("java/modern/sample/Point.java"),
 			fixture("java/modern/module-info.java"),
 		])
+		.release("25")
 		.output_dir(root.path().join("classes"))
 		.cargo_metadata(false)
 		.try_compile()?;
 	let mut names: Vec<String> = Vec::new();
 	for path in classes {
 		let class: ClassFile = parse_class(&fs::read(path)?)?;
+		assert_eq!(class.major_version, 69);
 		if class.this_class == "module-info" {
 			assert!(class.super_class.is_none());
 		}
