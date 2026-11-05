@@ -1,0 +1,5 @@
+error: Expected at least one JNI table field
+ --> tests/trybuild/fail-empty.rs:4:1
+  |
+4 | pub struct Table {}
+  | ^^^

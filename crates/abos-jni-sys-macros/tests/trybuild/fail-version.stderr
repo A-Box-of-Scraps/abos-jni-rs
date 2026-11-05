@@ -1,0 +1,5 @@
+error: Expected a JNI version such as "1.2", "9", or "reserved"
+ --> tests/trybuild/fail-version.rs:5:14
+  |
+5 |     #[jni_added("1.2.3")]
+  |                 ^^^^^^^

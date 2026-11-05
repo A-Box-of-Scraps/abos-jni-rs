@@ -1,0 +1,5 @@
+error: Generic JNI tables are not supported
+ --> tests/trybuild/fail-generics.rs:4:17
+  |
+4 | pub struct Table<T> {
+  |                 ^

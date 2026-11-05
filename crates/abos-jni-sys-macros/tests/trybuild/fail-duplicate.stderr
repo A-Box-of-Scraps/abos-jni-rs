@@ -1,0 +1,5 @@
+error: Duplicate jni_added attribute
+ --> tests/trybuild/fail-duplicate.rs:6:2
+  |
+6 |     #[jni_added("1.2")]
+  |     ^

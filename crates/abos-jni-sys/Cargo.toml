@@ -1,0 +1,17 @@
+[package]
+name = "abos-jni-sys"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Raw Rust definitions corresponding to jni.h."
+
+[lints]
+workspace = true
+
+[dependencies]
+abos-jni-sys-macros.workspace = true
+
+[dev-dependencies]
+libloading.workspace = true
+trybuild.workspace = true
