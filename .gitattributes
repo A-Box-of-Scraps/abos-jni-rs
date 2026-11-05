@@ -1,0 +1,6 @@
+# Normalize text files to LF in the repository and working tree.
+*          text=auto  eol=lf
+
+# Source and config files should always use LF.
+*.rs       text       eol=lf
+*.toml     text       eol=lf

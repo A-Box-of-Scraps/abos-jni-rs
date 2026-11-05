@@ -1,0 +1,13 @@
+# Editor files
+.idea/
+.vscode/
+.zed/
+
+# Rust
+/target
+
+# Environment files
+.env
+
+# macOS
+.DS_Store
