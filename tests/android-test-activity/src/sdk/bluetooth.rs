@@ -1,17 +1,10 @@
-use tracing::info;
-
 include!(concat!(env!("OUT_DIR"), "/bluetooth_bindings.rs"));
 
-use crate::io::github::jni_rs::jbindgen::testactivity::TestActivity;
+use crate::test_error::TestResult;
 
-pub fn test_bluetooth<'local>(
-	env: &mut jni::Env<'local>,
-	_activity: TestActivity<'local>,
-) -> Result<String, jni::errors::Error> {
-	info!("Testing android.bluetooth bindings");
-
+pub fn test_bluetooth<'local>(env: &mut jni::Env<'local>) -> TestResult {
 	// Just verify that the JNI bindings are able to cache the class, methods, and fields..
 	jni_init(env, &Default::default())?;
 
-	Ok("Bluetooth bindings generated successfully".to_string())
+	Ok("Bluetooth class, method and field resolution passed".to_string())
 }

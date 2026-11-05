@@ -12,12 +12,9 @@ crate-type = ["cdylib"]
 
 [dependencies]
 jni = "=0.22.4"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter", "tracing-log"] }
 
 [build-dependencies]
 abos-jbindgen = { path = "../../crates/abos-jbindgen" }
-abos-javac = { path = "../../crates/abos-javac" }
 
 [features]
 sdk_util_time_utils = []

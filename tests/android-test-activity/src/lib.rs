@@ -1,6 +1,7 @@
 //! TestActivity JNI implementation
-use std::sync::atomic::{AtomicUsize, Ordering};
-use tracing::{error, info};
+use test_error::{TestError, TestResult};
+
+mod test_error;
 
 pub mod sdk;
 
@@ -11,7 +12,7 @@ use io::github::jni_rs::jbindgen::testactivity::{TestActivity, TestActivityAPI, 
 
 struct SdkTest {
 	name: &'static str,
-	runner: for<'local> fn(&mut jni::Env<'local>, TestActivity<'local>) -> Result<String, jni::errors::Error>,
+	runner: for<'local> fn(&mut jni::Env<'local>) -> TestResult,
 }
 
 const SDK_TESTS: &[SdkTest] = &[
@@ -27,12 +28,12 @@ const SDK_TESTS: &[SdkTest] = &[
 	},
 	#[cfg(feature = "sdk_os_binder")]
 	SdkTest {
-		name: "sdk_os_binder",
+		name: "sdk_os_binder_resolution",
 		runner: sdk::os_binder::test_os_binder,
 	},
 	#[cfg(feature = "sdk_bluetooth")]
 	SdkTest {
-		name: "sdk_bluetooth",
+		name: "sdk_bluetooth_resolution",
 		runner: sdk::bluetooth::test_bluetooth,
 	},
 	#[cfg(feature = "sdk_content_intent")]
@@ -47,24 +48,10 @@ const SDK_TESTS: &[SdkTest] = &[
 	},
 ];
 
-static CURRENT_TEST_INDEX: AtomicUsize = AtomicUsize::new(0);
-
 impl TestActivityNativeInterface for TestActivityAPI {
-	type Error = jni::errors::Error;
+	type Error = TestError;
 
-	fn native_on_create<'local>(
-		env: &mut jni::Env<'local>,
-		this: TestActivity<'local>,
-		_saved_instance_state: jni::objects::JObject<'local>,
-	) -> Result<(), Self::Error> {
-		static INIT: std::sync::Once = std::sync::Once::new();
-		INIT.call_once(|| {
-			// Simple logging without paranoid_android for now
-			tracing_subscriber::fmt().with_max_level(tracing::Level::DEBUG).init();
-		});
-
-		// Smoke test the generated bindings by calling a simple method to
-		// update the UI with a message from Rust
+	fn native_on_create<'local>(env: &mut jni::Env<'local>, this: TestActivity<'local>) -> Result<(), Self::Error> {
 		let message = jni::objects::JString::from_str(env, "Hello from Rust native onCreate!")?;
 		this.update_ui(env, message)?;
 
@@ -75,7 +62,7 @@ impl TestActivityNativeInterface for TestActivityAPI {
 		env: &mut jni::Env<'local>,
 		_this: TestActivity<'local>,
 	) -> Result<jni::objects::JString<'local>, Self::Error> {
-		jni::objects::JString::from_str(env, "Message from Rust!")
+		Ok(jni::objects::JString::from_str(env, "Message from Rust!")?)
 	}
 
 	fn native_process_data<'local>(
@@ -86,30 +73,50 @@ impl TestActivityNativeInterface for TestActivityAPI {
 		Ok(value * 2)
 	}
 
-	fn native_run_next_test<'local>(
+	fn native_get_test_count<'local>(
+		_env: &mut jni::Env<'local>,
+		_this: TestActivity<'local>,
+	) -> Result<jni::sys::jint, Self::Error> {
+		Ok(i32::try_from(SDK_TESTS.len()).expect("test registry fits in a Java int"))
+	}
+
+	fn native_get_test_name<'local>(
 		env: &mut jni::Env<'local>,
-		this: TestActivity<'local>,
+		_this: TestActivity<'local>,
+		index: jni::sys::jint,
 	) -> Result<jni::objects::JString<'local>, Self::Error> {
-		let index = CURRENT_TEST_INDEX.fetch_add(1, Ordering::SeqCst);
+		Ok(jni::objects::JString::from_str(env, test_at(index)?.name)?)
+	}
 
-		if index >= SDK_TESTS.len() {
-			// No more tests - return empty string to signal completion
-			return jni::objects::JString::from_str(env, "");
-		}
+	fn native_run_test<'local>(
+		env: &mut jni::Env<'local>,
+		_this: TestActivity<'local>,
+		index: jni::sys::jint,
+	) -> Result<jni::objects::JString<'local>, Self::Error> {
+		let message = (test_at(index)?.runner)(env)?;
+		Ok(jni::objects::JString::from_str(env, message)?)
+	}
+}
 
-		let test = &SDK_TESTS[index];
-		info!("Running SDK test [{}]: {}", index, test.name);
+fn test_at(index: i32) -> Result<&'static SdkTest, TestError> {
+	usize::try_from(index)
+		.ok()
+		.and_then(|index| SDK_TESTS.get(index))
+		.ok_or_else(|| TestError::Assertion(format!("invalid SDK test index: {index}")))
+}
 
-		match (test.runner)(env, this) {
-			Ok(result) => {
-				let formatted = format!("[{}] {}: {}", index, test.name, result);
-				jni::objects::JString::from_str(env, &formatted)
-			}
-			Err(e) => {
-				error!("Test {} failed: {:?}", test.name, e);
-				let error_msg = format!("[{}] {}: ERROR - {:?}", index, test.name, e);
-				jni::objects::JString::from_str(env, &error_msg)
-			}
+#[cfg(test)]
+mod tests {
+	use super::{SDK_TESTS, test_at};
+
+	#[test]
+	fn rejects_invalid_indices_without_advancing_global_state() {
+		assert!(test_at(-1).is_err());
+		assert!(test_at(i32::try_from(SDK_TESTS.len()).expect("small registry")).is_err());
+		for (index, test) in SDK_TESTS.iter().enumerate() {
+			let index = i32::try_from(index).expect("small registry");
+			assert_eq!(test_at(index).expect("valid index").name, test.name);
+			assert_eq!(test_at(index).expect("same index remains valid").name, test.name);
 		}
 	}
 }

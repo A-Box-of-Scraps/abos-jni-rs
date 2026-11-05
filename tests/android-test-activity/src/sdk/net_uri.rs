@@ -1,16 +1,9 @@
-use tracing::info;
-
 include!(concat!(env!("OUT_DIR"), "/net_uri_bindings.rs"));
 
-use crate::io::github::jni_rs::jbindgen::testactivity::TestActivity;
+use crate::test_error::{TestResult, require};
 use android::net::AndroidUri;
 
-pub fn test_net_uri<'local>(
-	env: &mut jni::Env<'local>,
-	activity: TestActivity<'local>,
-) -> Result<String, jni::errors::Error> {
-	info!("Testing android.net.Uri bindings");
-
+pub fn test_net_uri<'local>(env: &mut jni::Env<'local>) -> TestResult {
 	// Parse a URI using the generated bindings
 	let uri_str = jni::objects::JString::from_str(env, "https://github.com/jni-rs/jni-rs")?;
 	let uri = AndroidUri::parse(env, uri_str)?;
@@ -24,15 +17,9 @@ pub fn test_net_uri<'local>(
 	let path = uri.get_path(env)?;
 	let path_str = path.to_string();
 
-	// Create result info string
-	let result_info = format!(
-		"URI Parsing:\nScheme: {}\nHost: {}\nPath: {}",
-		scheme_str, host_str, path_str
-	);
-
-	// Update the activity with test info
-	let info_jstring = jni::objects::JString::from_str(env, &result_info)?;
-	activity.update_device_info(env, info_jstring)?;
+	require(scheme_str == "https", format!("unexpected URI scheme: {scheme_str}"))?;
+	require(host_str == "github.com", format!("unexpected URI host: {host_str}"))?;
+	require(path_str == "/jni-rs/jni-rs", format!("unexpected URI path: {path_str}"))?;
 
 	Ok(format!("Uri: {}://{}{}", scheme_str, host_str, path_str))
 }

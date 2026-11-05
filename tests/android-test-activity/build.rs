@@ -5,24 +5,19 @@ use std::{env, path::PathBuf};
 type BuildResult = Result<(), Box<dyn std::error::Error>>;
 
 fn main() -> BuildResult {
-	for name in ["ANDROID_HOME", "ANDROID_SDK_ROOT", "ABOS_HIDDENAPI_FLAGS"] {
+	for name in ["ANDROID_HOME", "ANDROID_SDK_ROOT", "JAVA_HOME"] {
 		println!("cargo:rerun-if-env-changed={name}");
 	}
 	let sdk = AndroidSdk::from_env(35)?;
 	let android_jar = sdk.get_android_jar()?;
+	println!("cargo:rerun-if-changed={}", android_jar.display());
 	let output = PathBuf::from(env::var_os("OUT_DIR").ok_or("OUT_DIR is not set")?);
-	let source = PathBuf::from("app/src/main/java/io/github/jni_rs/jbindgen/testactivity/TestActivity.java");
-	abos_javac::Build::new()
-		.file(&source)
-		.classpath(&android_jar)
-		.output_dir(output.join("classes"))
-		.encoding("UTF-8")
-		.emit_rerun_if_changed(true)
-		.try_compile()?;
+	let sources = PathBuf::from("app/src/main/java");
+	println!("cargo:rerun-if-changed={}", sources.display());
 	Builder::new()
 		.input_sources(
-			vec![source],
-			vec![android_jar],
+			vec![sources],
+			vec![android_jar.clone()],
 			vec!["io.github.jni_rs.jbindgen.testactivity.TestActivity".to_owned()],
 		)
 		.generate()?
@@ -76,20 +71,16 @@ fn main() -> BuildResult {
 		}
 		let mut builder = Builder::new()
 			.root_path(format!("crate::sdk::{module}"))
-			.input_android_sdk(35, patterns.iter().map(|pattern| (*pattern).to_owned()).collect());
+			// The platform JAR already defines the public SDK surface. Runtime tests
+			// do not need source documentation or hidden-API filtering.
+			.input_jar(&android_jar)
+			.patterns(patterns.iter().copied())
+			.generate_native_interfaces(false);
 		if let Some(prefix) = prefix {
 			builder = builder.name_prefix(prefix);
 		}
 		if let Some(signature) = skip {
 			builder = builder.skip_signature(signature);
-		}
-		if let Some(flags) = env::var_os("ABOS_HIDDENAPI_FLAGS") {
-			let path = PathBuf::from(flags);
-			if !path.is_file() {
-				return Err("ABOS_HIDDENAPI_FLAGS must name an existing CSV file".into());
-			}
-			println!("cargo:rerun-if-changed={}", path.display());
-			builder = builder.hiddenapi_flags(path);
 		}
 		builder
 			.generate()?

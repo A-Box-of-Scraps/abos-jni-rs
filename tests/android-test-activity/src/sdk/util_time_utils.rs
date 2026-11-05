@@ -1,15 +1,8 @@
-use tracing::info;
+include!(concat!(env!("OUT_DIR"), "/util_time_utils_bindings.rs"));
 
-include!(concat!(env!("OUT_DIR"), "/time_utils_bindings.rs"));
+use crate::test_error::{TestResult, require};
 
-use crate::io::github::jni_rs::jbindgen::testactivity::TestActivity;
-
-pub fn test_time_utils<'local>(
-	env: &mut jni::Env<'local>,
-	activity: TestActivity<'local>,
-) -> Result<String, jni::errors::Error> {
-	info!("Testing android.util.TimeUtils and android.icu.util.TimeZone bindings");
-
+pub fn test_time_utils<'local>(env: &mut jni::Env<'local>) -> TestResult {
 	// Just verify that the JNI bindings are able to cache the class, methods, and fields..
 	jni_init(env, &Default::default())?;
 
@@ -28,15 +21,13 @@ pub fn test_time_utils<'local>(
 	let tz_display_name = default_tz.get_display_name(env)?;
 	let tz_display_name_str = tz_display_name.to_string();
 
-	// Create timezone info string
-	let timezone_info = format!(
-		"Timezone DB: {}\nTimezone: {}\nDisplay: {}",
-		tz_version_str, tz_id_str, tz_display_name_str
-	);
-
-	// Update the activity with timezone info
-	let info_jstring = jni::objects::JString::from_str(env, &timezone_info)?;
-	activity.update_device_info(env, info_jstring)?;
+	for (name, value) in [
+		("database version", &tz_version_str),
+		("ID", &tz_id_str),
+		("display name", &tz_display_name_str),
+	] {
+		require(!value.trim().is_empty(), format!("timezone {name} is empty"))?;
+	}
 
 	Ok(format!("TimeZone: {} ({})", tz_id_str, tz_version_str))
 }

@@ -110,6 +110,12 @@ run = "python tests/android-test-activity/tests/run.py"
 [tasks."test:android-runner"]
 run = "python -B -m unittest discover --start-directory tests/android-test-activity/tests --pattern 'test_*.py' --quiet"
 
+[tasks."test:android:check"]
+run = "python tests/android-test-activity/tests/run.py --compile-only --suite full"
+
+[tasks."test:android:smoke"]
+run = "python tests/android-test-activity/tests/run.py --suite smoke"
+
 [tasks."test:lints"]
 dir = "lints/explicit_binding_types"
 run = "cargo test -q"

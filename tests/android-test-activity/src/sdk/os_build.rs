@@ -1,16 +1,9 @@
-use tracing::info;
-
 include!(concat!(env!("OUT_DIR"), "/os_build_bindings.rs"));
 
-use crate::io::github::jni_rs::jbindgen::testactivity::TestActivity;
+use crate::test_error::{TestResult, require};
 use android::os::AndroidBuild;
 
-pub fn test_os_build<'local>(
-	env: &mut jni::Env<'local>,
-	activity: TestActivity<'local>,
-) -> Result<String, jni::errors::Error> {
-	info!("Testing android.os.Build bindings");
-
+pub fn test_os_build<'local>(env: &mut jni::Env<'local>) -> TestResult {
 	// Use the generated AndroidBuild bindings to access static fields
 	let brand = AndroidBuild::BRAND(env)?;
 	let brand_str = brand.to_string();
@@ -29,18 +22,18 @@ pub fn test_os_build<'local>(
 
 	let sdk_int = android::os::AndroidBuildVERSION::SDK_INT(env)?;
 
-	// Create detailed build info string
-	let build_info = format!(
-		"Device: {} {}\nManufacturer: {}\nModel: {}\nAndroid: {} (SDK {})",
-		brand_str, device_str, manufacturer_str, model_str, version_str, sdk_int
-	);
-
-	// Call back to the activity to update device info on screen
-	let info_jstring = jni::objects::JString::from_str(env, &build_info)?;
-	activity.update_device_info(env, info_jstring)?;
+	require(sdk_int >= 31, format!("device API {sdk_int} is below minSdk 31"))?;
+	for (name, value) in [
+		("brand", &brand_str),
+		("model", &model_str),
+		("device", &device_str),
+		("manufacturer", &manufacturer_str),
+		("release", &version_str),
+	] {
+		require(!value.trim().is_empty(), format!("Build {name} is empty"))?;
+	}
 
 	let result = format!("Brand: {}, Model: {}, Device: {}", brand_str, model_str, device_str);
 
-	info!("{}", &result);
 	Ok(result)
 }
