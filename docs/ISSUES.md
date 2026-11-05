@@ -59,6 +59,10 @@ unnecessary and introduces the panic.
 
 ### Current workaround
 
+Introduced in commit `b40faa469110d70c3b1e6edaa900168f6a7fb67d` (`fix(jbindgen): normalize generated Rust identifiers`).
+This commit also contains permanent identifier and collision fixes; remove only the dependency-specific guard and
+related limitation handling after migration, not the entire commit.
+
 `crates/abos-jbindgen/src/internal/generator/identifiers.rs::validate_java_member_name` rejects names that would trigger
 this panic. Callers can explicitly omit a member with `Builder::skip_signature`; renaming its Rust binding alone does
 not avoid the dependency bug.
