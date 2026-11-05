@@ -3,11 +3,15 @@ dprint = "0.64.3"
 
 [tasks.fmt]
 quiet = true
-run = ["cargo fmt --all -q", "dprint fmt --log-level warn"]
+run = ["mise fmt -q", "cargo fmt --all -q", "dprint fmt --log-level warn"]
 
 [tasks."fmt:check"]
 quiet = true
-run = ["cargo fmt --all --check -q", "dprint check --log-level warn"]
+run = [
+  "mise fmt --check -q",
+  "cargo fmt --all --check -q",
+  "dprint check --log-level warn",
+]
 
 [tasks.check]
 quiet = true
