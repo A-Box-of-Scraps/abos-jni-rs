@@ -1,12 +1,15 @@
 [tools]
 dprint = "0.64.3"
+"cargo:jscpd" = "5.4.2"
+
+[settings]
+task.output = "interleave"
+task.quiet = true
 
 [tasks.fmt]
-quiet = true
 run = ["mise fmt -q", "cargo fmt --all -q", "dprint fmt --log-level warn"]
 
 [tasks."fmt:check"]
-quiet = true
 run = [
   "mise fmt --check -q",
   "cargo fmt --all --check -q",
@@ -14,5 +17,7 @@ run = [
 ]
 
 [tasks.check]
-quiet = true
-depends = ["fmt"]
+depends = ["fmt", "check:duplicates"]
+
+[tasks."check:duplicates"]
+run = "jscpd --fail-on-empty --no-tips"
