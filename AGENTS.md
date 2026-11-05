@@ -7,14 +7,16 @@ Rust bindings and utilities for the Java Native Interface.
 Here is an overview of the project:
 
 ```
-.cargo/config.toml
+.cargo/
 crates/
-  abos-javac/
+lints/
 .gitattributes
 .gitignore
+.jscpd.json
 AGENTS.md
 Cargo.lock
 Cargo.toml
+clippy.toml
 dprint.json
 LICENSE
 mise.toml
