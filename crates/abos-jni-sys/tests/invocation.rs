@@ -22,11 +22,14 @@ fn invocation_and_native_calls() {
 	} else {
 		home.join("lib/server/libjvm.so")
 	};
-	// The JVM can retain process-wide state after DestroyJavaVM. Keep its code loaded until process exit.
+	// SAFETY: JAVA_HOME selects a trusted host JVM library whose initialization is valid here.
+	// Keep it loaded until process exit because the JVM can retain state after DestroyJavaVM.
 	let library: &Library = Box::leak(Box::new(unsafe {
 		Library::new(&library_path).expect("load the host JVM")
 	}));
-	// Signatures match jni.h; all table accesses below use a live VM on its creating thread.
+	// SAFETY: The entry-point signature matches jni.h, and initialization arguments and output
+	// pointers remain valid for the call. After successful creation, table accesses use the live
+	// VM on its creating thread; no JNI calls are made after destruction.
 	unsafe {
 		let create: Symbol<'_, CreateJavaVm> = library.get(b"JNI_CreateJavaVM\0").expect("JNI_CreateJavaVM");
 		let mut option = sys::JavaVMOption {
@@ -72,6 +75,8 @@ struct JavaVm(*mut sys::JavaVM);
 
 impl Drop for JavaVm {
 	fn drop(&mut self) {
+		// SAFETY: This guard owns a successfully created VM and is forgotten after explicit
+		// destruction. Otherwise it destroys the still-live VM on the creating thread.
 		unsafe {
 			((**self.0).v1_1.DestroyJavaVM)(self.0);
 		}
@@ -79,6 +84,8 @@ impl Drop for JavaVm {
 }
 
 unsafe fn assert_no_exception(env: *mut sys::JNIEnv) {
+	// SAFETY: The caller supplies the live JNI environment for the current attached thread.
+	// Exception inspection and clearing do not invalidate that environment.
 	unsafe {
 		if ((**env).v1_2.ExceptionCheck)(env) != sys::JNI_FALSE {
 			((**env).v1_1.ExceptionDescribe)(env);
@@ -89,6 +96,9 @@ unsafe fn assert_no_exception(env: *mut sys::JNIEnv) {
 }
 
 unsafe fn integer_roundtrip(env: *mut sys::JNIEnv) -> sys::jint {
+	// SAFETY: The caller supplies the current thread's live JNI environment. Class and method
+	// lookups are checked for null, signatures match java.lang.Integer, and argument storage
+	// lives through each call. Local references are deleted only after their last use.
 	unsafe {
 		let api: &sys::JNINativeInterface__1_1 = &(**env).v1_1;
 		assert!((api.GetVersion)(env) >= sys::JNI_VERSION_1_8);
