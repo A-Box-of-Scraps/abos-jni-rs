@@ -17,6 +17,16 @@ mod overrides {
 	include!(concat!(env!("OUT_DIR"), "/overrides.rs"));
 }
 
+#[allow(dead_code, non_snake_case)]
+mod collision_overrides {
+	include!(concat!(env!("OUT_DIR"), "/collision_overrides.rs"));
+}
+#[allow(dead_code, non_snake_case)]
+mod native_collisions {
+	include!(concat!(env!("OUT_DIR"), "/native_collisions.rs"));
+}
+mod collisions;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	use bindings::com::example::SimpleClass;
 	let args = jni::InitArgsBuilder::new()
@@ -56,6 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		let renamed = overrides::com::example::type_::gen_(env)?;
 		renamed.set_value(env, 42)?;
 		assert_eq!(renamed.with_dash(env)?, 42);
+		collisions::check(env)?;
 		Ok(())
 	})?;
 	Ok(())

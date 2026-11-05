@@ -1,10 +1,8 @@
 use super::names::java_name_to_rust;
 use super::signatures::generate_jni_signature_for_sorting;
 use crate::MethodInfo;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 pub fn group_methods_by_name(methods: &[MethodInfo]) -> Vec<(&str, Vec<&MethodInfo>)> {
-	use std::collections::HashMap;
-
 	let mut groups: HashMap<&str, Vec<&MethodInfo>> = HashMap::new();
 	for method in methods {
 		groups.entry(method.name.as_str()).or_default().push(method);
@@ -36,44 +34,27 @@ pub fn group_methods_by_name(methods: &[MethodInfo]) -> Vec<(&str, Vec<&MethodIn
 	result
 }
 
-/// Detect and resolve Rust name collisions by appending underscores
-///
-/// Returns (`final_name`, `had_collision`, `java_name_for_warning`)
-/// where `had_collision` indicates if a collision was detected and resolved
+/// Reserve a Rust callable name for a full Java member signature or accessor key.
+/// Repeated reservations for the same member are stable; other members gain underscores.
+/// Returns the name, whether it changed, and the first conflicting member for diagnostics.
 pub fn resolve_name_collision(
 	rust_name: String,
-	java_name: &str,
-	used_names: &mut HashSet<(String, String)>,
+	member: &str,
+	used_names: &mut HashMap<String, String>,
 ) -> (String, bool, Option<String>) {
 	let mut candidate: String = rust_name;
-	let mut had_collision = false;
-	let mut conflicting_java_name: Option<String> = None;
-
-	// Check if this rust_name is already used by a different Java name
-	loop {
-		// Find if there's an existing entry with this rust name
-		let existing: Option<&(String, String)> = used_names.iter().find(|(rust, _java)| rust == &candidate);
-
-		if let Some((_existing_rust, existing_java)) = existing {
-			// If the Java names are different, we have a collision
-			if existing_java == java_name {
-				// Same Java name - this is the same entry, no collision
-				break;
-			}
-			had_collision = true;
-			if conflicting_java_name.is_none() {
-				conflicting_java_name = Some(existing_java.clone());
-			}
-			// Append underscore and try again
-			candidate.push('_');
-		} else {
-			// No existing entry with this rust name - we're good
+	let mut previous: Option<String> = None;
+	while let Some(owner) = used_names.get(&candidate) {
+		if owner == member {
 			break;
 		}
+		if previous.is_none() {
+			previous = Some(owner.clone());
+		}
+		candidate.push('_');
 	}
-
-	used_names.insert((candidate.clone(), java_name.to_string()));
-	(candidate, had_collision, conflicting_java_name)
+	used_names.insert(candidate.clone(), member.to_owned());
+	(candidate, previous.is_some(), previous)
 }
 
 /// Convert a Java type name to a `snake_case` suffix for method naming
@@ -191,4 +172,34 @@ fn overload_name(base: &str, method: &MethodInfo, arity: usize, varying: &[usize
 pub fn is_snake_case(name: &str) -> bool {
 	name.chars()
 		.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
+#[cfg(test)]
+mod tests {
+	use super::resolve_name_collision;
+	use std::collections::HashMap;
+
+	#[test]
+	fn full_member_signatures_and_accessor_roles_have_distinct_names() {
+		let mut names: HashMap<String, String> = HashMap::new();
+		let members = [
+			"Lsample/Example;-><init>(I)V",
+			"Lsample/Example;-><init>(J)V",
+			"Lsample/Example;->call:I",
+			"setter:Lsample/Example;->call:I",
+			"Lsample/Example;->call(I)V",
+			"Lsample/Example;->call(J)V",
+		];
+		for (index, member) in members.iter().enumerate() {
+			let (name, collision, previous) = resolve_name_collision("call".to_owned(), member, &mut names);
+			assert_eq!(name, format!("call{}", "_".repeat(index)));
+			assert_eq!(collision, index != 0);
+			assert_eq!(previous.as_deref(), (index != 0).then_some(members[0]));
+		}
+		for (index, member) in members.iter().enumerate() {
+			let (name, _, _) = resolve_name_collision("call".to_owned(), member, &mut names);
+			assert_eq!(name, format!("call{}", "_".repeat(index)));
+		}
+		assert_eq!(names.len(), members.len());
+	}
 }

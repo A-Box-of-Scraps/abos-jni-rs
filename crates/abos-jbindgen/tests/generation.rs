@@ -204,3 +204,41 @@ fn type_map_protects_core_jni_types() {
 	assert_eq!(map.len(), 1);
 	assert_eq!(map.get_rust_type("app.Model"), Some("Model"));
 }
+
+#[test]
+fn skipped_members_do_not_reserve_rust_names() -> TestResult {
+	let code: String = source_builder(&["MemberCollisions.java"])
+		.skip_signature("Lcom/example/MemberCollisions;-><init>(I)V")
+		.skip_signature("Lcom/example/MemberCollisions;-><init>(Ljava/lang/String;)V")
+		.skip_signature("Lcom/example/MemberCollisions;->newInt:I")
+		.generate()?
+		.to_string();
+	assert!(!code.contains("constructors {"), "{code}");
+	assert!(code.contains("fn new_int() -> jint"), "{code}");
+	assert!(code.contains("fn set_new_int_(value: jint) -> jint"), "{code}");
+	Ok(())
+}
+
+#[test]
+fn configured_constructor_names_take_precedence_over_annotations() -> TestResult {
+	let annotations: TempDir = annotations()?;
+	let root: TempDir = tempfile::tempdir()?;
+	let source: PathBuf = root.path().join("ConstructorNames.java");
+	fs::write(
+		&source,
+		"import io.github.jni_rs.jbindgen.RustName;
+		public class ConstructorNames {
+			@RustName(\"from_annotation\") public ConstructorNames() {}
+		}",
+	)?;
+	let builder: Builder = Builder::new().input_sources(vec![source], vec![annotations.path().to_owned()], Vec::new());
+	let annotated: String = builder.clone().generate()?.to_string();
+	assert!(annotated.contains("fn from_annotation("), "{annotated}");
+	let configured: String = builder
+		.name_override("LConstructorNames;-><init>()V", "from_option")
+		.generate()?
+		.to_string();
+	assert!(configured.contains("fn from_option("), "{configured}");
+	assert!(!configured.contains("fn from_annotation("), "{configured}");
+	Ok(())
+}

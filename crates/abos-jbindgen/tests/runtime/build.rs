@@ -16,6 +16,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		"NativeMethodVisibility",
 		"WithNative",
 		"AccessorCollisions",
+		"MemberCollisions",
+		"MixedMethods",
 		"Identifiers",
 		"keywords/match",
 	];
@@ -49,6 +51,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.name_override("Lcom/example/SimpleClass;->getValue()I", "with-dash")
 		.generate()?
 		.write_to_file(output.join("overrides.rs"))?;
+	abos_jbindgen::Builder::new()
+		.input_class(classes.join("com/example/MemberCollisions.class"))
+		.root_path("crate::collision_overrides")
+		.name_override("Lcom/example/MemberCollisions;-><init>(I)V", "make")
+		.name_override("Lcom/example/MemberCollisions;-><init>(Ljava/lang/String;)V", "make")
+		.name_override("Lcom/example/MemberCollisions;->choose(I)I", "pick-name")
+		.name_override(
+			"Lcom/example/MemberCollisions;->choose(Ljava/lang/String;)I",
+			"pick_name",
+		)
+		.generate()?
+		.write_to_file(output.join("collision_overrides.rs"))?;
+	abos_jbindgen::Builder::new()
+		.input_class(classes.join("com/example/MixedMethods.class"))
+		.root_path("crate::native_collisions")
+		.generate()?
+		.write_to_file(output.join("native_collisions.rs"))?;
 	println!("cargo:rustc-env=FIXTURE_CLASSES={}", classes.display());
 	Ok(())
 }

@@ -232,7 +232,10 @@ impl Builder {
 		self
 	}
 
-	/// Override the Rust name for a method or field matching the given DEX signature.
+	/// Override the Rust name for a constructor, method, or field matching the given DEX signature.
+	///
+	/// Takes precedence over `@RustName`. Names are normalized to Rust identifiers and
+	/// gain trailing underscores when needed to avoid other constructors, methods, or field accessors.
 	pub fn name_override<S1: Into<String>, S2: Into<String>>(mut self, signature: S1, name: S2) -> Self {
 		self.name_overrides.insert(signature.into(), name.into());
 		self

@@ -7,7 +7,10 @@ pub mod signatures;
 
 use crate::{BindgenOptions, ClassInfo, ModuleBinding, Result, TypeMap};
 use names::derive_rust_type_name;
-use std::{collections::HashSet, fmt::Write as _};
+use std::{
+	collections::{HashMap, HashSet},
+	fmt::Write as _,
+};
 
 pub(super) struct Context<'a> {
 	pub class: &'a ClassInfo,
@@ -16,7 +19,8 @@ pub(super) struct Context<'a> {
 	pub used: HashSet<String>,
 	pub primitives: HashSet<String>,
 	pub body: String,
-	pub member_names: HashSet<(String, String)>,
+	// Rust callable name -> full Java member signature (plus accessor role for setters).
+	pub member_names: HashMap<String, String>,
 }
 
 pub fn generate_with_type_map(class: &ClassInfo, options: &BindgenOptions, types: &TypeMap) -> Result<ModuleBinding> {
@@ -35,7 +39,7 @@ pub fn generate_with_type_map(class: &ClassInfo, options: &BindgenOptions, types
 		used: HashSet::new(),
 		primitives: HashSet::new(),
 		body: String::new(),
-		member_names: HashSet::new(),
+		member_names: HashMap::new(),
 	};
 	members::constructors(&mut context)?;
 	members::fields(&mut context)?;
