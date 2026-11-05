@@ -10,10 +10,13 @@ task.output = "interleave"
 task.quiet = true
 
 [tasks.check]
-depends = ["fmt", "lint", "check:duplicates"]
+depends = ["fmt", "lint", "check:duplicates", "check:file-length"]
 
 [tasks."check:duplicates"]
 run = "jscpd --fail-on-empty --no-tips"
+
+[tasks."check:file-length"]
+run = "python scripts/check-file-length.py"
 
 [tasks."clone:javac"]
 run = "python scripts/clone-reference.py javac"
