@@ -26,6 +26,8 @@ README.md
 rustfmt.toml
 ```
 
+This project is using `mise` check `mise.toml` to learn about available tasks and tools.
+
 ## Upstream References
 
 Run `mise run clone:<repo>` to populate the Git-ignored `.references/` directory with pinned upstream source snapshots.
