@@ -1,3 +1,5 @@
+//! Compiler discovery and Cargo environment integration tests.
+
 use abos_javac::{Build, Error, JavaCompiler};
 use std::{
 	env,

@@ -1,3 +1,5 @@
+//! Java compilation and compiler configuration integration tests.
+
 use abos_javac::{Build, Error, JavaCompiler};
 use std::{ffi::OsString, fs, path::PathBuf, process::Command};
 use tempfile::TempDir;

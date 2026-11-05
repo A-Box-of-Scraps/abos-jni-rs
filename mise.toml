@@ -53,11 +53,16 @@ run = "mvn --batch-mode --no-transfer-progress -q spotless:apply"
 run = "mvn --batch-mode --no-transfer-progress -q spotless:check"
 
 [tasks.lint]
+depends = ["lint:docs"]
 env = { DYLINT_RUSTFLAGS = "-D warnings" }
 run = [
   "cargo clippy --workspace --all-targets --all-features -q -- -D warnings",
   "cargo dylint --all --workspace --fail-on-no-libraries -q -- --all-targets --all-features -q",
 ]
+
+[tasks."lint:docs"]
+env = { RUSTDOCFLAGS = "-D warnings" }
+run = "cargo doc --workspace --all-features --no-deps -q"
 
 [tasks."lint:fix"]
 run = "cargo clippy --fix --workspace --all-targets --all-features -q"

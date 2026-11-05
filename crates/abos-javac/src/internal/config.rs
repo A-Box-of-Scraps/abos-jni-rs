@@ -1,7 +1,9 @@
 use std::{ffi::OsString, path::PathBuf};
 
-// These independent javac switches are not mutually exclusive states.
-#[allow(clippy::struct_excessive_bools)]
+#[allow(
+	clippy::struct_excessive_bools,
+	reason = "These independent javac switches are not mutually exclusive states"
+)]
 #[derive(Debug, Clone)]
 pub struct Config {
 	pub files: Vec<PathBuf>,

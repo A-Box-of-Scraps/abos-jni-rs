@@ -12,6 +12,7 @@ rust-version = "1.99.1"
 libraries = [{ path = "lints/explicit_binding_types" }]
 
 [workspace.lints.rust]
+missing_docs = "warn"
 unsafe_code = "forbid"
 
 [workspace.lints.clippy]
@@ -25,3 +26,6 @@ too_many_arguments = "warn"
 dbg_macro = "warn"
 todo = "warn"
 unwrap_used = "warn"
+allow_attributes_without_reason = "warn"
+let_underscore_must_use = "warn"
+exit = "warn"
