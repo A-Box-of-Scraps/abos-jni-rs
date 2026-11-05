@@ -4,6 +4,7 @@ dprint = "0.64.3"
 "cargo:cargo-dylint" = "6.3.2"
 "cargo:dylint-link" = "6.3.2"
 python = "3.15.2"
+maven = "3.9.16"
 
 [settings]
 task.output = "interleave"
@@ -11,6 +12,9 @@ task.quiet = true
 
 [tasks.check]
 depends = ["fmt", "lint", "check:duplicates", "check:file-length"]
+
+[tasks."check:ci"]
+depends = ["fmt:check", "lint", "check:duplicates", "check:file-length"]
 
 [tasks."check:duplicates"]
 run = "jscpd --fail-on-empty --no-tips"
@@ -25,6 +29,7 @@ run = "python scripts/clone-reference.py javac"
 run = "python scripts/clone-reference.py jbindgen"
 
 [tasks.fmt]
+depends = ["fmt:java"]
 run = [
   "mise fmt -q",
   "cargo fmt --all -q",
@@ -33,12 +38,19 @@ run = [
 ]
 
 [tasks."fmt:check"]
+depends = ["fmt:java:check"]
 run = [
   "mise fmt --check -q",
   "cargo fmt --all --check -q",
   "cd lints/explicit_binding_types && cargo fmt --all --check -q",
   "dprint check --log-level warn",
 ]
+
+[tasks."fmt:java"]
+run = "mvn --batch-mode --no-transfer-progress -q spotless:apply"
+
+[tasks."fmt:java:check"]
+run = "mvn --batch-mode --no-transfer-progress -q spotless:check"
 
 [tasks.lint]
 env = { DYLINT_RUSTFLAGS = "-D warnings" }
