@@ -1,0 +1,122 @@
+use super::*;
+
+#[test]
+pub fn call_method_returning_null() {
+	attach_current_thread(|env| {
+		// Create an Exception with no message
+		let obj = unwrap(env.new_object(EXCEPTION_CLASS, jni_sig!("()V"), &[]), env).auto();
+		// Call Throwable#getMessage must return null
+		let message = unwrap(
+			env.call_method(&obj, jni_str!("getMessage"), jni_sig!("()Ljava/lang/String;"), &[]),
+			env,
+		);
+		let message_ref = unwrap(message.l(), env).auto();
+
+		assert!(message_ref.is_null());
+		Ok(())
+	})
+	.unwrap();
+}
+
+#[test]
+pub fn is_instance_of_same_class() {
+	attach_current_thread(|env| {
+		let obj = unwrap(env.new_object(EXCEPTION_CLASS, jni_sig!("()V"), &[]), env).auto();
+		assert!(unwrap(env.is_instance_of(&obj, EXCEPTION_CLASS), env));
+
+		Ok(())
+	})
+	.unwrap();
+}
+
+#[test]
+pub fn is_instance_of_superclass() {
+	attach_current_thread(|env| {
+		let obj = unwrap(env.new_object(ARITHMETIC_EXCEPTION_CLASS, jni_sig!("()V"), &[]), env).auto();
+		assert!(unwrap(env.is_instance_of(&obj, EXCEPTION_CLASS), env));
+
+		Ok(())
+	})
+	.unwrap();
+}
+
+#[test]
+pub fn is_instance_of_subclass() {
+	attach_current_thread(|env| {
+		let obj = unwrap(env.new_object(EXCEPTION_CLASS, jni_sig!("()V"), &[]), env).auto();
+		assert!(!unwrap(env.is_instance_of(&obj, ARITHMETIC_EXCEPTION_CLASS), env,));
+
+		Ok(())
+	})
+	.unwrap();
+}
+
+#[test]
+pub fn is_instance_of_not_superclass() {
+	attach_current_thread(|env| {
+		let obj = unwrap(env.new_object(ARITHMETIC_EXCEPTION_CLASS, jni_sig!("()V"), &[]), env).auto();
+		assert!(!unwrap(env.is_instance_of(&obj, ARRAYLIST_CLASS), env));
+
+		Ok(())
+	})
+	.unwrap();
+}
+
+#[test]
+pub fn is_instance_of_null() {
+	attach_current_thread(|env| {
+		let obj = JObject::null();
+		assert!(unwrap(env.is_instance_of(&obj, ARRAYLIST_CLASS), env));
+		assert!(unwrap(env.is_instance_of(&obj, EXCEPTION_CLASS), env));
+		assert!(unwrap(env.is_instance_of(&obj, ARITHMETIC_EXCEPTION_CLASS), env,));
+
+		Ok(())
+	})
+	.unwrap();
+}
+
+#[test]
+pub fn is_same_object_diff_references() {
+	attach_current_thread(|env| {
+		let string = JString::from_jni_str(env, TESTING_OBJECT_STR).unwrap();
+		let ref_from_string = unwrap(env.new_local_ref(&string), env);
+		assert!(env.is_same_object(&string, &ref_from_string).unwrap());
+		env.delete_local_ref(ref_from_string);
+
+		Ok(())
+	})
+	.unwrap();
+}
+
+#[test]
+pub fn is_same_object_same_reference() {
+	attach_current_thread(|env| {
+		let string = JString::from_jni_str(env, TESTING_OBJECT_STR).unwrap();
+		assert!(env.is_same_object(&string, &string).unwrap());
+
+		Ok(())
+	})
+	.unwrap();
+}
+
+#[test]
+pub fn is_not_same_object() {
+	attach_current_thread(|env| {
+		let string = JString::from_jni_str(env, TESTING_OBJECT_STR).unwrap();
+		let same_src_str = JString::from_jni_str(env, TESTING_OBJECT_STR).unwrap();
+		assert!(!env.is_same_object(&string, &same_src_str).unwrap());
+
+		Ok(())
+	})
+	.unwrap();
+}
+
+#[test]
+pub fn is_not_same_object_null() {
+	attach_current_thread(|env| {
+		assert!(env.is_same_object(JObject::null(), JObject::null()).unwrap());
+
+		Ok(())
+	})
+	.unwrap();
+}

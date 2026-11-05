@@ -1,0 +1,12 @@
+error[E0624]: method `private_field` is private
+  --> tests/ui/bind_java_type/fail/visibility_private_field.rs:17:31
+   |
+ 6 | /     bind_java_type! {
+ 7 | |         pub TestClass => "com.example.TestClass",
+ 8 | |         fields {
+...  |
+12 | |     }
+   | |_____- private method defined here
+...
+17 |       let _ = inner::TestClass::private_field;
+   |                                 ^^^^^^^^^^^^^ private method

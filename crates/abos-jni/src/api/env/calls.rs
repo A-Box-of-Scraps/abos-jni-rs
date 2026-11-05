@@ -1,0 +1,279 @@
+use super::*;
+
+impl<'local> Env<'local> {
+	/// Calls an object method safely. This comes with a number of lookups/checks. It
+	///
+	/// * Looks up the [JClass] for the given object.
+	/// * Looks up the [JMethodID] for the object's class/name/signature combination
+	/// * Ensures that the number/types of args matches the signature
+	/// * Calls [`Self::call_method_unchecked`] with the verified safe arguments.
+	///
+	/// Note: this may cause a Java exception if the arguments are the wrong type, in addition to if the method itself
+	/// throws.
+	///
+	/// # Example
+	///
+	/// ```rust,no_run
+	/// # use abos_jni::{jni_sig, jni_str, errors::Result, Env, objects::JObject, JValue};
+	/// # fn example<'local>(env: &mut Env<'local>, obj: &JObject<'local>) -> Result<()> {
+	/// // Call a method with signature: String concat(String str)
+	/// let arg = env.new_string("world")?;
+	/// let result = env.call_method(
+	///     obj,
+	///     jni_str!("concat"),
+	///     jni_sig!((str: JString) -> JString),
+	///     &[JValue::Object(&arg)],
+	/// )?;
+	/// # Ok(())
+	/// # }
+	/// ```
+	/// Note: a traditional, raw JNI signature like `"(Ljava/lang/String;)Ljava/lang/String;"` can also be used with
+	/// [`jni_sig!`] but this demonstrates the more ergonomic syntax that the macro allows. See the [`jni_sig!`] macro
+	/// documentation for more details and examples.
+	pub fn call_method<'other_local, 'sig, 'sig_args, O, N, S>(
+		&mut self,
+		obj: O,
+		name: N,
+		sig: S,
+		args: &[JValue],
+	) -> Result<JValueOwned<'local>>
+	where
+		O: AsRef<JObject<'other_local>>,
+		N: AsRef<JNIStr>,
+		S: AsRef<MethodSignature<'sig, 'sig_args>>,
+	{
+		// Runtime check that the 'local reference lifetime will be tied to
+		// Env lifetime for the top JNI stack frame
+		self.assert_top();
+		let obj = obj.as_ref();
+		let obj = null_check!(obj, "call_method obj argument")?;
+		let sig = sig.as_ref();
+
+		if sig.args().len() != args.len() {
+			return Err(Error::InvalidArgList(sig.into()));
+		}
+
+		// check arguments types
+		let base_types_match = sig.args().iter().zip(args.iter()).all(|(exp, act)| match exp {
+			JavaType::Primitive(p) => act.primitive_type() == Some(*p),
+			JavaType::Object | JavaType::Array => act.primitive_type().is_none(),
+		});
+		if !base_types_match {
+			return Err(Error::InvalidArgList(sig.into()));
+		}
+
+		let class = self.get_object_class(obj)?.auto();
+
+		let args: Vec<jvalue> = args.iter().map(|v| v.as_jni()).collect();
+
+		// SAFETY: We've ensured that the Desc trait will be used to dynamically look up a valid
+		// method ID for the object's class, method name, and signature (or else it will return an
+		// Err). We've also validated the argument counts and types using the same type signature we
+		// fetched the original method ID from.
+		unsafe { self.call_method_unchecked(obj, (&class, name, sig), sig.ret(), &args) }
+	}
+
+	/// Calls a static method safely. This comes with a number of
+	/// lookups/checks. It
+	///
+	/// * Looks up the [JMethodID] for the class/name/signature combination
+	/// * Ensures that the number/types of args matches the signature
+	///   * Cannot check an object's type - but primitive types are matched against each other (including Object)
+	/// * Calls [`Self::call_static_method_unchecked`] with the verified safe arguments.
+	///
+	/// Note: this may cause a Java exception if the arguments are the wrong
+	/// type, in addition to if the method itself throws.
+	pub fn call_static_method<'other_local, 'sig, 'sig_args, C, N, S>(
+		&mut self,
+		class: C,
+		name: N,
+		sig: S,
+		args: &[JValue],
+	) -> Result<JValueOwned<'local>>
+	where
+		C: Desc<'local, JClass<'other_local>>,
+		N: AsRef<JNIStr>,
+		S: AsRef<MethodSignature<'sig, 'sig_args>>,
+	{
+		// Runtime check that the 'local reference lifetime will be tied to
+		// Env lifetime for the top JNI stack frame
+		self.assert_top();
+		let sig = sig.as_ref();
+		if sig.args().len() != args.len() {
+			return Err(Error::InvalidArgList(sig.into()));
+		}
+
+		// check arguments types
+		let base_types_match = sig.args().iter().zip(args.iter()).all(|(exp, act)| match exp {
+			JavaType::Primitive(p) => act.primitive_type() == Some(*p),
+			JavaType::Object | JavaType::Array => act.primitive_type().is_none(),
+		});
+		if !base_types_match {
+			return Err(Error::InvalidArgList(sig.into()));
+		}
+
+		// go ahead and look up the class since we'll need that for the next call.
+		let class = class.lookup(self)?;
+		let class = class.as_ref();
+
+		let args: Vec<jvalue> = args.iter().map(|v| v.as_jni()).collect();
+
+		// SAFETY: We've obtained the method_id above, so it is valid for this class.
+		// We've also validated the argument counts and types using the same type signature
+		// we fetched the original method ID from.
+		unsafe { self.call_static_method_unchecked(class, (class, name, sig), sig.ret(), &args) }
+	}
+
+	/// Calls a non-virtual method safely. This comes with a number of
+	/// lookups/checks. It
+	///
+	/// * Looks up the [JMethodID] for the class/name/signature combination
+	/// * Ensures that the number/types of args matches the signature
+	///   * Cannot check an object's type - but primitive types are matched against each other (including Object)
+	/// * Calls [`Self::call_nonvirtual_method_unchecked`] with the verified safe arguments.
+	///
+	/// Note: this may cause a Java exception if the arguments are the wrong
+	/// type, in addition to if the method itself throws.
+	pub fn call_nonvirtual_method<'other_local, 'sig, 'sig_args, O, C, N, S>(
+		&mut self,
+		obj: O,
+		class: C,
+		name: N,
+		sig: S,
+		args: &[JValue],
+	) -> Result<JValueOwned<'local>>
+	where
+		O: AsRef<JObject<'other_local>>,
+		C: Desc<'local, JClass<'other_local>>,
+		N: AsRef<JNIStr>,
+		S: AsRef<MethodSignature<'sig, 'sig_args>>,
+	{
+		// Runtime check that the 'local reference lifetime will be tied to
+		// Env lifetime for the top JNI stack frame
+		self.assert_top();
+		let obj = obj.as_ref();
+		let obj = null_check!(obj, "call_method obj argument")?;
+		let sig = sig.as_ref();
+		if sig.args().len() != args.len() {
+			return Err(Error::InvalidArgList(sig.into()));
+		}
+
+		// check arguments types
+		let base_types_match = sig.args().iter().zip(args.iter()).all(|(exp, act)| match exp {
+			JavaType::Primitive(p) => act.primitive_type() == Some(*p),
+			JavaType::Object | JavaType::Array => act.primitive_type().is_none(),
+		});
+		if !base_types_match {
+			return Err(Error::InvalidArgList(sig.into()));
+		}
+
+		// go ahead and look up the class since we'll need that for the next call.
+		let class = class.lookup(self)?;
+		let class = class.as_ref();
+
+		let args: Vec<jvalue> = args.iter().map(|v| v.as_jni()).collect();
+
+		// SAFETY: We've obtained the method_id above, so it is valid for this class.
+		// We've also validated the argument counts and types using the same type signature
+		// we fetched the original method ID from.
+		unsafe { self.call_nonvirtual_method_unchecked(obj, class, (class, name, sig), sig.ret(), &args) }
+	}
+
+	/// Create a new object using a constructor. This is done safely using
+	/// checks similar to those in `call_static_method`.
+	pub fn new_object<'other_local, 'sig, 'sig_args, C, S>(
+		&mut self,
+		class: C,
+		ctor_sig: S,
+		ctor_args: &[JValue],
+	) -> Result<JObject<'local>>
+	where
+		C: Desc<'local, JClass<'other_local>>,
+		S: AsRef<MethodSignature<'sig, 'sig_args>>,
+	{
+		// Runtime check that the 'local reference lifetime will be tied to
+		// Env lifetime for the top JNI stack frame
+		self.assert_top();
+		let ctor_sig = ctor_sig.as_ref();
+
+		// check arguments length
+		if ctor_sig.args().len() != ctor_args.len() {
+			return Err(Error::InvalidArgList(ctor_sig.into()));
+		}
+
+		// check arguments types
+		let base_types_match = ctor_sig
+			.args()
+			.iter()
+			.zip(ctor_args.iter())
+			.all(|(exp, act)| match exp {
+				JavaType::Primitive(p) => act.primitive_type() == Some(*p),
+				JavaType::Object | JavaType::Array => act.primitive_type().is_none(),
+			});
+		if !base_types_match {
+			return Err(Error::InvalidArgList(ctor_sig.into()));
+		}
+
+		// check return value
+		if ctor_sig.ret() != ReturnType::Primitive(Primitive::Void) {
+			return Err(Error::InvalidCtorReturn);
+		}
+
+		// build strings
+		let class = class.lookup(self)?;
+		let class = class.as_ref();
+
+		let method_id: JMethodID = Desc::<JMethodID>::lookup((class, ctor_sig), self)?;
+
+		let ctor_args: Vec<jvalue> = ctor_args.iter().map(|v| v.as_jni()).collect();
+		// SAFETY: We've obtained the method_id above, so it is valid for this class.
+		// We've also validated the argument counts and types using the same type signature
+		// we fetched the original method ID from.
+		unsafe { self.new_object_unchecked(class, method_id, &ctor_args) }
+	}
+
+	/// Create a new object using a constructor. Arguments aren't checked
+	/// because of the `JMethodID` usage.
+	///
+	/// # Safety
+	///
+	/// The provided JMethodID must be valid, and match the types and number of arguments, as well as return type
+	/// (always an Object for a constructor). If these are incorrect, the JVM may crash.  The JMethodID must also match
+	/// the passed type.
+	pub unsafe fn new_object_unchecked<'other_local, C, M>(
+		&mut self,
+		class: C,
+		ctor_id: M,
+		ctor_args: &[jvalue],
+	) -> Result<JObject<'local>>
+	where
+		C: Desc<'local, JClass<'other_local>>,
+		M: Desc<'local, JMethodID>,
+	{
+		// Runtime check that the 'local reference lifetime will be tied to
+		// Env lifetime for the top JNI stack frame
+		self.assert_top();
+		let class = class.lookup(self)?;
+
+		let ctor_id: JMethodID = *ctor_id.lookup(self)?.as_ref();
+
+		let jni_args = ctor_args.as_ptr();
+
+		let obj = unsafe {
+			jni_call_post_check_ex_and_null_ret!(
+				self,
+				v1_1,
+				NewObjectA,
+				class.as_ref().as_raw(),
+				ctor_id.into_raw(),
+				jni_args
+			)
+			.map(|obj| JObject::from_raw(self, obj))
+		}?;
+
+		// Ensure that `class` isn't dropped before the JNI call returns.
+		drop(class);
+
+		Ok(obj)
+	}
+}

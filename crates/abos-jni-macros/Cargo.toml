@@ -1,0 +1,28 @@
+[package]
+name = "abos-jni-macros"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Procedural macros for abos-jni."
+
+[lints]
+workspace = true
+
+[lib]
+proc-macro = true
+doctest = false
+
+[build-dependencies]
+rustc_version.workspace = true
+
+[dependencies]
+proc-macro2.workspace = true
+quote.workspace = true
+simd_cesu8.workspace = true
+syn.workspace = true
+
+[dev-dependencies]
+rusty-fork.workspace = true
+thiserror.workspace = true
+trybuild.workspace = true

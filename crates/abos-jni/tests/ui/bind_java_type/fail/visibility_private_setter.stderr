@@ -1,0 +1,12 @@
+error[E0624]: method `set_mixed` is private
+  --> tests/ui/bind_java_type/fail/visibility_private_setter.rs:21:31
+   |
+ 6 | /     bind_java_type! {
+ 7 | |         pub TestClass => "com.example.TestClass",
+ 8 | |         fields {
+...  |
+16 | |     }
+   | |_____- private method defined here
+...
+21 |       let _ = inner::TestClass::set_mixed;
+   |                                 ^^^^^^^^^ private method

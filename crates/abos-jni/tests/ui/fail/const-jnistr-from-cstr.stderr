@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: called `Option::unwrap()` on a `None` value
+ --> tests/ui/fail/const-jnistr-from-cstr.rs:4:41
+  |
+4 |     const INVALID_MUTF8_CSTR: &JNIStr = JNIStr::from_cstr(c"invalid mutf8: 🦀").unwrap();
+  |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `main::INVALID_MUTF8_CSTR` failed here
