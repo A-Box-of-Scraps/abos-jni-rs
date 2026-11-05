@@ -3,6 +3,7 @@ dprint = "0.64.3"
 "cargo:jscpd" = "5.4.2"
 "cargo:cargo-dylint" = "6.3.2"
 "cargo:dylint-link" = "6.3.2"
+python = "3.15.2"
 
 [settings]
 task.output = "interleave"
@@ -13,6 +14,12 @@ depends = ["fmt", "lint", "check:duplicates"]
 
 [tasks."check:duplicates"]
 run = "jscpd --fail-on-empty --no-tips"
+
+[tasks."clone:javac"]
+run = "python scripts/clone-reference.py javac"
+
+[tasks."clone:jbindgen"]
+run = "python scripts/clone-reference.py jbindgen"
 
 [tasks.fmt]
 run = [
@@ -41,7 +48,7 @@ run = [
 run = "cargo clippy --fix --workspace --all-targets --all-features -q"
 
 [tasks.test]
-depends = ["test:abos-javac", "test:lints"]
+depends = ["test:abos-javac", "test:lints", "test:scripts"]
 
 [tasks."test:abos-javac"]
 run = "cargo test --package abos-javac --all-features -q"
@@ -49,3 +56,6 @@ run = "cargo test --package abos-javac --all-features -q"
 [tasks."test:lints"]
 dir = "lints/explicit_binding_types"
 run = "cargo test -q"
+
+[tasks."test:scripts"]
+run = "python -B -m unittest discover --start-directory scripts/tests --quiet"

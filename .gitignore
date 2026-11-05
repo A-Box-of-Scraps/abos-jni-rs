@@ -11,3 +11,9 @@ target/
 
 # macOS
 .DS_Store
+
+# Upstream source references
+/.references/
+
+# Python
+__pycache__/
