@@ -1,0 +1,14 @@
+[package]
+name = "abos-jbindgen-runtime-test"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+jni = { version = "=0.22.4", features = ["invocation"] }
+
+[build-dependencies]
+abos-jbindgen = { path = "../.." }
+abos-javac = { path = "../../../abos-javac" }

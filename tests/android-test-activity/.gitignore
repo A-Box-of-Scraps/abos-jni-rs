@@ -1,0 +1,15 @@
+/target
+
+.gradle
+local.properties
+
+*.iml
+/.idea
+/build
+/captures
+.externalNativeBuild
+.cxx
+*.so
+
+test_activity_screenshot.png
+app/src/main/jniLibs/

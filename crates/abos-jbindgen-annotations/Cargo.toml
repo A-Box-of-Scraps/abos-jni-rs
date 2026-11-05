@@ -1,0 +1,14 @@
+[package]
+name = "abos-jbindgen-annotations"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Embedded Java annotations for abos-jbindgen."
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+abos-javac = { path = "../abos-javac", version = "0.1.0" }
+tempfile = "3"

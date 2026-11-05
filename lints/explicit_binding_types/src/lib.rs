@@ -21,6 +21,8 @@ impl<'tcx> LateLintPass<'tcx> for ExplicitBindingTypes {
 	fn check_local(&mut self, cx: &LateContext<'tcx>, local: &'tcx LetStmt<'tcx>) {
 		if !matches!(local.source, LocalSource::Normal)
 			|| local.span.from_expansion()
+			// Derive macros can give generated locals the span of an original field.
+			|| cx.tcx.def_span(local.hir_id.owner.def_id).from_expansion()
 			|| !matches!(local.pat.kind, PatKind::Binding(..))
 			|| local.ty.is_some_and(explicit_type)
 		{

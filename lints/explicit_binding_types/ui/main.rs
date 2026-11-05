@@ -67,3 +67,9 @@ fn main() {
 	let pair = (get_player(), true);
 	let copied = player;
 }
+
+// A macro-generated owner can contain statements carrying caller-provided spans.
+macro_rules! generated_owner {
+    ($body:block) => { fn generated_owner() $body };
+}
+generated_owner!({ let player = get_player(); });

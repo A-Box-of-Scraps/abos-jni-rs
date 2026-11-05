@@ -23,6 +23,8 @@
                              Upstream references and build output are outside this scope. -->
                         <includes>
                             <include>crates/*/tests/java/**/*.java</include>
+                            <include>crates/*/java/**/*.java</include>
+                            <include>tests/android-test-activity/app/src/**/*.java</include>
                         </includes>
                         <palantirJavaFormat>
                             <version>2.103.0</version>

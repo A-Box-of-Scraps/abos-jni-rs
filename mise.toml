@@ -33,6 +33,8 @@ depends = ["fmt:java"]
 run = [
   "mise fmt -q",
   "cargo fmt --all -q",
+  "cargo fmt --manifest-path crates/abos-jbindgen/tests/runtime/Cargo.toml -q",
+  "cargo fmt --manifest-path tests/android-test-activity/Cargo.toml -q",
   "cd lints/explicit_binding_types && cargo fmt --all -q",
   "dprint fmt --log-level warn",
 ]
@@ -42,6 +44,8 @@ depends = ["fmt:java:check"]
 run = [
   "mise fmt --check -q",
   "cargo fmt --all --check -q",
+  "cargo fmt --manifest-path crates/abos-jbindgen/tests/runtime/Cargo.toml --check -q",
+  "cargo fmt --manifest-path tests/android-test-activity/Cargo.toml --check -q",
   "cd lints/explicit_binding_types && cargo fmt --all --check -q",
   "dprint check --log-level warn",
 ]
@@ -68,7 +72,14 @@ run = "cargo doc --workspace --all-features --no-deps -q"
 run = "cargo clippy --fix --workspace --all-targets --all-features -q"
 
 [tasks.test]
-depends = ["test:abos-javac", "test:lints", "test:scripts"]
+depends = [
+  "test:abos-javac",
+  "test:abos-jbindgen",
+  "test:abos-jbindgen-annotations",
+  "test:android-runner",
+  "test:lints",
+  "test:scripts",
+]
 
 [tasks."test:abos-javac"]
 run = "cargo test --package abos-javac --all-features -q"
@@ -79,3 +90,15 @@ run = "cargo test -q"
 
 [tasks."test:scripts"]
 run = "python -B -m unittest discover --start-directory scripts/tests --quiet"
+
+[tasks."test:abos-jbindgen"]
+run = "cargo test --package abos-jbindgen --all-features -q"
+
+[tasks."test:abos-jbindgen-annotations"]
+run = "cargo test --package abos-jbindgen-annotations -q"
+
+[tasks."test:android"]
+run = "python tests/android-test-activity/tests/run.py"
+
+[tasks."test:android-runner"]
+run = "python -B -m unittest discover --start-directory tests/android-test-activity/tests --pattern 'test_*.py' --quiet"
