@@ -8,6 +8,13 @@
 //! The current `jni::bind_java_type!` macro cannot represent certain Java member
 //! names, such as names containing `$`. Generation rejects these with an error;
 //! use [`Builder::skip_signature`] to explicitly omit unsupported members.
+//!
+//! Bytecode JAR inputs use a base-only policy: module/package metadata and all
+//! `META-INF/` entries (including multi-release variants) are excluded before
+//! parsing or pattern matching. Remaining classes are processed in archive-name
+//! order, independently of ZIP entry order and the host JVM. Version-only classes
+//! and members are not generated; target-release selection is not currently supported.
+//! The JVM still selects its runtime variant, which must retain the generated base members.
 mod api;
 mod internal;
 

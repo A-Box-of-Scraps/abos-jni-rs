@@ -109,21 +109,62 @@ pub fn visit_jar_classes(
 	mut visitor: impl FnMut(&str, &[u8]) -> Result<()>,
 ) -> Result<()> {
 	let mut archive: zip::ZipArchive<fs::File> = zip::ZipArchive::new(fs::File::open(path)?)?;
-	for index in 0..archive.len() {
-		let mut file: zip::read::ZipFile<'_, fs::File> = archive.by_index(index)?;
-		let name: String = file.name().to_owned();
-		if Path::new(&name)
-			.extension()
-			.is_none_or(|extension| extension != "class")
-		{
-			continue;
-		}
-		if !patterns.is_empty() && !matches_any_pattern(&name, patterns) {
-			continue;
-		}
+	// Select from the central-directory names before reading class data. Metadata and
+	// versioned entries are never parsed, and host JVM versions do not affect selection.
+	let mut names: Vec<String> = archive
+		.file_names()
+		.filter(|name| is_binding_class_entry(name) && (patterns.is_empty() || matches_any_pattern(name, patterns)))
+		.map(str::to_owned)
+		.collect();
+	names.sort();
+	for name in names {
+		let mut file: zip::read::ZipFile<'_, fs::File> = archive.by_name(&name)?;
 		let mut bytes: Vec<u8> = Vec::new();
 		file.read_to_end(&mut bytes)?;
 		visitor(&name, &bytes)?;
 	}
 	Ok(())
+}
+
+#[expect(
+	clippy::case_sensitive_file_extension_comparisons,
+	reason = "JAR class entry names are case-sensitive and use forward slashes on every host."
+)]
+fn is_binding_class_entry(name: &str) -> bool {
+	// JAR paths use '/', independently of the host operating system.
+	name.ends_with(".class")
+		&& !name.starts_with("META-INF/")
+		&& !matches!(
+			name.rsplit('/').next(),
+			Some("module-info.class" | "package-info.class")
+		)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::is_binding_class_entry;
+
+	#[test]
+	fn distinguishes_metadata_from_bindable_class_entries() {
+		for name in [
+			"Example.class",
+			"sample/Example.class",
+			"sample/Outer$Inner.class",
+			"sample/module-info/Example.class",
+		] {
+			assert!(is_binding_class_entry(name), "{name}");
+		}
+		for name in [
+			"module-info.class",
+			"package-info.class",
+			"sample/package-info.class",
+			"META-INF/versions/17/sample/Example.class",
+			"META-INF/Example.class",
+			"sample/Example.java",
+			"sample/Example.CLASS",
+			"sample/Example.class/",
+		] {
+			assert!(!is_binding_class_entry(name), "{name}");
+		}
+	}
 }

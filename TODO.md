@@ -9,9 +9,9 @@
       [JNI-MACROS-001](docs/ISSUES.md#jni-macros-001-explicit-java-member-names-can-panic-during-macro-expansion).
 - [x] **3. Share constructor and member name allocation.** Reserve constructor names alongside methods and field
       accessors. Use full member signatures to distinguish overloads and test constructor/method collisions.
-- [ ] **4. Handle JAR metadata and multi-release entries.** Exclude metadata classes such as `module-info` and define a
-      deterministic policy for selecting one class version before generating bindings. Compile modular and multi-release
-      fixtures.
+- [x] **4. Handle JAR metadata and multi-release entries.** Exclude module/package metadata and all `META-INF/` entries.
+      Generate base-class bindings in archive-name order, independent of the host JVM and ZIP entry order. Compile and
+      execute modular and multi-release fixtures; version-only APIs are intentionally not selected.
 - [ ] **5. Reject incomplete Android generation by default.** Propagate parsing and generation failures rather than
       silently dropping classes. If partial output is supported, require an explicit option and return structured
       diagnostics.

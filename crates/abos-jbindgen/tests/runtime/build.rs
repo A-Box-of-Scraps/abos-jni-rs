@@ -1,5 +1,10 @@
 //! Compile fixture Java and generate Rust bindings for execution tests.
-use std::{env, path::PathBuf};
+#[path = "../support/jars.rs"]
+mod jar_fixtures;
+use std::{
+	env,
+	path::{Path, PathBuf},
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let output = PathBuf::from(env::var_os("OUT_DIR").ok_or("OUT_DIR missing")?);
@@ -68,6 +73,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.root_path("crate::native_collisions")
 		.generate()?
 		.write_to_file(output.join("native_collisions.rs"))?;
-	println!("cargo:rustc-env=FIXTURE_CLASSES={}", classes.display());
+	archive_bindings(&output)?;
+	Ok(())
+}
+
+fn archive_bindings(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
+	let sources = Path::new("../java/archives");
+	println!("cargo:rerun-if-changed={}", sources.display());
+	let jars = jar_fixtures::create(sources, &output.join("jars"))?;
+	for (name, path) in [
+		("modular_jar", &jars.modular),
+		("multi_release_jar", &jars.multi_release),
+		("reversed_jar", &jars.reversed),
+	] {
+		abos_jbindgen::Builder::new()
+			.input_jar(path)
+			.root_path(format!("crate::{name}"))
+			.generate()?
+			.write_to_file(output.join(format!("{name}.rs")))?;
+	}
+	let classpath = env::join_paths([output.join("classes"), jars.modular, jars.multi_release])?;
+	println!(
+		"cargo:rustc-env=FIXTURE_CLASSES={}",
+		classpath.to_str().ok_or("non-UTF-8 fixture classpath")?
+	);
 	Ok(())
 }

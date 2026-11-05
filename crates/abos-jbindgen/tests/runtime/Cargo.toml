@@ -12,3 +12,4 @@ jni = { version = "=0.22.4", features = ["invocation"] }
 [build-dependencies]
 abos-jbindgen = { path = "../.." }
 abos-javac = { path = "../../../abos-javac" }
+zip = { version = "7", default-features = false, features = ["deflate"] }

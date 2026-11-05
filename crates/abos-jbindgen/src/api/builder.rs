@@ -90,6 +90,12 @@ impl Builder {
 	}
 
 	/// Set the input to a JAR file.
+	///
+	/// Generates bindings from base class entries, in archive-name order. Ignores
+	/// `module-info.class`, `package-info.class`, and everything under `META-INF/`,
+	/// including multi-release variants. Selection never depends on the host JVM.
+	/// Version-only classes and members are not included, even with explicit patterns.
+	/// The JVM still chooses its runtime variant, which must retain the generated base members.
 	pub fn input_jar<P: AsRef<Path>>(mut self, path: P) -> Self {
 		self.input = Some(InputSource::JarFile {
 			path: path.as_ref().to_path_buf(),

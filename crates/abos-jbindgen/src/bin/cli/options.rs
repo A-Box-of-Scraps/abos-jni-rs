@@ -10,7 +10,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-	/// Generate bindings from a class file or JAR.
+	/// Generate bindings from a class file or base JAR classes, excluding metadata and multi-release variants.
 	Classfile {
 		input: PathBuf,
 		#[command(flatten)]

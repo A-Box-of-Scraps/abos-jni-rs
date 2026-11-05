@@ -41,6 +41,7 @@ dependencies = [
  "abos-javac",
  "abos-jbindgen",
  "jni",
+ "zip",
 ]
 
 [[package]]
