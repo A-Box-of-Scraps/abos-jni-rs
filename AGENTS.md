@@ -13,6 +13,7 @@ crates/
 licenses/
 lints/
 scripts/
+tests/
 .gitattributes
 .gitignore
 .jscpd.json
@@ -23,6 +24,7 @@ clippy.toml
 dprint.json
 LICENSE
 mise.toml
+pom.xml
 README.md
 rustfmt.toml
 THIRD_PARTY_NOTICES
