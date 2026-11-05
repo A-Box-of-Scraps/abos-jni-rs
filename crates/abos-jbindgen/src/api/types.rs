@@ -1,6 +1,6 @@
 //! Shared intermediate representation types for Java class parsing
 //!
-//! These types are used by both the cafebabe (bytecode) parser and the
+//! These types are used by both the class-file metadata parser and the
 //! Java source parser to represent parsed Java API information.
 
 /// Intermediate representation of a Java class for binding generation

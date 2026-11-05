@@ -1,5 +1,5 @@
 use crate::{ArgInfo, ClassInfo, Error, FieldInfo, InstanceOfInfo, MethodInfo, MethodSignature, Result, TypeInfo};
-use cafebabe::{ClassFile, FieldAccessFlags, MethodAccessFlags};
+use abos_cafebabe::{AccessFlags, ClassFile};
 
 fn type_prefix(descriptor: &str, allow_void: bool) -> Result<(TypeInfo, &str)> {
 	let dimensions: usize = descriptor.bytes().take_while(|byte| *byte == b'[').count();
@@ -66,8 +66,9 @@ pub fn parse_method_descriptor(descriptor: &str) -> Result<(Vec<ArgInfo>, TypeIn
 	Ok((arguments, return_type))
 }
 
-pub fn parse_class(class: &ClassFile<'_>) -> Result<ClassInfo> {
-	let name: String = class.this_class.to_string();
+pub fn parse_class(bytes: &[u8]) -> Result<ClassInfo> {
+	let class: ClassFile = abos_cafebabe::parse_class(bytes)?;
+	let name: String = class.this_class.clone();
 	let (package, simple) = name.rsplit_once('/').unwrap_or(("", &name));
 	let mut info = ClassInfo {
 		class_name: name.clone(),
@@ -87,36 +88,36 @@ pub fn parse_class(class: &ClassFile<'_>) -> Result<ClassInfo> {
 		instance_of: Vec::new(),
 	};
 	for field in &class.fields {
-		if field.access_flags.contains(FieldAccessFlags::PRIVATE) {
+		if field.access_flags.contains(AccessFlags::PRIVATE) {
 			continue;
 		}
 		info.fields.push(FieldInfo {
-			name: field.name.to_string(),
+			name: field.name.clone(),
 			documentation: None,
 			rust_name_override: None,
-			type_info: parse_type_descriptor(&field.descriptor.to_string())?,
-			is_static: field.access_flags.contains(FieldAccessFlags::STATIC),
-			is_final: field.access_flags.contains(FieldAccessFlags::FINAL),
+			type_info: parse_type_descriptor(&field.descriptor)?,
+			is_static: field.access_flags.contains(AccessFlags::STATIC),
+			is_final: field.access_flags.contains(AccessFlags::FINAL),
 			is_deprecated: false,
 		});
 	}
 	for method in &class.methods {
-		let name: String = method.name.to_string();
-		let native: bool = method.access_flags.contains(MethodAccessFlags::NATIVE);
-		if name == "<clinit>" || (!native && method.access_flags.contains(MethodAccessFlags::PRIVATE)) {
+		let name: String = method.name.clone();
+		let native: bool = method.access_flags.contains(AccessFlags::NATIVE);
+		if name == "<clinit>" || (!native && method.access_flags.contains(AccessFlags::PRIVATE)) {
 			continue;
 		}
-		let (arguments, return_type) = parse_method_descriptor(&method.descriptor.to_string())?;
+		let (arguments, return_type) = parse_method_descriptor(&method.descriptor)?;
 		let method_info = MethodInfo {
 			is_constructor: name == "<init>",
 			name,
 			documentation: None,
 			rust_name_override: None,
 			signature: MethodSignature { arguments, return_type },
-			is_static: method.access_flags.contains(MethodAccessFlags::STATIC),
+			is_static: method.access_flags.contains(AccessFlags::STATIC),
 			is_native: native,
 			is_deprecated: false,
-			is_public: method.access_flags.contains(MethodAccessFlags::PUBLIC),
+			is_public: method.access_flags.contains(AccessFlags::PUBLIC),
 		};
 		if native {
 			info.native_methods.push(method_info);

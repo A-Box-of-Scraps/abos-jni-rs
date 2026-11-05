@@ -12,7 +12,7 @@ pub enum Error {
 	#[error("IO error: {0}")]
 	Io(#[from] io::Error),
 
-	/// Error parsing class file with cafebabe
+	/// Error parsing class file with abos-cafebabe
 	#[error("Failed to parse class file: {0}")]
 	ParseClass(String),
 
@@ -37,9 +37,9 @@ pub enum Error {
 	CodeGen(String),
 }
 
-impl From<cafebabe::ParseError> for Error {
+impl From<abos_cafebabe::ParseError> for Error {
 	/// Preserve the bytecode parser diagnostic.
-	fn from(err: cafebabe::ParseError) -> Self {
+	fn from(err: abos_cafebabe::ParseError) -> Self {
 		Self::ParseClass(err.to_string())
 	}
 }

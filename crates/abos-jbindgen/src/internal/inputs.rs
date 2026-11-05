@@ -1,4 +1,4 @@
-use crate::internal::{bytecode as cafebabe_parser, generator, java_parser};
+use crate::internal::{bytecode, generator, java_parser};
 use crate::{BindgenOptions, Error, ModuleBinding, Result};
 use std::{
 	fs,
@@ -36,8 +36,7 @@ pub fn generate_bindings_from_bytes(
 	options: &BindgenOptions,
 	extra_type_map: Vec<(String, String)>,
 ) -> Result<ModuleBinding> {
-	let class: cafebabe::ClassFile<'_> = cafebabe::parse_class(bytes)?;
-	let class_info: crate::ClassInfo = cafebabe_parser::parse_class(&class)?;
+	let class_info: crate::ClassInfo = bytecode::parse_class(bytes)?;
 
 	let mut type_map: crate::TypeMap = crate::TypeMap::from_classes(std::iter::once(&class_info), options);
 	type_map.merge(extra_type_map);
@@ -53,9 +52,9 @@ pub fn generate_bindings_from_jar(
 ) -> Result<Vec<ModuleBinding>> {
 	let mut classes: Vec<(String, crate::ClassInfo)> = Vec::new();
 	visit_jar_classes(jar_path, patterns, |name, bytes| {
-		let class: cafebabe::ClassFile<'_> =
-			cafebabe::parse_class(bytes).map_err(|error| Error::CodeGen(format!("Failed to parse {name}: {error}")))?;
-		classes.push((name.to_owned(), cafebabe_parser::parse_class(&class)?));
+		let class: crate::ClassInfo =
+			bytecode::parse_class(bytes).map_err(|error| Error::CodeGen(format!("Failed to parse {name}: {error}")))?;
+		classes.push((name.to_owned(), class));
 		Ok(())
 	})?;
 

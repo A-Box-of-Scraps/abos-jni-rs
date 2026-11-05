@@ -73,6 +73,7 @@ run = "cargo clippy --fix --workspace --all-targets --all-features -q"
 
 [tasks.test]
 depends = [
+  "test:abos-cafebabe",
   "test:abos-javac",
   "test:abos-jbindgen",
   "test:abos-jbindgen-annotations",
@@ -81,15 +82,11 @@ depends = [
   "test:scripts",
 ]
 
+[tasks."test:abos-cafebabe"]
+run = "cargo test --package abos-cafebabe -q"
+
 [tasks."test:abos-javac"]
 run = "cargo test --package abos-javac --all-features -q"
-
-[tasks."test:lints"]
-dir = "lints/explicit_binding_types"
-run = "cargo test -q"
-
-[tasks."test:scripts"]
-run = "python -B -m unittest discover --start-directory scripts/tests --quiet"
 
 [tasks."test:abos-jbindgen"]
 run = "cargo test --package abos-jbindgen --all-features -q"
@@ -102,3 +99,10 @@ run = "python tests/android-test-activity/tests/run.py"
 
 [tasks."test:android-runner"]
 run = "python -B -m unittest discover --start-directory tests/android-test-activity/tests --pattern 'test_*.py' --quiet"
+
+[tasks."test:lints"]
+dir = "lints/explicit_binding_types"
+run = "cargo test -q"
+
+[tasks."test:scripts"]
+run = "python -B -m unittest discover --start-directory scripts/tests --quiet"

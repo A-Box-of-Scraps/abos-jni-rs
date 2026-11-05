@@ -1,5 +1,5 @@
 pub mod sdk;
-use crate::internal::{bytecode as cafebabe_parser, generator, java_parser};
+use crate::internal::{bytecode, generator, java_parser};
 use crate::{AndroidSdk, BindgenOptions, ClassInfo, HiddenApiFilter, ModuleBinding, Result, TypeMap};
 use std::{
 	collections::HashMap,
@@ -64,10 +64,7 @@ pub fn generate_android_bindings(
 pub(super) fn parse_jar_classes(jar_path: &Path, patterns: &[String]) -> Result<HashMap<String, ClassInfo>> {
 	let mut classes: HashMap<String, ClassInfo> = HashMap::new();
 	crate::internal::inputs::visit_jar_classes(jar_path, patterns, |name, bytes| {
-		match cafebabe::parse_class(bytes)
-			.map_err(crate::Error::from)
-			.and_then(|class| cafebabe_parser::parse_class(&class))
-		{
+		match bytecode::parse_class(bytes) {
 			Ok(class) => {
 				classes.insert(class.class_name.replace('/', "."), class);
 			}

@@ -10,8 +10,8 @@ description = "Generate Rust JNI bindings from Java source, bytecode, and Androi
 workspace = true
 
 [dependencies]
+abos-cafebabe = { path = "../abos-cafebabe", version = "0.1.0" }
 abos-jbindgen-annotations = { path = "../abos-jbindgen-annotations", version = "0.1.0" }
-cafebabe = "0.9"
 clap = { version = "4", features = ["derive"] }
 jni = { version = "0.22.4", features = ["invocation"] }
 log = "0.4"
