@@ -15,6 +15,11 @@
 //! order, independently of ZIP entry order and the host JVM. Version-only classes
 //! and members are not generated; target-release selection is not currently supported.
 //! The JVM still selects its runtime variant, which must retain the generated base members.
+//!
+//! Android generation fails on selected-class parsing or generation errors instead
+//! of silently returning incomplete bindings. Class failures retain their context
+//! and underlying cause. There is no partial-output mode; class patterns and member
+//! skips remain explicit ways to select the API surface.
 mod api;
 mod internal;
 

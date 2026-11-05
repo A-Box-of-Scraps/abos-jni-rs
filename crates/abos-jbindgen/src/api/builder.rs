@@ -115,6 +115,10 @@ impl Builder {
 	}
 
 	/// Set the input to Android SDK APIs.
+	///
+	/// Generation fails on the first selected-class parsing or code-generation error;
+	/// it never returns partial bindings after silently dropping a failing class.
+	/// Class failures preserve the class/archive context and underlying error.
 	pub fn input_android_sdk(mut self, api_level: u32, patterns: Vec<String>) -> Self {
 		self.input = Some(InputSource::AndroidSdk {
 			api_level,
@@ -136,6 +140,7 @@ impl Builder {
 	}
 
 	/// Allow "unsupported" APIs when filtering with hiddenapi-flags.csv.
+	/// This affects hidden-API eligibility only; parsing and generation errors still fail.
 	pub const fn allow_unsupported(mut self, allow: bool) -> Self {
 		self.hidden_api_filter.allow_unsupported = allow;
 		self

@@ -1,6 +1,6 @@
 pub mod sdk;
 use crate::internal::{bytecode, generator, java_parser};
-use crate::{AndroidSdk, BindgenOptions, ClassInfo, HiddenApiFilter, ModuleBinding, Result, TypeMap};
+use crate::{AndroidSdk, BindgenOptions, ClassInfo, Error, HiddenApiFilter, ModuleBinding, Result, TypeMap};
 use std::{
 	collections::HashMap,
 	path::{Path, PathBuf},
@@ -46,15 +46,14 @@ pub fn generate_android_bindings(
 
 	let mut results: Vec<crate::ModuleBinding> = Vec::new();
 	for class_info in filtered_classes {
-		let class_name: String = class_info.class_name.clone();
-		match generator::generate_with_type_map(&class_info, options, &type_map) {
-			Ok(binding) => {
-				results.push(binding);
-			}
-			Err(e) => {
-				eprintln!("Warning: Failed to generate bindings for {class_name}: {e}");
-			}
-		}
+		let binding: ModuleBinding =
+			generator::generate_with_type_map(&class_info, options, &type_map).map_err(|source| {
+				Error::AndroidClassGeneration {
+					class_name: class_info.class_name.replace('/', "."),
+					source: Box::new(source),
+				}
+			})?;
+		results.push(binding);
 	}
 
 	Ok(results)
@@ -64,14 +63,12 @@ pub fn generate_android_bindings(
 pub(super) fn parse_jar_classes(jar_path: &Path, patterns: &[String]) -> Result<HashMap<String, ClassInfo>> {
 	let mut classes: HashMap<String, ClassInfo> = HashMap::new();
 	crate::internal::inputs::visit_jar_classes(jar_path, patterns, |name, bytes| {
-		match bytecode::parse_class(bytes) {
-			Ok(class) => {
-				classes.insert(class.class_name.replace('/', "."), class);
-			}
-			Err(error) => {
-				log::warn!("Failed to parse {name}: {error}");
-			}
-		}
+		let class: ClassInfo = bytecode::parse_class(bytes).map_err(|source| Error::AndroidClassParse {
+			archive: jar_path.to_owned(),
+			entry: name.to_owned(),
+			source: Box::new(source),
+		})?;
+		classes.insert(class.class_name.replace('/', "."), class);
 		Ok(())
 	})?;
 

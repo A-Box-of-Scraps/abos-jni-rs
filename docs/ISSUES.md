@@ -1,7 +1,7 @@
 # Deferred dependency issues
 
 Track dependency bugs and temporary workarounds here. Keep resolved entries with their status updated so the reason for
-removing a workaround remains discoverable. Active workspace fixes are tracked in [TODO.md](../TODO.md).
+removing a workaround remains discoverable.
 
 ## JNI-MACROS-001: Explicit Java member names can panic during macro expansion
 
@@ -83,5 +83,5 @@ Coverage lives in:
 - [ ] Switch `abos-jbindgen` to the fixed fork, then remove `validate_java_member_name` and its call sites. Remove the
       direct `unicode-ident` dependency if it is no longer used elsewhere.
 - [ ] Convert rejection tests and `UnsupportedNames.java` into successful generation and execution regressions. Update
-      the public limitation documentation in `crates/abos-jbindgen/src/lib.rs` and the note in `TODO.md`.
+      the public limitation documentation in `crates/abos-jbindgen/src/lib.rs`.
 - [ ] Mark this issue resolved and record the fixing commit.
