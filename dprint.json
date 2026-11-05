@@ -1,0 +1,15 @@
+{
+  "includes": [
+    "**/*.md"
+  ],
+  "excludes": [
+    "**/target/**"
+  ],
+  "markdown": {
+    "textWrap": "always",
+    "lineWidth": 120
+  },
+  "plugins": [
+    "npm:@dprint/markdown@0.28.2"
+  ]
+}
