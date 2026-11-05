@@ -1,0 +1,83 @@
+warning: this binding's type is not obvious from its initializer
+  --> $DIR/main.rs:57:6
+   |
+LL |     let player = get_player();
+   |         ^^^^^^
+   |
+   = help: add an explicit type annotation to the binding
+   = note: `#[warn(explicit_binding_types)]` on by default
+
+warning: this binding's type is not obvious from its initializer
+  --> $DIR/main.rs:58:6
+   |
+LL |     let other = player.get_player();
+   |         ^^^^^
+   |
+   = help: add an explicit type annotation to the binding
+
+warning: this binding's type is not obvious from its initializer
+  --> $DIR/main.rs:59:6
+   |
+LL |     let mut list = Vec::new();
+   |         ^^^^^^^^
+   |
+   = help: add an explicit type annotation to the binding
+
+warning: this binding's type is not obvious from its initializer
+  --> $DIR/main.rs:61:6
+   |
+LL |     let inferred: _ = get_player();
+   |         ^^^^^^^^
+   |
+   = help: add an explicit type annotation to the binding
+
+warning: this binding's type is not obvious from its initializer
+  --> $DIR/main.rs:62:6
+   |
+LL |     let partial: Vec<_> = players();
+   |         ^^^^^^^
+   |
+   = help: add an explicit type annotation to the binding
+
+warning: this binding's type is not obvious from its initializer
+  --> $DIR/main.rs:63:6
+   |
+LL |     let nested: Vec<Option<_>> = std::iter::once(Some(get_player())).collect();
+   |         ^^^^^^
+   |
+   = help: add an explicit type annotation to the binding
+
+warning: this binding's type is not obvious from its initializer
+  --> $DIR/main.rs:64:6
+   |
+LL |     let mut partial_constructor = Vec::<_>::new();
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: add an explicit type annotation to the binding
+
+warning: this binding's type is not obvious from its initializer
+  --> $DIR/main.rs:66:6
+   |
+LL |     let misleading = Misleading::new();
+   |         ^^^^^^^^^^
+   |
+   = help: add an explicit type annotation to the binding
+
+warning: this binding's type is not obvious from its initializer
+  --> $DIR/main.rs:67:6
+   |
+LL |     let pair = (get_player(), true);
+   |         ^^^^
+   |
+   = help: add an explicit type annotation to the binding
+
+warning: this binding's type is not obvious from its initializer
+  --> $DIR/main.rs:68:6
+   |
+LL |     let copied = player;
+   |         ^^^^^^
+   |
+   = help: add an explicit type annotation to the binding
+
+warning: 10 warnings emitted
+

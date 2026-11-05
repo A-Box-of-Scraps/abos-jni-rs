@@ -1,6 +1,10 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+exclude = ["lints/*"]
+
+[workspace.metadata.dylint]
+libraries = [{ path = "lints/explicit_binding_types" }]
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

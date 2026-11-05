@@ -1,0 +1,20 @@
+[package]
+name = "explicit_binding_types"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Require explicit types on bindings whose initializer does not reveal the type"
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+dylint_linting = "=6.3.2"
+
+[dev-dependencies]
+dylint_testing = "=6.3.2"
+
+[package.metadata.rust-analyzer]
+rustc_private = true

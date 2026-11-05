@@ -1,6 +1,8 @@
 [tools]
 dprint = "0.64.3"
 "cargo:jscpd" = "5.4.2"
+"cargo:cargo-dylint" = "6.3.2"
+"cargo:dylint-link" = "6.3.2"
 
 [settings]
 task.output = "interleave"
@@ -13,17 +15,31 @@ depends = ["fmt", "lint", "check:duplicates"]
 run = "jscpd --fail-on-empty --no-tips"
 
 [tasks.fmt]
-run = ["mise fmt -q", "cargo fmt --all -q", "dprint fmt --log-level warn"]
+run = [
+  "mise fmt -q",
+  "cargo fmt --all -q",
+  "cd lints/explicit_binding_types && cargo fmt --all -q",
+  "dprint fmt --log-level warn",
+]
 
 [tasks."fmt:check"]
 run = [
   "mise fmt --check -q",
   "cargo fmt --all --check -q",
+  "cd lints/explicit_binding_types && cargo fmt --all --check -q",
   "dprint check --log-level warn",
 ]
 
 [tasks.lint]
-run = "cargo clippy --workspace --all-targets --all-features -q -- -D warnings"
+env = { DYLINT_RUSTFLAGS = "-D warnings" }
+run = [
+  "cargo clippy --workspace --all-targets --all-features -q -- -D warnings",
+  "cargo dylint --all --workspace --fail-on-no-libraries -q -- --all-targets --all-features -q",
+]
 
 [tasks."lint:fix"]
 run = "cargo clippy --fix --workspace --all-targets --all-features -q"
+
+[tasks."test:lints"]
+dir = "lints/explicit_binding_types"
+run = "cargo test -q"
