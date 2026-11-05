@@ -14,6 +14,8 @@ import tempfile
 REVISIONS = {
     "javac": "8dcbc94481d5bdf003895957dd010486e95bf20e",
     "jbindgen": "b331bcc2c24ff03fbd64cc5ee833c9bc21aa30c1",
+    "jni-rs": "dbfb17647988b81ff37b897ce93cc85ee4c84863",
+    "jni-sys": "809b4c4939a2a581b84aa17018a5033b71c6d435",
 }
 
 
@@ -49,7 +51,7 @@ def clone_reference(name, reference_root):
         subprocess.run(
             [
                 "git", "clone", "--quiet", "--depth", "5", "--single-branch",
-                "--branch", "main", "--no-tags",
+                "--no-tags",
                 f"https://github.com/jni-rs/{name}.git", str(staging),
             ],
             check=True,
@@ -60,7 +62,7 @@ def clone_reference(name, reference_root):
             stderr=subprocess.DEVNULL,
             check=False,
         )
-        # The pinned commit may have fallen outside main's shallow history.
+        # The pinned commit may be outside the default branch's shallow history.
         if available.returncode != 0:
             subprocess.run([*git, "fetch", "--quiet", "--depth", "5", "origin", revision], check=True)
         subprocess.run([*git, "reset", "--quiet", "--hard", revision], check=True)

@@ -23,11 +23,20 @@ run = "jscpd --fail-on-empty --no-tips"
 [tasks."check:file-length"]
 run = "python scripts/check-file-length.py"
 
+[tasks."clone:all"]
+depends = ["clone:javac", "clone:jbindgen", "clone:jni-rs", "clone:jni-sys"]
+
 [tasks."clone:javac"]
 run = "python scripts/clone-reference.py javac"
 
 [tasks."clone:jbindgen"]
 run = "python scripts/clone-reference.py jbindgen"
+
+[tasks."clone:jni-rs"]
+run = "python scripts/clone-reference.py jni-rs"
+
+[tasks."clone:jni-sys"]
+run = "python scripts/clone-reference.py jni-sys"
 
 [tasks.fmt]
 depends = ["fmt:java"]

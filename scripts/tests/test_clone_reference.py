@@ -3,6 +3,7 @@ from pathlib import Path
 import stat
 import subprocess
 import tempfile
+import tomllib
 import unittest
 from unittest.mock import Mock, patch
 
@@ -48,9 +49,28 @@ class CloneReferenceTests(unittest.TestCase):
         self.assertEqual((self.destination / SOURCE_FILE).read_text(), REPLACEMENT_CONTENT)
         commands = [call.args[0] for call in self.git.call_args_list]
         self.assertIn("--single-branch", commands[0])
-        self.assertIn("main", commands[0])
+        self.assertNotIn("--branch", commands[0])
         self.assertEqual(commands[-1][-4:], ["reset", "--quiet", "--hard", clone.REVISIONS[REPOSITORY]])
         self.assertEqual(list(self.root.iterdir()), [self.destination])
+
+    def test_clones_each_registered_repository(self):
+        for name, revision in clone.REVISIONS.items():
+            with self.subTest(repository=name):
+                self.git.reset_mock()
+                clone.clone_reference(name, self.root)
+                commands = [call.args[0] for call in self.git.call_args_list]
+                self.assertEqual(commands[0][-2], f"https://github.com/jni-rs/{name}.git")
+                self.assertEqual(commands[-1][-1], revision)
+                self.assertRegex(revision, r"^[0-9a-f]{40}$")
+                self.assertEqual((self.root / name / SOURCE_FILE).read_text(), REPLACEMENT_CONTENT)
+
+    def test_clone_tasks_cover_all_repositories(self):
+        config = tomllib.loads((SCRIPT.parent.parent / "mise.toml").read_text())
+        tasks = config["tasks"]
+        self.assertEqual(list(tasks), sorted(tasks))
+        self.assertEqual(tasks["clone:all"]["depends"], [f"clone:{name}" for name in sorted(clone.REVISIONS)])
+        for name in clone.REVISIONS:
+            self.assertEqual(tasks[f"clone:{name}"]["run"], f"python scripts/clone-reference.py {name}")
 
     def test_fetches_revision_outside_shallow_history(self):
         self.missing_revision = True
