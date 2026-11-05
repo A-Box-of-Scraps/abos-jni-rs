@@ -3,6 +3,11 @@ resolver = "3"
 members = ["crates/*"]
 exclude = ["lints/*"]
 
+[workspace.package]
+edition = "2024"
+license = "MIT"
+rust-version = "1.99.1"
+
 [workspace.metadata.dylint]
 libraries = [{ path = "lints/explicit_binding_types" }]
 

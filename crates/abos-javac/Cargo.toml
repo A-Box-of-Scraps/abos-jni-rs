@@ -6,9 +6,5 @@ A build-time dependency for Cargo build scripts and unit tests to assist in
 invoking the native Java compiler to compile Java source files into class files.
 """
 
-edition = "2024"
-license = "MIT OR Apache-2.0"
-rust-version = "1.99.1"
-
 [lints]
 workspace = true
