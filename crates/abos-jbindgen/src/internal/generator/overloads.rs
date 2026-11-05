@@ -2,7 +2,6 @@ use super::names::java_name_to_rust;
 use super::signatures::generate_jni_signature_for_sorting;
 use crate::MethodInfo;
 use std::collections::HashSet;
-use std::sync::LazyLock;
 pub fn group_methods_by_name(methods: &[MethodInfo]) -> Vec<(&str, Vec<&MethodInfo>)> {
 	use std::collections::HashMap;
 
@@ -189,25 +188,7 @@ fn overload_name(base: &str, method: &MethodInfo, arity: usize, varying: &[usize
 	name
 }
 
-/// Rust keywords that need to be escaped when used as identifiers
-static RUST_KEYWORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
-	HashSet::from([
-		"as", "break", "const", "continue", "crate", "else", "enum", "extern", "false", "fn", "for", "if", "impl",
-		"in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return", "self", "Self", "static", "struct",
-		"super", "trait", "true", "type", "unsafe", "use", "where", "while", "async", "await", "dyn", "abstract",
-		"become", "box", "do", "final", "macro", "override", "priv", "typeof", "unsized", "virtual", "yield", "try",
-	])
-});
-
-/// Sanitize parameter names that are Rust keywords by appending an underscore
-pub fn sanitize_rust_keyword(name: &str) -> String {
-	if RUST_KEYWORDS.contains(name) {
-		format!("{name}_")
-	} else {
-		name.to_string()
-	}
-}
-
 pub fn is_snake_case(name: &str) -> bool {
-	name.chars().all(|c| c.is_lowercase() || c == '_')
+	name.chars()
+		.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }

@@ -1,3 +1,4 @@
+use super::identifiers::rust_identifier;
 use crate::TypeMap;
 use std::collections::HashSet;
 /// Builtin JNI type information
@@ -102,11 +103,7 @@ pub fn derive_rust_type_name(class_name: &str, rust_type_override: Option<&str>,
 	let base_name_cleaned: String = base_name.replace('$', "");
 
 	// Apply name prefix if specified
-	if let Some(prefix) = name_prefix {
-		format!("{prefix}{base_name_cleaned}")
-	} else {
-		base_name_cleaned
-	}
+	rust_identifier(&format!("{}{base_name_cleaned}", name_prefix.unwrap_or_default()))
 }
 
 // Match jni-macros naming rules so shorthand bindings resolve the original Java name.
@@ -185,7 +182,9 @@ pub fn java_name_to_rust(java_name: &str) -> (String, bool) {
 	if is_upper_snake_case {
 		// Keep UPPER_SNAKE_CASE names as-is (e.g., DEFAULT_KEYS_DIALER, RESULT_OK)
 		// These are reversible since jni_macros leaves them unchanged
-		return (java_name.to_string(), true);
+		let name: String = rust_identifier(java_name);
+		let reversible: bool = name == java_name;
+		return (name, reversible);
 	}
 
 	// Simple conversion: insert underscores before uppercase letters
@@ -206,7 +205,8 @@ pub fn java_name_to_rust(java_name: &str) -> (String, bool) {
 		}
 	}
 
-	// Check if the transformation is reversible by applying jni_macros algorithm
+	let result: String = rust_identifier(&result);
+	// Check reversibility after normalization so renamed members use explicit Java names.
 	let back_converted: String = jni_macros_snake_case_to_lower_camel_case(&result);
 	let is_reversible: bool = back_converted == java_name;
 

@@ -16,6 +16,7 @@ clap.workspace = true
 jni.workspace = true
 log.workspace = true
 thiserror.workspace = true
+unicode-ident.workspace = true
 zip.workspace = true
 
 [build-dependencies]

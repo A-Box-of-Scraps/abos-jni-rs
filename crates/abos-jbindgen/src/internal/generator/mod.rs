@@ -1,4 +1,5 @@
 mod documentation;
+pub mod identifiers;
 mod members;
 pub mod names;
 mod overloads;
@@ -37,7 +38,7 @@ pub fn generate_with_type_map(class: &ClassInfo, options: &BindgenOptions, types
 		member_names: HashSet::new(),
 	};
 	members::constructors(&mut context)?;
-	members::fields(&mut context);
+	members::fields(&mut context)?;
 	members::methods(&mut context, false)?;
 	if options.generate_native_interfaces {
 		members::methods(&mut context, true)?;
@@ -57,7 +58,11 @@ pub fn generate_with_type_map(class: &ClassInfo, options: &BindgenOptions, types
 	output.push_str("}\n");
 	Ok(ModuleBinding {
 		package: class.package.join("."),
-		module_path: class.package.clone(),
+		module_path: class
+			.package
+			.iter()
+			.map(|part| identifiers::rust_identifier(part))
+			.collect(),
 		use_statements: vec!["use jni::bind_java_type;".to_owned()],
 		binding_code: output,
 		rust_api_type_name: format!("{name}API"),

@@ -26,6 +26,7 @@ dependencies = [
  "jni",
  "log",
  "thiserror",
+ "unicode-ident",
  "zip",
 ]
 

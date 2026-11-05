@@ -1,5 +1,8 @@
-use crate::internal::generator::names::{builtin_jni_types, derive_rust_type_name};
-use crate::{BindgenOptions, ClassInfo};
+use crate::internal::generator::{
+	identifiers::rust_identifier,
+	names::{builtin_jni_types, derive_rust_type_name},
+};
+use crate::{BindgenOptions, ClassInfo, Error, Result};
 use std::collections::HashMap;
 /// Maps Java binary names to Rust wrapper type paths.
 #[derive(Debug, Clone)]
@@ -10,8 +13,12 @@ pub struct TypeMap {
 
 impl TypeMap {
 	/// Create a new `TypeMap` from a collection of `ClassInfo`
-	pub(crate) fn from_classes<'a>(classes: impl IntoIterator<Item = &'a ClassInfo>, options: &BindgenOptions) -> Self {
-		let mut map: std::collections::HashMap<String, String> = HashMap::new();
+	pub(crate) fn from_classes<'a>(
+		classes: impl IntoIterator<Item = &'a ClassInfo>,
+		options: &BindgenOptions,
+	) -> Result<Self> {
+		let mut map: HashMap<String, String> = HashMap::new();
+		let mut owners: HashMap<String, String> = HashMap::new();
 
 		for class_info in classes {
 			// Build the Java type name using class_name which has the full binary name with $ for inner classes
@@ -36,15 +43,22 @@ impl TypeMap {
 			let mut rust_path: String = options.root_path.clone();
 			for segment in &class_info.package {
 				rust_path.push_str("::");
-				rust_path.push_str(segment);
+				rust_path.push_str(&rust_identifier(segment));
 			}
 			rust_path.push_str("::");
 			rust_path.push_str(&rust_name);
 
+			if let Some(previous) = owners.insert(rust_path.clone(), java_type.clone())
+				&& previous != java_type
+			{
+				return Err(Error::CodeGen(format!(
+					"Java classes {previous:?} and {java_type:?} map to the same Rust type {rust_path:?}; use distinct Rust type names or generate them separately"
+				)));
+			}
 			map.insert(java_type, rust_path);
 		}
 
-		Self { map }
+		Ok(Self { map })
 	}
 
 	/// Add `(Rust type path, Java binary name)` mappings.

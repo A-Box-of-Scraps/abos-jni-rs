@@ -41,7 +41,7 @@ pub fn generate_android_bindings(
 	filtered_classes.sort_by(|left, right| left.class_name.cmp(&right.class_name));
 
 	// Generate bindings from filtered classes
-	let mut type_map: crate::TypeMap = TypeMap::from_classes(filtered_classes.iter(), options);
+	let mut type_map: crate::TypeMap = TypeMap::from_classes(filtered_classes.iter(), options)?;
 	type_map.merge(extra_type_map);
 
 	let mut results: Vec<crate::ModuleBinding> = Vec::new();

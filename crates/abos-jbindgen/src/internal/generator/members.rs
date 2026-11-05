@@ -1,6 +1,7 @@
 use super::{
 	Context,
 	documentation::format_javadoc_as_rustdoc,
+	identifiers::{rust_identifier, validate_java_member_name},
 	names::{java_name_to_rust, resolve_type_with_deps},
 	overloads::{generate_unique_overload_names, group_methods_by_name, is_snake_case, resolve_name_collision},
 	signatures::{
@@ -59,6 +60,7 @@ pub(super) fn constructors(context: &mut Context<'_>) -> Result<()> {
 			.as_deref()
 			.or_else(|| context.options.name_overrides.get(&dex).map(String::as_str))
 			.unwrap_or(generated);
+		let name: String = rust_identifier(name);
 		let sig: String = generate_method_signature_with_deps(
 			method,
 			context.types,
@@ -70,7 +72,7 @@ pub(super) fn constructors(context: &mut Context<'_>) -> Result<()> {
 			&mut context.body,
 			method.documentation.as_deref(),
 			method.is_deprecated,
-			name,
+			&name,
 		);
 		writeln!(context.body, "        fn {name}{sig},").expect("writing to String");
 	}
@@ -78,7 +80,7 @@ pub(super) fn constructors(context: &mut Context<'_>) -> Result<()> {
 	Ok(())
 }
 
-pub(super) fn fields(context: &mut Context<'_>) {
+pub(super) fn fields(context: &mut Context<'_>) -> Result<()> {
 	let fields: Vec<&FieldInfo> = context
 		.class
 		.fields
@@ -91,10 +93,11 @@ pub(super) fn fields(context: &mut Context<'_>) {
 		})
 		.collect();
 	if fields.is_empty() {
-		return;
+		return Ok(());
 	}
 	context.body.push_str("    fields {\n");
 	for field in fields {
+		validate_java_member_name(&field.name)?;
 		let dex: String = generate_field_dex_signature(&context.class.class_name, field);
 		let (name, reversible) = member_name(context, &field.name, &dex, field.rust_name_override.as_deref(), None);
 		context.member_names.remove(&(name.clone(), field.name.clone()));
@@ -137,6 +140,7 @@ pub(super) fn fields(context: &mut Context<'_>) {
 		}
 	}
 	context.body.push_str("    },\n");
+	Ok(())
 }
 
 fn member_name(
@@ -153,7 +157,8 @@ fn member_name(
 		.map(String::as_str)
 		.or(annotation)
 		.or(overload);
-	let (name, reversible) = override_name.map_or_else(|| java_name_to_rust(java), |name| (name.to_owned(), false));
+	let (name, reversible) =
+		override_name.map_or_else(|| java_name_to_rust(java), |name| (rust_identifier(name), false));
 	let (resolved, collision, previous) = resolve_name_collision(name, java, &mut context.member_names);
 	if collision {
 		log::warn!("Java member {java} conflicts with {previous:?}; using {resolved}");
@@ -209,6 +214,7 @@ fn method_binding(
 	reversible: bool,
 	native: bool,
 ) -> Result<()> {
+	validate_java_member_name(&method.name)?;
 	let sig: String = generate_method_signature_with_deps(
 		method,
 		context.types,

@@ -38,7 +38,7 @@ pub fn generate_bindings_from_bytes(
 ) -> Result<ModuleBinding> {
 	let class_info: crate::ClassInfo = bytecode::parse_class(bytes)?;
 
-	let mut type_map: crate::TypeMap = crate::TypeMap::from_classes(std::iter::once(&class_info), options);
+	let mut type_map: crate::TypeMap = crate::TypeMap::from_classes(std::iter::once(&class_info), options)?;
 	type_map.merge(extra_type_map);
 
 	generator::generate_with_type_map(&class_info, options, &type_map)
@@ -58,7 +58,7 @@ pub fn generate_bindings_from_jar(
 		Ok(())
 	})?;
 
-	let mut type_map: crate::TypeMap = crate::TypeMap::from_classes(classes.iter().map(|(_, c)| c), options);
+	let mut type_map: crate::TypeMap = crate::TypeMap::from_classes(classes.iter().map(|(_, c)| c), options)?;
 	type_map.merge(extra_type_map);
 
 	let mut results: Vec<crate::ModuleBinding> = Vec::new();
@@ -87,7 +87,7 @@ pub fn generate_bindings_from_sources(
 	let classes: Vec<crate::ClassInfo> =
 		java_parser::parse_java_sources(source_paths, class_path_entries, &pattern_str)?;
 
-	let mut type_map: crate::TypeMap = crate::TypeMap::from_classes(classes.iter(), options);
+	let mut type_map: crate::TypeMap = crate::TypeMap::from_classes(classes.iter(), options)?;
 	type_map.merge(extra_type_map);
 
 	let mut results: Vec<crate::ModuleBinding> = Vec::new();

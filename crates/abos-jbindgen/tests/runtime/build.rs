@@ -16,6 +16,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		"NativeMethodVisibility",
 		"WithNative",
 		"AccessorCollisions",
+		"Identifiers",
+		"keywords/match",
 	];
 	let sources: Vec<PathBuf> = names
 		.iter()
@@ -33,6 +35,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.generate()?;
 	bindings.write_to_file(output.join("bindings.rs"))?;
 	bindings.write_to_files(output.join("tree"))?;
+	abos_jbindgen::Builder::new()
+		.input_class(classes.join("com/type/Identifiers.class"))
+		.root_path("crate::bytecode")
+		.type_mapping("crate::bindings::com::type_::match_", "com.type.match")
+		.generate()?
+		.write_to_file(output.join("bytecode.rs"))?;
+	abos_jbindgen::Builder::new()
+		.input_class(classes.join("com/example/SimpleClass.class"))
+		.root_path("crate::overrides")
+		.rust_type_name("type")
+		.name_override("Lcom/example/SimpleClass;-><init>()V", "gen")
+		.name_override("Lcom/example/SimpleClass;->getValue()I", "with-dash")
+		.generate()?
+		.write_to_file(output.join("overrides.rs"))?;
 	println!("cargo:rustc-env=FIXTURE_CLASSES={}", classes.display());
 	Ok(())
 }

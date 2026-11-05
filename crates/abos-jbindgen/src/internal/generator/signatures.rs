@@ -1,6 +1,6 @@
 use super::{
+	identifiers::unique_identifier,
 	names::{java_name_to_rust, resolve_type_with_deps},
-	overloads::sanitize_rust_keyword,
 };
 use crate::{BindgenOptions, Error, MethodInfo, Result, TypeMap};
 use std::collections::HashSet;
@@ -122,16 +122,22 @@ pub fn generate_method_signature_with_deps(
 	used_primitive_types: &mut HashSet<String>,
 ) -> Result<String> {
 	let mut sig: String = String::from("(");
+	// These names are parameters or locals emitted by bind_java_type! itself.
+	let mut names: HashSet<String> = ["env", "api", "jni_args", "class", "this", "unowned_env"]
+		.into_iter()
+		.map(str::to_owned)
+		.collect();
 
 	for (i, arg) in method.signature.arguments.iter().enumerate() {
 		if i > 0 {
 			sig.push_str(", ");
 		}
 
-		let arg_name: String = arg.name.as_deref().map_or_else(
-			|| format!("arg{i}"),
-			|name| sanitize_rust_keyword(&java_name_to_rust(name).0),
-		);
+		let arg_name: String = arg
+			.name
+			.as_deref()
+			.map_or_else(|| format!("arg{i}"), |name| java_name_to_rust(name).0);
+		let arg_name: String = unique_identifier(&arg_name, &mut names);
 		write!(sig, "{arg_name}: ").expect("writing to String");
 
 		if let Some(rust_prim) = &arg.rust_primitive {

@@ -28,6 +28,7 @@ proc-macro2 = "1"
 quote = "1"
 syn = { version = "3", features = ["full"] }
 trybuild = "1"
+unicode-ident = "1"
 which = "8"
 zip = { version = "7", default-features = false, features = ["deflate"] }
 
