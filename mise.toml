@@ -1,4 +1,6 @@
 [tools]
+fd = "10.5.1"
+mold = { version = "3.0.0", os = ["linux"] }
 dprint = "0.64.3"
 "cargo:jscpd" = "5.4.2"
 "cargo:cargo-dylint" = "6.3.2"
