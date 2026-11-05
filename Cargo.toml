@@ -1,3 +1,18 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cognitive_complexity = "warn"
+excessive_nesting = "warn"
+too_many_lines = "warn"
+too_many_arguments = "warn"
+dbg_macro = "warn"
+todo = "warn"
+unwrap_used = "warn"

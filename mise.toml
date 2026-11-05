@@ -6,6 +6,12 @@ dprint = "0.64.3"
 task.output = "interleave"
 task.quiet = true
 
+[tasks.check]
+depends = ["fmt", "lint", "check:duplicates"]
+
+[tasks."check:duplicates"]
+run = "jscpd --fail-on-empty --no-tips"
+
 [tasks.fmt]
 run = ["mise fmt -q", "cargo fmt --all -q", "dprint fmt --log-level warn"]
 
@@ -16,8 +22,8 @@ run = [
   "dprint check --log-level warn",
 ]
 
-[tasks.check]
-depends = ["fmt", "check:duplicates"]
+[tasks.lint]
+run = "cargo clippy --workspace --all-targets --all-features -q -- -D warnings"
 
-[tasks."check:duplicates"]
-run = "jscpd --fail-on-empty --no-tips"
+[tasks."lint:fix"]
+run = "cargo clippy --fix --workspace --all-targets --all-features -q"
