@@ -13,6 +13,6 @@ invoking the native Java compiler to compile Java source files into class files.
 workspace = true
 
 [dependencies]
-tempfile = "3"
-thiserror = "2"
-which = "8"
+tempfile.workspace = true
+thiserror.workspace = true
+which.workspace = true
