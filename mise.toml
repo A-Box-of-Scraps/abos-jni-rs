@@ -4,6 +4,7 @@ mold = { version = "3.0.0", os = ["linux"] }
 dprint = "0.64.3"
 "cargo:jscpd" = "5.4.2"
 "cargo:cargo-dylint" = "6.3.2"
+"cargo:cargo-fuzz" = "0.13.2"
 "cargo:dylint-link" = "6.3.2"
 python = "3.15.2"
 maven = "3.9.16"
@@ -53,6 +54,7 @@ depends = ["fmt:java"]
 run = [
   "mise fmt -q",
   "cargo fmt --all -q",
+  "cargo fmt --manifest-path fuzz/Cargo.toml -q",
   "cargo fmt --manifest-path tools/abos-jni-gen-windows-bindings/Cargo.toml -q",
   "cargo fmt --manifest-path crates/abos-jbindgen/tests/runtime/Cargo.toml -q",
   "cargo fmt --manifest-path tests/android-test-activity/Cargo.toml -q",
@@ -66,6 +68,7 @@ depends = ["fmt:java:check"]
 run = [
   "mise fmt --check -q",
   "cargo fmt --all --check -q",
+  "cargo fmt --manifest-path fuzz/Cargo.toml --check -q",
   "cargo fmt --manifest-path tools/abos-jni-gen-windows-bindings/Cargo.toml --check -q",
   "cargo fmt --manifest-path crates/abos-jbindgen/tests/runtime/Cargo.toml --check -q",
   "cargo fmt --manifest-path tests/android-test-activity/Cargo.toml --check -q",
@@ -79,6 +82,33 @@ run = "mvn --batch-mode --no-transfer-progress -q spotless:apply"
 
 [tasks."fmt:java:check"]
 run = "mvn --batch-mode --no-transfer-progress -q spotless:check"
+
+[tasks."fuzz:build"]
+dir = "fuzz"
+run = "cargo fuzz build cafebabe_parse_class"
+
+[tasks."fuzz:cafebabe"]
+depends = ["fuzz:seed"]
+dir = "fuzz"
+raw = true
+run = "cargo fuzz run cafebabe_parse_class -- -max_len=65536 -timeout=5 -rss_limit_mb=2048"
+
+[tasks."fuzz:seed"]
+dir = "fuzz"
+run = """
+mkdir -p corpus/cafebabe_parse_class
+for seed in seeds/cafebabe_parse_class/*.class; do
+  destination="corpus/cafebabe_parse_class/$(basename "$seed")"
+  if [ ! -e "$destination" ]; then
+    cp "$seed" "$destination"
+  fi
+done
+"""
+
+[tasks."fuzz:smoke"]
+depends = ["fuzz:seed"]
+dir = "fuzz"
+run = "cargo fuzz run cafebabe_parse_class -- -max_total_time=60 -max_len=65536 -timeout=5 -rss_limit_mb=2048"
 
 [tasks."generate:abos-jni:windows-bindings"]
 run = "cargo run --manifest-path tools/abos-jni-gen-windows-bindings/Cargo.toml -q"
@@ -107,6 +137,10 @@ run = "cargo clippy --fix --workspace --all-targets --all-features -q"
 [tasks."setup:android"]
 raw = true
 run = "python tests/android-test-activity/tests/android_env.py setup"
+
+[tasks."setup:fuzz"]
+dir = "fuzz"
+run = ["mise install cargo:cargo-fuzz", "rustup show active-toolchain"]
 
 [tasks.test]
 depends = [
@@ -183,6 +217,10 @@ run = "python tests/android-test-activity/tests/run.py --package-only --suite fu
 
 [tasks."test:android:smoke"]
 run = "python tests/android-test-activity/tests/run.py --suite smoke"
+
+[tasks."test:fuzz-seeds"]
+dir = "fuzz"
+run = "cargo test --locked --test seeds -q"
 
 [tasks."test:lints"]
 dir = "lints"

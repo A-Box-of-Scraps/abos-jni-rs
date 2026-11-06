@@ -1,0 +1,24 @@
+[package]
+name = "abos-jni-fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+members = ["."]
+resolver = "3"
+
+[dependencies]
+abos-cafebabe = { path = "../crates/abos-cafebabe" }
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "cafebabe_parse_class"
+path = "fuzz_targets/cafebabe_parse_class.rs"
+test = false
+doc = false
+bench = false
