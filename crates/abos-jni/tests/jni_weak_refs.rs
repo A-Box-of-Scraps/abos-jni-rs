@@ -19,6 +19,54 @@ mod util;
 use util::{attach_current_thread, unwrap};
 
 #[test]
+fn null_weak_local_upgrade_returns_none() {
+	attach_current_thread(|env| {
+		for weak in [Weak::<JObject<'static>>::null(), Weak::default()] {
+			assert!(weak.is_garbage_collected(env)?);
+			assert!(weak.upgrade_local(env)?.is_none());
+		}
+		for weak in [Weak::<JString<'static>>::null(), Weak::default()] {
+			assert!(weak.upgrade_local(env)?.is_none());
+		}
+		Ok(())
+	})
+	.expect("null weak local upgrades succeed");
+}
+
+#[test]
+fn null_weak_global_upgrade_returns_none() {
+	attach_current_thread(|env| {
+		for weak in [Weak::<JObject<'static>>::null(), Weak::default()] {
+			assert!(weak.is_garbage_collected(env)?);
+			assert!(weak.upgrade_global(env)?.is_none());
+		}
+		for weak in [Weak::<JString<'static>>::null(), Weak::default()] {
+			assert!(weak.upgrade_global(env)?.is_none());
+		}
+		Ok(())
+	})
+	.expect("null weak global upgrades succeed");
+}
+
+#[test]
+fn weak_upgrades_preserve_pending_exceptions() {
+	attach_current_thread(|env| {
+		let original: JString<'_> = env.new_string("live referent")?;
+		let weak: Weak<JString<'static>> = env.new_weak_ref(&original)?;
+		assert!(matches!(
+			env.throw_new(jni_str!("java/lang/RuntimeException"), jni_str!("pending")),
+			Err(Error::JavaException)
+		));
+		assert!(matches!(weak.upgrade_local(env), Err(Error::JavaException)));
+		assert!(matches!(weak.upgrade_global(env), Err(Error::JavaException)));
+		assert!(env.exception_check());
+		env.exception_clear();
+		Ok(())
+	})
+	.expect("weak upgrade errors preserve pending exceptions");
+}
+
+#[test]
 fn weak_ref_works_in_other_threads() {
 	const ITERS_PER_THREAD: usize = 10_000;
 

@@ -131,8 +131,9 @@ where
 	///
 	/// This is equivalent [`Weak::default()`]
 	///
-	/// A `null` [`Weak`] acts as-if the object has been garbage collected
-	/// ([`Self::is_garbage_collected()`] will return `true`).
+	/// A `null` [`Weak`] acts as-if the object has been garbage collected:
+	/// [`Self::is_garbage_collected()`] returns `true`, and both
+	/// [`Self::upgrade_local`] and [`Self::upgrade_global`] return `None`.
 	#[must_use]
 	pub fn null() -> Self {
 		Self { obj: T::default() }
@@ -145,8 +146,8 @@ where
 
 	/// Creates a new local reference to this object.
 	///
-	/// This returns `None` if the object has already been garbage collected, otherwise it returns
-	/// `Some(new_local_reference)`.
+	/// This returns `None` if this weak reference is null or the object has already been garbage
+	/// collected, otherwise it returns `Some(new_local_reference)`.
 	///
 	/// If this method returns `Some(r)`, it is guaranteed that the object will not be garbage
 	/// collected at least until `r` is deleted or becomes invalid.
@@ -156,6 +157,7 @@ where
 	/// Returns an error if a local reference cannot be allocated or a Java exception is pending.
 	pub fn upgrade_local<'local>(&self, env: &mut Env<'local>) -> Result<Option<T::Kind<'local>>> {
 		match env.new_local_ref(self) {
+			Ok(local_ref) if local_ref.is_null() => Ok(None),
 			Ok(local_ref) => Ok(Some(local_ref)),
 			Err(Error::ObjectFreed) => Ok(None),
 			Err(err) => Err(err),
@@ -164,8 +166,8 @@ where
 
 	/// Creates a new strong global reference to this object.
 	///
-	/// This returns `None` if the object has already been garbage collected, otherwise it returns
-	/// `Some(new_local_reference)`.
+	/// This returns `None` if this weak reference is null or the object has already been garbage
+	/// collected, otherwise it returns `Some(new_global_reference)`.
 	///
 	/// If this method returns `Some(r)`, it is guaranteed that the object will not be garbage
 	/// collected at least until `r` is deleted or becomes invalid.
@@ -175,9 +177,10 @@ where
 	/// Returns an error if a global reference cannot be allocated or a Java exception is pending.
 	pub fn upgrade_global(&self, env: &Env) -> Result<Option<Global<T::GlobalKind>>> {
 		match env.new_global_ref(self) {
+			Ok(global_ref) if global_ref.is_null() => Ok(None),
+			Ok(global_ref) => Ok(Some(global_ref)),
 			Err(Error::ObjectFreed) => Ok(None),
 			Err(err) => Err(err),
-			Ok(global_ref) => Ok(Some(global_ref)),
 		}
 	}
 
