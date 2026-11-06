@@ -149,9 +149,14 @@ static JAVA_VM_SINGLETON: std::sync::OnceLock<JavaVM> = std::sync::OnceLock::new
 /// # fn main() {}
 /// ```
 ///
-/// At runtime, the JVM installation path is determined via the [java-locator] crate:
-/// 1. By the `JAVA_HOME` environment variable, if it is set.
-/// 2. Otherwise — from `java` output.
+/// At runtime, the JVM installation is discovered as follows:
+/// 1. Use `JAVA_HOME` if it is nonempty.
+/// 2. Otherwise, use `/usr/libexec/java_home` on macOS, or locate `java` on `PATH`
+///    using `where` on Windows and `which` on other platforms, resolving symbolic links.
+///
+/// The installation is searched for the platform JVM shared library. An invalid nonempty
+/// `JAVA_HOME` is an error; discovery does not silently select another installation.
+/// Use [`JavaVM::with_libjvm`] to supply an explicit library path.
 ///
 /// It is recommended to set `JAVA_HOME`
 ///
@@ -170,7 +175,6 @@ static JAVA_VM_SINGLETON: std::sync::OnceLock<JavaVM> = std::sync::OnceLock::new
 /// [actp]: struct.JavaVM.html#method.attach_current_thread_permanently
 /// [spec-references]:
 ///     https://docs.oracle.com/en/java/javase/12/docs/specs/jni/design.html#referencing-java-objects
-/// [java-locator]: https://crates.io/crates/java-locator
 #[derive(Debug, Clone)]
 pub struct JavaVM(*mut sys::JavaVM);
 

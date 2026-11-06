@@ -7,7 +7,7 @@ use crate::internal::fls_attach_guard;
 #[cfg(all(feature = "invocation", not(target_os = "android"), use_tls_attach_guard))]
 use crate::internal::tls_attach_guard;
 #[cfg(all(feature = "invocation", not(target_os = "android")))]
-use std::{os::raw::c_void, path::PathBuf};
+use std::os::raw::c_void;
 #[cfg(feature = "invocation")]
 use {
 	crate::{
@@ -27,8 +27,8 @@ impl JavaVM {
 	/// *This API requires the "invocation" feature to be enabled,
 	/// see [Launching JVM from Rust](struct.JavaVM.html#launching-jvm-from-rust).*
 	///
-	/// This will attempt to locate a JVM using
-	/// [java-locator], if the JVM has not already been loaded. Use the
+	/// This will attempt to locate a JVM using `JAVA_HOME` or the platform Java installation,
+	/// if the JVM has not already been loaded. Use the
 	/// [`with_libjvm`][Self::with_libjvm] method to give an explicit location for the JVM shared
 	/// library (`jvm.dll`, `libjvm.so`, or `libjvm.dylib`, depending on the platform).
 	#[cfg(feature = "invocation")]
@@ -40,14 +40,7 @@ impl JavaVM {
 		#[cfg(not(target_os = "android"))]
 		{
 			Self::with_libjvm(args, || {
-				Ok([
-					java_locator::locate_jvm_dyn_library()
-						.map_err(StartJvmError::NotFound)?
-						.as_str(),
-					java_locator::get_jvm_dyn_lib_file_name(),
-				]
-				.iter()
-				.collect::<PathBuf>())
+				crate::internal::java_locator::locate_jvm().map_err(StartJvmError::NotFound)
 			})
 		}
 

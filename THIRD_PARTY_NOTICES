@@ -1,2 +1,9 @@
 Copyright (c) 2016 Prevoty, Inc. and jni-rs contributors
 Copyright (c) 2015 The rust-jni-sys Developers
+
+Java runtime discovery in crates/abos-jni/src/internal/java_locator.rs is adapted from java-locator 0.1.9.
+Source: https://github.com/astonbitecode/java-locator
+Revision: 05d29632ffa0554c7929f1e505af20f21480b4eb
+Copyright 2019 astonbitecode
+Licensed under Apache-2.0; see licenses/java-locator/LICENSE.
+Modified to provide JVM-only discovery with standard-library errors, native paths, and cycle-safe traversal.

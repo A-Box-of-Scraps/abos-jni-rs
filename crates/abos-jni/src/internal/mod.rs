@@ -15,3 +15,6 @@ pub mod windows_sys;
 pub mod fls_attach_guard;
 #[cfg(use_tls_attach_guard)]
 pub mod tls_attach_guard;
+
+#[cfg(all(feature = "invocation", not(target_os = "android")))]
+pub mod java_locator;

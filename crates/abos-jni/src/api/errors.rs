@@ -253,12 +253,11 @@ pub enum StartJvmError {
 	)]
 	Unsupported,
 
-	/// An attempt was made to find a JVM using [java-locator], but it failed.
+	/// Automatic JVM library discovery failed.
 	///
 	/// If this happens, give an explicit location to [`JavaVM::with_libjvm`] or set the
 	/// `JAVA_HOME` environment variable.
 	///
-	/// [java-locator]: https://docs.rs/java-locator/
 	/// [`JavaVM::with_libjvm`]: crate::JavaVM::with_libjvm
 	#[cfg(not(target_os = "android"))]
 	#[error(
@@ -267,7 +266,7 @@ pub enum StartJvmError {
 	NotFound(
 		#[from]
 		#[source]
-		java_locator::errors::JavaLocatorError,
+		std::io::Error,
 	),
 	/// A place holder for the `libloading` error, when built without the `libloading` dependency
 	#[cfg(target_os = "android")]
