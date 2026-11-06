@@ -33,8 +33,9 @@ annotations.
 
 ## Development
 
-This is a separate Cargo workspace with a pinned nightly toolchain and `rustc-dev`. The application workspace continues
-to use its own toolchain. Dylint's compiler APIs are unstable; update the toolchain and lint implementation together.
+This crate belongs to the shared `lints/` workspace, which owns the pinned nightly toolchain, `rustc-dev`, dependency
+versions, and lockfile. The application workspace continues to use its own toolchain. Dylint's compiler APIs are
+unstable; update the toolchain and lint implementation together.
 
 From the repository root:
 

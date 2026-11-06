@@ -32,13 +32,14 @@ the lint for the supported targets/features for broader coverage. It is not a fi
 
 ## Development
 
-The lint is a separate workspace using the same pinned nightly and Dylint version as `explicit_binding_types`.
+This crate shares the `lints/` workspace with `explicit_binding_types`. The workspace owns the pinned nightly toolchain,
+Dylint dependency versions, and lockfile.
 
 ```sh
 mise run test:lints
 mise run lint
 ```
 
-The root lint task loads both libraries and treats warnings as errors. UI fixtures under `tests/ui/` intentionally
+The root lint task loads both libraries and treats warnings as errors. UI fixtures under `ui/` intentionally
 contain a miniature package with both accepted test layouts and rejected `src/` implementations; `.stderr` snapshots
 record expected diagnostics.

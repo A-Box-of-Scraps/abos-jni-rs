@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
-exclude = ["lints/*", "tests/android-test-activity", "tests/abos-jni-sys-systest", "crates/abos-jbindgen/tests/runtime"]
+exclude = ["lints", "tests/android-test-activity", "tests/abos-jni-sys-systest", "crates/abos-jbindgen/tests/runtime"]
 
 [workspace.package]
 edition = "2024"

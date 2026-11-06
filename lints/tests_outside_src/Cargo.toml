@@ -1,20 +1,18 @@
 [package]
 name = "tests_outside_src"
 version = "0.1.0"
-edition = "2024"
-publish = false
+edition.workspace = true
+publish.workspace = true
 description = "Keep test implementations outside production source directories"
-
-[workspace]
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-dylint_linting = "=6.3.2"
+dylint_linting.workspace = true
 
 [dev-dependencies]
-dylint_testing = "=6.3.2"
+dylint_testing.workspace = true
 
 [package.metadata.rust-analyzer]
 rustc_private = true
