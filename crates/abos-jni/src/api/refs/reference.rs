@@ -18,6 +18,10 @@ use crate::objects::{Auto, JString};
 /// This trait unifies the behavior of all JNI reference types, allowing generic code to work with
 /// both local and global references as well as smart-pointer-like wrappers around them.
 ///
+/// Implementing this trait does not guarantee that the referent is kept alive: [`crate::refs::Weak`]
+/// also implements it. Operations requiring a strong reference additionally require access to a
+/// typed object wrapper, such as `AsRef<JObject>`, which `Weak` deliberately does not provide.
+///
 /// For example, this makes it possible for APIs like [`Env::new_global_ref`] to be given a
 /// non-static local reference type like [`JString<'local>`] (or an [`Auto`] wrapper) and return a
 /// [`Global`] that is instead parameterized by [`JString<'static>`].
@@ -50,6 +54,9 @@ use crate::objects::{Auto, JString};
 ///   `AsRef<IsInstanceOfType<'local>>` for any super-types (most importantly [`JObject`])
 ///
 /// # Safety
+///
+/// [`Self::as_raw`] must return null or a valid JNI reference that remains valid while `self` is
+/// borrowed. A weak global reference may refer to an object that has already been collected.
 ///
 /// The associated `Kind` and `GlobalKind` types must be FFI-safe, transparent wrappers around the
 /// underlying JNI object reference types (such as [`abos_jni::sys::jobject`] or [`abos_jni::sys::jclass`])

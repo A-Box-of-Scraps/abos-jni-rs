@@ -13,9 +13,9 @@ impl Env<'_> {
 	/// # Errors
 	///
 	/// Returns an error if the JVM cannot allocate a global reference or a weak source reference has already been collected.
-	pub fn new_global_ref<'any_local, O>(&self, obj: O) -> Result<Global<O::GlobalKind>>
+	pub fn new_global_ref<O>(&self, obj: O) -> Result<Global<O::GlobalKind>>
 	where
-		O: Reference + AsRef<JObject<'any_local>>,
+		O: Reference,
 	{
 		// Avoid passing null to `NewGlobalRef` so that we can recognise out-of-memory errors
 		if obj.is_null() {
@@ -249,11 +249,12 @@ impl Env<'_> {
 	/// This may be useful if a third-party library gives you ownership over a JNI weak reference
 	/// pointer and you want to manage it safely in Rust.
 	///
-	/// If you don't own the weak reference you must not use this function and can instead
-	/// use [`Env::as_cast_raw`] to temporarily wrap the raw pointer without taking ownership.
+	/// This function takes ownership of the weak reference and must not be used for borrowed handles.
+	/// Upgrade the returned [`Weak`] before accessing the object; a weak handle must not be borrowed
+	/// as an ordinary object wrapper through [`Env::as_cast_raw`].
 	///
 	/// # Safety
-	/// - The `raw` pointer must be a valid JNI reference of the appropriate type `T`, or `null`.
+	/// - The `raw` pointer must be a valid JNI weak global reference of the appropriate type `T`, or `null`.
 	/// - The `raw` pointer must not have any other existing wrappers
 	/// - You must logically own the weak reference and be able to guarantee that it can not
 	///   be deleted elsewhere while the returned [`Weak`] is alive.

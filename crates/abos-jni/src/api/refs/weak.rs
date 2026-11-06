@@ -13,9 +13,9 @@ use crate::{
 
 use super::Reference;
 
-// Note: `Weak` must not implement `Into<JObject>`! If it did, then it would be possible to
-// wrap it in `Auto`, which would cause undefined behavior upon drop as a result of calling
-// the wrong JNI function to delete the reference.
+// Weak must not expose its hidden object wrapper through AsRef or Deref: doing so
+// would allow object access without first preventing collection. Into<JObject> would
+// also allow Auto to release the weak reference with the wrong JNI deletion function.
 
 /// A global reference to a Java object that does *not* prevent it from being
 /// garbage collected.
@@ -43,6 +43,11 @@ use super::Reference;
 ///
 /// Upgrading a weak global reference does not delete it. It is only deleted
 /// when the `Weak` is dropped, and it can be upgraded more than once.
+///
+/// `Weak` implements [`Reference`] for reference management, but does not implement
+/// [`Deref`] or [`AsRef`] to an object wrapper. APIs that access an object's class,
+/// fields, methods, or contents require an upgraded reference. Reference creation
+/// and [`Env::is_same_object`] can accept a `Weak` directly.
 ///
 ///
 /// # Creating and Deleting
@@ -102,26 +107,6 @@ where
 	}
 }
 
-impl<T, U> AsRef<U> for Weak<T>
-where
-	T: AsRef<U> + Into<JObject<'static>> + AsRef<JObject<'static>> + Default + Reference + Send + Sync,
-{
-	fn as_ref(&self) -> &U {
-		self.obj.as_ref()
-	}
-}
-
-impl<T> Deref for Weak<T>
-where
-	T: Into<JObject<'static>> + AsRef<JObject<'static>> + Default + Reference + Send + Sync,
-{
-	type Target = T;
-
-	fn deref(&self) -> &Self::Target {
-		&self.obj
-	}
-}
-
 impl<T> Weak<T>
 where
 	T: Into<JObject<'static>> + AsRef<JObject<'static>> + Default + Reference + Send + Sync,
@@ -142,7 +127,7 @@ where
 		Self { obj }
 	}
 
-	/// Creates a [`Global`] wrapper for a `null` reference
+	/// Creates a [`Weak`] wrapper for a `null` reference
 	///
 	/// This is equivalent [`Weak::default()`]
 	///
@@ -198,7 +183,7 @@ where
 
 	/// Checks if the object referred to by this `Weak` has been garbage collected.
 	///
-	/// Note that garbage collection can happen at any moment, so a return of `Ok(true)` from this
+	/// Note that garbage collection can happen at any moment, so a return of `Ok(false)` from this
 	/// method does not guarantee that [`Weak::upgrade_local`] or [`Weak::upgrade_global`]
 	/// will succeed.
 	///
@@ -229,7 +214,7 @@ where
 	where
 		O: AsRef<JObject<'local>>,
 	{
-		env.is_same_object(self, object)
+		env.is_same_object(self, object.as_ref())
 	}
 
 	/// Returns true if this weak reference refers to the same object as another weak reference.

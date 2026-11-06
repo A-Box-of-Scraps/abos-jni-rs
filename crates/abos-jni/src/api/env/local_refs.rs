@@ -24,12 +24,9 @@ impl<'local> Env<'local> {
 	/// `'local` is the lifetime of the local reference frame that this `Env` belongs to. This
 	/// method creates a new local reference in that frame, with lifetime `'local`.
 	///
-	/// `'other_local` is the lifetime of the original reference's frame. It can be any valid
-	/// lifetime, even one that `'local` outlives or vice versa.
-	///
-	/// Think of `'local` as meaning `'new` and `'other_local` as meaning `'original`. (It is
-	/// unfortunately not possible to actually give these names to the two lifetimes because
-	/// `'local` is a parameter to the `Env` type, not a parameter to this method.)
+	/// The original reference can belong to any live local frame or be a global or weak global
+	/// reference. Its lifetime need not match `'local`. If a weak referent has been collected,
+	/// this method returns [`Error::ObjectFreed`] instead of a new local reference.
 	///
 	/// # Example
 	///
@@ -102,15 +99,13 @@ impl<'local> Env<'local> {
 	/// # Errors
 	///
 	/// Returns an error if the JVM cannot allocate a local reference or a weak source reference has already been collected.
-	pub fn new_local_ref<'any_local, O>(&mut self, obj: O) -> Result<O::Kind<'local>>
+	pub fn new_local_ref<O>(&mut self, obj: O) -> Result<O::Kind<'local>>
 	where
-		O: Reference + AsRef<JObject<'any_local>>,
+		O: Reference,
 	{
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-
-		//let obj = obj.as_ref();
 
 		// By checking for `null` before calling `NewLocalRef` we can recognise
 		// that a `null` returned from `NewLocalRef` is from being out of memory.

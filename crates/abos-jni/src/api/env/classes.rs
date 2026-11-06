@@ -485,28 +485,29 @@ impl<'local> Env<'local> {
 	}
 
 	/// Returns true if ref1 and ref2 refer to the same Java object, or are both `NULL`. Otherwise,
-	/// returns false.
+	/// returns false. Accepts local, global, and weak global references. A collected weak reference
+	/// compares equal to `NULL`; this check does not keep its referent alive for subsequent access.
 	///
 	/// Returns [`Error::JavaException`] if called while there is a pending Java exception
 	///
 	/// # Errors
 	///
 	/// Returns `Error::JavaException` if a Java exception is pending.
-	pub fn is_same_object<'other_local_1, 'other_local_2, O, T>(&self, ref1: O, ref2: T) -> Result<bool>
+	pub fn is_same_object<O, T>(&self, ref1: O, ref2: T) -> Result<bool>
 	where
-		O: AsRef<JObject<'other_local_1>>,
-		T: AsRef<JObject<'other_local_2>>,
+		O: Reference,
+		T: Reference,
 	{
 		// Safety:
 		// - IsSameObject is 1.1 API that must be valid
-		// - the spec allows either object reference to be `null`
+		// - Reference supplies valid JNI handles; either may be null or a collected weak reference.
 		unsafe {
 			jni_call_no_post_check_ex!(
 				self,
 				v1_1,
 				IsSameObject,
-				ref1.as_ref().as_raw(), // may be null
-				ref2.as_ref().as_raw()  // may be null
+				ref1.as_raw(), // may be null or weak
+				ref2.as_raw()  // may be null or weak
 			)
 		}
 	}

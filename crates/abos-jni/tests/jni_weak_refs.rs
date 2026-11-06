@@ -8,8 +8,10 @@ use std::{
 };
 
 use abos_jni::{
-	Env, jni_sig, jni_str,
-	objects::{IntoAuto as _, JObject, JValue, Weak},
+	Env,
+	errors::Error,
+	jni_sig, jni_str,
+	objects::{Auto, Global, IntoAuto as _, JObject, JString, JValue, Weak},
 	sys::jint,
 };
 
@@ -81,6 +83,37 @@ fn weak_ref_works_in_other_threads() {
 		Ok(())
 	})
 	.expect("attached JNI callback succeeds");
+}
+
+#[test]
+fn typed_weak_reference_management() {
+	attach_current_thread(|env| {
+		let original: Auto<'_, JString<'_>> = env.new_string("weak reference")?.auto();
+		let weak: Weak<JString<'static>> = env.new_weak_ref(&original)?;
+		let local: JString<'_> = env.new_local_ref(&weak)?;
+		let global: Global<JString<'static>> = env.new_global_ref(&weak)?;
+		let cloned: Weak<JString<'static>> = env.new_weak_ref(&weak)?;
+
+		drop(original);
+		run_gc(env);
+
+		assert_eq!(local.try_to_string(env)?, "weak reference");
+		assert_eq!(global.try_to_string(env)?, "weak reference");
+		assert!(env.is_same_object(&weak, &local)?);
+		assert!(env.is_same_object(&global, &weak)?);
+		assert!(env.is_same_object(&weak, &cloned)?);
+
+		let upgraded: JString<'_> = cloned
+			.upgrade_local(env)?
+			.expect("strong references keep the string alive");
+		let upgraded_global: Global<JString<'static>> = cloned
+			.upgrade_global(env)?
+			.expect("strong references keep the string alive");
+		assert_eq!(upgraded.try_to_string(env)?, "weak reference");
+		assert_eq!(upgraded_global.try_to_string(env)?, "weak reference");
+		Ok(())
+	})
+	.expect("typed weak reference management succeeds");
 }
 
 #[test]
@@ -200,6 +233,9 @@ fn assert_weak_live(env: &mut Env, obj_weak: &Weak<JObject<'static>>, obj_local:
 }
 
 fn assert_weak_collected(env: &mut Env, obj_weak: &Weak<JObject<'static>>) {
+	assert!(matches!(env.new_local_ref(obj_weak), Err(Error::ObjectFreed)));
+	assert!(matches!(env.new_global_ref(obj_weak), Err(Error::ObjectFreed)));
+
 	{
 		let obj_local_from_weak: Option<JObject<'_>> = unwrap(obj_weak.upgrade_local(env), env);
 
