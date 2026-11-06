@@ -10,5 +10,5 @@ The generator reserves names used by Java members but not names already emitted 
 Confirmed: legal Java methods `fromRaw()` and `intoRaw()` generated Rust methods named `from_raw` and `into_raw`,
 colliding with the wrapper's built-in methods. Compilation failed with duplicate-definition errors.
 
-Fix: seed collision handling with generated method names. Also account for generated API types and helper
-symbols, and compile regression fixtures rather than checking generated text alone.
+Fix: seed collision handling with generated method names. Also account for generated API types and helper symbols, and
+compile regression fixtures rather than checking generated text alone.
