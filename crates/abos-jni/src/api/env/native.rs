@@ -8,12 +8,19 @@ impl<'local> Env<'local> {
 	/// Lock a Java object. The `MonitorGuard` that this returns is responsible
 	/// for ensuring that it gets unlocked.
 	///
+	/// The guard borrows `obj` and cannot outlive either that reference or this environment's
+	/// thread attachment. Drop the guard before deleting a local reference or dropping its
+	/// [`Global`](crate::refs::Global) or [`Auto`](crate::refs::Auto) owner.
+	/// No additional JNI reference is allocated, and `Env` can still be used mutably while locked.
+	///
 	/// # Errors
 	///
 	/// Returns an error if the object is null, the monitor cannot be acquired, or a Java exception is pending.
-	pub fn lock_obj<'other_local, O>(&self, obj: O) -> Result<MonitorGuard<'local>>
+	pub fn lock_obj<'guard, 'other_local, O>(&self, obj: &'guard O) -> Result<MonitorGuard<'guard>>
 	where
-		O: AsRef<JObject<'other_local>>,
+		'local: 'guard,
+		'other_local: 'guard,
+		O: AsRef<JObject<'other_local>> + ?Sized,
 	{
 		// Note: although the returned Monitor is associated with a lifetime, we
 		// don't need a `&mut self` reference and we don't assert that
@@ -21,14 +28,14 @@ impl<'local> Env<'local> {
 		// returned monitor is associated with the current thread and is not a
 		// local reference.
 
-		let inner: crate::sys::jobject = obj.as_ref().as_raw();
-		// SAFETY: The object reference is non-null and live; MonitorGuard will release the acquired monitor.
-		let res: i32 = unsafe { jni_call_no_post_check_ex!(self, v1_1, MonitorEnter, inner)? };
+		let obj: &'guard JObject<'other_local> = null_check!(obj.as_ref(), "lock_obj obj argument")?;
+		// SAFETY: The non-null reference and thread attachment outlive the guard, which releases the monitor.
+		let res: i32 = unsafe { jni_call_no_post_check_ex!(self, v1_1, MonitorEnter, obj.as_raw())? };
 		jni_error_code_to_result(res)?;
 
 		Ok(MonitorGuard {
-			obj: inner,
-			life: std::marker::PhantomData,
+			obj,
+			_not_send_sync: std::marker::PhantomData,
 		})
 	}
 

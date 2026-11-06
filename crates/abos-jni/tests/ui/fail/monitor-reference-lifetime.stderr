@@ -1,0 +1,35 @@
+error[E0505]: cannot move out of `object` because it is borrowed
+  --> tests/ui/fail/monitor-reference-lifetime.rs:10:7
+   |
+ 8 | fn global(env: &Env, object: Global<JObject<'static>>) -> Result<()> {
+   |                      ------ binding `object` declared here
+ 9 |     let guard = env.lock_obj(&object)?;
+   |                              ------- borrow of `object` occurs here
+10 |     drop(object);
+   |          ^^^^^^ move out of `object` occurs here
+11 |     drop(guard);
+   |          ----- borrow later used here
+
+error[E0505]: cannot move out of `object` because it is borrowed
+  --> tests/ui/fail/monitor-reference-lifetime.rs:17:23
+   |
+15 | fn local<'local>(env: &Env<'local>, object: JObject<'local>) -> Result<()> {
+   |                                     ------ binding `object` declared here
+16 |     let guard = env.lock_obj(&object)?;
+   |                              ------- borrow of `object` occurs here
+17 |     env.delete_local_ref(object);
+   |                          ^^^^^^ move out of `object` occurs here
+18 |     drop(guard);
+   |          ----- borrow later used here
+
+error[E0505]: cannot move out of `object` because it is borrowed
+  --> tests/ui/fail/monitor-reference-lifetime.rs:24:7
+   |
+22 | fn auto<'local>(env: &Env<'local>, object: Auto<'local, JObject<'local>>) -> Result<()> {
+   |                                    ------ binding `object` declared here
+23 |     let guard = env.lock_obj(&object)?;
+   |                              ------- borrow of `object` occurs here
+24 |     drop(object);
+   |          ^^^^^^ move out of `object` occurs here
+25 |     drop(guard);
+   |          ----- borrow later used here

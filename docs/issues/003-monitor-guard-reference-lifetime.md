@@ -1,5 +1,7 @@
 # 003: Monitor guards can outlive their object reference
 
+Status: fixed.
+
 Priority: high.
 
 Locations: `crates/abos-jni/src/api/env/native.rs`, `Env::lock_obj`, and `crates/abos-jni/src/api/env/mod.rs`,
@@ -11,4 +13,7 @@ deleted before the guard calls `MonitorExit`.
 Confirmed using only safe calls: lock a global reference, drop the global reference, then drop the guard. The JVM
 aborted under `-Xcheck:jni` with a bad-reference error.
 
-Fix: borrow the reference owner for the guard's lifetime, or retain an independent strong reference.
+Resolution: `lock_obj` borrows its object reference, and the guard cannot outlive that borrow or the environment's
+attachment lifetime. No extra JNI reference is allocated. Rust field operations retain their reference owners until
+unlocking. Compile-fail tests cover owner deletion, frame escape, and attachment escape; runtime tests cover reentrancy,
+unwinding, pending exceptions, and owned global references.

@@ -127,3 +127,24 @@ fn take_poisoned_rust_field_preserves_ownership() {
 		assert_take_succeeds(env, obj, drops, 42)
 	});
 }
+
+#[test]
+fn rust_field_operations_keep_owned_globals_alive_until_unlock() {
+	with_rust_field(|env, obj, drops| {
+		let global: abos_jni::refs::Global<JObject<'static>> = env.new_global_ref(obj)?;
+		// SAFETY: The global refers to the same object holding the Tracked value installed by with_rust_field.
+		let guard: MutexGuard<'_, Tracked> = unsafe { env.get_rust_field(global, jni_str!("handle"))? };
+		assert_eq!(guard.value, 42);
+		drop(guard);
+
+		let global: abos_jni::refs::Global<JObject<'static>> = env.new_global_ref(obj)?;
+		// SAFETY: The same field owns the Tracked value, and its mutex guard has been dropped.
+		let value: Tracked = unsafe { env.take_rust_field(global, jni_str!("handle"))? };
+		assert_eq!(handle(env, obj)?, 0);
+
+		let global: abos_jni::refs::Global<JObject<'static>> = env.new_global_ref(obj)?;
+		// SAFETY: Taking the value cleared this long field; transfer the same value back to Java.
+		unsafe { env.set_rust_field(global, jni_str!("handle"), value)? };
+		assert_take_succeeds(env, obj, drops, 42)
+	});
+}

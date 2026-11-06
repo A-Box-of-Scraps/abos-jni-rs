@@ -7,13 +7,15 @@ impl<'local> Env<'local> {
 	/// Looks up the field ID for the given field name and takes the monitor
 	/// lock on the given object so the field can be updated without racing
 	/// with other Java threads
-	pub(super) fn lock_rust_field<'other_local, O, S>(
+	pub(super) fn lock_rust_field<'guard, 'other_local, O, S>(
 		&self,
-		obj: O,
+		obj: &'guard O,
 		field: S,
-	) -> Result<(MonitorGuard<'local>, JFieldID)>
+	) -> Result<(MonitorGuard<'guard>, JFieldID)>
 	where
-		O: AsRef<JObject<'other_local>>,
+		'local: 'guard,
+		'other_local: 'guard,
+		O: AsRef<JObject<'other_local>> + ?Sized,
 		S: AsRef<JNIStr>,
 	{
 		// Note: although the returned Monitor is associated with a lifetime, this API doesn't need
@@ -29,7 +31,7 @@ impl<'local> Env<'local> {
 		// reference for.
 
 		self.with_local_frame(DEFAULT_LOCAL_FRAME_CAPACITY, |env| {
-			let obj: &JObject<'_> = obj.as_ref();
+			let obj: &'guard JObject<'other_local> = obj.as_ref();
 			let class: crate::objects::JClass<'_> = env.get_object_class(obj)?;
 			let field_id: JFieldID = Desc::<JFieldID>::lookup((&class, &field, jni_sig!("J")), env)?;
 			let guard: MonitorGuard<'_> = self.lock_obj(obj)?;
@@ -110,7 +112,7 @@ impl<'local> Env<'local> {
 
 			// Safety: the requirement that the given field must be a `long` is
 			// documented in the 'Safety' section of this function
-			unsafe { env.set_field_unchecked(obj, field_id, (ptr as crate::sys::jlong).into()) }
+			unsafe { env.set_field_unchecked(&obj, field_id, (ptr as crate::sys::jlong).into()) }
 		})
 	}
 
@@ -159,7 +161,7 @@ impl<'local> Env<'local> {
 			// documented in the 'Safety' section of this function
 			unsafe {
 				let field_ptr = env
-					.get_field_unchecked(obj, field_id, ReturnType::Primitive(Primitive::Long))?
+					.get_field_unchecked(&obj, field_id, ReturnType::Primitive(Primitive::Long))?
 					.j()? as *mut Mutex<T>;
 				null_check!(field_ptr, "rust value from Java")?;
 				// dereferencing is safe, because we checked it for null

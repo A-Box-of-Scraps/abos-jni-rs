@@ -404,39 +404,29 @@ impl<'desc> NativeMethod<'desc> {
 	}
 }
 
-/// Guard for a lock on a java object. This gets returned from the `lock_obj`
-/// method.
+/// A borrowed Java object monitor, acquired through [`Env::lock_obj`].
+///
+/// The guard cannot outlive the borrowed object reference or the acquiring thread's
+/// attachment. It releases the monitor on drop, including during unwinding or with
+/// a Java exception pending, and cannot be sent or shared across threads.
 #[derive(Debug)]
 #[must_use]
-pub struct MonitorGuard<'local> {
-	obj: sys::jobject,
-	life: PhantomData<&'local ()>,
+pub struct MonitorGuard<'guard> {
+	obj: &'guard JObject<'guard>,
+	// Even a borrowed global reference must only be unlocked by the acquiring thread.
+	_not_send_sync: PhantomData<*mut ()>,
 }
 
 impl Drop for MonitorGuard<'_> {
 	fn drop(&mut self) {
-		// Panics:
-		//
-		// The first `.expect()` is OK because the `&self` reference is enough to prove that
-		// `JavaVM::singleton` must have been initialized and won't panic. (A MonitorGuard can only
-		// be created with a Env reference)
-		//
-		// The second `.expect()` is OK because the guard is associated with a Env lifetime, so
-		// it logically shouldn't be possible for the thread to become detached before the monitor
-		// is dropped.
+		// lock_obj requires an Env and bounds the guard by its attachment lifetime,
+		// so the VM is initialized and this thread is still attached.
 		JavaVM::singleton()
 			.expect("JavaVM singleton must be initialized")
 			.with_top_local_frame(|env| -> crate::errors::Result<()> {
-				// Safety:
-				//
-				// This relies on `MonitorGuard` not being `Send` to maintain the
-				// invariant that "The current thread must be the owner of the monitor
-				// associated with the underlying Java object referred to by obj"
-				//
-				// This also means we can assume the `IllegalMonitorStateException`
-				// exception can't be thrown due to the current thread not owning
-				// the monitor.
-				let res: i32 = unsafe { ex_safe_jni_call_no_post_check_ex!(env, v1_1, MonitorExit, self.obj) };
+				// SAFETY: The guard retains the borrowed reference and cannot leave the acquiring thread.
+				// MonitorExit is permitted while a Java exception is pending.
+				let res: i32 = unsafe { ex_safe_jni_call_no_post_check_ex!(env, v1_1, MonitorExit, self.obj.as_raw()) };
 				if let Err(err) = jni_error_code_to_result(res) {
 					log::error!("error releasing java monitor: {err}");
 				}

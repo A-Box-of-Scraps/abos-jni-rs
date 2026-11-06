@@ -1,0 +1,19 @@
+error: lifetime may not live long enough
+ --> tests/ui/fail/monitor-frame-lifetime.rs:6:3
+  |
+4 |     let guard = env.with_local_frame(1, |inner| {
+  |                                          ------ return type of closure is Result<MonitorGuard<'2>, abos_jni::errors::Error>
+  |                                          |
+  |                                          has type `&mut Env<'1>`
+5 |         let object = inner.new_object(jni_str!("java/lang/Object"), jni_sig!("()V"), &[])?;
+6 |         env.lock_obj(&object)
+  |         ^^^^^^^^^^^^^^^^^^^^^ returning this value requires that `'1` must outlive `'2`
+
+error[E0515]: cannot return value referencing local variable `object`
+ --> tests/ui/fail/monitor-frame-lifetime.rs:6:3
+  |
+6 |         env.lock_obj(&object)
+  |         ^^^^^^^^^^^^^-------^
+  |         |            |
+  |         |            `object` is borrowed here
+  |         returns a value referencing data owned by the current function
