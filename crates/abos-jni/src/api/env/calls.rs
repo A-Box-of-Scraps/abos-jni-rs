@@ -141,6 +141,7 @@ impl<'local> Env<'local> {
 	/// Calls a non-virtual method safely. This comes with a number of
 	/// lookups/checks. It
 	///
+	/// * Ensures that the receiver is an instance of the supplied class.
 	/// * Looks up the [`JMethodID`] for the class/name/signature combination
 	/// * Ensures that the number/types of args matches the signature
 	///   * Cannot check an object's type - but primitive types are matched against each other (including Object)
@@ -151,7 +152,9 @@ impl<'local> Env<'local> {
 	///
 	/// # Errors
 	///
-	/// Returns an error if class or method lookup fails, arguments do not match the signature, or Java throws an exception.
+	/// Returns [`Error::WrongObjectType`] if the receiver is not an instance of the supplied class.
+	/// Returns an error if the receiver is null, class or method lookup fails, arguments do not match the signature,
+	/// or Java throws an exception.
 	pub fn call_nonvirtual_method<'other_local, 'sig, 'sig_args, O, C, N, S>(
 		&mut self,
 		obj: O,
@@ -170,7 +173,7 @@ impl<'local> Env<'local> {
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let obj: &JObject<'_> = obj.as_ref();
-		let obj: &JObject<'_> = null_check!(obj, "call_method obj argument")?;
+		let obj: &JObject<'_> = null_check!(obj, "call_nonvirtual_method obj argument")?;
 		let sig: &MethodSignature<'_, '_> = sig.as_ref();
 		if sig.args().len() != args.len() {
 			return Err(Error::InvalidArgList(sig.into()));
@@ -189,9 +192,13 @@ impl<'local> Env<'local> {
 		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 		let class: &JClass<'_> = class.as_ref();
 
+		if !self.is_instance_of(obj, class)? {
+			return Err(Error::WrongObjectType);
+		}
+
 		let args: Vec<jvalue> = args.iter().map(super::super::jvalue::JValue::as_jni).collect();
 
-		// SAFETY: We've obtained the method_id above, so it is valid for this class.
+		// SAFETY: The receiver is an instance of class, and the method ID is resolved from that same class.
 		// We've also validated the argument counts and types using the same type signature
 		// we fetched the original method ID from.
 		unsafe { self.call_nonvirtual_method_unchecked(obj, class, (class, name, sig), sig.ret(), &args) }

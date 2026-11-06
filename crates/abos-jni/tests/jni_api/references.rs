@@ -132,6 +132,38 @@ fn test_call_nonvirtual_method() {
 }
 
 #[test]
+fn call_nonvirtual_method_rejects_incompatible_receiver() {
+	attach_current_thread(|env| {
+		let object: JObject<'_> = env.new_object(jni_str!("java/lang/Object"), jni_sig!("()V"), &[])?;
+		let result = env.call_nonvirtual_method(&object, STRING_CLASS, jni_str!("length"), jni_sig!("()I"), &[]);
+		assert_matches!(result, Err(Error::WrongObjectType));
+		assert!(!env.exception_check());
+
+		let string: JString<'_> = env.new_string("test")?;
+		let integer_class = env.find_class(INTEGER_CLASS)?;
+		let result = env.call_nonvirtual_method(&string, &integer_class, jni_str!("intValue"), jni_sig!("()I"), &[]);
+		assert_matches!(result, Err(Error::WrongObjectType));
+		assert!(!env.exception_check());
+
+		Ok(())
+	})
+	.expect("attached JNI callback succeeds");
+}
+
+#[test]
+fn call_nonvirtual_method_rejects_null_receiver() {
+	attach_current_thread(|env| {
+		let result =
+			env.call_nonvirtual_method(JObject::null(), STRING_CLASS, jni_str!("length"), jni_sig!("()I"), &[]);
+		assert_matches!(result, Err(Error::NullPtr("call_nonvirtual_method obj argument")));
+		assert!(!env.exception_check());
+
+		Ok(())
+	})
+	.expect("attached JNI callback succeeds");
+}
+
+#[test]
 fn short_lifetime_with_local_frame() {
 	attach_current_thread(|env| {
 		let object: std::result::Result<JObject<'_>, abos_jni::errors::Error> =
