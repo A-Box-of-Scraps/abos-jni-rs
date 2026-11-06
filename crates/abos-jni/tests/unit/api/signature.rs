@@ -204,3 +204,20 @@ const METHOD_CASES: &[(&str, &[JavaType], ReturnType)] = &[
 		ReturnType::Primitive(Primitive::Void),
 	),
 ];
+
+#[test]
+fn deeply_nested_arrays_do_not_grow_the_stack() {
+	for (element, valid) in [("I", true), ("Ljava/lang/String;", true), ("V", false), ("", false)] {
+		let descriptor: String = format!("{}{element}", "[".repeat(65_536));
+		assert_eq!(descriptor.parse::<JavaType>().is_ok(), valid);
+		assert_eq!(RuntimeFieldSignature::from_str(&descriptor).is_ok(), valid);
+		assert_eq!(
+			RuntimeMethodSignature::from_str(format!("({descriptor})V")).is_ok(),
+			valid
+		);
+		assert_eq!(
+			RuntimeMethodSignature::from_str(format!("(){descriptor}")).is_ok(),
+			valid
+		);
+	}
+}

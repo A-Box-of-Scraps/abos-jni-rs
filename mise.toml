@@ -85,7 +85,7 @@ run = "mvn --batch-mode --no-transfer-progress -q spotless:check"
 
 [tasks."fuzz:build"]
 dir = "fuzz"
-run = "cargo fuzz build cafebabe_parse_class"
+run = "cargo fuzz build"
 
 [tasks."fuzz:cafebabe"]
 depends = ["fuzz:seed"]
@@ -96,19 +96,64 @@ run = "cargo fuzz run cafebabe_parse_class -- -max_len=65536 -timeout=5 -rss_lim
 [tasks."fuzz:seed"]
 dir = "fuzz"
 run = """
-mkdir -p corpus/cafebabe_parse_class
-for seed in seeds/cafebabe_parse_class/*.class; do
-  destination="corpus/cafebabe_parse_class/$(basename "$seed")"
-  if [ ! -e "$destination" ]; then
-    cp "$seed" "$destination"
-  fi
+for target in cafebabe_parse_class jbindgen_descriptors jbindgen_parse_class jni_mutf8 jni_signatures jni_string_roundtrip; do
+  case "$target" in
+    jbindgen_parse_class) source=cafebabe_parse_class ;;
+    jbindgen_descriptors|jni_signatures) source=descriptors ;;
+    *) source="$target" ;;
+  esac
+  mkdir -p "corpus/$target"
+  for seed in "seeds/$source/"*; do
+    destination="corpus/$target/$(basename "$seed")"
+    if [ ! -e "$destination" ]; then
+      cp "$seed" "$destination"
+    fi
+  done
 done
 """
 
 [tasks."fuzz:smoke"]
-depends = ["fuzz:seed"]
+depends = ["fuzz:smoke:cafebabe"]
+
+[tasks."fuzz:smoke:all"]
+depends = [
+  "fuzz:smoke:cafebabe",
+  "fuzz:smoke:jbindgen-descriptors",
+  "fuzz:smoke:jbindgen-parse-class",
+  "fuzz:smoke:jni-mutf8",
+  "fuzz:smoke:jni-signatures",
+  "fuzz:smoke:jni-string-roundtrip",
+]
+
+[tasks."fuzz:smoke:cafebabe"]
+depends = ["fuzz:build", "fuzz:seed"]
 dir = "fuzz"
 run = "cargo fuzz run cafebabe_parse_class -- -max_total_time=60 -max_len=65536 -timeout=5 -rss_limit_mb=2048"
+
+[tasks."fuzz:smoke:jbindgen-descriptors"]
+depends = ["fuzz:build", "fuzz:seed"]
+dir = "fuzz"
+run = "cargo fuzz run jbindgen_descriptors -- -max_total_time=60 -max_len=65536 -timeout=5 -rss_limit_mb=2048"
+
+[tasks."fuzz:smoke:jbindgen-parse-class"]
+depends = ["fuzz:build", "fuzz:seed"]
+dir = "fuzz"
+run = "cargo fuzz run jbindgen_parse_class -- -max_total_time=60 -max_len=65536 -timeout=5 -rss_limit_mb=2048"
+
+[tasks."fuzz:smoke:jni-mutf8"]
+depends = ["fuzz:build", "fuzz:seed"]
+dir = "fuzz"
+run = "cargo fuzz run jni_mutf8 -- -max_total_time=60 -max_len=65536 -timeout=5 -rss_limit_mb=2048"
+
+[tasks."fuzz:smoke:jni-signatures"]
+depends = ["fuzz:build", "fuzz:seed"]
+dir = "fuzz"
+run = "cargo fuzz run jni_signatures -- -max_total_time=60 -max_len=65536 -timeout=5 -rss_limit_mb=2048"
+
+[tasks."fuzz:smoke:jni-string-roundtrip"]
+depends = ["fuzz:build", "fuzz:seed"]
+dir = "fuzz"
+run = "cargo fuzz run jni_string_roundtrip -- -max_total_time=60 -max_len=65536 -timeout=5 -rss_limit_mb=2048"
 
 [tasks."generate:abos-jni:windows-bindings"]
 run = "cargo run --manifest-path tools/abos-jni-gen-windows-bindings/Cargo.toml -q"

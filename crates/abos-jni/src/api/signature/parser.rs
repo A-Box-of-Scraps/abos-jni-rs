@@ -44,7 +44,9 @@ pub(super) fn parse_array(input: &str) -> Result<(JavaType, &str)> {
 	let input: &str = input
 		.strip_prefix('[')
 		.ok_or_else(|| Error::ParseFailed("expected '[' for array type".into()))?;
-	let (_, rest) = parse_non_void_type(input)?;
+	// JavaType only records that this is an array, not its dimensions. Skip
+	// the remaining prefixes without growing the stack for untrusted input.
+	let (_, rest) = parse_non_void_type(input.trim_start_matches('['))?;
 	Ok((JavaType::Array, rest))
 }
 

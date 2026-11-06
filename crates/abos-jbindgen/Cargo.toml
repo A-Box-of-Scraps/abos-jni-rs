@@ -6,6 +6,10 @@ license.workspace = true
 rust-version.workspace = true
 description = "Generate Rust JNI bindings from Java source, bytecode, and Android SDKs."
 
+[features]
+# Internal parser access for the isolated fuzz workspace.
+_fuzzing = []
+
 [lints]
 workspace = true
 

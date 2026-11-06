@@ -14,11 +14,48 @@ resolver = "3"
 
 [dependencies]
 abos-cafebabe = { path = "../crates/abos-cafebabe" }
+abos-jbindgen = { path = "../crates/abos-jbindgen", features = ["_fuzzing"] }
+abos-jni = { path = "../crates/abos-jni" }
 libfuzzer-sys = "0.4"
 
 [[bin]]
 name = "cafebabe_parse_class"
 path = "fuzz_targets/cafebabe_parse_class.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "jbindgen_descriptors"
+path = "fuzz_targets/jbindgen_descriptors.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "jbindgen_parse_class"
+path = "fuzz_targets/jbindgen_parse_class.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "jni_mutf8"
+path = "fuzz_targets/jni_mutf8.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "jni_signatures"
+path = "fuzz_targets/jni_signatures.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "jni_string_roundtrip"
+path = "fuzz_targets/jni_string_roundtrip.rs"
 test = false
 doc = false
 bench = false
