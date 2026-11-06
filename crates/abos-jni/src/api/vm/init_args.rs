@@ -94,7 +94,7 @@ impl JvmError {
 	}
 
 	#[cfg(all(test, windows))]
-	fn opt_string_mut(&mut self) -> Option<&mut String> {
+	const fn opt_string_mut(&mut self) -> Option<&mut String> {
 		match self {
 			Self::TooManyOptions(_) => None,
 			Self::NullOptString(opt_string)

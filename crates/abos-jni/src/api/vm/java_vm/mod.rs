@@ -254,7 +254,7 @@ pub unsafe fn sys_attach_current_thread(
 
 /// Check if the process is currently shutting down.
 ///
-/// Note: RtlDllShutdownInProgress is available on Windows 10 + but not part of
+/// Note: `RtlDllShutdownInProgress` is available on Windows 10 + but not part of
 /// the Windows SDK (not available via windows-bindgen), so we link to it
 /// manually.
 #[cfg(target_os = "windows")]
@@ -263,6 +263,7 @@ fn windows_is_shutdown_in_progress() -> bool {
 	unsafe extern "system" {
 		fn RtlDllShutdownInProgress() -> u8; // BOOLEAN
 	}
+	// SAFETY: This process-state query takes no arguments and has no caller preconditions.
 	unsafe { RtlDllShutdownInProgress() != 0 }
 }
 

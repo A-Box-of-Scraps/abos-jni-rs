@@ -53,7 +53,7 @@ impl JavaVM {
 
 		#[cfg(target_os = "android")]
 		{
-			let _a = args;
+			drop(args);
 			Err(StartJvmError::Unsupported)
 		}
 	}
@@ -149,8 +149,9 @@ impl JavaVM {
 			tls_attach_guard::tls_attach_current_thread(&vm, &crate::vm::AttachConfig::default())?
 		};
 		#[cfg(use_fls_attach_guard)]
+		// SAFETY: JNI_CreateJavaVM has attached this thread; FLS tracking takes ownership without detaching it.
 		unsafe {
-			fls_attach_guard::fls_attach_current_thread(&vm, &Default::default())?
+			fls_attach_guard::fls_attach_current_thread(&vm, &crate::vm::AttachConfig::default())?
 		};
 
 		Ok(vm)
@@ -251,8 +252,8 @@ impl JavaVM {
 
 		#[cfg(target_os = "android")]
 		{
-			let _args = args;
-			let _libjvm_path = libjvm_path;
+			drop(libjvm_path);
+			drop(args);
 			Err(StartJvmError::Unsupported)
 		}
 	}

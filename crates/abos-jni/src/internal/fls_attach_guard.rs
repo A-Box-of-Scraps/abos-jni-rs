@@ -44,7 +44,7 @@
 //! ever know if your per-thread env pointer is still valid)
 //!
 //! As with TLS based attachment tracking we do want to be resilient to external code manually
-//! detaching threads when there are no active `AttachGuard`s, so attach_current_thread() will
+//! detaching threads when there are no active `AttachGuard`s, so `attach_current_thread()` will
 //! always check the real JNI attachment state if there are no active guards.
 
 use std::{
@@ -57,7 +57,7 @@ use log::{debug, error};
 
 use crate::{
 	AttachGuard, JavaVM,
-	errors::*,
+	errors::{Error, JniError, Result},
 	vm::{sys_attach_current_thread, sys_detach_current_thread},
 };
 
@@ -83,12 +83,12 @@ struct FlsAttachData {
 ///
 /// SAFETY: This callback is invoked by Windows when:
 /// 1. A fiber terminates or is deleted
-/// 2. The FLS slot is freed (via FlsFree)
+/// 2. The FLS slot is freed (via `FlsFree`)
 ///
 /// When this callback runs, it detaches the current thread from the JVM.
 ///
 /// In the unlikely event that multiple fibers have attached the same thread (e.g., if
-/// DetachCurrentThread was called manually by external code), each fiber's termination
+/// `DetachCurrentThread` was called manually by external code), each fiber's termination
 /// will attempt to detach the thread, but subsequent detach calls are harmless no-ops.
 ///
 /// # Panics
@@ -122,6 +122,7 @@ unsafe extern "system" fn fls_callback(data: *const core::ffi::c_void) {
 	// Always safe to detach when guard_level == 0
 	// Note: We pass None for cross_check_env because with multiple fibers, subsequent
 	// detach attempts will have stale env pointers. DetachCurrentThread is idempotent.
+	// SAFETY: No attachment guards remain, as checked above; no environment is used after detaching.
 	if let Err(e) = unsafe { sys_detach_current_thread(None, &attach_data.thread) } {
 		error!(
 			"Error detaching thread in FLS callback: {:#?}\nThread {} id={:?}",
@@ -160,27 +161,27 @@ fn get_or_init_fls_index() -> Result<u32> {
 /// terminates, the FLS callback will automatically detach the thread from the JVM (without holding
 /// the loader lock).
 ///
-/// Note: This function assumes that the caller has already used GetEnv to check if the thread is
+/// Note: This function assumes that the caller has already used `GetEnv` to check if the thread is
 /// already attached, and only calls this function if it is not attached.
 ///
 /// Typically only one fiber per thread will call this function because subsequent fibers on the
 /// same thread will find the thread already attached.
 ///
 /// Note: Although it is unlikely, it's possible that this can be called from multiple fibers on the
-/// the same thread, if DetachCurrentThread was called manually by external code (we allow this as
-/// long as there are no active AttachGuards). In this case we allow the ATTACHED_THREADS counter to
+/// the same thread, if `DetachCurrentThread` was called manually by external code (we allow this as
+/// long as there are no active `AttachGuards`). In this case we allow the `ATTACHED_THREADS` counter to
 /// be incremented for each fiber with its own FLS data so the number can technically diverge from
 /// the real _thread_ attachment count. This is acceptable since the number is only used for
 /// debugging and unit tests. In fact, on Windows the unit tests will test for this scenario.
 ///
 /// If we do end up with multiple fibers having FLS data then each fiber's termination will attempt to
 /// detach the thread, but subsequent detach calls are harmless no-ops. They will also decrement the
-/// ATTACHED_THREADS counter accordingly so the logical count remains correct.
+/// `ATTACHED_THREADS` counter accordingly so the logical count remains correct.
 ///
 /// # Panics
 ///
 /// This function will panic if called while there are active `AttachGuard`s.
-pub(crate) unsafe fn fls_attach_current_thread<'local>(
+pub unsafe fn fls_attach_current_thread<'local>(
 	java_vm: &crate::JavaVM,
 	config: &crate::vm::AttachConfig,
 ) -> Result<crate::vm::AttachGuard<'local>> {
@@ -205,11 +206,12 @@ pub(crate) unsafe fn fls_attach_current_thread<'local>(
 	let existing = unsafe { FlsGetValue(fls_index) };
 	// Although it's unlikely, it's possible that the thread was already permanently attached
 	// but some external code manually detached it (this is allowed as long as there are no
-	// active AttachGuards). In this case we don't want to double-increment the attached
+	// active `AttachGuards`). In this case we don't want to double-increment the attached
 	// threads counter.
 	let inc_attached_count = existing.is_null();
 
 	let thread = current();
+	// SAFETY: No attachment guards are active, and the caller upholds the returned guard's scope requirements.
 	let env = unsafe { sys_attach_current_thread(java_vm, config, &thread, inc_attached_count)? };
 
 	// Create attachment data for this fiber
@@ -217,16 +219,16 @@ pub(crate) unsafe fn fls_attach_current_thread<'local>(
 	// multiple fibers share the same thread attachment
 	let attach_data = Box::new(FlsAttachData { thread: current() });
 
-	let data_ptr = Box::into_raw(attach_data) as *mut core::ffi::c_void;
+	let data_ptr = Box::into_raw(attach_data).cast::<core::ffi::c_void>();
 
 	// Store in FLS for this fiber
 	// Safety: fls_index is valid, data_ptr is a valid pointer
 	let result = unsafe { FlsSetValue(fls_index, data_ptr) };
 
 	if result == 0 {
-		// Failed to set FLS value, clean up
+		// SAFETY: FLS did not take ownership; reclaim the allocation produced by Box::into_raw above.
 		unsafe {
-			let _ = Box::from_raw(data_ptr as *mut FlsAttachData);
+			drop(Box::from_raw(data_ptr.cast::<FlsAttachData>()));
 		}
 		return Err(Error::JniCall(JniError::Unknown));
 	}
@@ -238,6 +240,7 @@ pub(crate) unsafe fn fls_attach_current_thread<'local>(
 		java_vm.threads_attached(),
 	);
 
+	// SAFETY: The environment belongs to this thread; FLS owns the attachment and the caller guarantees the guard scope.
 	Ok(unsafe { AttachGuard::from_unowned(env) })
 }
 
@@ -250,7 +253,7 @@ pub(crate) unsafe fn fls_attach_current_thread<'local>(
 ///
 /// This function will panic if called while there are active `AttachGuard` instances.
 /// Fiber detachment/switching must not occur while an `AttachGuard` is in scope.
-pub(crate) fn fls_detach_current_thread() -> Result<()> {
+pub fn fls_detach_current_thread() -> Result<()> {
 	if JavaVM::thread_attach_guard_level() != 0 {
 		return Err(Error::ThreadAttachmentGuarded);
 	}
@@ -278,10 +281,11 @@ pub(crate) fn fls_detach_current_thread() -> Result<()> {
 
 	// Clean up the FLS data and detach
 	// Safety: data_ptr came from FlsGetValue and we stored Box<FlsAttachData>
-	let attach_data = unsafe { Box::from_raw(data_ptr as *mut FlsAttachData) };
+	let attach_data = unsafe { Box::from_raw(data_ptr.cast::<FlsAttachData>()) };
 
 	// Note: We pass None for cross_check_env because we don't store env pointers in FLS
 	// (they can become stale with multiple fibers). DetachCurrentThread is idempotent.
+	// SAFETY: No attachment guards remain, and the FLS slot was cleared before detaching.
 	unsafe { sys_detach_current_thread(None, &attach_data.thread)? };
 	Ok(())
 }
