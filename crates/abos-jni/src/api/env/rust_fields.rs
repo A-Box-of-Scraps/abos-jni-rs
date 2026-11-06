@@ -185,11 +185,12 @@ impl<'local> Env<'local> {
 	///
 	/// # Errors
 	///
-	/// Returns an error if the field is empty, its value is currently locked, or accessing or clearing the Java field fails.
+	/// Returns an error if the field is empty, its value is currently locked or poisoned,
+	/// or accessing or clearing the Java field fails. On error, Java retains ownership of the value.
 	///
 	/// # Panics
 	///
-	/// Panics if the mutex protecting the Rust value is poisoned.
+	/// Panics if the mutex is unexpectedly poisoned after the lock check.
 	pub unsafe fn take_rust_field<'other_local, O, S, T>(&self, obj: O, field: S) -> Result<T>
 	where
 		O: AsRef<JObject<'other_local>>,
@@ -205,28 +206,28 @@ impl<'local> Env<'local> {
 		// get_field_unchecked doesn't need to create any local references.
 
 		self.with_top_local_frame(|env| {
-			// Safety: the requirement that the given field must be a `long` is
-			// documented in the 'Safety' section of this function
-			let mbox: Box<Mutex<T>> = unsafe {
-				let ptr = env
-					.get_field_unchecked(&obj, field_id, ReturnType::Primitive(Primitive::Long))?
-					.j()? as *mut Mutex<T>;
-
-				null_check!(ptr, "rust value from Java")?;
-				Box::from_raw(ptr)
+			// SAFETY: lock_rust_field resolved this object's long field while holding its monitor.
+			let ptr: *mut Mutex<T> = unsafe {
+				env.get_field_unchecked(&obj, field_id, ReturnType::Primitive(Primitive::Long))?
+					.j()? as *mut Mutex<T>
 			};
+			null_check!(ptr, "rust value from Java")?;
 
-			// attempt to acquire the lock. This prevents us from consuming the
-			// mutex if there's an outstanding lock. No one else will be able to
-			// get a new one as long as we're in the guarded scope.
-			drop(mbox.try_lock()?);
+			// Borrow until all fallible operations succeed: creating a Box earlier would
+			// free Java's value on an error, possibly while a MutexGuard still borrows it.
+			// SAFETY: The caller guarantees a valid stored Mutex<T>; the Java monitor prevents another take.
+			let mutex: &Mutex<T> = unsafe { &*ptr };
+			// Reject outstanding or poisoned locks. The Java monitor prevents new guards
+			// from being acquired between this check and clearing the field.
+			drop(mutex.try_lock()?);
 
-			// Safety: the requirement that the given field must be a `long` is
-			// documented in the 'Safety' section of this function
+			// SAFETY: The field ID belongs to this object's long field. Keep obj alive until the monitor is released.
 			unsafe {
-				env.set_field_unchecked(obj, field_id, (0 as sys::jlong).into())?;
+				env.set_field_unchecked(&obj, field_id, (0 as sys::jlong).into())?;
 			}
 
+			// SAFETY: The field is cleared and no guards remain, so Java has relinquished ownership of the allocation.
+			let mbox: Box<Mutex<T>> = unsafe { Box::from_raw(ptr) };
 			Ok(mbox.into_inner().expect("Rust field mutex is not poisoned"))
 		})
 	}
