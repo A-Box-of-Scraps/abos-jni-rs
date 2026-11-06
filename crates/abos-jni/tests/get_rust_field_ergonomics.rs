@@ -19,6 +19,10 @@ pub struct Surface {
 	// fields
 }
 
+#[expect(
+	clippy::significant_drop_tightening,
+	reason = "Keep both field guards alive while exercising subsequent mutable Env access."
+)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_Renderer_render<'local>(
 	mut unowned_env: EnvUnowned<'local>,
@@ -28,7 +32,9 @@ pub extern "system" fn Java_Renderer_render<'local>(
 ) {
 	unowned_env
 		.with_env(|env| -> abos_jni::errors::Result<_> {
+			// SAFETY: The native callback contract requires mNative to contain the Renderer installed with set_rust_field.
 			let mut renderer = unsafe { env.get_rust_field::<_, _, Renderer>(renderer, jni_str!("mNative"))? };
+			// SAFETY: The native callback contract requires mNative to contain the Surface installed with set_rust_field.
 			let surface = unsafe { env.get_rust_field::<_, _, Surface>(surface, jni_str!("mNative"))? };
 			renderer.render(&surface);
 

@@ -21,18 +21,17 @@ crate::bind_java_type! {
 	}
 }
 
-#[allow(rustdoc::invalid_html_tags)]
 /// Display the contents of a `JString`
 ///
 /// This implementation relies on JNI (`GetStringUTFChars`) to retrieve the string contents for
 /// display.
 ///
-/// If you try and format a null reference this will output "<NULL>"
+/// If you try and format a null reference this will output `"<NULL>"`
 ///
 /// In case you attempt to format a `JString` before [`JavaVM::singleton`] has been initialized then
-/// this will simply output "<JNI Not Initialized>" and log an error.
+/// this will simply output `"<JNI Not Initialized>"` and log an error.
 ///
-/// In case of any other unexpected JNI error, this will output "<JNI Error>" and log the error
+/// In case of any other unexpected JNI error, this will output `"<JNI Error>"` and log the error
 /// details.
 impl std::fmt::Display for JString<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -108,6 +107,10 @@ impl JString<'_> {
 	///
 	/// To avoid the overhead of encoding and copying, use [`Self::from_jni_str`] and the
 	/// [`crate::jni_str`!] macro to encode strings to MUTF-8 at compile time.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the JVM cannot allocate the string or a Java exception is already pending.
 	pub fn new<'env_local>(env: &mut Env<'env_local>, from: impl AsRef<str>) -> Result<JString<'env_local>> {
 		Self::from_str(env, from)
 	}
@@ -124,6 +127,10 @@ impl JString<'_> {
 	///
 	/// To avoid the overhead of encoding and copying, use [`Self::from_jni_str`] and the
 	/// [`crate::jni_str`!] macro to encode strings to MUTF-8 at compile time.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the JVM cannot allocate the string or a Java exception is already pending.
 	pub fn from_str<'env_local>(env: &mut Env<'env_local>, from: impl AsRef<str>) -> Result<JString<'env_local>> {
 		Self::from_jni_str(env, JNIString::new(from))
 	}
@@ -135,6 +142,10 @@ impl JString<'_> {
 	///
 	/// This API catches exceptions internally and is not expected to return
 	/// [`Error::JavaException`] (unless called while there is a pending exception).
+	///
+	/// # Errors
+	///
+	/// Returns an error if the JVM cannot allocate the string or a Java exception is already pending.
 	pub fn from_jni_str<'env_local>(
 		env: &mut Env<'env_local>,
 		from: impl AsRef<JNIStr>,
@@ -143,6 +154,7 @@ impl JString<'_> {
 		// Env lifetime for the top JNI stack frame
 		env.assert_top();
 		let ffi_str: &JNIStr = from.as_ref();
+		// SAFETY: JNIStr supplies a terminated modified-UTF-8 string, and env owns the current local frame.
 		unsafe {
 			jni_call_with_catch_and_null_check!(
                 catch |env| {

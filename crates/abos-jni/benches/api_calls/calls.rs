@@ -12,11 +12,11 @@ use abos_jni::{
 use abos_jni_sys::jvalue;
 
 #[inline(never)]
-pub(super) const fn native_abs(x: i32) -> i32 {
+pub const fn native_abs(x: i32) -> i32 {
 	x.abs()
 }
 
-pub(super) fn jni_abs_safe(env: &mut Env, x: jint) -> jint {
+pub fn jni_abs_safe(env: &mut Env, x: jint) -> jint {
 	let x = JValue::from(x);
 	let v = env
 		.call_static_method(CLASS_MATH, METHOD_MATH_ABS, &SIG_MATH_ABS, &[x])
@@ -24,14 +24,14 @@ pub(super) fn jni_abs_safe(env: &mut Env, x: jint) -> jint {
 	v.i().expect("JNI result contains an int")
 }
 
-pub(super) fn jni_hash_safe(env: &mut Env, obj: &JObject) -> jint {
+pub fn jni_hash_safe(env: &mut Env, obj: &JObject) -> jint {
 	let v = env
 		.call_method(obj, METHOD_OBJECT_HASH_CODE, &SIG_OBJECT_HASH_CODE, &[])
 		.expect("instance method call succeeds");
 	v.i().expect("JNI result contains an int")
 }
 
-pub(super) fn jni_local_date_time_of_safe<'local>(env: &mut Env<'local>, components: [jint; 7]) -> JObject<'local> {
+pub fn jni_local_date_time_of_safe<'local>(env: &mut Env<'local>, components: [jint; 7]) -> JObject<'local> {
 	let args = components.map(JValue::Int);
 	env.call_static_method(
 		CLASS_LOCAL_DATE_TIME,
@@ -44,7 +44,7 @@ pub(super) fn jni_local_date_time_of_safe<'local>(env: &mut Env<'local>, compone
 	.expect("JNI result contains an object")
 }
 
-pub(super) fn jni_int_call_static_unchecked<'local, C>(
+pub fn jni_int_call_static_unchecked<'local, C>(
 	env: &mut Env<'local>,
 	class: C,
 	method_id: JStaticMethodID,
@@ -61,7 +61,7 @@ where
 	v.i().expect("JNI result contains an int")
 }
 
-pub(super) fn jni_int_call_unchecked<'local, M>(env: &mut Env<'local>, obj: &JObject<'local>, method_id: M) -> jint
+pub fn jni_int_call_unchecked<'local, M>(env: &mut Env<'local>, obj: &JObject<'local>, method_id: M) -> jint
 where
 	M: Desc<'local, JMethodID>,
 {
@@ -71,7 +71,7 @@ where
 	v.i().expect("JNI result contains an int")
 }
 
-pub(super) fn jni_object_call_static_unchecked<'local, C>(
+pub fn jni_object_call_static_unchecked<'local, C>(
 	env: &mut Env<'local>,
 	class: C,
 	method_id: JStaticMethodID,

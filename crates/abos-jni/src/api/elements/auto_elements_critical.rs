@@ -54,6 +54,7 @@ where
 		// GetPrimitiveArrayCritical can return NULL on OutOfMemory and may throw
 		// OutOfMemoryError. If it returns NULL, no critical section has been
 		// created, so it's safe to make JNI calls to check/clear exceptions.
+		// SAFETY: The typed array is valid, the copy flag is writable, and the guard will delimit the critical section.
 		let ptr = unsafe {
 			jni_call_no_post_check_ex!(
 				env,
@@ -68,9 +69,7 @@ where
 		// Check for NULL return (indicates OutOfMemory)
 		// If we got NULL, no critical section was created, so we can safely
 		// make JNI calls to clear any pending exception.
-		let ptr = if let Some(ptr) = NonNull::new(ptr) {
-			ptr
-		} else {
+		let Some(ptr) = NonNull::new(ptr) else {
 			// Clear any pending OutOfMemoryError before returning
 			env.exception_clear();
 			return Err(Error::JniCall(JniError::NoMemory));
@@ -88,6 +87,7 @@ where
 
 	pub(crate) fn new(env: &Env<'_>, array: TArrayRef, mode: ReleaseMode) -> Result<Self> {
 		let len = array.as_ref().len(env)?;
+		// SAFETY: The length was obtained from the same typed array retained by the returned guard.
 		unsafe { Self::new_with_len(env, array, len, mode) }
 	}
 
@@ -111,6 +111,7 @@ where
 		// - Since `self` is associated with a local reference frame lifetime we know that the
 		//   thread is attached and so `with_top_local_frame()` can't return an error.
 		// - ReleasePrimitiveArrayCritical can be called while there is a pending exception
+		// SAFETY: The pointer belongs to this retained array, mode is valid, and this call releases the critical section.
 		JavaVM::singleton()?.with_top_local_frame(|env| unsafe {
 			ex_safe_jni_call_no_post_check_ex!(
 				env,
@@ -191,6 +192,7 @@ where
 	type Target = [T];
 
 	fn deref(&self) -> &Self::Target {
+		// SAFETY: The guard keeps len initialized elements pinned, and the shared borrow prevents mutation through it.
 		unsafe { std::slice::from_raw_parts(self.ptr.as_ptr(), self.len) }
 	}
 }
@@ -200,6 +202,7 @@ where
 	TArrayRef: AsRef<JPrimitiveArray<'array_local, T>>,
 {
 	fn deref_mut(&mut self) -> &mut Self::Target {
+		// SAFETY: The guard pins len initialized elements and the mutable borrow grants exclusive access.
 		unsafe { std::slice::from_raw_parts_mut(self.ptr.as_mut(), self.len) }
 	}
 }

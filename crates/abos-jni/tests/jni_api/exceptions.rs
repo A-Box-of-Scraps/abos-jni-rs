@@ -126,12 +126,9 @@ fn test_jstring_conversion() {
 	let null = JString::null();
 	assert_eq!(null.to_string(), "<NULL>");
 
-	// XXX: this is highly unsafe but the expectation here is that the implementation
-	// will not get as far as attempting to dereference the invalid pointer because
-	// JavaVM::singleton is not yet initialized.
-	//
-	// Alternatively the only other way we could test this case would be with a
-	// native method callback which is hard to reproduce here.
+	assert!(abos_jni::JavaVM::singleton().is_err());
+	// SAFETY: In this isolated pre-initialization process, Display returns before using the
+	// sentinel. It is never dereferenced or passed to JNI, and is discarded before JVM setup.
 	let invalid = unsafe { JString::kind_from_raw(1 as _) };
 	assert_eq!(invalid.to_string(), "<JNI Not Initialized>");
 
@@ -150,7 +147,7 @@ fn test_jstring_conversion() {
 #[test]
 pub fn test_null_string_mutf8_chars() {
 	attach_current_thread(|env| {
-		let s = unsafe { JString::from_raw(env, std::ptr::null_mut()) };
+		let s = JString::null();
 		let ret = s.mutf8_chars(env);
 		assert!(ret.is_err());
 
@@ -237,16 +234,7 @@ fn test_exception_match() {
 					.expect("Expected an exception after ExceptionCheck");
 				env.exception_clear();
 
-				if let Some(_oom) = abos_jni::exceptions::JOutOfMemoryError::matches(env, &e)? {
-					Err(abos_jni::errors::Error::JniCall(JniError::NoMemory))
-				} else if let Some(eformat) = abos_jni::exceptions::JNumberFormatException::matches(env, &e)? {
-					let msg = eformat.as_throwable().get_message(env).unwrap_or_default();
-					let msg = msg.to_string();
-					Err(Error::ParseFailed(msg))
-				} else {
-					eprintln!("Unexpected exception: {e:?}");
-					Err(Error::JniCall(JniError::Unknown))
-				}
+				classify_test_exception(env, &e)
 			})
 		} else {
 			Ok(())
@@ -258,4 +246,17 @@ fn test_exception_match() {
 		Ok(())
 	})
 	.expect("attached JNI callback succeeds");
+}
+
+fn classify_test_exception(env: &mut abos_jni::Env, e: &abos_jni::objects::JThrowable) -> abos_jni::errors::Result<()> {
+	if let Some(_oom) = abos_jni::exceptions::JOutOfMemoryError::matches(env, e)? {
+		Err(abos_jni::errors::Error::JniCall(JniError::NoMemory))
+	} else if let Some(eformat) = abos_jni::exceptions::JNumberFormatException::matches(env, e)? {
+		let msg = eformat.as_throwable().get_message(env).unwrap_or_default();
+		let msg = msg.to_string();
+		Err(Error::ParseFailed(msg))
+	} else {
+		eprintln!("Unexpected exception: {e:?}");
+		Err(Error::JniCall(JniError::Unknown))
+	}
 }

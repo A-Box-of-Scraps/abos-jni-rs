@@ -81,11 +81,13 @@ where
 #[deprecated(since = "0.22.0", note = r#"Since 0.22, `WeakRef` has been renamed to `Weak`."#)]
 pub type WeakRef<T> = Weak<T>;
 
+// SAFETY: JNI global references are usable across threads; the wrapped type is Send + Sync and JNI access requires an Env.
 unsafe impl<T> Send for Weak<T> where
 	T: Into<JObject<'static>> + AsRef<JObject<'static>> + Default + Reference + Send + Sync
 {
 }
 
+// SAFETY: JNI global references are usable across threads; the wrapped type is Send + Sync and JNI access requires an Env.
 unsafe impl<T> Sync for Weak<T> where
 	T: Into<JObject<'static>> + AsRef<JObject<'static>> + Default + Reference + Send + Sync
 {
@@ -163,6 +165,10 @@ where
 	///
 	/// If this method returns `Some(r)`, it is guaranteed that the object will not be garbage
 	/// collected at least until `r` is deleted or becomes invalid.
+	///
+	/// # Errors
+	///
+	/// Returns an error if a local reference cannot be allocated or a Java exception is pending.
 	pub fn upgrade_local<'local>(&self, env: &mut Env<'local>) -> Result<Option<T::Kind<'local>>> {
 		match env.new_local_ref(self) {
 			Ok(local_ref) => Ok(Some(local_ref)),
@@ -178,6 +184,10 @@ where
 	///
 	/// If this method returns `Some(r)`, it is guaranteed that the object will not be garbage
 	/// collected at least until `r` is deleted or becomes invalid.
+	///
+	/// # Errors
+	///
+	/// Returns an error if a global reference cannot be allocated or a Java exception is pending.
 	pub fn upgrade_global(&self, env: &Env) -> Result<Option<Global<T::GlobalKind>>> {
 		match env.new_global_ref(self) {
 			Err(Error::ObjectFreed) => Ok(None),
@@ -196,6 +206,10 @@ where
 	/// <code>self.[is_same_object][Weak::is_same_object](env, [JObject::null]\())</code>.
 	///
 	/// This may return [`Error::JavaException`] if called while there is a pending exception.
+	///
+	/// # Errors
+	///
+	/// Returns an error if a Java exception is pending while comparing the references.
 	pub fn is_garbage_collected(&self, env: &Env) -> Result<bool> {
 		env.is_same_object(self, JObject::null())
 	}
@@ -207,6 +221,10 @@ where
 	/// `Weak` has been garbage collected, or false if the object has not yet been garbage
 	/// collected.
 	#[deprecated = "Use Env::is_same_object"]
+	///
+	/// # Errors
+	///
+	/// Returns an error if a Java exception is pending while comparing the references.
 	pub fn is_same_object<'local, O>(&self, env: &Env<'local>, object: O) -> Result<bool>
 	where
 		O: AsRef<JObject<'local>>,
@@ -220,6 +238,10 @@ where
 	/// This method will also return true if both weak references refer to an object that has been
 	/// garbage collected.
 	#[deprecated = "Use Env::is_same_object"]
+	///
+	/// # Errors
+	///
+	/// Returns an error if a Java exception is pending while comparing the references.
 	pub fn is_weak_ref_to_same_object(&self, env: &Env, other: &Self) -> Result<bool> {
 		env.is_same_object(self, other)
 	}
@@ -227,6 +249,10 @@ where
 	/// Creates a new weak reference to the same object that this one refers to.
 	///
 	/// This method returns `None` if the object has already been garbage collected.
+	///
+	/// # Errors
+	///
+	/// Returns an error if a new weak reference cannot be allocated or a Java exception is pending.
 	pub fn clone_in_jvm(&self, env: &mut Env<'_>) -> Result<Option<Weak<T::GlobalKind>>> {
 		match env.new_weak_ref(self) {
 			Err(Error::ObjectFreed) => Ok(None),
@@ -245,39 +271,41 @@ where
 
 		// It's redundant to explicitly call DeleteWeakGlobalRef with a null pointer and we don't
 		// assume that a JavaVM has been initialized if we only wrap a 'static null pointer
-		if !obj.is_null() {
-			// Panic: If we have a non-null reference, we know JavaVM::singleton() must have been
-			// initialized (and can't return an error) because ::new() takes a Env reference.
-			let vm = JavaVM::singleton().expect("JavaVM singleton uninitialized");
+		if obj.is_null() {
+			return;
+		}
+		// Panic: If we have a non-null reference, we know JavaVM::singleton() must have been
+		// initialized (and can't return an error) because ::new() takes a Env reference.
+		let vm = JavaVM::singleton().expect("JavaVM singleton uninitialized");
 
-			// Note: we use `attach_current_thread_guard` and avoid using
-			// `AttachGuard::detach_with_catch` because we need to be exception safe and must
-			// not interfere with any currently-pending exception
-			let exception_safe_delete = || -> abos_jni::errors::Result<()> {
-				let mut scope = abos_jni::ScopeToken::default();
-				let mut guard =
-					unsafe { vm.attach_current_thread_guard(|| AttachConfig::new().scoped(true), &mut scope)? };
-				let env = guard.borrow_env_mut();
+		// Note: we use `attach_current_thread_guard` and avoid using
+		// `AttachGuard::detach_with_catch` because we need to be exception safe and must
+		// not interfere with any currently-pending exception
+		let exception_safe_delete = || -> abos_jni::errors::Result<()> {
+			let mut scope = abos_jni::ScopeToken::default();
+			let mut guard =
+				// SAFETY: The scope token and guard remain on this stack until the reference has been released.
+				unsafe { vm.attach_current_thread_guard(|| AttachConfig::new().scoped(true), &mut scope)? };
+			let env = guard.borrow_env_mut();
 
-				// If the Env is borrowing from an AttachGuard that owns the current thread
-				// attachment that means the thread was not already attached
-				if env.owns_attachment() {
-					warn!(
-						"Dropping a Weak in a detached thread. Fix your code if this message appears frequently (see the Weak docs)."
-					);
-				}
-
-				// Safety: This method is safe to call in case of pending exceptions (see chapter 2 of the spec)
-				// jni-rs requires JNI_VERSION > 1.2
-				unsafe {
-					ex_safe_jni_call_no_post_check_ex!(env, v1_2, DeleteWeakGlobalRef, obj.as_raw());
-				}
-				Ok(())
-			};
-
-			if let Err(err) = exception_safe_delete() {
-				debug!("error dropping weak ref: {err:#?}");
+			// If the Env is borrowing from an AttachGuard that owns the current thread
+			// attachment that means the thread was not already attached
+			if env.owns_attachment() {
+				warn!(
+					"Dropping a Weak in a detached thread. Fix your code if this message appears frequently (see the Weak docs)."
+				);
 			}
+
+			// Safety: This method is safe to call in case of pending exceptions (see chapter 2 of the spec)
+			// jni-rs requires JNI_VERSION > 1.2
+			unsafe {
+				ex_safe_jni_call_no_post_check_ex!(env, v1_2, DeleteWeakGlobalRef, obj.as_raw());
+			}
+			Ok(())
+		};
+
+		if let Err(err) = exception_safe_delete() {
+			debug!("error dropping weak ref: {err:#?}");
 		}
 	}
 }
@@ -307,10 +335,12 @@ where
 	}
 
 	unsafe fn kind_from_raw<'env>(local_ref: jobject) -> Self::Kind<'env> {
+		// SAFETY: The caller guarantees the local reference type and lifetime required by the delegated constructor.
 		unsafe { T::kind_from_raw(local_ref) }
 	}
 
 	unsafe fn global_kind_from_raw(global_ref: jobject) -> Self::GlobalKind {
+		// SAFETY: The caller guarantees the global reference type required by the delegated constructor.
 		unsafe { T::global_kind_from_raw(global_ref) }
 	}
 }

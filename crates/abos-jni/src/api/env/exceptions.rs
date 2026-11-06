@@ -1,6 +1,7 @@
 use super::{
 	DEFAULT_LOCAL_FRAME_CAPACITY, Desc, Env, Error, JClass, JNIStr, JThrowable, LoaderContext, Reference, Result,
 };
+use std::fmt::Write as _;
 
 impl<'local> Env<'local> {
 	/// Raise an exception from an existing object. This will continue being thrown in java unless
@@ -35,6 +36,10 @@ impl<'local> Env<'local> {
 	/// # Ok(())
 	/// # }
 	/// ```
+	///
+	/// # Errors
+	///
+	/// Returns `Error::JavaException` after throwing, or an error if resolving or throwing the exception fails.
 	pub fn throw<'other_local, E>(&mut self, obj: E) -> Result<()>
 	where
 		E: Desc<'local, JThrowable<'other_local>>,
@@ -115,6 +120,10 @@ impl<'local> Env<'local> {
 	///
 	/// Alternatively, see [`Env::throw_new_void`] if you want to construct an exception with no
 	/// message argument.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::JavaException` after throwing, or an error if resolving or constructing the exception fails.
 	pub fn throw_new<'other_local, S, T>(&mut self, class: T, msg: S) -> Result<()>
 	where
 		S: AsRef<JNIStr>,
@@ -147,6 +156,10 @@ impl<'local> Env<'local> {
 	/// This will expect to find a constructor for the given `class` that takes no arguments.
 	///
 	/// Alternatively, see [`Env::throw_new`] if you want to construct an exception with a message.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::JavaException` after throwing, or an error if resolving or constructing the exception fails.
 	pub fn throw_new_void<'other_local, T>(&mut self, class: T) -> Result<()>
 	where
 		T: Desc<'local, JClass<'other_local>>,
@@ -174,10 +187,12 @@ impl<'local> Env<'local> {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
+		// SAFETY: ExceptionOccurred is valid with a pending exception and returns a local throwable reference.
 		let throwable = unsafe { ex_safe_jni_call_no_post_check_ex!(self, v1_1, ExceptionOccurred) };
 		if throwable.is_null() {
 			None
 		} else {
+			// SAFETY: The non-null pointer came from ExceptionOccurred in the current local frame.
 			Some(unsafe { JThrowable::from_raw(self, throwable) })
 		}
 	}
@@ -201,6 +216,14 @@ impl<'local> Env<'local> {
 	///
 	/// If a Java exception is pending, it will be cleared and converted into a
 	/// Rust [`Error::CaughtJavaException`].
+	///
+	/// # Errors
+	///
+	/// Returns `Error::CaughtJavaException` for a pending exception, or an error encountered while inspecting it.
+	///
+	/// # Panics
+	///
+	/// Panics if JNI reports a pending exception but returns a null throwable.
 	pub fn exception_catch(&self) -> Result<()> {
 		pub(super) fn try_get_stack_trace(
 			env: &mut abos_jni::Env<'_>,
@@ -212,54 +235,53 @@ impl<'local> Env<'local> {
 			for i in 0..len {
 				let element = stack_trace.get_element(env, i)?;
 				let element_jstr = element.try_to_string(env)?;
-				trace.push_str(&format!("{i}: {element_jstr}\n"));
+				writeln!(trace, "{i}: {element_jstr}").expect("writing to String cannot fail");
 			}
 			Ok(trace)
 		}
 
-		if self.exception_check() {
-			let result = self.with_local_frame(
-				DEFAULT_LOCAL_FRAME_CAPACITY,
-				|env| -> abos_jni::errors::Result<abos_jni::errors::Error> {
-					let Some(e) = env.exception_occurred() else {
-						// should only be called after receiving a JavaException Result
-						unreachable!("ExceptionOccurred returned None after ExceptionCheck returned true");
-					};
-					env.exception_clear();
+		if !self.exception_check() {
+			return Ok(());
+		}
+		let result = self.with_local_frame(
+			DEFAULT_LOCAL_FRAME_CAPACITY,
+			|env| -> abos_jni::errors::Result<abos_jni::errors::Error> {
+				let Some(e) = env.exception_occurred() else {
+					// should only be called after receiving a JavaException Result
+					unreachable!("ExceptionOccurred returned None after ExceptionCheck returned true");
+				};
+				env.exception_clear();
 
-					assert!(!e.is_null(), "ExceptionOccurred returned a null throwable");
+				assert!(!e.is_null(), "ExceptionOccurred returned a null throwable");
 
-					let e = env.new_global_ref(e)?;
-					// besides null pointer checks, there are no documented errors or exceptions
-					// for GetObjectClass or getName, so this should be infallible
-					let name = env.get_object_class(&e)?.get_name(env)?.to_string();
-					let msg = e.get_message(env)?.to_string();
+				let e = env.new_global_ref(e)?;
+				// besides null pointer checks, there are no documented errors or exceptions
+				// for GetObjectClass or getName, so this should be infallible
+				let name = env.get_object_class(&e)?.get_name(env)?.to_string();
+				let msg = e.get_message(env)?.to_string();
 
-					let stack = match try_get_stack_trace(env, &e) {
-						Ok(stack_trace) => stack_trace,
-						Err(err) => format!("none: {err:?}"),
-					};
+				let stack = match try_get_stack_trace(env, &e) {
+					Ok(stack_trace) => stack_trace,
+					Err(err) => format!("none: {err:?}"),
+				};
 
-					Ok(abos_jni::errors::Error::CaughtJavaException {
-						exception: e,
-						name,
-						msg,
-						stack,
-					})
-				},
-			);
+				Ok(abos_jni::errors::Error::CaughtJavaException {
+					exception: e,
+					name,
+					msg,
+					stack,
+				})
+			},
+		);
 
-			match result {
-				Ok(exception) => Err(exception),
-				Err(err) => Err(abos_jni::errors::Error::CaughtJavaException {
-					exception: Default::default(),
-					name: "UNKNOWN".to_string(),
-					msg: format!("Failed to query JThrowable: {err:?})"),
-					stack: "none".to_string(),
-				}),
-			}
-		} else {
-			Ok(())
+		match result {
+			Ok(exception) => Err(exception),
+			Err(err) => Err(abos_jni::errors::Error::CaughtJavaException {
+				exception: crate::refs::Global::default(),
+				name: "UNKNOWN".to_string(),
+				msg: format!("Failed to query JThrowable: {err:?})"),
+				stack: "none".to_string(),
+			}),
 		}
 	}
 

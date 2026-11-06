@@ -104,30 +104,28 @@ impl TypeMappings {
 	}
 
 	pub fn insert_alias(&mut self, from: &str, to: &str) -> Result<()> {
-		if let Some(rust_type) = self.alias_to_rust.get(to) {
-			if let Some(existing) = self.alias_to_rust.get(from) {
-				if existing != rust_type {
-					return Err(syn::Error::new(
-						Span::call_site(),
-						format!(
-							"Cannot change mapping for typealias '{}' to '{}': already mapped to a different type ({}). Only one mapping per Rust type name is allowed.",
-							from,
-							to,
-							existing.path()
-						),
-					));
-				}
-				return Ok(());
-			}
-
-			self.alias_to_rust.insert(from.to_string(), rust_type.clone());
-			Ok(())
-		} else {
-			Err(syn::Error::new(
+		let rust_type = self.alias_to_rust.get(to).ok_or_else(|| {
+			syn::Error::new(
 				Span::call_site(),
 				format!("Cannot create alias from '{from}' to '{to}': target type not found"),
-			))
+			)
+		})?;
+		if let Some(existing) = self.alias_to_rust.get(from) {
+			if existing != rust_type {
+				return Err(syn::Error::new(
+					Span::call_site(),
+					format!(
+						"Cannot change mapping for typealias '{}' to '{}': already mapped to a different type ({}). Only one mapping per Rust type name is allowed.",
+						from,
+						to,
+						existing.path()
+					),
+				));
+			}
+			return Ok(());
 		}
+		self.alias_to_rust.insert(from.to_string(), rust_type.clone());
+		Ok(())
 	}
 
 	/// Parse `type_map` block with Reference + primitive mappings and aliases
@@ -190,111 +188,111 @@ impl TypeMappings {
 		braced!(mappings_content in input);
 
 		while !mappings_content.is_empty() {
-			if mappings_content.peek(typealias) {
-				// Parse alias mapping
-				mappings_content.parse::<typealias>()?;
-
-				// Parse new alias name
-				let new_alias: syn::Path = mappings_content.parse()?;
-
-				// Parse separator
-				mappings_content.parse::<Token![=>]>()?;
-
-				// Parse existing type name
-				let existing_type: syn::Path = mappings_content.parse()?;
-
-				// Insert alias
-				let new_alias_str = path_to_string_no_spaces(&new_alias);
-				let existing_type_str = path_to_string_no_spaces(&existing_type);
-				self.insert_alias(&new_alias_str, &existing_type_str)?;
-
-				// Require comma between entries, but trailing comma is optional
-				if !mappings_content.is_empty() {
-					mappings_content.parse::<Token![,]>()?;
-				}
-			} else {
-				let is_prim_mapping = if mappings_content.peek(Token![unsafe]) {
-					mappings_content.parse::<Token![unsafe]>()?;
-					true
-				} else {
-					false
-				};
-
-				// Parse Rust path
-				let rust_path: syn::Path = mappings_content.parse()?;
-
-				// Convert path to string without spaces
-				let rust_path_str = path_to_string_no_spaces(&rust_path);
-
-				// Parse separator
-				mappings_content.parse::<Token![=>]>()?;
-
-				if is_prim_mapping {
-					// Parse primitive type name
-					let prim_type_ident: Ident = mappings_content.parse()?;
-					let prim_type_name = prim_type_ident.to_string();
-
-					// Validate type name by checking that it's a "built-in" primitive type name
-					match self.map_alias(&prim_type_name) {
-						Some(ConcreteType::Primitive {
-							primitive, is_builtin, ..
-						}) if is_builtin => {
-							self.insert_prim_type(&rust_path_str, primitive, &rust_path_str, false)?;
-						}
-						_ => {
-							return Err(syn::Error::new(
-								prim_type_ident.span(),
-								format!(
-									"Invalid primitive type name '{prim_type_name}' for unsafe primitive mapping. Must be one of the built-in primitive type names (e.g., 'int', 'long', 'boolean', etc.)"
-								),
-							));
-						}
-					}
-				} else {
-					// Parse Java class name
-					let java_class_mapping: JavaClassName = mappings_content.parse()?;
-
-					// Insert mapping
-					self.insert_ref_type(&rust_path_str, &rust_path_str, java_class_mapping, false)?;
-				}
-
-				// Require comma between entries, but trailing comma is optional
-				if !mappings_content.is_empty() {
-					mappings_content.parse::<Token![,]>()?;
-				}
+			self.parse_mapping(&mappings_content)?;
+			// Require comma between entries, but trailing comma is optional.
+			if !mappings_content.is_empty() {
+				mappings_content.parse::<Token![,]>()?;
 			}
 		}
 
 		Ok(())
 	}
 
+	fn parse_mapping(&mut self, input: ParseStream) -> Result<()> {
+		if input.peek(typealias) {
+			// Parse alias mapping
+			input.parse::<typealias>()?;
+
+			// Parse new alias name
+			let new_alias: syn::Path = input.parse()?;
+
+			// Parse separator
+			input.parse::<Token![=>]>()?;
+
+			// Parse existing type name
+			let existing_type: syn::Path = input.parse()?;
+
+			// Insert alias
+			let new_alias_str = path_to_string_no_spaces(&new_alias);
+			let existing_type_str = path_to_string_no_spaces(&existing_type);
+			self.insert_alias(&new_alias_str, &existing_type_str)?;
+		} else {
+			let is_prim_mapping = if input.peek(Token![unsafe]) {
+				input.parse::<Token![unsafe]>()?;
+				true
+			} else {
+				false
+			};
+
+			// Parse Rust path
+			let rust_path: syn::Path = input.parse()?;
+
+			// Convert path to string without spaces
+			let rust_path_str = path_to_string_no_spaces(&rust_path);
+
+			// Parse separator
+			input.parse::<Token![=>]>()?;
+
+			if is_prim_mapping {
+				self.parse_primitive_mapping(input, &rust_path_str)?;
+			} else {
+				// Parse Java class name
+				let java_class_mapping: JavaClassName = input.parse()?;
+
+				// Insert mapping
+				self.insert_ref_type(&rust_path_str, &rust_path_str, java_class_mapping, false)?;
+			}
+		}
+		Ok(())
+	}
+
+	fn parse_primitive_mapping(&mut self, input: ParseStream, rust_path_str: &str) -> Result<()> {
+		// Parse primitive type name
+		let prim_type_ident: Ident = input.parse()?;
+		let prim_type_name = prim_type_ident.to_string();
+
+		// Validate type name by checking that it's a "built-in" primitive type name
+		match self.map_alias(&prim_type_name) {
+			Some(ConcreteType::Primitive {
+				primitive, is_builtin, ..
+			}) if is_builtin => {
+				self.insert_prim_type(rust_path_str, primitive, rust_path_str, false)?;
+			}
+			_ => {
+				return Err(syn::Error::new(
+					prim_type_ident.span(),
+					format!(
+						"Invalid primitive type name '{prim_type_name}' for unsafe primitive mapping. Must be one of the built-in primitive type names (e.g., 'int', 'long', 'boolean', etc.)"
+					),
+				));
+			}
+		}
+		Ok(())
+	}
+
 	/// Get the Java class name and canonical Rust type for a Rust type alias
 	pub fn map_alias(&self, alias: &str) -> Option<ConcreteType> {
-		if let Some(rust_type) = self.alias_to_rust.get(alias) {
-			match &rust_type.target {
-				RustTypeTarget::Primitive {
-					primitive,
-					path,
-					is_builtin,
-				} => Some(ConcreteType::Primitive {
-					primitive: primitive.clone(),
-					path: path.clone(),
-					is_builtin: *is_builtin,
-				}),
-				RustTypeTarget::Reference { .. } => {
-					let java_class = self
-						.rust_to_java
-						.get(rust_type)
-						.expect("TypeMappings invariant violated: rust_type missing in rust_to_java map");
-					Some(ConcreteType::Object {
-						name: java_class.clone(),
-						reference_type: rust_type.clone(),
-					})
+		self.alias_to_rust.get(alias).map(|rust_type| match &rust_type.target {
+			RustTypeTarget::Primitive {
+				primitive,
+				path,
+				is_builtin,
+			} => ConcreteType::Primitive {
+				primitive: primitive.clone(),
+				path: path.clone(),
+				is_builtin: *is_builtin,
+			},
+			RustTypeTarget::Reference { .. } => {
+				let java_class = self
+					.rust_to_java
+					.get(rust_type)
+					.expect("TypeMappings invariant violated: rust_type missing in rust_to_java map");
+				ConcreteType::Object {
+					name: java_class.clone(),
+					reference_type: rust_type.clone(),
 				}
 			}
-		} else {
-			None
-		}
+		})
 	}
 
 	/// Get the canonical Rust type path for a Java class name
@@ -303,7 +301,10 @@ impl TypeMappings {
 	}
 
 	/// Get an iterator over all Java class names
-	#[allow(unused)]
+	#[allow(
+		unused,
+		reason = "Expose the Java-class side of the internal mapping for generator extensions."
+	)]
 	pub fn java_classes(&self) -> impl Iterator<Item = &Rc<JavaClassName>> {
 		self.java_to_rust.keys()
 	}

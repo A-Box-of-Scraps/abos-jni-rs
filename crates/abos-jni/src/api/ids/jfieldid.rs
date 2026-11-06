@@ -27,7 +27,9 @@ pub struct JFieldID {
 }
 
 // Field IDs are valid across threads (not tied to a Env)
+// SAFETY: JNI member IDs are valid across threads and are not tied to an Env.
 unsafe impl Send for JFieldID {}
+// SAFETY: JNI member IDs are valid across threads and are not tied to an Env.
 unsafe impl Sync for JFieldID {}
 
 impl JFieldID {

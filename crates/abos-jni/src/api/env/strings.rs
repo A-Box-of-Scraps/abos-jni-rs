@@ -8,6 +8,10 @@ impl<'local> Env<'local> {
 		since = "0.22.0",
 		note = "use JList::cast_local instead or Env::new_cast_local_ref/cast_local/as_cast_local or Env::new_cast_global_ref/cast_global/as_cast_global"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error if the object cannot be cast to a Java list or its class cannot be resolved.
 	pub fn get_list<'any_local>(
 		&mut self,
 		obj: impl Reference + Into<JObject<'any_local>> + AsRef<JObject<'any_local>>,
@@ -22,6 +26,10 @@ impl<'local> Env<'local> {
 		since = "0.22.0",
 		note = "use JMap::cast_local instead or Env::new_cast_local_ref/cast_local/as_cast_local or Env::new_cast_global_ref/cast_global/as_cast_global"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error if the object cannot be cast to a Java map or its class cannot be resolved.
 	pub fn get_map<'any_local>(
 		&mut self,
 		obj: impl Reference + Into<JObject<'any_local>> + AsRef<JObject<'any_local>>,
@@ -82,6 +90,10 @@ impl<'local> Env<'local> {
 	///
 	/// To avoid this intermediate copy + encoding, consider using [`JString::from_jni_str`], and
 	/// using the [`crate::jni_str`] macro to encode string literals at compile time.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the JVM cannot allocate the string or a Java exception is pending.
 	pub fn new_string(&mut self, from: impl AsRef<str>) -> Result<JString<'local>> {
 		JString::new(self, from)
 	}

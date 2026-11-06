@@ -6,6 +6,7 @@ use crate::{
 	strings::JNIStr,
 };
 
+// SAFETY: Lookup resolves the class by name and returns a typed local class reference retained by Auto.
 unsafe impl<'local, T> Desc<'local, JClass<'local>> for T
 where
 	T: AsRef<JNIStr>,

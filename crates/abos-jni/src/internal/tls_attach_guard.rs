@@ -46,12 +46,14 @@ impl TLSAttachGuard {
 	/// Since this is used in the implementation of `Drop` you must make sure
 	/// to not let `Drop` run if this is called explicitly.
 	unsafe fn detach_impl(&self) -> Result<()> {
+		// SAFETY: The caller prevents a second detach, and this thread-local guard belongs to the current thread.
 		unsafe { sys_detach_current_thread(None, &self.thread) }
 	}
 }
 
 impl Drop for TLSAttachGuard {
 	fn drop(&mut self) {
+		// SAFETY: Drop runs once on the thread that owns this TLS guard.
 		if let Err(e) = unsafe { self.detach_impl() } {
 			error!(
 				"Error detaching current thread: {:#?}\nThread {} id={:?}",
@@ -86,19 +88,19 @@ pub unsafe fn tls_attach_current_thread<'local>(
 		// but some external code manually detached it (this is allowed as long as there are no
 		// active AttachGuards). In this case we don't want to double-increment the attached
 		// threads counter.
-		let inc_attached_count = if let Some(guard) = f.borrow_mut().take() {
+		let inc_attached_count = f.borrow_mut().take().is_none_or(|guard| {
 			// We use `std::mem::forget` to ensure we don't drop the existing guard and
 			// call detach again.
 			std::mem::forget(guard);
 			false
-		} else {
-			true
-		};
+		});
+		// SAFETY: The caller upholds the attachment contract; the config and thread remain live during attachment.
 		let env = unsafe { sys_attach_current_thread(java_vm, config, &thread, inc_attached_count)? };
 		*f.borrow_mut() = Some(TLSAttachGuard { thread: current() });
 		Ok(env)
 	})?;
 
+	// SAFETY: The JNI environment was obtained for this thread and the returned guard tracks its scope.
 	Ok(unsafe { AttachGuard::from_unowned(env) })
 }
 
@@ -111,14 +113,15 @@ pub fn tls_detach_current_thread() -> Result<()> {
 	}
 
 	TLS_ATTACH_GUARD.with(move |f| {
-		if let Some(guard) = f.borrow_mut().take() {
-			// Safety: we use `std::mem::forget` to ensure we don't also
-			// run the `Drop` implementation
-			let res = unsafe { guard.detach_impl() };
-			std::mem::forget(guard);
-			res
-		} else {
-			Ok(())
-		}
+		f.borrow_mut().take().map_or_else(
+			|| Ok(()),
+			|guard| {
+				// Safety: we use `std::mem::forget` to ensure we don't also
+				// run the `Drop` implementation
+				let res = unsafe { guard.detach_impl() };
+				std::mem::forget(guard);
+				res
+			},
+		)
 	})
 }

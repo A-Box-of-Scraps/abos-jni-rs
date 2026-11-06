@@ -99,11 +99,13 @@ where
 #[deprecated(since = "0.22.0", note = r#"Since 0.22, `GlobalRef` has been renamed to `Global`."#)]
 pub type GlobalRef<T> = Global<T>;
 
+// SAFETY: JNI global references are usable across threads; the wrapped type is Send + Sync and JNI access requires an Env.
 unsafe impl<T> Send for Global<T> where
 	T: Into<JObject<'static>> + AsRef<JObject<'static>> + Default + Reference + Send + Sync + 'static
 {
 }
 
+// SAFETY: JNI global references are usable across threads; the wrapped type is Send + Sync and JNI access requires an Env.
 unsafe impl<T> Sync for Global<T> where
 	T: Into<JObject<'static>> + AsRef<JObject<'static>> + Default + Reference + Send + Sync + 'static
 {
@@ -218,36 +220,38 @@ where
 
 		// It's redundant to explicitly call DeleteGlobalRef with a null pointer and we don't
 		// assume that a JavaVM has been initialized if we only wrap a 'static null pointer
-		if !obj.is_null() {
-			// Panic: If we have a non-null reference, we know JavaVM::singleton() must have been
-			// initialized (and can't return an error) because ::new() takes a Env reference.
-			let vm = JavaVM::singleton().expect("JavaVM singleton uninitialized");
+		if obj.is_null() {
+			return;
+		}
+		// Panic: If we have a non-null reference, we know JavaVM::singleton() must have been
+		// initialized (and can't return an error) because ::new() takes a Env reference.
+		let vm = JavaVM::singleton().expect("JavaVM singleton uninitialized");
 
-			// Note: we use `attach_current_thread_guard` and avoid using
-			// `AttachGuard::detach_with_catch` because we need to be exception safe and must
-			// not interfere with any currently-pending exception
-			let exception_safe_delete = || -> abos_jni::errors::Result<()> {
-				let mut scope = abos_jni::ScopeToken::default();
-				let mut guard =
-					unsafe { vm.attach_current_thread_guard(|| AttachConfig::new().scoped(true), &mut scope)? };
-				let env = guard.borrow_env_mut();
-				// If the Env is borrowing from an AttachGuard that owns the current thread
-				// attachment that means the thread was not already attached
-				if env.owns_attachment() {
-					warn!(
-						"A JNI global reference was dropped on a thread that is not attached. This will cause a performance problem if it happens frequently. For more information, see the documentation for `abos_jni::objects::Global`."
-					);
-				}
-				// Safety: This method is safe to call in case of pending exceptions (see chapter 2 of the spec)
-				unsafe {
-					ex_safe_jni_call_no_post_check_ex!(env, v1_1, DeleteGlobalRef, obj.as_raw());
-				}
-				Ok(())
-			};
-
-			if let Err(err) = exception_safe_delete() {
-				debug!("error dropping global ref: {err:#?}");
+		// Note: we use `attach_current_thread_guard` and avoid using
+		// `AttachGuard::detach_with_catch` because we need to be exception safe and must
+		// not interfere with any currently-pending exception
+		let exception_safe_delete = || -> abos_jni::errors::Result<()> {
+			let mut scope = abos_jni::ScopeToken::default();
+			let mut guard =
+				// SAFETY: The scope token and guard remain on this stack until the reference has been released.
+				unsafe { vm.attach_current_thread_guard(|| AttachConfig::new().scoped(true), &mut scope)? };
+			let env = guard.borrow_env_mut();
+			// If the Env is borrowing from an AttachGuard that owns the current thread
+			// attachment that means the thread was not already attached
+			if env.owns_attachment() {
+				warn!(
+					"A JNI global reference was dropped on a thread that is not attached. This will cause a performance problem if it happens frequently. For more information, see the documentation for `abos_jni::objects::Global`."
+				);
 			}
+			// Safety: This method is safe to call in case of pending exceptions (see chapter 2 of the spec)
+			unsafe {
+				ex_safe_jni_call_no_post_check_ex!(env, v1_1, DeleteGlobalRef, obj.as_raw());
+			}
+			Ok(())
+		};
+
+		if let Err(err) = exception_safe_delete() {
+			debug!("error dropping global ref: {err:#?}");
 		}
 	}
 }
@@ -277,10 +281,12 @@ where
 	}
 
 	unsafe fn kind_from_raw<'env>(local_ref: jobject) -> Self::Kind<'env> {
+		// SAFETY: The caller guarantees the local reference type and lifetime required by the delegated constructor.
 		unsafe { T::kind_from_raw::<'env>(local_ref) }
 	}
 
 	unsafe fn global_kind_from_raw(global_ref: jobject) -> Self::GlobalKind {
+		// SAFETY: The caller guarantees the global reference type required by the delegated constructor.
 		unsafe { T::global_kind_from_raw(global_ref) }
 	}
 }

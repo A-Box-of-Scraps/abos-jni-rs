@@ -8,12 +8,17 @@ use abos_jni_macros::bind_java_type;
 // Define a private data struct
 #[derive(Debug)]
 struct JTest2Priv {
-	#[allow(unused)]
+	#[allow(
+		unused,
+		reason = "The example demonstrates initialization of private state without reading it back."
+	)]
 	initialized: bool,
 	// make it something that's not automatically Send/Sync
 	_need_send_sync: std::marker::PhantomData<*mut ()>,
 }
+// SAFETY: The state contains only a bool and PhantomData, with no actual thread-affine pointer to transfer.
 unsafe impl Send for JTest2Priv {}
+// SAFETY: The state contains only a bool and PhantomData, with no mutable or thread-affine pointee to share.
 unsafe impl Sync for JTest2Priv {}
 
 bind_java_type! {

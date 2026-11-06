@@ -11,9 +11,9 @@ mod util;
 use util::{attach_current_thread, unwrap};
 
 #[test]
-pub fn test_generated_alias_methods() {
+fn test_generated_alias_methods() {
 	use abos_jni::errors::Result;
-	let _: Result<()> = attach_current_thread(|env| {
+	attach_current_thread(|env| -> Result<()> {
 		// First just do an `AsRef` cast of a `null` object and check `.is_null()`
 		// Covers: https://github.com/jni-rs/jni-rs/issues/773 bug
 		let null_list = JList::null();
@@ -60,5 +60,6 @@ pub fn test_generated_alias_methods() {
 		let _size4 = unwrap(set_collection_via_from.size(env), env);
 
 		Ok(())
-	});
+	})
+	.expect("generated aliases preserve the Java object and allow method calls");
 }

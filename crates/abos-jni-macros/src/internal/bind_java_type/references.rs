@@ -277,13 +277,15 @@ This does not require a runtime type check since any `"#, stringify!(#type_name)
 						}
 
 						// Assuming #type_name<'local> is a transparent wrapper around JObject
-						// (asserted) we can implement `AsRef` by transmuting `&self` to
+						// (asserted) we can implement `AsRef` by casting `&self` to
 						// `&#type_path<'local>`.
 						impl<'local> ::core::convert::AsRef<#type_path<'local>> for #type_name<'local> {
 							fn as_ref(&self) -> &#type_path<'local> {
 								const fn assert_is_instance_of_type_is_ffi_safe<T: #jni::refs::TransparentReference>() {}
 								const _: () = assert_is_instance_of_type_is_ffi_safe::<#type_path<'_>>();
-								unsafe { ::std::mem::transmute(self) }
+								// SAFETY: Both reference types are transparent wrappers around JObject,
+								// and is_instance_of declares that this object has the target Java type.
+								unsafe { &*(self as *const Self).cast::<#type_path<'local>>() }
 							}
 						}
 					});

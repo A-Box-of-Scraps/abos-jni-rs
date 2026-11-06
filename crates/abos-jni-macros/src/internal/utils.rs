@@ -14,7 +14,7 @@ fn jni_crate_default() -> syn::Path {
 	syn::parse_quote!(::abos_jni)
 }
 
-pub fn parse_jni_crate_override(input: &syn::parse::ParseStream) -> Result<syn::Path, syn::Error> {
+pub fn parse_jni_crate_override(input: syn::parse::ParseStream) -> Result<syn::Path, syn::Error> {
 	if !input.peek(Ident) {
 		return Ok(jni_crate_default());
 	}

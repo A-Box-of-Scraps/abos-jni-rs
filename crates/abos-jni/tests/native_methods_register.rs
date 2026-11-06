@@ -9,10 +9,18 @@ use abos_jni::sys::{jint, jlong};
 use abos_jni::{Env, NativeMethod, native_method};
 
 // Instance method implementations
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn add_impl<'local>(_env: &mut Env<'local>, _this: JObject<'local>, a: jint, b: jint) -> Result<jint, Error> {
 	Ok(a + b)
 }
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn multiply_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: JObject<'local>,
@@ -23,6 +31,10 @@ const fn multiply_impl<'local>(
 }
 
 // Static method implementations
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn static_add_impl<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
@@ -32,6 +44,10 @@ const fn static_add_impl<'local>(
 	Ok(a + b)
 }
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn static_multiply_impl<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
@@ -49,7 +65,10 @@ const ADD_METHOD: NativeMethod = native_method! {
 };
 
 // This is an example of how you would use these macros with register_native_methods
-#[allow(dead_code)]
+#[allow(
+	dead_code,
+	reason = "Demonstrate manual registration separately from the executable test harness."
+)]
 fn register_my_methods(env: &mut Env, class: JClass) -> abos_jni::errors::Result<()> {
 	// Create an array of NativeMethods using the macros
 	const METHODS: &[NativeMethod] = &[
@@ -73,6 +92,7 @@ fn register_my_methods(env: &mut Env, class: JClass) -> abos_jni::errors::Result
 	];
 
 	// Register all the methods at once
+	// SAFETY: The fixture class declares the names and JNI signatures supplied by these native-method descriptors.
 	unsafe {
 		env.register_native_methods(class, METHODS)?;
 	}

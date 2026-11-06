@@ -25,13 +25,17 @@ impl JavaVM {
 	/// to [Attaching Native Threads section](#attaching-native-threads)).
 	///
 	/// *This API requires the "invocation" feature to be enabled,
-	/// see ["Launching JVM from Rust"](struct.JavaVM.html#launching-jvm-from-rust).*
+	/// see [Launching JVM from Rust](struct.JavaVM.html#launching-jvm-from-rust).*
 	///
 	/// This will attempt to locate a JVM using
 	/// [java-locator], if the JVM has not already been loaded. Use the
 	/// [`with_libjvm`][Self::with_libjvm] method to give an explicit location for the JVM shared
 	/// library (`jvm.dll`, `libjvm.so`, or `libjvm.dylib`, depending on the platform).
 	#[cfg(feature = "invocation")]
+	///
+	/// # Errors
+	///
+	/// Returns an error if the JVM library cannot be located or loaded, VM creation fails, or attachment tracking fails.
 	pub fn new(args: InitArgs) -> StartJvmResult<Self> {
 		#[cfg(not(target_os = "android"))]
 		{
@@ -92,6 +96,10 @@ impl JavaVM {
 	/// `jni-rs` from that dependency). For example the `android-activity` crate will initialize a
 	/// [`JavaVM`] before `android_main()` is called, but unless you are using the same version of
 	/// `jni-rs` as `android-activity` you can't immediately assume there is a [`JavaVM`] singleton.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::UninitializedJavaVM` if no VM has been registered.
 	pub fn singleton() -> Result<Self> {
 		JAVA_VM_SINGLETON.get().cloned().ok_or(Error::UninitializedJavaVM)
 	}
@@ -108,6 +116,7 @@ impl JavaVM {
 		let mut ptr: *mut sys::JavaVM = ::std::ptr::null_mut();
 		let mut env: *mut sys::JNIEnv = ::std::ptr::null_mut();
 
+		// SAFETY: The caller supplies JNI_CreateJavaVM with its declared ABI; output pointers and initialization options are live.
 		unsafe {
 			jni_error_code_to_result(create_fn_ptr(
 				&raw mut ptr,
@@ -116,6 +125,10 @@ impl JavaVM {
 			))?;
 		}
 
+		// VM creation has finished reading the option buffers.
+		drop(args);
+
+		// SAFETY: Successful JNI_CreateJavaVM initialized the VM pointer.
 		let vm = unsafe { Self::from_raw(ptr) };
 
 		// JNI_CreateJavaVM will implicitly attach the calling thread to the JVM.
@@ -131,8 +144,9 @@ impl JavaVM {
 		//
 		// This will track the new attachment in TLS/FLS
 		#[cfg(use_tls_attach_guard)]
+		// SAFETY: JNI_CreateJavaVM has attached this thread; TLS tracking takes ownership without detaching it.
 		unsafe {
-			tls_attach_guard::tls_attach_current_thread(&vm, &Default::default())?
+			tls_attach_guard::tls_attach_current_thread(&vm, &crate::vm::AttachConfig::default())?
 		};
 		#[cfg(use_fls_attach_guard)]
 		unsafe {
@@ -149,7 +163,7 @@ impl JavaVM {
 	/// to [Attaching Native Threads section](#attaching-native-threads)).
 	///
 	/// *This API requires the "invocation" feature to be enabled,
-	/// see ["Launching JVM from Rust"](struct.JavaVM.html#launching-jvm-from-rust).*
+	/// see [Launching JVM from Rust](struct.JavaVM.html#launching-jvm-from-rust).*
 	///
 	/// The `libjvm_path` parameter takes a *closure* which returns the path to the JVM shared
 	/// library. The closure is only called if the JVM is not already loaded. Any work that needs
@@ -167,11 +181,13 @@ impl JavaVM {
 			let libjvm_path_string = libjvm_path.as_ref().to_string_lossy().into_owned();
 
 			// Try to load it.
+			// SAFETY: This API loads a JNI VM implementation; the library is retained for the lifetime of the created VM.
 			let libjvm = match unsafe { libloading::Library::new(libjvm_path.as_ref()) } {
 				Ok(ok) => ok,
 				Err(error) => return Err(StartJvmError::LoadError(libjvm_path_string, error)),
 			};
 
+			// SAFETY: The loaded JVM library exports JNI_CreateJavaVM with the expected ABI and remains loaded for VM use.
 			let result = unsafe {
 				// Try to find the `JNI_CreateJavaVM` function in the loaded library.
 				let create_fn = libjvm
@@ -214,12 +230,16 @@ impl JavaVM {
 	/// to [Attaching Native Threads section](#attaching-native-threads)).
 	///
 	/// *This API requires the "invocation" feature to be enabled,
-	/// see ["Launching JVM from Rust"](struct.JavaVM.html#launching-jvm-from-rust).*
+	/// see [Launching JVM from Rust](struct.JavaVM.html#launching-jvm-from-rust).*
 	///
 	/// The `libjvm_path` parameter takes a *closure* which returns the path to the JVM shared
 	/// library. The closure is only called if the JVM is not already loaded. Any work that needs
 	/// to be done to locate the JVM shared library should be done inside that closure.
 	#[cfg(feature = "invocation")]
+	///
+	/// # Errors
+	///
+	/// Returns an error if the specified JVM library cannot be loaded, VM creation fails, or attachment tracking fails.
 	pub fn with_libjvm<P: AsRef<OsStr>>(
 		args: InitArgs,
 		libjvm_path: impl FnOnce() -> StartJvmResult<P>,
@@ -244,6 +264,10 @@ impl JavaVM {
 	/// Expects a valid, non-null `JavaVM` pointer that supports JNI version >= 1.4.
 	///
 	/// Only does a `null` check.
+	///
+	/// # Panics
+	///
+	/// Panics if the raw pointer is null.
 	pub unsafe fn from_raw(ptr: *mut sys::JavaVM) -> Self {
 		assert!(!ptr.is_null());
 		JAVA_VM_SINGLETON.get_or_init(|| Self(ptr)).clone()
@@ -265,6 +289,7 @@ impl JavaVM {
 			Ok(jvm.clone())
 		} else {
 			let mut raw = ptr::null_mut();
+			// SAFETY: The current Env is valid and the output VM pointer is writable.
 			let res = unsafe { jni_call_no_post_check_ex!(env, v1_1, GetJavaVM, &raw mut raw)? };
 			jni_error_code_to_result(res)?;
 

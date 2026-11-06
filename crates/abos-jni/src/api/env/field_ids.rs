@@ -22,6 +22,14 @@ impl<'local> Env<'local> {
 	///
 	/// This API catches exceptions internally and is not expected to return
 	/// [`Error::JavaException`] (unless called while there is a pending exception).
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class or field cannot be resolved, its signature does not match, or a Java exception is pending.
+	///
+	/// # Panics
+	///
+	/// Panics if JNI returns a null field ID without reporting an exception.
 	pub fn get_field_id<'other_local, 'sig, C, N, S>(&mut self, class: C, name: N, sig: S) -> Result<JFieldID>
 	where
 		C: Desc<'local, JClass<'other_local>>,
@@ -32,6 +40,7 @@ impl<'local> Env<'local> {
 		let ffi_name = name.as_ref();
 		let ffi_sig = sig.as_ref();
 
+		// SAFETY: The resolved class, field name and signature remain valid during the JNI lookup.
 		let field_id = unsafe {
 			jni_call_with_catch!(
 				catch |env| {
@@ -42,11 +51,7 @@ impl<'local> Env<'local> {
 						}),
 					e: crate::exceptions::JExceptionInInitializerError => {
 						let exception = e.get_exception(env);
-						let exception = if let Ok(exception) = exception {
-							env.new_global_ref(exception).ok()
-						} else {
-							None
-						};
+						let exception = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
 						Err(Error::ExceptionInInitializer { exception })
 					},
 					crate::exceptions::JOutOfMemoryError =>
@@ -67,6 +72,7 @@ impl<'local> Env<'local> {
 
 		assert!(!field_id.is_null(), "Spurious null field ID returned with no exception");
 
+		// SAFETY: The field ID came from JNI and was checked for null.
 		Ok(unsafe { JFieldID::from_raw(field_id) })
 	}
 
@@ -92,6 +98,14 @@ impl<'local> Env<'local> {
 	///
 	/// This API catches exceptions internally and is not expected to return
 	/// [`Error::JavaException`] (unless called while there is a pending exception).
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class or field cannot be resolved, its signature does not match, or a Java exception is pending.
+	///
+	/// # Panics
+	///
+	/// Panics if JNI returns a null field ID without reporting an exception.
 	pub fn get_static_field_id<'other_local, 'sig, T, U, V>(
 		&mut self,
 		class: T,
@@ -107,6 +121,7 @@ impl<'local> Env<'local> {
 		let ffi_name = name.as_ref();
 		let ffi_sig = sig.as_ref();
 
+		// SAFETY: The resolved class, field name and signature remain valid during the JNI lookup.
 		let field_id = unsafe {
 			jni_call_with_catch!(
 				catch |env| {
@@ -117,11 +132,7 @@ impl<'local> Env<'local> {
 						}),
 					e: crate::exceptions::JExceptionInInitializerError => {
 						let exception = e.get_exception(env);
-						let exception = if let Ok(exception) = exception {
-							env.new_global_ref(exception).ok()
-						} else {
-							None
-						};
+						let exception = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
 						Err(Error::ExceptionInInitializer { exception })
 					},
 					crate::exceptions::JOutOfMemoryError =>
@@ -142,10 +153,15 @@ impl<'local> Env<'local> {
 
 		assert!(!field_id.is_null(), "Spurious null field ID returned with no exception");
 
+		// SAFETY: The static field ID came from JNI and was checked for null.
 		Ok(unsafe { JStaticFieldID::from_raw(field_id) })
 	}
 
 	/// Get the class for an object.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the object is null or a Java exception is pending.
 	pub fn get_object_class<'other_local, O>(&mut self, obj: O) -> Result<JClass<'local>>
 	where
 		O: AsRef<JObject<'other_local>>,
@@ -155,6 +171,7 @@ impl<'local> Env<'local> {
 		self.assert_top();
 		let obj = obj.as_ref();
 		let obj = null_check!(obj, "get_object_class")?;
+		// SAFETY: The object is non-null and valid; GetObjectClass returns a local reference in this frame.
 		unsafe {
 			Ok(JClass::from_raw(
 				self,

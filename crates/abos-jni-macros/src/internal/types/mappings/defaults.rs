@@ -15,71 +15,10 @@ impl TypeMappings {
 			jni_crate: jni_crate.clone(),
 		};
 
-		// Helper function to parse a Java class name from a dotted string
-		let parse_java_class_dotted = |class_str: &str| -> JavaClassName {
-			let parts: Vec<&str> = class_str.split('.').collect();
-			assert!(!parts.is_empty(), "Invalid Java class name: {class_str}");
-
-			let class = parts
-				.last()
-				.expect("built-in class names have at least one component")
-				.to_string();
-			let package = parts[..parts.len() - 1]
-				.iter()
-				.map(std::string::ToString::to_string)
-				.collect();
-
-			JavaClassName { package, class }
-		};
-
 		// Convert the jni crate path to a string
 		let jni_crate_str = path_to_string_no_spaces(jni_crate);
 
-		// Add default type mappings for built-in jni crate types
-		let builtins = [
-			("JByteBuffer", "java.nio.ByteBuffer", "objects::JByteBuffer", false),
-			(
-				"JCharSequence",
-				"java.lang.CharSequence",
-				"objects::JCharSequence",
-				false,
-			),
-			("JClassLoader", "java.lang.ClassLoader", "objects::JClassLoader", false),
-			("JClass", "java.lang.Class", "objects::JClass", true),
-			("JCollection", "java.util.Collection", "objects::JCollection", false),
-			("JIterator", "java.util.Iterator", "objects::JIterator", false),
-			("JList", "java.util.List", "objects::JList", false),
-			("JMap", "java.util.Map", "objects::JMap", false),
-			("JMapEntry", "java.util.Map$Entry", "objects::JMapEntry", false),
-			("JObject", "java.lang.Object", "objects::JObject", true),
-			("JSet", "java.util.Set", "objects::JSet", false),
-			(
-				"JStackTraceElement",
-				"java.lang.StackTraceElement",
-				"objects::JStackTraceElement",
-				false,
-			),
-			("JString", "java.lang.String", "objects::JString", true),
-			("JThread", "java.lang.Thread", "objects::JThread", false),
-			("JThrowable", "java.lang.Throwable", "objects::JThrowable", true),
-		];
-
-		for (simple_name, java_class_str, module_path, is_core) in builtins {
-			let java_class = Rc::new(parse_java_class_dotted(java_class_str));
-
-			let jni_full_path = format!("abos_jni::{module_path}");
-			let real_full_path = format!("{jni_crate_str}::{module_path}");
-
-			type_mappings
-				.insert_ref_type(&jni_full_path, &real_full_path, (*java_class).clone(), true)
-				.expect("Failed to insert built-in jni crate type mapping");
-			type_mappings
-				.insert_alias(simple_name, &jni_full_path)
-				.expect("Failed to insert built-in jni crate type alias");
-			if is_core {
-				type_mappings.core_java.insert(java_class.clone());
-			}
-		}
+		type_mappings.add_reference_defaults(&jni_crate_str);
 
 		// Insert Void as a special case
 		type_mappings
@@ -138,6 +77,68 @@ impl TypeMappings {
 		}
 
 		type_mappings
+	}
+
+	fn add_reference_defaults(&mut self, jni_crate_str: &str) {
+		// Helper function to parse a Java class name from a dotted string
+		let parse_java_class_dotted = |class_str: &str| -> JavaClassName {
+			let parts: Vec<&str> = class_str.split('.').collect();
+			assert!(!parts.is_empty(), "Invalid Java class name: {class_str}");
+
+			let class = parts
+				.last()
+				.expect("built-in class names have at least one component")
+				.to_string();
+			let package = parts[..parts.len() - 1]
+				.iter()
+				.map(std::string::ToString::to_string)
+				.collect();
+
+			JavaClassName { package, class }
+		};
+		// Add default type mappings for built-in jni crate types
+		let builtins = [
+			("JByteBuffer", "java.nio.ByteBuffer", "objects::JByteBuffer", false),
+			(
+				"JCharSequence",
+				"java.lang.CharSequence",
+				"objects::JCharSequence",
+				false,
+			),
+			("JClassLoader", "java.lang.ClassLoader", "objects::JClassLoader", false),
+			("JClass", "java.lang.Class", "objects::JClass", true),
+			("JCollection", "java.util.Collection", "objects::JCollection", false),
+			("JIterator", "java.util.Iterator", "objects::JIterator", false),
+			("JList", "java.util.List", "objects::JList", false),
+			("JMap", "java.util.Map", "objects::JMap", false),
+			("JMapEntry", "java.util.Map$Entry", "objects::JMapEntry", false),
+			("JObject", "java.lang.Object", "objects::JObject", true),
+			("JSet", "java.util.Set", "objects::JSet", false),
+			(
+				"JStackTraceElement",
+				"java.lang.StackTraceElement",
+				"objects::JStackTraceElement",
+				false,
+			),
+			("JString", "java.lang.String", "objects::JString", true),
+			("JThread", "java.lang.Thread", "objects::JThread", false),
+			("JThrowable", "java.lang.Throwable", "objects::JThrowable", true),
+		];
+
+		for (simple_name, java_class_str, module_path, is_core) in builtins {
+			let java_class = Rc::new(parse_java_class_dotted(java_class_str));
+
+			let jni_full_path = format!("abos_jni::{module_path}");
+			let real_full_path = format!("{jni_crate_str}::{module_path}");
+
+			self.insert_ref_type(&jni_full_path, &real_full_path, (*java_class).clone(), true)
+				.expect("Failed to insert built-in jni crate type mapping");
+			self.insert_alias(simple_name, &jni_full_path)
+				.expect("Failed to insert built-in jni crate type alias");
+			if is_core {
+				self.core_java.insert(java_class.clone());
+			}
+		}
 	}
 
 	// Lookup the canonical RustType for a Reference type path

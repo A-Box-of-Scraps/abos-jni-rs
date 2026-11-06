@@ -43,5 +43,8 @@ fn attach_config() {
 		}
 	});
 
-	let _ = thread.join().expect("test worker completes without panicking");
+	thread
+		.join()
+		.expect("test worker completes without panicking")
+		.expect("configured thread attaches and executes successfully");
 }

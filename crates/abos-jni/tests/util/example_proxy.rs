@@ -1,4 +1,7 @@
-#![allow(dead_code)]
+#![allow(
+	dead_code,
+	reason = "Shared test and example helpers are used by different subsets of binaries."
+)]
 
 use std::{ops::Deref, sync::Arc};
 
@@ -29,7 +32,7 @@ pub struct AtomicIntegerProxyInner {
 
 impl AtomicIntegerProxy {
 	/// Creates a new instance of `AtomicIntegerProxy`
-	pub fn new(vm: Arc<JavaVM>, init_value: jint) -> Result<Self> {
+	pub fn new(vm: &JavaVM, init_value: jint) -> Result<Self> {
 		vm.attach_current_thread(|env| -> Result<Self> {
 			let obj = env.with_local_frame(DEFAULT_LOCAL_FRAME_CAPACITY, |env| {
 				let i = env.new_object(
@@ -46,13 +49,13 @@ impl AtomicIntegerProxy {
 	}
 
 	/// Gets a current value from java object
-	pub fn get(&mut self) -> Result<jint> {
+	pub fn get(&self) -> Result<jint> {
 		let vm = JavaVM::singleton()?;
 		vm.attach_current_thread(|env| env.call_method(&*self.obj, jni_str!("get"), jni_sig!("()I"), &[])?.i())
 	}
 
 	/// Increments a value of java object and then gets it
-	pub fn increment_and_get(&mut self) -> Result<jint> {
+	pub fn increment_and_get(&self) -> Result<jint> {
 		let vm = JavaVM::singleton()?;
 		vm.attach_current_thread(|env| {
 			env.call_method(&*self.obj, jni_str!("incrementAndGet"), jni_sig!("()I"), &[])?
@@ -61,7 +64,7 @@ impl AtomicIntegerProxy {
 	}
 
 	/// Adds some value to the value of java object and then gets a resulting value
-	pub fn add_and_get(&mut self, delta: jint) -> Result<jint> {
+	pub fn add_and_get(&self, delta: jint) -> Result<jint> {
 		let vm = JavaVM::singleton()?;
 		vm.attach_current_thread(|env| {
 			let delta = JValue::from(delta);

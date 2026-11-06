@@ -36,6 +36,10 @@ impl<'local> Env<'local> {
 	/// Note: a traditional, raw JNI signature like `"(Ljava/lang/String;)Ljava/lang/String;"` can also be used with
 	/// [`jni_sig!`] but this demonstrates the more ergonomic syntax that the macro allows. See the [`jni_sig!`] macro
 	/// documentation for more details and examples.
+	///
+	/// # Errors
+	///
+	/// Returns an error if class or method lookup fails, arguments do not match the signature, or Java throws an exception.
 	pub fn call_method<'other_local, 'sig, 'sig_args, O, N, S>(
 		&mut self,
 		obj: O,
@@ -89,6 +93,10 @@ impl<'local> Env<'local> {
 	///
 	/// Note: this may cause a Java exception if the arguments are the wrong
 	/// type, in addition to if the method itself throws.
+	///
+	/// # Errors
+	///
+	/// Returns an error if class or method lookup fails, arguments do not match the signature, or Java throws an exception.
 	pub fn call_static_method<'other_local, 'sig, 'sig_args, C, N, S>(
 		&mut self,
 		class: C,
@@ -140,6 +148,10 @@ impl<'local> Env<'local> {
 	///
 	/// Note: this may cause a Java exception if the arguments are the wrong
 	/// type, in addition to if the method itself throws.
+	///
+	/// # Errors
+	///
+	/// Returns an error if class or method lookup fails, arguments do not match the signature, or Java throws an exception.
 	pub fn call_nonvirtual_method<'other_local, 'sig, 'sig_args, O, C, N, S>(
 		&mut self,
 		obj: O,
@@ -187,6 +199,10 @@ impl<'local> Env<'local> {
 
 	/// Create a new object using a constructor. This is done safely using
 	/// checks similar to those in `call_static_method`.
+	///
+	/// # Errors
+	///
+	/// Returns an error if class or method lookup fails, arguments do not match the signature, or Java throws an exception.
 	pub fn new_object<'other_local, 'sig, 'sig_args, C, S>(
 		&mut self,
 		class: C,
@@ -246,6 +262,10 @@ impl<'local> Env<'local> {
 	/// The provided `JMethodID` must be valid, and match the types and number of arguments, as well as return type
 	/// (always an Object for a constructor). If these are incorrect, the JVM may crash.  The `JMethodID` must also match
 	/// the passed type.
+	///
+	/// # Errors
+	///
+	/// Returns an error if class or constructor resolution fails, allocation fails, or the constructor throws a Java exception.
 	pub unsafe fn new_object_unchecked<'other_local, C, M>(
 		&mut self,
 		class: C,
@@ -265,6 +285,7 @@ impl<'local> Env<'local> {
 
 		let jni_args = ctor_args.as_ptr();
 
+		// SAFETY: The caller guarantees that ctor_id and ctor_args match this class's constructor signature.
 		let obj = unsafe {
 			jni_call_post_check_ex_and_null_ret!(
 				self,

@@ -443,8 +443,7 @@ fn load_test_arrays_class(env: &mut Env, out_dir: &Path) -> abos_jni::errors::Re
 	let class_loader =
 		abos_jni::objects::JClassLoader::get_system_class_loader(env).expect("Failed to get system class loader");
 
-	env.define_class(Some(jni_str!("com/example/TestArrays")), &class_loader, &class_bytes)
-		.expect("Failed to define TestArrays class");
+	env.define_class(Some(jni_str!("com/example/TestArrays")), &class_loader, &class_bytes)?;
 
 	Ok(())
 }
@@ -454,7 +453,13 @@ fn setup_test_output(test_name: &str) -> PathBuf {
 		.join("jni_macros_tests")
 		.join(test_name);
 
-	let _ = fs::remove_dir_all(&out_dir);
+	match fs::remove_dir_all(&out_dir) {
+		Ok(()) => {}
+
+		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+
+		Err(error) => panic!("Failed to remove previous test output: {error}"),
+	}
 	fs::create_dir_all(&out_dir).expect("Failed to create test output directory");
 
 	out_dir

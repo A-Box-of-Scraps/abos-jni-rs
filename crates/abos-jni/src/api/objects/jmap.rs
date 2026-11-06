@@ -116,6 +116,10 @@ impl JMap<'_> {
 		since = "0.22.0",
 		note = "use JMap::cast_local instead or Env::new_cast_local_ref/cast_local/as_cast_local or Env::new_cast_global_ref/cast_global/as_cast_global"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error if resolving or calling the Java map or iterator methods fails, including pending Java exceptions.
 	pub fn from_env<'any_local>(
 		env: &mut Env<'_>,
 		obj: impl Reference + Into<JObject<'any_local>> + AsRef<JObject<'any_local>>,
@@ -137,6 +141,10 @@ impl JMap<'_> {
 	///
 	/// - `ClassCastException` - if the key is of an inappropriate type for this map
 	/// - `NullPointerException` - if the key is null and this map does not allow null keys
+	///
+	/// # Errors
+	///
+	/// Returns an error if resolving or calling the Java map or iterator methods fails, including pending Java exceptions.
 	pub fn get<'env_local>(&self, env: &mut Env<'env_local>, key: &JObject) -> Result<Option<JObject<'env_local>>> {
 		let value = self._get(env, key)?;
 		if value.is_null() { Ok(None) } else { Ok(Some(value)) }
@@ -156,6 +164,10 @@ impl JMap<'_> {
 	/// - `ClassCastException` - if the key or value are of an inappropriate type
 	/// - `NullPointerException` - if the key or value is null and this map does not allow null keys or values
 	/// - `IllegalArgumentException` - if some property of the key or value prevents it
+	///
+	/// # Errors
+	///
+	/// Returns an error if resolving or calling the Java map or iterator methods fails, including pending Java exceptions.
 	pub fn put<'env_local>(
 		&self,
 		env: &mut Env<'env_local>,
@@ -179,6 +191,10 @@ impl JMap<'_> {
 	/// - `UnsupportedOperationException` - if the remove operation is not supported by this map
 	/// - `ClassCastException` - if the key is of an inappropriate type for this map
 	/// - `NullPointerException` - if the key is null and this map does not allow null keys
+	///
+	/// # Errors
+	///
+	/// Returns an error if resolving or calling the Java map or iterator methods fails, including pending Java exceptions.
 	pub fn remove<'env_local>(&self, env: &mut Env<'env_local>, key: &JObject) -> Result<Option<JObject<'env_local>>> {
 		let old = self._remove(env, key)?;
 		if old.is_null() { Ok(None) } else { Ok(Some(old)) }
@@ -216,6 +232,14 @@ impl JMap<'_> {
 	/// Alternatively, if the map is known to have a small, predictable size,
 	/// the loop could be wrapped in [`Env::with_local_frame`] to delete all of
 	/// the local references at once.
+	#[expect(
+		clippy::iter_not_returning_iterator,
+		reason = "Java iteration is fallible and requires an Env argument for each step."
+	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error if resolving or calling the Java map or iterator methods fails, including pending Java exceptions.
 	pub fn iter<'env_local>(&self, env: &mut Env<'env_local>) -> Result<JMapIter<'env_local>> {
 		let set = self.entry_set(env)?;
 		let iterator = set.iterator(env)?;
@@ -303,6 +327,10 @@ impl JMapIter<'_> {
 	///
 	/// This is like [`std::iter::Iterator::next`], but requires a parameter of
 	/// type `&mut Env` in order to call into Java.
+	///
+	/// # Errors
+	///
+	/// Returns an error if resolving or calling the Java map or iterator methods fails, including pending Java exceptions.
 	pub fn next<'env_local>(&mut self, env: &mut Env<'env_local>) -> Result<Option<JMapEntry<'env_local>>> {
 		self.iterator.next(env)?.map_or(Ok(None), |entry| {
 			// SAFETY: we know that the entrySet iterator will yield Map.Entry values

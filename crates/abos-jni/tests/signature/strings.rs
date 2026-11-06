@@ -91,6 +91,9 @@ fn test_jni_str_const_evaluation() {
 
 #[test]
 fn test_jni_cstr_concat_multiple_literals() {
+	const TWO_PART: &CStr = jni_cstr!("com.example", ".MyClass");
+	const WITH_TRAILING_COMMA: &CStr = jni_cstr!("hello", " ", "world",);
+
 	use abos_jni_macros::jni_cstr;
 	use std::ffi::CStr;
 
@@ -98,15 +101,16 @@ fn test_jni_cstr_concat_multiple_literals() {
 	const CONCATENATED: &CStr = jni_cstr!("java", ".", "lang", ".", "String");
 	assert_eq!(CONCATENATED.to_bytes(), b"java.lang.String");
 
-	const TWO_PART: &CStr = jni_cstr!("com.example", ".MyClass");
 	assert_eq!(TWO_PART.to_bytes(), b"com.example.MyClass");
 
-	const WITH_TRAILING_COMMA: &CStr = jni_cstr!("hello", " ", "world",);
 	assert_eq!(WITH_TRAILING_COMMA.to_bytes(), b"hello world");
 }
 
 #[test]
 fn test_jni_str_concat_multiple_literals() {
+	const TWO_PART: &JNIStr = jni_str!("com.example", ".MyClass");
+	const WITH_TRAILING_COMMA: &JNIStr = jni_str!("hello", " ", "world",);
+
 	use abos_jni::strings::JNIStr;
 	use abos_jni_macros::jni_str;
 
@@ -114,15 +118,16 @@ fn test_jni_str_concat_multiple_literals() {
 	const CONCATENATED: &JNIStr = jni_str!("java", ".", "lang", ".", "String");
 	assert_eq!(CONCATENATED.to_bytes(), b"java.lang.String");
 
-	const TWO_PART: &JNIStr = jni_str!("com.example", ".MyClass");
 	assert_eq!(TWO_PART.to_bytes(), b"com.example.MyClass");
 
-	const WITH_TRAILING_COMMA: &JNIStr = jni_str!("hello", " ", "world",);
 	assert_eq!(WITH_TRAILING_COMMA.to_bytes(), b"hello world");
 }
 
 #[test]
 fn test_jni_str_with_jni_crate_override() {
+	// Test with multiple literals after jni override
+	const MULTI_WITH_OVERRIDE: &abos_jni::strings::JNIStr = jni_str!(jni = abos_jni, "test", ".", "Class");
+
 	use abos_jni_macros::jni_str;
 
 	// Test that we can override the jni crate path
@@ -130,8 +135,6 @@ fn test_jni_str_with_jni_crate_override() {
 	const WITH_JNI_OVERRIDE: &abos_jni::strings::JNIStr = jni_str!(jni = abos_jni, "test.Class");
 	assert_eq!(WITH_JNI_OVERRIDE.to_bytes(), b"test.Class");
 
-	// Test with multiple literals after jni override
-	const MULTI_WITH_OVERRIDE: &abos_jni::strings::JNIStr = jni_str!(jni = abos_jni, "test", ".", "Class");
 	assert_eq!(MULTI_WITH_OVERRIDE.to_bytes(), b"test.Class");
 }
 
@@ -149,6 +152,9 @@ fn test_jni_cstr_and_jni_str_concat_same_encoding() {
 
 #[test]
 fn test_jni_cstr_mixed_literal_types() {
+	const VERSION: &CStr = jni_cstr!("Version ", 1, '.', 2, '.', 3);
+	const FLAG: &CStr = jni_cstr!("enabled=", true);
+
 	use abos_jni_macros::jni_cstr;
 	use std::ffi::CStr;
 
@@ -156,15 +162,16 @@ fn test_jni_cstr_mixed_literal_types() {
 	const PORT: &CStr = jni_cstr!("localhost:", 8080);
 	assert_eq!(PORT.to_bytes(), b"localhost:8080");
 
-	const VERSION: &CStr = jni_cstr!("Version ", 1, '.', 2, '.', 3);
 	assert_eq!(VERSION.to_bytes(), b"Version 1.2.3");
 
-	const FLAG: &CStr = jni_cstr!("enabled=", true);
 	assert_eq!(FLAG.to_bytes(), b"enabled=true");
 }
 
 #[test]
 fn test_jni_str_mixed_literal_types() {
+	const VERSION: &JNIStr = jni_str!("v", 2, '.', 0);
+	const BYTE_VAL: &JNIStr = jni_str!("byte=", b'A');
+
 	use abos_jni::strings::JNIStr;
 	use abos_jni_macros::jni_str;
 
@@ -172,10 +179,8 @@ fn test_jni_str_mixed_literal_types() {
 	const PORT: &JNIStr = jni_str!("localhost:", 8080);
 	assert_eq!(PORT.to_bytes(), b"localhost:8080");
 
-	const VERSION: &JNIStr = jni_str!("v", 2, '.', 0);
 	assert_eq!(VERSION.to_bytes(), b"v2.0");
 
-	const BYTE_VAL: &JNIStr = jni_str!("byte=", b'A');
 	assert_eq!(BYTE_VAL.to_bytes(), b"byte=65"); // ASCII value of 'A'
 }
 

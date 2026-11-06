@@ -34,7 +34,7 @@ fn test_incorrect_type_mapping_panics() {
 		// Try to access the API, which will trigger the type mapping checks
 		// We need to actually initialize the API to trigger the checks
 		let loader = abos_jni::refs::LoaderContext::None;
-		let _ = JTestTypeAPI::get(env, &loader);
+		JTestTypeAPI::get(env, &loader)?;
 
 		// This should panic before we get here due to the type mapping assertion
 		Ok(())

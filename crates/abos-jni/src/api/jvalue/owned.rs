@@ -42,6 +42,10 @@ impl<'local> JValueOwned<'local> {
 	/// **Note**: In many cases if `null` represents an error then the API would throw a Java
 	/// exception, which would be automatically translated to an [`Error::JavaException`] error by
 	/// this crate.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::NullPtr` if this value contains a null object reference.
 	pub const fn check_null(self) -> Result<Self> {
 		match self {
 			Self::Object(obj) => {
@@ -58,6 +62,10 @@ impl<'local> JValueOwned<'local> {
 	/// Try to unwrap to an Object.
 	///
 	/// See [`Self::into_object`] as a more-ergonomic alias.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn l(self) -> Result<JObject<'local>> {
 		match self {
 			Self::Object(obj) => Ok(obj),
@@ -67,19 +75,31 @@ impl<'local> JValueOwned<'local> {
 
 	/// Try to unwrap to an Object.
 	#[doc(alias = "l")]
-	pub fn into_object(self) -> Result<JObject<'local>> {
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
+	pub const fn into_object(self) -> Result<JObject<'local>> {
 		self.l()
 	}
 
 	/// Try to unwrap to a boolean.
 	///
 	/// See [`Self::into_bool`] as a more-ergonomic alias.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn z(self) -> Result<bool> {
 		self.borrow().z()
 	}
 
 	/// Try to unwrap to a boolean.
 	#[doc(alias = "z")]
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn into_bool(self) -> Result<bool> {
 		self.borrow().z()
 	}
@@ -87,12 +107,20 @@ impl<'local> JValueOwned<'local> {
 	/// Try to unwrap to a byte.
 	///
 	/// See [`Self::into_byte`] as a more-ergonomic alias.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn b(self) -> Result<jbyte> {
 		self.borrow().b()
 	}
 
 	/// Try to unwrap to a byte.
 	#[doc(alias = "b")]
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn into_byte(self) -> Result<jbyte> {
 		self.borrow().b()
 	}
@@ -100,6 +128,10 @@ impl<'local> JValueOwned<'local> {
 	/// Try to unwrap to a `jchar`.
 	///
 	/// See [`Self::into_char`] as a more-ergonomic alias.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn c(self) -> Result<jchar> {
 		self.borrow().c()
 	}
@@ -111,6 +143,10 @@ impl<'local> JValueOwned<'local> {
 	///
 	/// See [`char_from_java`] for more information.
 	#[doc(alias = "c")]
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn into_char(self) -> Result<jchar> {
 		self.borrow().c()
 	}
@@ -137,12 +173,20 @@ impl<'local> JValueOwned<'local> {
 	/// Try to unwrap to a double.
 	///
 	/// See [`Self::into_double`] as a more-ergonomic alias.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn d(self) -> Result<jdouble> {
 		self.borrow().d()
 	}
 
 	/// Try to unwrap to a double.
 	#[doc(alias = "d")]
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn into_double(self) -> Result<jdouble> {
 		self.borrow().d()
 	}
@@ -150,12 +194,20 @@ impl<'local> JValueOwned<'local> {
 	/// Try to unwrap to a float.
 	///
 	/// See [`Self::into_float`] as a more-ergonomic alias.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn f(self) -> Result<jfloat> {
 		self.borrow().f()
 	}
 
 	/// Try to unwrap to a float.
 	#[doc(alias = "f")]
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn into_float(self) -> Result<jfloat> {
 		self.borrow().f()
 	}
@@ -163,12 +215,20 @@ impl<'local> JValueOwned<'local> {
 	/// Try to unwrap to an int.
 	///
 	/// See [`Self::into_int`] as a more-ergonomic alias.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn i(self) -> Result<jint> {
 		self.borrow().i()
 	}
 
 	/// Try to unwrap to an int.
 	#[doc(alias = "i")]
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn into_int(self) -> Result<jint> {
 		self.borrow().i()
 	}
@@ -203,12 +263,20 @@ impl<'local> JValueOwned<'local> {
 	/// Try to unwrap to a long.
 	///
 	/// See [`Self::into_long`] as a more-ergonomic alias.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn j(self) -> Result<jlong> {
 		self.borrow().j()
 	}
 
 	/// Try to unwrap to a long.
 	#[doc(alias = "j")]
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn into_long(self) -> Result<jlong> {
 		self.borrow().j()
 	}
@@ -216,12 +284,20 @@ impl<'local> JValueOwned<'local> {
 	/// Try to unwrap to a short.
 	///
 	/// See [`Self::into_short`] as a more-ergonomic alias.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn s(self) -> Result<jshort> {
 		self.borrow().s()
 	}
 
 	/// Try to unwrap to a short.
 	#[doc(alias = "s")]
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn into_short(self) -> Result<jshort> {
 		self.borrow().s()
 	}
@@ -229,12 +305,20 @@ impl<'local> JValueOwned<'local> {
 	/// Try to unwrap to a void.
 	///
 	/// See [`Self::into_void`] as a more-ergonomic alias.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn v(self) -> Result<()> {
 		self.borrow().v()
 	}
 
 	/// Try to unwrap to a void.
 	#[doc(alias = "v")]
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn into_void(self) -> Result<()> {
 		self.borrow().v()
 	}

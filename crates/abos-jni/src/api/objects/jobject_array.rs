@@ -82,6 +82,7 @@ impl<'local, E: Reference> From<JObjectArray<'local, E>> for JObject<'local> {
 	}
 }
 
+// SAFETY: JObjectArray contains only an object-array reference with the declared local lifetime.
 unsafe impl<'local, E: Reference> AsJArrayRaw<'local> for JObjectArray<'local, E> {}
 
 pub struct JObjectArrayAPI<E: Reference> {
@@ -136,6 +137,7 @@ impl<E: Reference + Send + Sync> JObjectArrayAPI<E> {
 		// Leak it to get a true 'static reference and erase the type for storage
 		let leaked: &'static Self = Box::leak(Box::new(created));
 		write.insert(tid, leaked as &'static (dyn Any + Send + Sync));
+		drop(write);
 
 		Ok(leaked)
 	}
@@ -155,16 +157,19 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 	/// # Ok(())
 	/// # }
 	/// ```
+	///
+	/// # Errors
+	///
+	/// Returns an error if the length is too large, the element class cannot be resolved, or the JVM cannot allocate the array.
 	pub fn new<'env_local, 'any_local>(
 		env: &mut Env<'env_local>,
 		length: usize,
 		initial_element: impl AsRef<E::Kind<'any_local>>,
 	) -> Result<JObjectArray<'env_local, E::Kind<'env_local>>> {
-		if length > crate::sys::jsize::MAX as usize {
-			return Err(crate::errors::Error::JniCall(crate::errors::JniError::InvalidArguments));
-		}
+		let length = crate::sys::jsize::try_from(length).map_err(|_| Error::JniCall(JniError::InvalidArguments))?;
 		env.assert_top();
 		let element_class = E::lookup_class(env, &LoaderContext::default())?;
+		// SAFETY: The element class is resolved through Reference, and the initial value has the matching element type.
 		let array = unsafe {
 			jni_call_with_catch_and_null_check!(
 				catch |env| {
@@ -175,7 +180,7 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 				env,
 				v1_1,
 				NewObjectArray,
-				length as i32,
+				length,
 				element_class.as_raw(),
 				initial_element.as_ref().as_raw()
 			)
@@ -202,6 +207,7 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 		raw: jobjectArray,
 	) -> JObjectArray<'env_local, E::Kind<'env_local>> {
 		JObjectArray {
+			// SAFETY: The caller guarantees raw is an object-array reference valid for this environment's lifetime.
 			array: unsafe { JObject::from_raw(env, raw as jobject) },
 			_marker: std::marker::PhantomData,
 		}
@@ -250,10 +256,15 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 	}
 
 	/// Returns the length of the array.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array is null or a Java exception is pending.
 	pub fn len(&self, env: &Env) -> Result<usize> {
 		let array = null_check!(self.as_raw() as jobjectArray, "JObjectArray::len self argument")?;
-		let len = unsafe { jni_call_no_post_check_ex!(env, v1_1, GetArrayLength, array)? } as usize;
-		Ok(len)
+		// SAFETY: The typed array reference is non-null and valid for this Env.
+		let len = unsafe { jni_call_no_post_check_ex!(env, v1_1, GetArrayLength, array)? };
+		usize::try_from(len).map_err(|_| Error::JniCall(JniError::Unknown))
 	}
 
 	/// Returns a local reference to an element of the [`JObjectArray`] `array`.
@@ -262,14 +273,21 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 	///
 	/// This API catches exceptions internally and is not expected to return
 	/// [`Error::JavaException`] (unless called while there is a pending exception).
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array is null, the index is out of bounds or does not fit JNI, or a Java exception is pending.
+	///
+	/// # Panics
+	///
+	/// Panics if the environment is not associated with the current top JNI frame.
 	pub fn get_element<'env_local>(&self, env: &mut Env<'env_local>, index: usize) -> Result<E::Kind<'env_local>> {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		assert_eq!(env.level, JavaVM::thread_attach_guard_level());
 		let array = null_check!(self.as_raw() as jobjectArray, "get_object_array_element array argument")?;
-		if index > i32::MAX as usize {
-			return Err(crate::errors::Error::JniCall(crate::errors::JniError::InvalidArguments));
-		}
+		let index = crate::sys::jsize::try_from(index).map_err(|_| Error::JniCall(JniError::InvalidArguments))?;
+		// SAFETY: The typed array is non-null, index fits jint, and JNI checks array bounds.
 		unsafe {
 			jni_call_with_catch!(
                 catch |env| {
@@ -277,7 +295,7 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
                         Err(Error::IndexOutOfBounds),
                     else => Err(Error::JniCall(JniError::Unknown)),
                 },
-                env, v1_1, GetObjectArrayElement, array, index as i32)
+                env, v1_1, GetObjectArrayElement, array, index)
 			.map(|obj| E::kind_from_raw(obj))
 		}
 	}
@@ -290,6 +308,10 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 	///
 	/// This API catches exceptions internally and is not expected to return
 	/// [`Error::JavaException`] (unless called while there is a pending exception).
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array is null, the index is invalid, the element has an incompatible type, or a Java exception is pending.
 	pub fn set_element<'any_local>(
 		&self,
 		env: &Env<'_>,
@@ -297,9 +319,8 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 		value: impl AsRef<E::Kind<'any_local>>,
 	) -> Result<()> {
 		let array = null_check!(self.as_raw() as jobjectArray, "set_object_array_element array argument")?;
-		if index > i32::MAX as usize {
-			return Err(crate::errors::Error::JniCall(crate::errors::JniError::InvalidArguments));
-		}
+		let index = crate::sys::jsize::try_from(index).map_err(|_| Error::JniCall(JniError::InvalidArguments))?;
+		// SAFETY: The typed array and element references are valid, index fits jint, and JNI checks bounds and element compatibility.
 		unsafe {
 			jni_call_with_catch!(
 				catch |env| {
@@ -313,7 +334,7 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 				v1_1,
 				SetObjectArrayElement,
 				array,
-				index as i32,
+				index,
 				value.as_ref().as_raw()
 			)?;
 		}
@@ -357,6 +378,7 @@ unsafe impl<'local, E: Reference + 'local> Reference for JObjectArray<'local, E>
 
 	unsafe fn kind_from_raw<'env>(local_ref: jobject) -> Self::Kind<'env> {
 		JObjectArray {
+			// SAFETY: The caller guarantees a valid local array reference with the requested lifetime.
 			array: unsafe { JObject::kind_from_raw(local_ref) },
 			_marker: std::marker::PhantomData,
 		}
@@ -364,6 +386,7 @@ unsafe impl<'local, E: Reference + 'local> Reference for JObjectArray<'local, E>
 
 	unsafe fn global_kind_from_raw(global_ref: jobject) -> Self::GlobalKind {
 		JObjectArray {
+			// SAFETY: The caller guarantees a valid global array reference.
 			array: unsafe { JObject::global_kind_from_raw(global_ref) },
 			_marker: std::marker::PhantomData,
 		}

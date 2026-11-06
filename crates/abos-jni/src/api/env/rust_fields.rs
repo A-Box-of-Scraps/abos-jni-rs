@@ -77,6 +77,10 @@ impl<'local> Env<'local> {
 	/// taken and dropped multiple times from Rust. If you need to copy an
 	/// object with one of these fields then the field should be zero
 	/// initialized in the copy.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the field is already populated, field lookup fails, or the Java object cannot be locked.
 	pub unsafe fn set_rust_field<'other_local, O, S, T>(&self, obj: O, field: S, rust_object: T) -> Result<()>
 	where
 		O: AsRef<JObject<'other_local>>,
@@ -128,6 +132,14 @@ impl<'local> Env<'local> {
 	/// If the field contains a non-zero value then it is assumed to be a valid
 	/// pointer that was set via `set_rust_field` and will lead to undefined
 	/// behaviour if that is not true.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the field contains a null pointer, field lookup fails, or the Java object cannot be locked.
+	///
+	/// # Panics
+	///
+	/// Panics if the mutex protecting the Rust value is poisoned.
 	pub unsafe fn get_rust_field<'other_local, O, S, T>(&self, obj: O, field: S) -> Result<MutexGuard<'local, T>>
 	where
 		O: AsRef<JObject<'other_local>>,
@@ -170,6 +182,14 @@ impl<'local> Env<'local> {
 	/// If the field contains a non-zero value then it is assumed to be a valid
 	/// pointer that was set via `set_rust_field` and will lead to undefined
 	/// behaviour if that is not true.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the field is empty, its value is currently locked, or accessing or clearing the Java field fails.
+	///
+	/// # Panics
+	///
+	/// Panics if the mutex protecting the Rust value is poisoned.
 	pub unsafe fn take_rust_field<'other_local, O, S, T>(&self, obj: O, field: S) -> Result<T>
 	where
 		O: AsRef<JObject<'other_local>>,

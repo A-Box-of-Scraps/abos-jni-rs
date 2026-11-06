@@ -418,8 +418,7 @@ fn load_test_methods_class(env: &mut Env, out_dir: &Path) -> abos_jni::errors::R
 	let class_loader =
 		abos_jni::objects::JClassLoader::get_system_class_loader(env).expect("Failed to get system class loader");
 
-	env.define_class(Some(jni_str!("com/example/TestMethods")), &class_loader, &class_bytes)
-		.expect("Failed to define TestMethods class");
+	env.define_class(Some(jni_str!("com/example/TestMethods")), &class_loader, &class_bytes)?;
 
 	Ok(())
 }
@@ -431,7 +430,11 @@ fn setup_test_output(test_name: &str) -> PathBuf {
 		.join(test_name);
 
 	// Clean up any existing output
-	let _ = fs::remove_dir_all(&out_dir);
+	match fs::remove_dir_all(&out_dir) {
+		Ok(()) => {}
+		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+		Err(error) => panic!("Failed to remove previous test output: {error}"),
+	}
 	fs::create_dir_all(&out_dir).expect("Failed to create test output directory");
 
 	out_dir

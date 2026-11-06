@@ -15,7 +15,7 @@ macro_rules! native_method_test {
             #[test]
             $(#[$attribute])*
             fn $test_name() {
-                #[allow(clippy::crate_in_macro_def)]
+                #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                 let out_dir = $crate::util::setup_test_output(stringify!($test_name));
 
                 let _classes = abos_javac::Build::new()
@@ -23,7 +23,7 @@ macro_rules! native_method_test {
                     .output_dir(&out_dir)
                     .compile();
 
-                #[allow(clippy::crate_in_macro_def)]
+                #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                 $crate::util::attach_current_thread(|$env| {
                     let class_name = $java_class
                         .trim_end_matches(".java")
@@ -31,7 +31,7 @@ macro_rules! native_method_test {
                         .last()
                         .expect("Invalid Java class path");
 
-                    #[allow(clippy::crate_in_macro_def)]
+                    #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                     $crate::util::load_test_class($env, &out_dir, class_name)?;
                     let loader = abos_jni::refs::LoaderContext::default();
                     <$api>::get($env, &loader)?;
@@ -56,7 +56,7 @@ macro_rules! native_method_test {
             #[test]
             $(#[$attribute])*
             fn $test_name() {
-                #[allow(clippy::crate_in_macro_def)]
+                #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                 let out_dir = $crate::util::setup_test_output(stringify!($test_name));
 
                 let _classes = abos_javac::Build::new()
@@ -64,7 +64,7 @@ macro_rules! native_method_test {
                     .output_dir(&out_dir)
                     .compile();
 
-                #[allow(clippy::crate_in_macro_def)]
+                #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                 let result = $crate::util::attach_current_thread(|$env| {
                     let class_name = $java_class
                         .trim_end_matches(".java")
@@ -72,7 +72,7 @@ macro_rules! native_method_test {
                         .last()
                         .expect("Invalid Java class path");
 
-                    #[allow(clippy::crate_in_macro_def)]
+                    #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                     $crate::util::load_test_class($env, &out_dir, class_name)?;
                     let loader = abos_jni::refs::LoaderContext::default();
                     <$api>::get($env, &loader)?;

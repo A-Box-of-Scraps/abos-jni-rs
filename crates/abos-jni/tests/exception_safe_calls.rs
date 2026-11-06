@@ -15,7 +15,7 @@ rusty_fork_test! {
 fn test_exception_unsafe_calls() {
 	let jvm = util::jvm();
 	let res = jvm.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
-		let _ = env.throw("Test Exception".to_string());
+		assert!(matches!(env.throw("Test Exception".to_string()), Err(abos_jni::errors::Error::JavaException)));
 
 		let res = env.new_string("Test");
 
@@ -34,11 +34,7 @@ fn test_exception_unsafe_calls() {
 	});
 
 	println!("res = {res:?}");
-	assert!(matches!(res, Err(abos_jni::errors::Error::CaughtJavaException {
-		ref name,
-		ref msg,
-		..
-	}) if name == "java.lang.RuntimeException" && msg == "Test Exception"));
+	assert_caught_exception(&res, "java.lang.RuntimeException", Some("Test Exception"));
 }
 }
 
@@ -47,7 +43,10 @@ fn test_bind_java_type_exception_safety_checks() {
 	let jvm = util::jvm();
 
 	jvm.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
-		let _ = env.throw("Test Exception");
+		assert!(matches!(
+			env.throw("Test Exception"),
+			Err(abos_jni::errors::Error::JavaException)
+		));
 		let res = abos_jni::objects::JThread::current_thread(env);
 		assert!(matches!(res, Err(abos_jni::errors::Error::JavaException)));
 		assert!(env.exception_check());
@@ -213,7 +212,10 @@ fn test_global_drop_no_exception_side_effects() {
 
 		// Don't use '?' here because we want to continue with the JavaException error
 		// indicating a pending exception.
-		let _ = env.throw("Test Exception");
+		assert!(matches!(
+			env.throw("Test Exception"),
+			Err(abos_jni::errors::Error::JavaException)
+		));
 
 		assert!(env.exception_check());
 
@@ -241,7 +243,10 @@ fn test_weak_drop_no_exception_side_effects() {
 
 		// Don't use '?' here because we want to continue with the JavaException error
 		// indicating a pending exception.
-		let _ = env.throw("Test Exception");
+		assert!(matches!(
+			env.throw("Test Exception"),
+			Err(abos_jni::errors::Error::JavaException)
+		));
 
 		assert!(env.exception_check());
 
@@ -269,11 +274,7 @@ fn test_env_throw_apis_return_java_exception_err() {
 
 		let catch = env.exception_catch();
 		println!("Caught exception: {catch:?}");
-		assert!(matches!(catch, Err(abos_jni::errors::Error::CaughtJavaException {
-                ref name,
-                ref msg,
-                ..
-            }) if name == "java.lang.RuntimeException" && msg == "Test Exception"));
+		assert_caught_exception(&catch, "java.lang.RuntimeException", Some("Test Exception"));
 		assert!(!env.exception_check());
 
 		let res = env.throw_new(
@@ -285,11 +286,7 @@ fn test_env_throw_apis_return_java_exception_err() {
 
 		let catch = env.exception_catch();
 		println!("Caught exception: {catch:?}");
-		assert!(matches!(catch, Err(abos_jni::errors::Error::CaughtJavaException {
-                ref name,
-                ref msg,
-                ..
-            }) if name == "java.lang.Exception" && msg == "something bad happened"));
+		assert_caught_exception(&catch, "java.lang.Exception", Some("something bad happened"));
 		assert!(!env.exception_check());
 
 		let res = env.throw_new_void(abos_jni::jni_str!("java/lang/NullPointerException"));
@@ -298,11 +295,7 @@ fn test_env_throw_apis_return_java_exception_err() {
 
 		let catch = env.exception_catch();
 		println!("Caught exception: {catch:?}");
-		assert!(matches!(catch, Err(abos_jni::errors::Error::CaughtJavaException {
-                ref name,
-                ref msg,
-                ..
-            }) if name == "java.lang.NullPointerException"));
+		assert_caught_exception(&catch, "java.lang.NullPointerException", None);
 		assert!(!env.exception_check());
 
 		Ok(())
@@ -319,7 +312,10 @@ fn test_no_attach_current_thread_side_effects() {
 
 		// Don't use '?' here because we want to continue with the JavaException error
 		// indicating a pending exception.
-		let _ = env.throw("Test Exception");
+		assert!(matches!(
+			env.throw("Test Exception"),
+			Err(abos_jni::errors::Error::JavaException)
+		));
 
 		let res = jvm.attach_current_thread(|env| {
 			let msg = env.new_string("Bad Format")?;
@@ -331,20 +327,12 @@ fn test_no_attach_current_thread_side_effects() {
 		// The test exception should have been temporarily cleared before running the
 		// nested attachment closure, and we should get back the exception that the
 		// closure throws
-		assert!(matches!(res, Err(abos_jni::errors::Error::CaughtJavaException {
-                ref name,
-                ref msg,
-                ..
-            }) if name == "java.lang.NumberFormatException" && msg == "Bad Format"));
+		assert_caught_exception(&res, "java.lang.NumberFormatException", Some("Bad Format"));
 
 		// The original 'Test Exception' should be re-thrown and still be pending here
 		let catch = env.exception_catch();
 		println!("Caught exception: {catch:?}");
-		assert!(matches!(catch, Err(abos_jni::errors::Error::CaughtJavaException {
-                ref name,
-                ref msg,
-                ..
-            }) if name == "java.lang.RuntimeException" && msg == "Test Exception"));
+		assert_caught_exception(&catch, "java.lang.RuntimeException", Some("Test Exception"));
 
 		// For reference, we also check the behaviour of
 		// `AttachmentExceptionPolicy::PreCheckPostCatch` which was the
@@ -352,7 +340,10 @@ fn test_no_attach_current_thread_side_effects() {
 
 		// Don't use '?' here because we want to continue with the JavaException error
 		// indicating a pending exception.
-		let _ = env.throw("Test Exception");
+		assert!(matches!(
+			env.throw("Test Exception"),
+			Err(abos_jni::errors::Error::JavaException)
+		));
 
 		let res = jvm.attach_current_thread_with_config(
 			|| AttachConfig::default().exceptions_policy(AttachmentExceptionPolicy::PreCheckPostCatch),
@@ -365,14 +356,13 @@ fn test_no_attach_current_thread_side_effects() {
 
 		let catch = env.exception_catch();
 		println!("Caught exception: {catch:?}");
-		assert!(matches!(catch, Err(abos_jni::errors::Error::CaughtJavaException {
-                ref name,
-                ref msg,
-                ..
-            }) if name == "java.lang.RuntimeException" && msg == "Test Exception"));
+		assert_caught_exception(&catch, "java.lang.RuntimeException", Some("Test Exception"));
 
 		// Finally we check the behaviour of `AttachmentExceptionPolicy::Ignore`
-		let _ = env.throw("Test Exception");
+		assert!(matches!(
+			env.throw("Test Exception"),
+			Err(abos_jni::errors::Error::JavaException)
+		));
 		let pending = jvm
 			.attach_current_thread_with_config(
 				|| AttachConfig::default().exceptions_policy(AttachmentExceptionPolicy::Ignore),
@@ -394,4 +384,18 @@ fn test_no_attach_current_thread_side_effects() {
 		Ok(())
 	})
 	.expect("attached JNI callback succeeds");
+}
+
+fn assert_caught_exception<T: std::fmt::Debug>(
+	result: &abos_jni::errors::Result<T>,
+	expected_name: &str,
+	expected_message: Option<&str>,
+) {
+	let Err(abos_jni::errors::Error::CaughtJavaException { name, msg, .. }) = result else {
+		panic!("Expected a caught Java exception, got {result:?}");
+	};
+	assert_eq!(name, expected_name);
+	if let Some(message) = expected_message {
+		assert_eq!(msg, message);
+	}
 }

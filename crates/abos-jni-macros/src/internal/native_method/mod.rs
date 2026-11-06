@@ -59,7 +59,7 @@ struct NativeMethodStructInput {
 	/// Java class name for export (e.g., "com.example.MyClass")
 	java_type: Option<JavaClassName>,
 	java_method_name: String,
-	method_signature: MethodSignature,
+	signature: MethodSignature,
 	fn_path: syn::Path,
 	type_mappings: TypeMappings,
 	/// true if `raw = true` or `raw` qualifier with inline signature
@@ -110,11 +110,10 @@ pub fn generate_native_method_abi_check(
 		}
 	};
 
-	let type_mapping_runtime_checks = if let Some(type_mappings) = check_type_mappings {
-		generate_type_mapping_checks(type_mappings, jni)
-	} else {
-		quote! {}
-	};
+	let type_mapping_runtime_checks = check_type_mappings.map_or_else(
+		|| quote! {},
+		|type_mappings| generate_type_mapping_checks(type_mappings, jni),
+	);
 
 	quote! {
 		// Use atomic try_update to guard the ABI check. The closure runs without holding
@@ -164,229 +163,176 @@ pub fn generate_native_method_abi_check(
 	}
 }
 
-/// Generate the `NativeMethod` struct creation
+/// Generate the `NativeMethod` descriptor and optional exported wrapper.
 pub fn native_method_impl(input: TokenStream) -> Result<TokenStream> {
 	let input: NativeMethodStructInput = syn::parse2(input)?;
-
-	let is_static = input.is_static;
-	let jni = &input.jni_crate;
-	let java_method_name = &input.java_method_name;
-	let fn_path = &input.fn_path;
-	let type_mappings = &input.type_mappings;
-
-	// Generate JNI signature
-	let jni_signature = input.method_signature.to_jni_signature(type_mappings).map_err(|e| {
-		syn::Error::new(
-			proc_macro2::Span::call_site(),
-			format!("Failed to generate JNI signature: {e}"),
-		)
-	})?;
-
-	// Create CStr literals for name and signature
-	let name_cstr = lit_cstr_mutf8(java_method_name);
-	let sig_cstr = lit_cstr_mutf8(&jni_signature);
-
-	// Generate the type-checked wrapper function
-	let lifetime = quote! { 'local };
-
-	// Build parameter list - differs for raw vs wrapped functions
-	// For raw functions: extern "system" signature with EnvUnowned<'local> (no &mut)
-	// For wrapped functions: the user's function takes &mut Env<'local>
-	let mut raw_params = Vec::new();
-	let mut user_fn_params = Vec::new();
-
-	if input.is_raw_fn {
-		// Raw function: extern "system" fn(unowned_env: EnvUnowned<'local>, ...)
-		raw_params.push(quote! { unowned_env: #jni::EnvUnowned<#lifetime> });
-		user_fn_params.push(quote! { unowned_env: #jni::EnvUnowned<#lifetime> });
+	let signature = input
+		.signature
+		.to_jni_signature(&input.type_mappings)
+		.map_err(|error| {
+			syn::Error::new(
+				proc_macro2::Span::call_site(),
+				format!("Failed to generate JNI signature: {error}"),
+			)
+		})?;
+	let wrapper = NativeWrapper::new(&input);
+	let method = wrapper.method_block(&lit_cstr_mutf8(&input.java_method_name), &lit_cstr_mutf8(&signature));
+	if matches!(input.export, NativeMethodExport::No) {
+		Ok(quote! { const { #method } })
 	} else {
-		// Wrapped function: extern "system" wrapper, but user's fn takes &mut Env<'local>
-		raw_params.push(quote! { mut unowned_env: #jni::EnvUnowned<#lifetime> });
-		user_fn_params.push(quote! { env: &mut #jni::Env<#lifetime> });
+		wrapper.export(&signature, &method)
 	}
+}
 
-	// Add this/class parameter
-	if is_static {
-		raw_params.push(quote! { class: #jni::objects::JClass<#lifetime> });
-		user_fn_params.push(quote! { class: #jni::objects::JClass<#lifetime> });
-	} else {
-		let this_type = if let Some(rust_type) = &input.rust_type {
-			quote! { #rust_type<#lifetime> }
+struct NativeWrapper<'a> {
+	input: &'a NativeMethodStructInput,
+	name: syn::Ident,
+	lifetime: TokenStream,
+	parameters: Vec<TokenStream>,
+	arguments: Vec<TokenStream>,
+	return_type: TokenStream,
+	abi_check: TokenStream,
+}
+
+impl<'a> NativeWrapper<'a> {
+	fn new(input: &'a NativeMethodStructInput) -> Self {
+		let lifetime = quote! { 'local };
+		let parameters = wrapper_parameters(input, &lifetime);
+		let mut arguments = vec![if input.is_static {
+			quote! { class }
 		} else {
-			quote! { #jni::objects::JObject<#lifetime> }
-		};
-		raw_params.push(quote! { this: #this_type });
-		user_fn_params.push(quote! { this: #this_type });
+			quote! { this }
+		}];
+		for parameter in &input.signature.parameters {
+			let name = &parameter.name;
+			arguments.push(quote! { #name });
+		}
+		let return_type = sig_type_to_rust_type_core(
+			&input.signature.return_type,
+			&lifetime,
+			&input.type_mappings,
+			&input.jni_crate,
+		);
+		let abi_check = generate_native_method_abi_check(
+			&input.jni_crate,
+			&input.java_method_name,
+			input.abi_check,
+			input.is_raw_fn,
+			input.is_static,
+			Some(&input.type_mappings),
+		);
+		Self {
+			input,
+			name: syn::Ident::new("__native_method_wrapper", proc_macro2::Span::call_site()),
+			lifetime,
+			parameters,
+			arguments,
+			return_type,
+			abi_check,
+		}
 	}
 
-	// Add method parameters
-	for param in &input.method_signature.parameters {
-		let param_name = &param.name;
-		let rust_type = sig_type_to_rust_type_core(&param.ty, &lifetime, type_mappings, jni);
-		raw_params.push(quote! { #param_name: #rust_type });
-		user_fn_params.push(quote! { #param_name: #rust_type });
-	}
-
-	// Get return type
-	let return_type = sig_type_to_rust_type_core(&input.method_signature.return_type, &lifetime, type_mappings, jni);
-
-	// Build argument list for calling the user's function
-	let mut call_args = Vec::new();
-	if is_static {
-		call_args.push(quote! { class });
-	} else {
-		call_args.push(quote! { this });
-	}
-	for param in &input.method_signature.parameters {
-		let param_name = &param.name;
-		call_args.push(quote! { #param_name });
-	}
-
-	// Note: we unconditionally generate a wrapper, even for raw functions without
-	// an ABI check, so we can be sure we register an `extern "system"` ABI function
-	// pointer.
-
-	let abi_check = generate_native_method_abi_check(
-		jni,
-		java_method_name,
-		input.abi_check,
-		input.is_raw_fn,
-		input.is_static,
-		Some(type_mappings),
-	);
-
-	let (wrapper_path, native_method_block) = if input.is_raw_fn {
-		// For raw functions with ABI check: create wrapper that does ABI check
-		// The wrapper has extern "system" signature with raw_params
-		// The user's function is called with user_fn_params (EnvUnowned)
-		let wrapper_ident = syn::Ident::new("__native_method_wrapper", proc_macro2::Span::call_site());
-		let wrapper_path: syn::Path = syn::parse_quote! { #wrapper_ident };
-
-		let block = quote! {
-			// ABI-checking wrapper function that converts from extern "system" to Rust calling convention
-			extern "system" fn #wrapper_ident<#lifetime>(
-				#(#raw_params),*
-			) -> #return_type {
-				#abi_check
-
-				// Call the user's raw function
-				#fn_path(unowned_env, #(#call_args),*)
-			}
-
-			// Safety: The wrapper function is type-checked at compile time to match
-			// the signature specified in the macro. The function pointer is valid
-			// and points to __native_method_abi_check_wrapper.
-			unsafe {
-				#jni::NativeMethod::from_raw_parts(
-					#jni::strings::JNIStr::from_cstr_unchecked(#name_cstr),
-					#jni::strings::JNIStr::from_cstr_unchecked(#sig_cstr),
-					#wrapper_ident as *mut ::std::ffi::c_void,
-				)
-			}
-		};
-		(wrapper_path, block)
-	} else {
+	fn call_body(&self) -> TokenStream {
+		let input = self.input;
+		let jni = &input.jni_crate;
+		let function = &input.fn_path;
+		let arguments = &self.arguments;
+		let abi_check = &self.abi_check;
+		if input.is_raw_fn {
+			return quote! { #abi_check #function(unowned_env, #(#arguments),*) };
+		}
 		let with_env_api = if input.catch_unwind {
 			quote! { with_env }
 		} else {
 			quote! { with_env_no_catch }
 		};
-		// For safe wrapped functions: create wrapper that calls with_env and resolve
-		// The wrapper has extern "system" signature with raw_params
-		// The user's function is called with user_fn_params (env: &mut Env)
-		// Type checking happens naturally when calling the user function
-		let error_policy = input
-			.error_policy
-			.as_ref()
-			.map_or_else(|| quote! { #jni::errors::ThrowRuntimeExAndDefault }, |p| quote! { #p });
+		let policy = input.error_policy.as_ref().map_or_else(
+			|| quote! { #jni::errors::ThrowRuntimeExAndDefault },
+			|path| quote! { #path },
+		);
+		quote! {
+			unowned_env.#with_env_api(|env| { #abi_check #function(env, #(#arguments),*) }).resolve::<#policy>()
+		}
+	}
 
-		let wrapper_ident = syn::Ident::new("__native_method_wrapper", proc_macro2::Span::call_site());
-		let wrapper_path: syn::Path = syn::parse_quote! { #wrapper_ident };
-
-		let block = quote! {
-			// Type-checked wrapper function that converts from extern "system" to Rust calling convention
-			// and handles error resolution
-			extern "system" fn #wrapper_ident<#lifetime>(
-				#(#raw_params),*
-			) -> #return_type {
-				unowned_env
-					.#with_env_api(|env| {
-						#abi_check
-
-						#fn_path(env, #(#call_args),*)
-					})
-					.resolve::<#error_policy>()
-			}
-
-			// Safety: The wrapper function is type-checked at compile time to match
-			// the signature specified in the macro. The function pointer is valid
-			// and points to __native_method_wrapper.
+	fn method_block(&self, name_cstr: &syn::LitCStr, sig_cstr: &syn::LitCStr) -> TokenStream {
+		let jni = &self.input.jni_crate;
+		let name = &self.name;
+		let lifetime = &self.lifetime;
+		let parameters = &self.parameters;
+		let return_type = &self.return_type;
+		let body = self.call_body();
+		quote! {
+			extern "system" fn #name<#lifetime>(#(#parameters),*) -> #return_type { #body }
+			// The generated wrapper enforces the declared signature and ABI; literals are validated modified UTF-8.
 			unsafe {
 				#jni::NativeMethod::from_raw_parts(
 					#jni::strings::JNIStr::from_cstr_unchecked(#name_cstr),
 					#jni::strings::JNIStr::from_cstr_unchecked(#sig_cstr),
-					#wrapper_ident as *mut ::std::ffi::c_void,
+					#name as *mut ::std::ffi::c_void,
 				)
 			}
-		};
-		(wrapper_path, block)
-	};
+		}
+	}
 
-	// Generate export wrapper if requested
-	if matches!(input.export, NativeMethodExport::No) {
-		Ok(quote! {
-			const {
-				#native_method_block
-			}
-		})
-	} else {
-		// Generate the mangled JNI function name
-		let mangled_name = if let NativeMethodExport::WithName(export_name) = input.export {
-			export_name
+	fn export(&self, signature: &str, method: &TokenStream) -> Result<TokenStream> {
+		let input = self.input;
+		let mangled_name = if let NativeMethodExport::WithName(name) = &input.export {
+			name.clone()
 		} else {
-			let java_class = input.java_type.as_ref().ok_or_else(|| {
+			let class = input.java_type.as_ref().ok_or_else(|| {
 				syn::Error::new_spanned(
 					&input.fn_path,
 					"java_type is required for an automatically mangled export",
 				)
 			})?;
-			create_jni_fn_name(&java_class.to_java_dotted(), java_method_name, Some(&jni_signature))
+			create_jni_fn_name(&class.to_java_dotted(), &input.java_method_name, Some(signature))
 		};
-
-		// Use export_name attribute - check if has_unsafe_attr is set
-		let export_name_attr = if cfg!(has_unsafe_attr) {
+		let export_attr = if cfg!(has_unsafe_attr) {
 			quote! { #[unsafe(export_name = #mangled_name)] }
 		} else {
 			quote! { #[export_name = #mangled_name] }
 		};
-
-		// Build call arguments for the wrapper (just pass through all params)
-		let mut export_call_args = vec![quote! { unowned_env }];
-		if is_static {
-			export_call_args.push(quote! { class });
-		} else {
-			export_call_args.push(quote! { this });
-		}
-		for param in &input.method_signature.parameters {
-			let param_name = &param.name;
-			export_call_args.push(quote! { #param_name });
-		}
-
-		// The export wrapper calls the wrapper function (for wrapped) or user function (for raw)
+		let name = &self.name;
+		let lifetime = &self.lifetime;
+		let parameters = &self.parameters;
+		let arguments = &self.arguments;
+		let return_type = &self.return_type;
 		Ok(quote! {
 			const {
 				#[doc(hidden)]
-				#export_name_attr
-				pub extern "system" fn __native_method_export<#lifetime>(
-					#(#raw_params),*
-				) -> #return_type {
-					#wrapper_path(#(#export_call_args),*)
+				#export_attr
+				pub extern "system" fn __native_method_export<#lifetime>(#(#parameters),*) -> #return_type {
+					#name(unowned_env, #(#arguments),*)
 				}
-
-				#native_method_block
+				#method
 			}
 		})
 	}
+}
+
+fn wrapper_parameters(input: &NativeMethodStructInput, lifetime: &TokenStream) -> Vec<TokenStream> {
+	let jni = &input.jni_crate;
+	let mut parameters = vec![if input.is_raw_fn {
+		quote! { unowned_env: #jni::EnvUnowned<#lifetime> }
+	} else {
+		quote! { mut unowned_env: #jni::EnvUnowned<#lifetime> }
+	}];
+	if input.is_static {
+		parameters.push(quote! { class: #jni::objects::JClass<#lifetime> });
+	} else {
+		let ty = input.rust_type.as_ref().map_or_else(
+			|| quote! { #jni::objects::JObject<#lifetime> },
+			|path| quote! { #path<#lifetime> },
+		);
+		parameters.push(quote! { this: #ty });
+	}
+	for parameter in &input.signature.parameters {
+		let name = &parameter.name;
+		let ty = sig_type_to_rust_type_core(&parameter.ty, lifetime, &input.type_mappings, jni);
+		parameters.push(quote! { #name: #ty });
+	}
+	parameters
 }
 
 mod parse;

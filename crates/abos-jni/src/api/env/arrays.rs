@@ -12,11 +12,16 @@ impl<'local> Env<'local> {
 		since = "0.22.0",
 		note = "use JPrimitiveArray::len or JObjectArray::len instead. This method will be removed in a future version"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array is null or a Java exception is pending.
 	pub fn get_array_length<'other_local, 'array>(
 		&self,
 		array: &'array impl AsJArrayRaw<'other_local>,
 	) -> Result<jsize> {
 		let array = null_check!(array.as_jarray_raw(), "get_array_length array argument")?;
+		// SAFETY: AsJArrayRaw guarantees an array reference, which was checked for null.
 		let len: jsize = unsafe { jni_call_no_post_check_ex!(self, v1_1, GetArrayLength, array)? };
 		Ok(len)
 	}
@@ -29,6 +34,10 @@ impl<'local> Env<'local> {
 	/// instead, which both support element type parameterization.
 	///
 	/// This API may be deprecated and removed in a future version.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
 	pub fn new_object_array<'other_local_1, 'other_local_2, T, U>(
 		&mut self,
 		length: jsize,
@@ -44,6 +53,7 @@ impl<'local> Env<'local> {
 		self.assert_top();
 		let class = element_class.lookup(self)?;
 
+		// SAFETY: The class descriptor resolves to a valid class and initial_element remains live during the JNI call.
 		let array = unsafe {
 			jni_call_post_check_ex_and_null_ret!(
 				self,
@@ -67,6 +77,10 @@ impl<'local> Env<'local> {
 	/// All elements are initially set to `initial_element`.
 	///
 	/// It's recommended to use [`JObjectArray::new`] instead.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
 	pub fn new_object_type_array<'any_local, E>(
 		&mut self,
 		length: usize,
@@ -83,6 +97,10 @@ impl<'local> Env<'local> {
 		since = "0.22.0",
 		note = "use JObjectArray::get_element instead. This method will be removed in a future version"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array is null, the index is invalid, or a Java exception is pending.
 	pub fn get_object_array_element<'other_local, E: Reference + 'other_local>(
 		&mut self,
 		array: impl AsRef<JObjectArray<'other_local, E>>,
@@ -96,6 +114,10 @@ impl<'local> Env<'local> {
 		since = "0.22.0",
 		note = "use JObjectArray::set_element instead. This method will be removed in a future version"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array is null, the index is invalid, the value has an incompatible type, or a Java exception is pending.
 	pub fn set_object_array_element<'any_local_1, 'any_local_2, E: Reference + 'any_local_1>(
 		&self,
 		array: impl AsRef<JObjectArray<'any_local_1, E>>,
@@ -106,6 +128,10 @@ impl<'local> Env<'local> {
 	}
 
 	/// Create a new java byte array from a rust byte slice.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
 	pub fn byte_array_from_slice(&mut self, buf: &[u8]) -> Result<JByteArray<'local>> {
 		let bytes = JByteArray::new(self, buf.len())?;
 		// SAFETY: i8 and u8 are both plain, single-byte, data types with the same size and
@@ -113,7 +139,7 @@ impl<'local> Env<'local> {
 		//
 		// We just want to forward the bitwise representation of the slice and it doesn't matter
 		// whether we interpret the data as signed or unsigned.
-		let buf: &[i8] = unsafe { std::mem::transmute(buf) };
+		let buf: &[i8] = unsafe { std::slice::from_raw_parts(buf.as_ptr().cast::<i8>(), buf.len()) };
 		bytes.set_region(self, 0, buf)?;
 		Ok(bytes)
 	}
@@ -124,13 +150,20 @@ impl<'local> Env<'local> {
 	/// valid (in case the array length is changed concurrently).
 	///
 	/// This API catches exceptions internally and is not expected to return [`Error::JavaException`]
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array is null, copying its contents fails, or a Java exception is pending.
 	pub fn convert_byte_array<'other_local>(&self, array: impl AsRef<JByteArray<'other_local>>) -> Result<Vec<u8>> {
 		let array = array.as_ref().as_raw();
 		let array = null_check!(array, "convert_byte_array array argument")?;
 
 		// GetArrayLength is not documented to throw any exceptions
+		// SAFETY: The byte-array reference was checked for null and is valid for this environment.
 		let length = unsafe { jni_call_no_post_check_ex!(self, v1_1, GetArrayLength, array)? };
-		let mut vec = vec![0u8; length as usize];
+		let buffer_len = usize::try_from(length).map_err(|_| Error::JniCall(JniError::Unknown))?;
+		let mut vec = vec![0u8; buffer_len];
+		// SAFETY: The destination is allocated for the array length, and the byte-array reference remains live.
 		unsafe {
 			jni_call_with_catch!(
 				catch |env| {
@@ -155,6 +188,10 @@ impl<'local> Env<'local> {
 	/// It is recommended to use [`JBooleanArray::new`] instead.
 	///
 	/// This API may be deprecated and removed in a future version.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
 	pub fn new_boolean_array(&mut self, length: usize) -> Result<JBooleanArray<'local>> {
 		JBooleanArray::new(self, length)
 	}
@@ -164,6 +201,10 @@ impl<'local> Env<'local> {
 	/// It is recommended to use [`JByteArray::new`] instead.
 	///
 	/// This API may be deprecated and removed in a future version.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
 	pub fn new_byte_array(&mut self, length: usize) -> Result<JByteArray<'local>> {
 		JByteArray::new(self, length)
 	}
@@ -173,6 +214,10 @@ impl<'local> Env<'local> {
 	/// It is recommended to use [`JCharArray::new`] instead.
 	///
 	/// This API may be deprecated and removed in a future version.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
 	pub fn new_char_array(&mut self, length: usize) -> Result<JCharArray<'local>> {
 		JCharArray::new(self, length)
 	}
@@ -182,6 +227,10 @@ impl<'local> Env<'local> {
 	/// It is recommended to use [`JShortArray::new`] instead.
 	///
 	/// This API may be deprecated and removed in a future version.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
 	pub fn new_short_array(&mut self, length: usize) -> Result<JShortArray<'local>> {
 		JShortArray::new(self, length)
 	}
@@ -191,6 +240,10 @@ impl<'local> Env<'local> {
 	/// It is recommended to use [`JIntArray::new`] instead.
 	///
 	/// This API may be deprecated and removed in a future version.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
 	pub fn new_int_array(&mut self, length: usize) -> Result<JIntArray<'local>> {
 		JIntArray::new(self, length)
 	}
@@ -200,6 +253,10 @@ impl<'local> Env<'local> {
 	/// It is recommended to use [`JLongArray::new`] instead.
 	///
 	/// This API may be deprecated and removed in a future version.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
 	pub fn new_long_array(&mut self, length: usize) -> Result<JLongArray<'local>> {
 		JLongArray::new(self, length)
 	}
@@ -209,6 +266,10 @@ impl<'local> Env<'local> {
 	/// It is recommended to use [`JFloatArray::new`] instead.
 	///
 	/// This API may be deprecated and removed in a future version.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
 	pub fn new_float_array(&mut self, length: usize) -> Result<JFloatArray<'local>> {
 		JFloatArray::new(self, length)
 	}
@@ -218,6 +279,10 @@ impl<'local> Env<'local> {
 	/// It is recommended to use [`JDoubleArray::new`] instead.
 	///
 	/// This API may be deprecated and removed in a future version.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
 	pub fn new_double_array(&mut self, length: usize) -> Result<JDoubleArray<'local>> {
 		JDoubleArray::new(self, length)
 	}

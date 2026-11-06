@@ -36,6 +36,20 @@ pub enum PrimitiveType {
 }
 
 impl PrimitiveType {
+	pub const fn jni_name(&self) -> &'static str {
+		match self {
+			Self::Void => "Void",
+			Self::Boolean => "Boolean",
+			Self::Byte => "Byte",
+			Self::Char => "Char",
+			Self::Short => "Short",
+			Self::Int => "Int",
+			Self::Long => "Long",
+			Self::Float => "Float",
+			Self::Double => "Double",
+		}
+	}
+
 	/// Convert primitive type to JNI descriptor character
 	pub const fn to_jni_descriptor(&self) -> &'static str {
 		match self {
@@ -55,7 +69,7 @@ impl PrimitiveType {
 /// Represents a Java class name (package + class)
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct JavaClassName {
-	/// Package segments (e.g., ["java", "lang"])
+	/// Package segments (e.g., `["java", "lang"]`)
 	pub package: Vec<String>,
 	/// Class name (including optional inner class names separated by '$')
 	pub class: String,
@@ -425,14 +439,12 @@ impl RustType {
 	}
 	pub const fn is_builtin(&self) -> bool {
 		match self.target {
-			RustTypeTarget::Primitive { is_builtin, .. } => is_builtin,
-			RustTypeTarget::Reference { is_builtin, .. } => is_builtin,
+			RustTypeTarget::Primitive { is_builtin, .. } | RustTypeTarget::Reference { is_builtin, .. } => is_builtin,
 		}
 	}
 	pub const fn path(&self) -> &str {
 		match &self.target {
-			RustTypeTarget::Primitive { path, .. } => path.as_str(),
-			RustTypeTarget::Reference { path, .. } => path.as_str(),
+			RustTypeTarget::Primitive { path, .. } | RustTypeTarget::Reference { path, .. } => path.as_str(),
 		}
 	}
 }
@@ -469,7 +481,7 @@ pub enum AbiCheck {
 }
 
 impl AbiCheck {
-	pub const fn requires_abi_check(&self) -> bool {
+	pub const fn requires_abi_check(self) -> bool {
 		match self {
 			Self::Always => true,
 			Self::UnsafeDebugOnly => cfg!(debug_assertions),

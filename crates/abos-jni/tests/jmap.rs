@@ -11,7 +11,7 @@ mod util;
 use util::{attach_current_thread, unwrap};
 
 #[test]
-pub fn jmap_push_and_iterate() {
+fn jmap_push_and_iterate() {
 	attach_current_thread(|env| {
 		let data = &[jni_str!("hello"), jni_str!("world"), jni_str!("from"), jni_str!("test")];
 

@@ -27,7 +27,9 @@ pub struct JStaticMethodID {
 }
 
 // Method IDs are valid across threads (not tied to a Env)
+// SAFETY: JNI member IDs are valid across threads and are not tied to an Env.
 unsafe impl Send for JStaticMethodID {}
+// SAFETY: JNI member IDs are valid across threads and are not tied to an Env.
 unsafe impl Sync for JStaticMethodID {}
 
 impl JStaticMethodID {

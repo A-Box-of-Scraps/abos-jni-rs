@@ -97,20 +97,18 @@ impl VisibilitySpec {
 	// type itself.
 	fn clamp_to(&self, other: &Self) -> Self {
 		match (self, other) {
-			(Self::Public, _) => other.clone(),
 			(Self::PubCrate, Self::Public) => Self::PubCrate,
-			(Self::PubCrate, _) => other.clone(),
 			(Self::PubSuper, Self::Public | Self::PubCrate) => Self::PubSuper,
-			(Self::PubSuper, _) => other.clone(),
-			(Self::PubSelf, Self::Public | Self::PubCrate | Self::PubSuper) => Self::PubSelf,
-			(Self::PubSelf, _) => other.clone(),
+			(Self::PubSelf, Self::Public | Self::PubCrate | Self::PubSuper) | (Self::PubInPath(_), Self::PubSelf) => {
+				Self::PubSelf
+			}
 			// XXX: it's a bit hand-wavey deciding how we should clamp `pub(in
 			// path)`, but essentially we'll assume that if someone want's their
 			// binding to only be visible for a specific module path then their
 			// API type should also only be visible for the same path, unless
 			// `other` is restricted to `pub(self)`
-			(Self::PubInPath(_), Self::PubSelf) => Self::PubSelf,
 			(Self::PubInPath(_), _) => self.clone(),
+			(Self::Public | Self::PubCrate | Self::PubSuper | Self::PubSelf, _) => other.clone(),
 		}
 	}
 }
@@ -119,7 +117,7 @@ impl VisibilitySpec {
 #[derive(Clone)]
 struct Constructor {
 	name: Ident,
-	method_signature: MethodSignature,
+	signature: MethodSignature,
 	attrs: Vec<syn::Attribute>,
 }
 
@@ -129,7 +127,7 @@ struct Method {
 	visibility: VisibilitySpec,
 	java_name: String,
 	rust_name: Ident,
-	method_signature: MethodSignature,
+	signature: MethodSignature,
 	attrs: Vec<syn::Attribute>,
 	is_static: bool,
 	non_null: bool,
@@ -139,13 +137,16 @@ struct Method {
 #[derive(Clone)]
 struct Field {
 	java_name: String,
-	#[allow(dead_code)]
+	#[allow(
+		dead_code,
+		reason = "Retain the declared Rust field name alongside custom getter and setter names."
+	)]
 	rust_name: Ident,
 	getter_name: Option<Ident>,
 	setter_name: Option<Ident>,
 	getter_visibility: VisibilitySpec,
 	setter_visibility: VisibilitySpec,
-	field_signature: FieldSignature,
+	signature: FieldSignature,
 	attrs: Vec<syn::Attribute>,
 	getter_attrs: Vec<syn::Attribute>,
 	setter_attrs: Vec<syn::Attribute>,
@@ -167,7 +168,7 @@ struct IsInstanceOfEntry {
 struct NativeMethod {
 	java_name: String,
 	rust_name: Ident,
-	method_signature: MethodSignature,
+	signature: MethodSignature,
 	error_policy: Option<syn::Path>,
 	export: NativeMethodExport,
 	attrs: Vec<syn::Attribute>,
@@ -192,8 +193,8 @@ enum MethodKind {
 /// Intermediate representation for a parsed method (after validation)
 struct ParsedMethod {
 	rust_name: Ident,
-	java_name: String,                 // Always set (either explicit or derived from rust_name)
-	method_signature: MethodSignature, // Always present after parsing
+	java_name: String,          // Always set (either explicit or derived from rust_name)
+	signature: MethodSignature, // Always present after parsing
 	visibility: Option<VisibilitySpec>,
 	error_policy: Option<syn::Path>,    // Only set for NativeMethod
 	export: Option<NativeMethodExport>, // Only set for NativeMethod

@@ -10,6 +10,7 @@ use crate::{
 
 const DEFAULT_EXCEPTION_CLASS: &JNIStr = jni_str!("java/lang/RuntimeException");
 
+// SAFETY: Lookup constructs or delegates to a checked throwable lookup and retains its typed local reference.
 unsafe impl<'local, 'other_local, C, M> Desc<'local, JThrowable<'local>> for (C, M)
 where
 	C: Desc<'local, JClass<'other_local>>,
@@ -34,6 +35,7 @@ where
 	}
 }
 
+// SAFETY: Lookup constructs or delegates to a checked throwable lookup and retains its typed local reference.
 unsafe impl<'local> Desc<'local, JThrowable<'local>> for Exception {
 	type Output = Auto<'local, JThrowable<'local>>;
 
@@ -44,6 +46,7 @@ unsafe impl<'local> Desc<'local, JThrowable<'local>> for Exception {
 	}
 }
 
+// SAFETY: Lookup constructs or delegates to a checked throwable lookup and retains its typed local reference.
 unsafe impl<'local> Desc<'local, JThrowable<'local>> for &str {
 	type Output = Auto<'local, JThrowable<'local>>;
 
@@ -53,6 +56,7 @@ unsafe impl<'local> Desc<'local, JThrowable<'local>> for &str {
 	}
 }
 
+// SAFETY: Lookup constructs or delegates to a checked throwable lookup and retains its typed local reference.
 unsafe impl<'local> Desc<'local, JThrowable<'local>> for String {
 	type Output = Auto<'local, JThrowable<'local>>;
 
@@ -62,6 +66,7 @@ unsafe impl<'local> Desc<'local, JThrowable<'local>> for String {
 	}
 }
 
+// SAFETY: Lookup constructs or delegates to a checked throwable lookup and retains its typed local reference.
 unsafe impl<'local, T> Desc<'local, JThrowable<'local>> for T
 where
 	T: AsRef<JNIStr>,

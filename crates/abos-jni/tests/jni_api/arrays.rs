@@ -33,7 +33,7 @@ macro_rules! test_auto_array_read_write {
                     .expect(stringify!(Env #$new_array must create a Java $jni_type array with given size));
 
                 // Insert array elements
-                let _ = java_array.set_region(env, 0, buf);
+                java_array.set_region(env, 0, buf)?;
 
                 // Use a scope to test Drop
                 {
@@ -43,6 +43,7 @@ macro_rules! test_auto_array_read_write {
                     // an existing array reference)
                     let mut auto_ptr = env.with_local_frame(10, |env| -> abos_jni::errors::Result<_> {
                         // Get byte array elements auto wrapper
+                        // SAFETY: The test owns the array and does not allow concurrent access while its element guard is live.
                         let auto_ptr: AutoElements<$jni_type, _> = unsafe {
                             java_array.get_elements(env, ReleaseMode::CopyBack).unwrap()
                         };
@@ -54,17 +55,23 @@ macro_rules! test_auto_array_read_write {
 
                     // Check pointer access
                     let ptr = auto_ptr.as_ptr();
+                    // SAFETY: The live element guard provides both initialized array entries, and no mutable reference is active.
                     assert_eq!(unsafe { *ptr.offset(0) }, $value_a);
+                    // SAFETY: The live element guard provides both initialized array entries, and no mutable reference is active.
                     assert_eq!(unsafe { *ptr.offset(1) }, $value_b);
 
                     // Check pointer From access
                     let ptr: *mut $jni_type = std::convert::From::from(&auto_ptr);
+                    // SAFETY: The live element guard provides both initialized array entries, and no mutable reference is active.
                     assert_eq!(unsafe { *ptr.offset(0) }, $value_a);
+                    // SAFETY: The live element guard provides both initialized array entries, and no mutable reference is active.
                     assert_eq!(unsafe { *ptr.offset(1) }, $value_b);
 
                     // Check pointer into() access
                     let ptr: *mut $jni_type = (&auto_ptr).into();
+                    // SAFETY: The live element guard provides both initialized array entries, and no mutable reference is active.
                     assert_eq!(unsafe { *ptr.offset(0) }, $value_a);
+                    // SAFETY: The live element guard provides both initialized array entries, and no mutable reference is active.
                     assert_eq!(unsafe { *ptr.offset(1) }, $value_b);
 
                     // Check slice access
@@ -73,6 +80,7 @@ macro_rules! test_auto_array_read_write {
                     //
                     // We make sure that the slice is dropped before also testing access via `Deref`
                     // (to ensure we don't have aliased references)
+                    // SAFETY: The guard retains the initialized elements, and this shared slice is dropped before mutable access.
                     unsafe {
                         let slice = std::slice::from_raw_parts(auto_ptr.as_ptr(), auto_ptr.len());
                         assert_eq!(slice[0], $value_a);
@@ -124,7 +132,7 @@ test_auto_array_read_write!(get_float_array_elements, jfloat, new_float_array, 0
 test_auto_array_read_write!(get_double_array_elements, jdouble, new_double_array, 0.0, 1.0);
 
 #[test]
-#[ignore] // Disabled until issue #283 is resolved
+#[ignore = "Disabled until issue #283 is resolved"]
 pub fn get_long_array_elements_commit() {
 	attach_current_thread(|env| {
 		// Create original Java array
@@ -134,9 +142,10 @@ pub fn get_long_array_elements_commit() {
 			.expect("Env#new_long_array must create a java array with given size");
 
 		// Insert array elements
-		let _ = java_array.set_region(env, 0, buf);
+		java_array.set_region(env, 0, buf)?;
 
 		// Get long array elements auto wrapper
+		// SAFETY: The test owns the array and does not allow concurrent access while its element guard is live.
 		let mut auto_ptr = unsafe {
 			java_array
 				.get_elements(env, ReleaseMode::CopyBack)
@@ -153,6 +162,7 @@ pub fn get_long_array_elements_commit() {
 		let ptr = auto_ptr.as_ptr();
 
 		// Modify
+		// SAFETY: The guard owns three writable elements; no slice or other element access overlaps these writes.
 		unsafe {
 			*ptr += 1;
 			*ptr.add(1) += 1;
@@ -191,6 +201,7 @@ pub fn get_array_elements_critical() {
 		// Use a scope to test Drop
 		{
 			// Get primitive array elements auto wrapper
+			// SAFETY: The test owns the array and does not allow concurrent access while its element guard is live.
 			let mut auto_ptr = unsafe {
 				java_array
 					.get_elements_critical(env, ReleaseMode::CopyBack)
@@ -206,6 +217,7 @@ pub fn get_array_elements_critical() {
 			//
 			// We make sure that the slice is dropped before also testing access via `Deref`
 			// (to ensure we don't have aliased references)
+			// SAFETY: The guard retains the initialized elements, and this shared slice is dropped before mutable access.
 			unsafe {
 				let slice = std::slice::from_raw_parts(auto_ptr.as_ptr(), auto_ptr.len());
 				assert_eq!(slice[0], 1);
@@ -242,35 +254,27 @@ pub fn new_primitive_array_ok() {
 		const SIZE: usize = 16;
 
 		let result = env.new_boolean_array(SIZE);
-		assert!(result.is_ok());
 		assert!(!result.expect("test operation succeeds").is_null());
 
 		let result = env.new_byte_array(SIZE);
-		assert!(result.is_ok());
 		assert!(!result.expect("test operation succeeds").is_null());
 
 		let result = env.new_char_array(SIZE);
-		assert!(result.is_ok());
 		assert!(!result.expect("test operation succeeds").is_null());
 
 		let result = env.new_short_array(SIZE);
-		assert!(result.is_ok());
 		assert!(!result.expect("test operation succeeds").is_null());
 
 		let result = env.new_int_array(SIZE);
-		assert!(result.is_ok());
 		assert!(!result.expect("test operation succeeds").is_null());
 
 		let result = env.new_long_array(SIZE);
-		assert!(result.is_ok());
 		assert!(!result.expect("test operation succeeds").is_null());
 
 		let result = env.new_float_array(SIZE);
-		assert!(result.is_ok());
 		assert!(!result.expect("test operation succeeds").is_null());
 
 		let result = env.new_double_array(SIZE);
-		assert!(result.is_ok());
 		assert!(!result.expect("test operation succeeds").is_null());
 
 		Ok(())

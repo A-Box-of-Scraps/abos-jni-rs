@@ -253,6 +253,8 @@ fn test_jni_sig_str_produces_utf8_string() {
 
 #[test]
 fn test_field_signatures_all_variants() {
+	const STR_FIELD: &str = jni_sig_str!(java.util.List);
+
 	use abos_jni_macros::{jni_sig_cstr, jni_sig_jstr, jni_sig_str};
 
 	// Test that field signatures work with all macro variants
@@ -265,12 +267,13 @@ fn test_field_signatures_all_variants() {
 	let jstr_field = jni_sig_jstr!(java.util.List);
 	assert_eq!(jstr_field.to_bytes(), b"Ljava/util/List;");
 
-	const STR_FIELD: &str = jni_sig_str!(java.util.List);
 	assert_eq!(STR_FIELD, "Ljava/util/List;");
 }
 
 #[test]
 fn test_raw_signature_all_variants() {
+	const STR_SIG: &str = jni_sig_str!("(ILjava/lang/String;)V");
+
 	use abos_jni_macros::{jni_sig_cstr, jni_sig_jstr, jni_sig_str};
 
 	// Test raw signatures with all macro variants
@@ -283,7 +286,6 @@ fn test_raw_signature_all_variants() {
 	let jstr_sig = jni_sig_jstr!("(ILjava/lang/String;)V");
 	assert_eq!(jstr_sig.to_bytes(), b"(ILjava/lang/String;)V");
 
-	const STR_SIG: &str = jni_sig_str!("(ILjava/lang/String;)V");
 	assert_eq!(STR_SIG, "(ILjava/lang/String;)V");
 }
 

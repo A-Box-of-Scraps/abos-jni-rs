@@ -8,7 +8,7 @@
 //!
 //! Note: This is a representative subset of export tests. Most name mangling
 //! variations are not included since they're handled by the same underlying
-//! code used by both bind_java_type! and native_method! macros.
+//! code used by both `bind_java_type!` and `native_method!` macros.
 
 #[macro_use]
 mod native_methods_utils;
@@ -69,14 +69,16 @@ native_method_test! {
 		},
 	],
 	test_body: |env, class| {
-		let obj = new_object!(env, class)?;
-
 		// Call through Java to ensure the native implementation is linked
 		use abos_jni::{jni_sig, jni_str};
+
+		let obj = new_object!(env, class)?;
+
 		let result_via_java = env.call_method(&obj, jni_str!("noArgs"), jni_sig!("()I"), &[])?.i()?;
 		assert_eq!(result_via_java, 1234);
 
 		// Also test calling the exported symbol directly
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
 			let ret = Java_com_example_TestNativeExports_noArgs__(unowned, obj);
@@ -86,7 +88,11 @@ native_method_test! {
 	}
 }
 
-fn no_args_impl<'local>(_env: &mut Env<'local>, _this: JObject<'local>) -> Result<jint, abos_jni::errors::Error> {
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
+const fn no_args_impl<'local>(_env: &mut Env<'local>, _this: JObject<'local>) -> Result<jint, abos_jni::errors::Error> {
 	Ok(1234)
 }
 
@@ -108,6 +114,8 @@ native_method_test! {
 	test_body: |env, class| {
 		let obj = new_object!(env, class)?;
 
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
+
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
 			let ret = Java_com_example_TestNativeExports_primitiveArgs__IJZ(
@@ -119,6 +127,10 @@ native_method_test! {
 	}
 }
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 fn primitive_args_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: JObject<'local>,
@@ -149,6 +161,8 @@ native_method_test! {
 		let str_arg = env.new_string("test")?;
 		let obj_arg = env.new_string("object")?;
 
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
+
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
 			let result = Java_com_example_TestNativeExports_objectArgs__Ljava_lang_String_2Ljava_lang_Object_2(
@@ -160,7 +174,11 @@ native_method_test! {
 	}
 }
 
-fn object_args_impl<'local>(
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
+const fn object_args_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: JObject<'local>,
 	str: JString<'local>,
@@ -187,6 +205,8 @@ native_method_test! {
 	test_body: |env, class| {
 		let obj = new_object!(env, class)?;
 
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
+
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
 			let result = Java_com_example_TestNativeExports_overloaded__(unowned, obj);
@@ -196,7 +216,11 @@ native_method_test! {
 	}
 }
 
-fn overloaded_no_args_impl<'local>(
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
+const fn overloaded_no_args_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: JObject<'local>,
 ) -> Result<jint, abos_jni::errors::Error> {
@@ -216,6 +240,8 @@ native_method_test! {
 	test_body: |env, class| {
 		let obj = new_object!(env, class)?;
 
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
+
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
 			let result = Java_com_example_TestNativeExports_overloaded__I(unowned, obj, 5);
@@ -225,7 +251,11 @@ native_method_test! {
 	}
 }
 
-fn overloaded_int_impl<'local>(
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
+const fn overloaded_int_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: JObject<'local>,
 	x: jint,
@@ -248,6 +278,8 @@ native_method_test! {
 		let obj = new_object!(env, class)?;
 		let input = env.new_string("hello")?;
 
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
+
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
 			let result = Java_com_example_TestNativeExports_overloaded__Ljava_lang_String_2(
@@ -259,7 +291,11 @@ native_method_test! {
 	}
 }
 
-fn overloaded_string_impl<'local>(
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
+const fn overloaded_string_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: JObject<'local>,
 	_s: JString<'local>,
@@ -287,6 +323,8 @@ native_method_test! {
 	test_body: |env, class| {
 		let obj = new_object!(env, class)?;
 
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
+
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
 			Java_com_example_TestNativeExports_method_1with_1underscore__(unowned, obj);
@@ -295,7 +333,11 @@ native_method_test! {
 	}
 }
 
-fn method_with_underscore_impl<'local>(
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
+const fn method_with_underscore_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: JObject<'local>,
 ) -> Result<(), abos_jni::errors::Error> {
@@ -320,6 +362,8 @@ native_method_test! {
 	test_body: |env, class| {
 		let obj = new_object!(env, class)?;
 
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
+
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
 			Java_com_example_TestNativeExports_manualExport(unowned, obj);
@@ -328,6 +372,13 @@ native_method_test! {
 	}
 }
 
-fn manual_export_impl<'local>(_env: &mut Env<'local>, _this: JObject<'local>) -> Result<(), abos_jni::errors::Error> {
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
+const fn manual_export_impl<'local>(
+	_env: &mut Env<'local>,
+	_this: JObject<'local>,
+) -> Result<(), abos_jni::errors::Error> {
 	Ok(())
 }

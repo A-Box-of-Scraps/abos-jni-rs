@@ -144,8 +144,8 @@ where
 	/// [`MUTF8Chars::from_raw`] and then dropping it, or by passing the pointer
 	/// to the JNI function `ReleaseStringUTFChars`.
 	pub fn into_raw(self) -> (*const c_char, bool) {
-		let _dont_call_drop = std::mem::ManuallyDrop::new(self);
-		(_dont_call_drop.chars, _dont_call_drop.is_copy)
+		let undropped_self = std::mem::ManuallyDrop::new(self);
+		(undropped_self.chars, undropped_self.is_copy)
 	}
 
 	/// Constructs a [`MUTF8Chars`] from raw components.
@@ -220,6 +220,7 @@ where
 	StringRef: AsRef<JString<'local>> + Reference,
 {
 	fn from(other: &'java_str MUTF8Chars<'local, StringRef>) -> &'java_str JNIStr {
+		// SAFETY: The character guard retains the terminated modified-UTF-8 buffer for this borrow.
 		unsafe { JNIStr::from_ptr(other.chars) }
 	}
 }
@@ -264,11 +265,14 @@ where
 			// `JavaVM::singleton()` must be initialized and won't panic.
 			JavaVM::singleton()?.with_top_local_frame(|env| {
 				// This method is safe to call in case of pending exceptions (see the chapter 2 of the spec)
+				// SAFETY: The caller supplies the string and pointer paired by GetStringUTFChars, and this releases them once.
 				unsafe { ex_safe_jni_call_no_post_check_ex!(env, v1_1, ReleaseStringUTFChars, obj, chars) };
 
 				Ok(())
 			})
 		}
+
+		// SAFETY: The guard retains its source string and releases its acquired character buffer exactly once.
 
 		match unsafe { release_string_utf_chars(self.obj.as_raw(), self.chars) } {
 			Ok(()) => {}

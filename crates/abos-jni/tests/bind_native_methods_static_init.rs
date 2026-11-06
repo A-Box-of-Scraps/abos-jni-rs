@@ -50,7 +50,7 @@ native_method_test! {
 		assert_eq!(static_value, 42, "Static value should 5 + 10 + 27 = 42");
 
 		// redundantly re-get the API to ensure the static init does not somehow run again
-		let _ = TestNativeStaticInitAPI::get(env, &Default::default())?;
+		let _ = TestNativeStaticInitAPI::get(env, &abos_jni::refs::LoaderContext::default())?;
 
 		let static_value = TestNativeStaticInit::get_static_value(env)?;
 		assert_eq!(static_value, 42, "Static value should still be 42");

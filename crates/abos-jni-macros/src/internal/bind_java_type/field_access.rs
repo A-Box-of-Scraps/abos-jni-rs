@@ -14,44 +14,11 @@ pub(super) fn generate_jni_get_field_call(
 
 	// Determine the JNI function name and return value handling based on the field type
 	let (top_check, call_fn, return_tokens) = if let Some(prim) = field_type.try_as_primitive(type_mappings) {
-		match prim {
-			PrimitiveType::Void => {
-				// Void fields don't make sense but we handle them for completeness
-				return quote! { Ok(()) };
-			}
-			PrimitiveType::Boolean => {
-				let call_fn = format_ident!("{}BooleanField", call_prefix);
-				(quote! {}, call_fn, quote! { ret })
-			}
-			PrimitiveType::Byte => {
-				let call_fn = format_ident!("{}ByteField", call_prefix);
-				(quote! {}, call_fn, quote! { ret })
-			}
-			PrimitiveType::Char => {
-				let call_fn = format_ident!("{}CharField", call_prefix);
-				(quote! {}, call_fn, quote! { ret })
-			}
-			PrimitiveType::Short => {
-				let call_fn = format_ident!("{}ShortField", call_prefix);
-				(quote! {}, call_fn, quote! { ret })
-			}
-			PrimitiveType::Int => {
-				let call_fn = format_ident!("{}IntField", call_prefix);
-				(quote! {}, call_fn, quote! { ret })
-			}
-			PrimitiveType::Long => {
-				let call_fn = format_ident!("{}LongField", call_prefix);
-				(quote! {}, call_fn, quote! { ret })
-			}
-			PrimitiveType::Float => {
-				let call_fn = format_ident!("{}FloatField", call_prefix);
-				(quote! {}, call_fn, quote! { ret })
-			}
-			PrimitiveType::Double => {
-				let call_fn = format_ident!("{}DoubleField", call_prefix);
-				(quote! {}, call_fn, quote! { ret })
-			}
+		if prim == PrimitiveType::Void {
+			return quote! { Ok(()) };
 		}
+		let call_fn = format_ident!("{}{}Field", call_prefix, prim.jni_name());
+		(quote! {}, call_fn, quote! { ret })
 	} else {
 		// For objects, arrays, and rust references, we call GetObjectField
 		let call_fn = format_ident!("{}ObjectField", call_prefix);
@@ -109,7 +76,10 @@ pub(super) fn generate_jni_get_field_call(
 }
 
 /// Generate JNI set field call code for a given field type
-#[allow(clippy::too_many_arguments)]
+#[allow(
+	clippy::too_many_arguments,
+	reason = "Code generation needs the independent binding metadata and JNI paths."
+)]
 pub(super) fn generate_jni_set_field_call(
 	debug_name: &str,
 	field_type: &SigType,

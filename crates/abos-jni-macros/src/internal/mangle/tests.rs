@@ -50,30 +50,31 @@ fn test_create_jni_fn_name() {
 
 #[test]
 fn test_valid_namespace() {
-	// Valid namespaces
-	assert!(valid_namespace("com.example.Foo"));
-	assert!(valid_namespace("com.antonok.kb"));
-	assert!(valid_namespace("org.signal.client.internal.Native"));
-	assert!(valid_namespace("net.under_score"));
-	assert!(valid_namespace("a.b.c.Test$"));
-
-	// Invalid namespaces - spaces and special characters
-	assert!(!valid_namespace("com example Foo"));
-	assert!(!valid_namespace(" com.example.Foo"));
-	assert!(!valid_namespace("com.example.Foo "));
-	assert!(!valid_namespace("com.example.1Foo"));
-
-	// Invalid namespaces - leading dots
-	assert!(!valid_namespace(".com.example.Foo"));
-	assert!(!valid_namespace("."));
-
-	// Invalid namespaces - trailing dots
-	assert!(!valid_namespace("com.example.Foo."));
-
-	// Invalid namespaces - consecutive dots
-	assert!(!valid_namespace("com..example.Foo"));
-	assert!(!valid_namespace("com...example.Foo"));
-	assert!(!valid_namespace("com.example..Foo"));
+	let cases = [
+		// Valid namespaces
+		("com.example.Foo", true),
+		("com.antonok.kb", true),
+		("org.signal.client.internal.Native", true),
+		("net.under_score", true),
+		("a.b.c.Test$", true),
+		// Invalid namespaces - spaces and special characters
+		("com example Foo", false),
+		(" com.example.Foo", false),
+		("com.example.Foo ", false),
+		("com.example.1Foo", false),
+		// Invalid namespaces - leading dots
+		(".com.example.Foo", false),
+		(".", false),
+		// Invalid namespaces - trailing dots
+		("com.example.Foo.", false),
+		// Invalid namespaces - consecutive dots
+		("com..example.Foo", false),
+		("com...example.Foo", false),
+		("com.example..Foo", false),
+	];
+	for (input, expected) in cases {
+		assert_eq!(valid_namespace(input), expected, "{input}");
+	}
 }
 
 #[test]
@@ -354,60 +355,54 @@ fn test_with_method_name_and_signature() {
 
 #[test]
 fn test_snake_case_to_lower_camel_case() {
-	// Basic conversions
-	assert_eq!(snake_case_to_lower_camel_case("say_hello"), "sayHello");
-	assert_eq!(snake_case_to_lower_camel_case("get_user_name"), "getUserName");
-	assert_eq!(snake_case_to_lower_camel_case("init"), "init");
-	assert_eq!(snake_case_to_lower_camel_case("close_it"), "closeIt");
-
-	// Idempotent - already lowerCamelCase
-	assert_eq!(snake_case_to_lower_camel_case("sayHello"), "sayHello");
-	assert_eq!(snake_case_to_lower_camel_case("getUserName"), "getUserName");
-	assert_eq!(snake_case_to_lower_camel_case("closeIt"), "closeIt");
-
-	// Mixed case - preserved unchanged
-	assert_eq!(snake_case_to_lower_camel_case("Foo_Bar"), "Foo_Bar");
-	assert_eq!(snake_case_to_lower_camel_case("XMLParser"), "XMLParser");
-	assert_eq!(snake_case_to_lower_camel_case("IOError"), "IOError");
-	assert_eq!(snake_case_to_lower_camel_case("HTML_Parser"), "HTML_Parser");
-
-	// Unicode support
-	assert_eq!(snake_case_to_lower_camel_case("café_résumé"), "caféRésumé");
-	assert_eq!(snake_case_to_lower_camel_case("ß_test"), "ßTest");
-	assert_eq!(snake_case_to_lower_camel_case("test_αλφα"), "testΑλφα");
-	assert_eq!(snake_case_to_lower_camel_case("method_привет"), "methodПривет");
-
-	// Leading underscores - one is removed
-	assert_eq!(snake_case_to_lower_camel_case("_private_method"), "privateMethod");
-	assert_eq!(snake_case_to_lower_camel_case("__dunder__"), "_dunder__");
-	assert_eq!(snake_case_to_lower_camel_case("_leading"), "leading");
-	assert_eq!(snake_case_to_lower_camel_case("__leading_multiple"), "_leadingMultiple");
-	assert_eq!(snake_case_to_lower_camel_case("___priv"), "__priv");
-	assert_eq!(snake_case_to_lower_camel_case("_priv_name"), "privName");
-	assert_eq!(snake_case_to_lower_camel_case("__priv_name"), "_privName");
-
-	// Trailing underscores preserved
-	assert_eq!(snake_case_to_lower_camel_case("trailing_"), "trailing_");
-	assert_eq!(
-		snake_case_to_lower_camel_case("trailing_multiple__"),
-		"trailingMultiple__"
-	);
-	assert_eq!(snake_case_to_lower_camel_case("_a_"), "a_");
-	assert_eq!(snake_case_to_lower_camel_case("_foo_bar_"), "fooBar_");
-
-	// All underscores
-	assert_eq!(snake_case_to_lower_camel_case("___"), "___");
-
-	// Edge cases
-	assert_eq!(snake_case_to_lower_camel_case("a_b_c"), "aBC");
-
-	// Numeric prefixes - capitalize first non-digit character
-	assert_eq!(snake_case_to_lower_camel_case("array_2d_foo"), "array2DFoo");
-	assert_eq!(snake_case_to_lower_camel_case("test_3d"), "test3D");
-	assert_eq!(snake_case_to_lower_camel_case("foo_123bar"), "foo123Bar");
-	assert_eq!(snake_case_to_lower_camel_case("get_2d_array"), "get2DArray");
-	assert_eq!(snake_case_to_lower_camel_case("test_42"), "test42");
-	assert_eq!(snake_case_to_lower_camel_case("a_1_b"), "a1B");
+	let cases = [
+		// Basic conversions
+		("say_hello", "sayHello"),
+		("get_user_name", "getUserName"),
+		("init", "init"),
+		("close_it", "closeIt"),
+		// Idempotent - already lowerCamelCase
+		("sayHello", "sayHello"),
+		("getUserName", "getUserName"),
+		("closeIt", "closeIt"),
+		// Mixed case - preserved unchanged
+		("Foo_Bar", "Foo_Bar"),
+		("XMLParser", "XMLParser"),
+		("IOError", "IOError"),
+		("HTML_Parser", "HTML_Parser"),
+		// Unicode support
+		("café_résumé", "caféRésumé"),
+		("ß_test", "ßTest"),
+		("test_αλφα", "testΑλφα"),
+		("method_привет", "methodПривет"),
+		// Leading underscores - one is removed
+		("_private_method", "privateMethod"),
+		("__dunder__", "_dunder__"),
+		("_leading", "leading"),
+		("__leading_multiple", "_leadingMultiple"),
+		("___priv", "__priv"),
+		("_priv_name", "privName"),
+		("__priv_name", "_privName"),
+		// Trailing underscores preserved
+		("trailing_", "trailing_"),
+		("trailing_multiple__", "trailingMultiple__"),
+		("_a_", "a_"),
+		("_foo_bar_", "fooBar_"),
+		// All underscores
+		("___", "___"),
+		// Edge cases
+		("a_b_c", "aBC"),
+		// Numeric prefixes - capitalize first non-digit character
+		("array_2d_foo", "array2DFoo"),
+		("test_3d", "test3D"),
+		("foo_123bar", "foo123Bar"),
+		("get_2d_array", "get2DArray"),
+		("test_42", "test42"),
+		("a_1_b", "a1B"),
+	];
+	for (input, expected) in cases {
+		assert_eq!(snake_case_to_lower_camel_case(input), expected, "{input}");
+	}
 }
 
 #[test]

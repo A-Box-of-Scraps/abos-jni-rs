@@ -64,46 +64,27 @@ pub(super) fn parse_name_spec(input: ParseStream) -> Result<(String, Ident)> {
 	}
 }
 
-/// Unified parser for method blocks (constructors, methods, and native methods)
-/// Parses both shorthand syntax: `[vis] [static] [raw] [extern] fn name(params) -> ret`
-/// and block syntax: `[vis] [static] [raw] [extern] fn name [=] { ... }`
-/// Ensures signature is always present and `java_name` is derived from `rust_name` if not explicit
-/// Validates based on the method kind
+#[derive(Default)]
+struct MethodOptions {
+	java_name: Option<String>,
+	signature: Option<MethodSignature>,
+	error_policy: Option<syn::Path>,
+	export: Option<NativeMethodExport>,
+	native_fn: Option<syn::Path>,
+	abi_check: Option<AbiCheck>,
+	catch_unwind: Option<bool>,
+	is_static: bool,
+	is_raw: bool,
+	extern_qualifier: Option<Token![extern]>,
+	non_null: bool,
+}
+
+/// Parse shorthand or property-block syntax and validate the selected method kind.
 pub(super) fn parse_method(input: ParseStream, type_mappings: &TypeMappings, kind: MethodKind) -> Result<ParsedMethod> {
-	// Parse attributes first
 	let attrs = input.call(syn::Attribute::parse_outer)?;
-
-	// Parse optional visibility specifier before the method name
 	let visibility = parse_visibility(input)?;
-
-	// Parse qualifiers that can appear after visibility and before the fn keyword
-	// For shorthand: [vis] [static] [raw] [extern] [non_null] fn name(params) -> ret
-	// For block: [vis] [static] [extern] fn name { ... }
-	let mut is_static = false;
-	let mut is_raw = false;
-	let mut is_extern = false;
-	let mut is_non_null = false;
-
-	// Parse qualifiers in any order (static, raw, extern, non_null)
-	loop {
-		if input.peek(Token![static]) {
-			input.parse::<Token![static]>()?;
-			is_static = true;
-		} else if input.peek(Token![extern]) {
-			input.parse::<Token![extern]>()?;
-			is_extern = true;
-		} else if input.peek(raw) {
-			input.parse::<raw>()?;
-			is_raw = true;
-		} else if input.peek(non_null) {
-			input.parse::<non_null>()?;
-			is_non_null = true;
-		} else {
-			break;
-		}
-	}
-
-	// Require 'fn' keyword for both shorthand and block syntax
+	let mut options = MethodOptions::default();
+	options.parse_qualifiers(input)?;
 	if !input.peek(Token![fn]) {
 		return Err(syn::Error::new(
 			input.span(),
@@ -111,298 +92,274 @@ pub(super) fn parse_method(input: ParseStream, type_mappings: &TypeMappings, kin
 		));
 	}
 	input.parse::<Token![fn]>()?;
-
-	let rust_name = input.parse::<Ident>()?;
-
-	let mut java_name = None;
-	let mut method_signature = None;
-	let mut error_policy = None;
-	let mut export = None;
-	let mut native_fn = None;
-	let mut abi_check = None;
-	let mut catch_unwind = None;
-
-	// Check if this is shorthand syntax (parentheses) or block syntax (braces)
+	let rust_name: Ident = input.parse()?;
 	if input.peek(syn::token::Paren) {
-		// Shorthand syntax: [vis] [qual..] fn name(params) [-> return_type]
-		let sig_content;
-		parenthesized!(sig_content in input);
-
-		let mut parameters = Vec::new();
-		let mut param_index = 0;
-		while !sig_content.is_empty() {
-			let param = parse_parameter_with_index(&sig_content, param_index, type_mappings)?;
-			parameters.push(param);
-			param_index += 1;
-
-			if !sig_content.is_empty() {
-				sig_content.parse::<Token![,]>()?;
-			}
-		}
-
-		// Check if there's a return type (-> Type)
-		// Constructors don't have return types, methods do
-		let return_type = if input.peek(Token![->]) {
-			input.parse::<Token![->]>()?;
-			parse_type(input, type_mappings)?
-		} else {
-			// No return type means this is constructor shorthand - use void
-			SigType::Alias("void".to_string())
-		};
-
-		method_signature = Some(MethodSignature {
-			parameters,
-			return_type,
-		});
+		options.signature = Some(parse_shorthand(input, type_mappings)?);
 	} else if input.peek(syn::token::Brace) || input.peek(Token![=]) {
-		// Block syntax: [vis] [qual..] fn name [=] { name = "javaName", sig = (params) -> ret, ... }
-
-		if input.peek(Token![=]) {
-			input.parse::<Token![=]>()?;
-		}
-
-		let body_content;
-		braced!(body_content in input);
-
-		while !body_content.is_empty() {
-			let lookahead = body_content.lookahead1();
-
-			if lookahead.peek(name) {
-				let (jname, _) = parse_name_spec(&body_content)?;
-				java_name = Some(jname);
-			} else if lookahead.peek(sig) {
-				method_signature = Some(parse_method_sig(&body_content, type_mappings)?);
-			} else if lookahead.peek(Token![fn]) {
-				// Parse: fn = path
-				body_content.parse::<Token![fn]>()?;
-				body_content.parse::<Token![=]>()?;
-				let path = body_content.parse::<syn::Path>()?;
-				native_fn = Some(path);
-			} else if lookahead.peek(Token![static]) {
-				body_content.parse::<Token![static]>()?;
-				body_content.parse::<Token![=]>()?;
-				let lit_bool = body_content.parse::<LitBool>()?;
-				is_static = lit_bool.value();
-			} else if lookahead.peek(raw) {
-				body_content.parse::<raw>()?;
-				body_content.parse::<Token![=]>()?;
-				let lit_bool = body_content.parse::<LitBool>()?;
-				is_raw = lit_bool.value();
-			} else if lookahead.peek(self::error_policy) {
-				body_content.parse::<error_policy>()?;
-				body_content.parse::<Token![=]>()?;
-				error_policy = Some(body_content.parse::<syn::Path>()?);
-			} else if lookahead.peek(self::export) {
-				body_content.parse::<export>()?;
-				body_content.parse::<Token![=]>()?;
-				if body_content.peek(LitStr) {
-					// export = "customName"
-					let name = body_content.parse::<LitStr>()?.value();
-					export = Some(NativeMethodExport::WithName(name));
-				} else if body_content.peek(LitBool) {
-					// export = true or export = false
-					let lit_bool = body_content.parse::<LitBool>()?;
-					export = Some(if lit_bool.value() {
-						NativeMethodExport::WithAutoMangle
-					} else {
-						NativeMethodExport::No
-					});
-				} else {
-					return Err(syn::Error::new(
-						body_content.span(),
-						"export must be 'true', 'false', or a string literal",
-					));
-				}
-			} else if lookahead.peek(self::abi_check) {
-				body_content.parse::<abi_check>()?;
-				body_content.parse::<Token![=]>()?;
-				abi_check = Some(body_content.parse::<AbiCheck>()?);
-			} else if lookahead.peek(self::catch_unwind) {
-				body_content.parse::<catch_unwind>()?;
-				body_content.parse::<Token![=]>()?;
-				let lit_bool = body_content.parse::<LitBool>()?;
-				catch_unwind = Some(lit_bool.value());
-			} else if lookahead.peek(self::non_null) {
-				body_content.parse::<non_null>()?;
-				body_content.parse::<Token![=]>()?;
-				let lit_bool = body_content.parse::<LitBool>()?;
-				is_non_null = lit_bool.value();
-			} else {
-				return Err(lookahead.error());
-			}
-
-			// Require comma between properties, but trailing comma is optional
-			if !body_content.is_empty() {
-				body_content.parse::<Token![,]>()?;
-			}
-		}
+		options.parse_body(input, type_mappings)?;
 	} else {
 		return Err(syn::Error::new(
 			rust_name.span(),
 			"Method must be followed by parentheses (shorthand syntax) or braces (block syntax)",
 		));
 	}
+	let java_name_overridden = options.java_name.is_some();
+	let parsed = options.finish(rust_name, attrs, visibility)?;
+	validate_method(&parsed, kind, java_name_overridden, type_mappings)?;
+	Ok(parsed)
+}
 
-	// If extern was specified before the name, it means export = true
-	if is_extern {
-		if export.is_some() {
-			return Err(syn::Error::new(
-				rust_name.span(),
-				"Cannot specify both 'extern' qualifier and 'export' property",
-			));
+impl MethodOptions {
+	fn parse_qualifiers(&mut self, input: ParseStream) -> Result<()> {
+		loop {
+			if input.peek(Token![static]) {
+				input.parse::<Token![static]>()?;
+				self.is_static = true;
+			} else if input.peek(Token![extern]) {
+				self.extern_qualifier = Some(input.parse::<Token![extern]>()?);
+			} else if input.peek(raw) {
+				input.parse::<raw>()?;
+				self.is_raw = true;
+			} else if input.peek(non_null) {
+				input.parse::<non_null>()?;
+				self.non_null = true;
+			} else {
+				return Ok(());
+			}
 		}
-		export = Some(NativeMethodExport::WithAutoMangle);
 	}
 
-	// Require signature - all methods must have one
-	let method_signature =
-		method_signature.ok_or_else(|| syn::Error::new(rust_name.span(), "Method must have a signature"))?;
+	fn parse_body(&mut self, input: ParseStream, mappings: &TypeMappings) -> Result<()> {
+		if input.peek(Token![=]) {
+			input.parse::<Token![=]>()?;
+		}
+		let body;
+		braced!(body in input);
+		while !body.is_empty() {
+			self.parse_property(&body, mappings)?;
+			if !body.is_empty() {
+				body.parse::<Token![,]>()?;
+			}
+		}
+		Ok(())
+	}
 
-	// Track whether java_name was explicitly overridden
-	let java_name_overridden = java_name.is_some();
+	fn parse_property(&mut self, input: ParseStream, mappings: &TypeMappings) -> Result<()> {
+		let lookahead = input.lookahead1();
+		if lookahead.peek(name) {
+			self.java_name = Some(parse_name_spec(input)?.0);
+		} else if lookahead.peek(sig) {
+			self.signature = Some(parse_method_sig(input, mappings)?);
+		} else if lookahead.peek(Token![fn]) {
+			input.parse::<Token![fn]>()?;
+			input.parse::<Token![=]>()?;
+			self.native_fn = Some(input.parse()?);
+		} else if lookahead.peek(Token![static]) {
+			input.parse::<Token![static]>()?;
+			input.parse::<Token![=]>()?;
+			self.is_static = input.parse::<LitBool>()?.value();
+		} else if lookahead.peek(raw) {
+			input.parse::<raw>()?;
+			input.parse::<Token![=]>()?;
+			self.is_raw = input.parse::<LitBool>()?.value();
+		} else if lookahead.peek(error_policy) {
+			input.parse::<error_policy>()?;
+			input.parse::<Token![=]>()?;
+			self.error_policy = Some(input.parse()?);
+		} else if lookahead.peek(export) {
+			input.parse::<export>()?;
+			input.parse::<Token![=]>()?;
+			self.export = Some(parse_export(input)?);
+		} else if lookahead.peek(abi_check) {
+			input.parse::<abi_check>()?;
+			input.parse::<Token![=]>()?;
+			self.abi_check = Some(input.parse()?);
+		} else if lookahead.peek(catch_unwind) {
+			input.parse::<catch_unwind>()?;
+			input.parse::<Token![=]>()?;
+			self.catch_unwind = Some(input.parse::<LitBool>()?.value());
+		} else if lookahead.peek(non_null) {
+			input.parse::<non_null>()?;
+			input.parse::<Token![=]>()?;
+			self.non_null = input.parse::<LitBool>()?.value();
+		} else {
+			return Err(lookahead.error());
+		}
+		Ok(())
+	}
 
-	// Set java_name: use explicit name if provided, otherwise convert from rust_name
-	let java_name = java_name.unwrap_or_else(|| snake_case_to_lower_camel_case(&rust_name.to_string()));
-
-	// Perform kind-specific validation
-	match kind {
-		MethodKind::Constructor => {
-			// Constructors cannot have explicit java name (it's always "<init>")
-			if java_name_overridden {
+	fn finish(
+		mut self,
+		rust_name: Ident,
+		attrs: Vec<syn::Attribute>,
+		visibility: Option<VisibilitySpec>,
+	) -> Result<ParsedMethod> {
+		if self.extern_qualifier.is_some() {
+			if self.export.is_some() {
 				return Err(syn::Error::new(
 					rust_name.span(),
-					"Cannot override 'name' for constructors - the Java constructor name is always '<init>'",
+					"Cannot specify both 'extern' qualifier and 'export' property",
 				));
 			}
-
-			// Constructors must return void
-			if !matches!(
-				method_signature.return_type,
-				SigType::Alias(ref name) if name == "void"
-			) {
-				return Err(syn::Error::new(
-					rust_name.span(),
-					"Constructors must return void - either omit '-> type' or use explicit '-> void' or '-> ()'",
-				));
-			}
-
-			// Constructors cannot be static
-			if is_static {
-				return Err(syn::Error::new(rust_name.span(), "Constructors cannot be static"));
-			}
-
-			// Constructors cannot use non_null
-			if is_non_null {
-				return Err(syn::Error::new(
-					rust_name.span(),
-					"Constructors cannot use 'non_null' - use it on methods that can return null instead",
-				));
-			}
+			self.export = Some(NativeMethodExport::WithAutoMangle);
 		}
-		MethodKind::Method => {
-			// See !NativeMethod validation below
-		}
-		MethodKind::NativeMethod => {
-			// Validate that raw methods and error_policy are not both specified
-			// error_policy only applies when we wrap with with_env
-			if is_raw {
-				if error_policy.is_some() {
-					return Err(syn::Error::new(
-						rust_name.span(),
-						"Cannot specify 'error_policy' when using 'raw' - error_policy only applies to safe wrappers that use with_env",
-					));
-				}
-				if catch_unwind.is_some() {
-					return Err(syn::Error::new(
-						rust_name.span(),
-						"Cannot specify 'catch_unwind' when using 'raw' - catch_unwind only applies to safe wrappers",
-					));
-				}
-				if is_non_null {
-					return Err(syn::Error::new(
-						rust_name.span(),
-						"Cannot specify 'non_null' when using 'raw' - non_null only applies to safe wrappers that return Result",
-					));
-				}
-			}
+		let signature = self
+			.signature
+			.ok_or_else(|| syn::Error::new(rust_name.span(), "Method must have a signature"))?;
+		let java_name = self
+			.java_name
+			.unwrap_or_else(|| snake_case_to_lower_camel_case(&rust_name.to_string()));
+		Ok(ParsedMethod {
+			rust_name,
+			java_name,
+			signature,
+			visibility,
+			attrs,
+			error_policy: self.error_policy,
+			export: self.export,
+			native_fn: self.native_fn,
+			is_raw: self.is_raw,
+			is_static: self.is_static,
+			abi_check: self.abi_check,
+			catch_unwind: self.catch_unwind,
+			non_null: self.non_null,
+		})
+	}
+}
+
+fn parse_export(input: ParseStream) -> Result<NativeMethodExport> {
+	if input.peek(LitStr) {
+		return Ok(NativeMethodExport::WithName(input.parse::<LitStr>()?.value()));
+	}
+	if input.peek(LitBool) {
+		return Ok(if input.parse::<LitBool>()?.value() {
+			NativeMethodExport::WithAutoMangle
+		} else {
+			NativeMethodExport::No
+		});
+	}
+	Err(syn::Error::new(
+		input.span(),
+		"export must be 'true', 'false', or a string literal",
+	))
+}
+
+fn parse_shorthand(input: ParseStream, mappings: &TypeMappings) -> Result<MethodSignature> {
+	let content;
+	parenthesized!(content in input);
+	let mut parameters = Vec::new();
+	while !content.is_empty() {
+		parameters.push(parse_parameter_with_index(&content, parameters.len(), mappings)?);
+		if !content.is_empty() {
+			content.parse::<Token![,]>()?;
 		}
 	}
-
-	// Common validation for non-native methods
-	if kind != MethodKind::NativeMethod {
-		// Only native methods can have error_policy types
-		if error_policy.is_some() {
-			return Err(syn::Error::new(
-				rust_name.span(),
-				"Only native methods can have 'error_policy'",
-			));
-		}
-
-		// Only native methods can have export
-		if export.is_some() {
-			return Err(syn::Error::new(
-				rust_name.span(),
-				"Only native methods can have extern qualifier or 'export =' property",
-			));
-		}
-
-		// Only native methods can have native_fn
-		if native_fn.is_some() {
-			return Err(syn::Error::new(rust_name.span(), "Only native methods can have 'fn'"));
-		}
-
-		// Only native methods can have raw
-		if is_raw {
-			return Err(syn::Error::new(rust_name.span(), "Only native methods can have 'raw'"));
-		}
-
-		if abi_check.is_some() {
-			return Err(syn::Error::new(
-				rust_name.span(),
-				"Only native methods can have 'abi_check'",
-			));
-		}
-
-		if catch_unwind.is_some() {
-			return Err(syn::Error::new(
-				rust_name.span(),
-				"Only native methods can have 'catch_unwind'",
-			));
-		}
-	}
-
-	// Validate non_null usage
-	if is_non_null {
-		// Check if the return type is a primitive or void
-		let is_primitive_or_void = method_signature.return_type.try_as_primitive(type_mappings).is_some()
-			|| matches!(
-				method_signature.return_type,
-				SigType::Alias(ref name) if name == "void"
-			);
-
-		if is_primitive_or_void {
-			return Err(syn::Error::new(
-				rust_name.span(),
-				"Cannot use 'non_null' with methods that return primitive types or void - non_null is only valid for object/reference return types",
-			));
-		}
-	}
-
-	Ok(ParsedMethod {
-		rust_name,
-		java_name,
-		method_signature,
-		visibility,
-		error_policy,
-		export,
-		attrs,
-		native_fn,
-		is_raw,
-		is_static,
-		abi_check,
-		catch_unwind,
-		non_null: is_non_null,
+	let return_type = if input.peek(Token![->]) {
+		input.parse::<Token![->]>()?;
+		parse_type(input, mappings)?
+	} else {
+		SigType::Alias("void".to_string())
+	};
+	Ok(MethodSignature {
+		parameters,
+		return_type,
 	})
+}
+
+fn validate_method(
+	method: &ParsedMethod,
+	kind: MethodKind,
+	name_overridden: bool,
+	mappings: &TypeMappings,
+) -> Result<()> {
+	match kind {
+		MethodKind::Constructor => validate_constructor(method, name_overridden)?,
+		MethodKind::NativeMethod => validate_native_method(method)?,
+		MethodKind::Method => {}
+	}
+	if kind != MethodKind::NativeMethod {
+		validate_non_native_method(method)?;
+	}
+	if method.non_null
+		&& (method.signature.return_type.try_as_primitive(mappings).is_some()
+			|| matches!(&method.signature.return_type, SigType::Alias(name) if name == "void"))
+	{
+		return Err(syn::Error::new(
+			method.rust_name.span(),
+			"Cannot use 'non_null' with methods that return primitive types or void - non_null is only valid for object/reference return types",
+		));
+	}
+	Ok(())
+}
+
+fn validate_constructor(method: &ParsedMethod, name_overridden: bool) -> Result<()> {
+	let checks = [
+		(
+			name_overridden,
+			"Cannot override 'name' for constructors - the Java constructor name is always '<init>'",
+		),
+		(
+			!matches!(&method.signature.return_type, SigType::Alias(name) if name == "void"),
+			"Constructors must return void - either omit '-> type' or use explicit '-> void' or '-> ()'",
+		),
+		(method.is_static, "Constructors cannot be static"),
+		(
+			method.non_null,
+			"Constructors cannot use 'non_null' - use it on methods that can return null instead",
+		),
+	];
+	validate_options(method, &checks)
+}
+
+fn validate_native_method(method: &ParsedMethod) -> Result<()> {
+	if !method.is_raw {
+		return Ok(());
+	}
+	let checks = [
+		(
+			method.error_policy.is_some(),
+			"Cannot specify 'error_policy' when using 'raw' - error_policy only applies to safe wrappers that use with_env",
+		),
+		(
+			method.catch_unwind.is_some(),
+			"Cannot specify 'catch_unwind' when using 'raw' - catch_unwind only applies to safe wrappers",
+		),
+		(
+			method.non_null,
+			"Cannot specify 'non_null' when using 'raw' - non_null only applies to safe wrappers that return Result",
+		),
+	];
+	validate_options(method, &checks)
+}
+
+fn validate_non_native_method(method: &ParsedMethod) -> Result<()> {
+	let checks = [
+		(
+			method.error_policy.is_some(),
+			"Only native methods can have 'error_policy'",
+		),
+		(
+			method.export.is_some(),
+			"Only native methods can have extern qualifier or 'export =' property",
+		),
+		(method.native_fn.is_some(), "Only native methods can have 'fn'"),
+		(method.is_raw, "Only native methods can have 'raw'"),
+		(method.abi_check.is_some(), "Only native methods can have 'abi_check'"),
+		(
+			method.catch_unwind.is_some(),
+			"Only native methods can have 'catch_unwind'",
+		),
+	];
+	validate_options(method, &checks)
+}
+
+fn validate_options(method: &ParsedMethod, checks: &[(bool, &str)]) -> Result<()> {
+	for &(invalid, message) in checks {
+		if invalid {
+			return Err(syn::Error::new(method.rust_name.span(), message));
+		}
+	}
+	Ok(())
 }
 
 /// Parse constructors block
@@ -414,7 +371,7 @@ pub(super) fn parse_constructors(input: ParseStream, type_mappings: &TypeMapping
 
 		constructors.push(Constructor {
 			name: parsed.rust_name,
-			method_signature: parsed.method_signature,
+			signature: parsed.signature,
 			attrs: parsed.attrs,
 		});
 
@@ -437,7 +394,7 @@ pub(super) fn parse_methods(input: ParseStream, type_mappings: &TypeMappings) ->
 			visibility: parsed.visibility.unwrap_or(VisibilitySpec::Public),
 			java_name: parsed.java_name,
 			rust_name: parsed.rust_name,
-			method_signature: parsed.method_signature,
+			signature: parsed.signature,
 			attrs: parsed.attrs,
 			is_static: parsed.is_static,
 			non_null: parsed.non_null,
@@ -467,7 +424,7 @@ pub(super) fn parse_native_methods(
 				visibility,
 				java_name: parsed.java_name.clone(),
 				rust_name: parsed.rust_name.clone(),
-				method_signature: parsed.method_signature.clone(),
+				signature: parsed.signature.clone(),
 				attrs: parsed.attrs.clone(),
 				is_static: parsed.is_static,
 				non_null: parsed.non_null,
@@ -476,7 +433,7 @@ pub(super) fn parse_native_methods(
 		native_methods.push(NativeMethod {
 			java_name: parsed.java_name,
 			rust_name: parsed.rust_name,
-			method_signature: parsed.method_signature,
+			signature: parsed.signature,
 			error_policy: parsed.error_policy,
 			export: parsed.export.unwrap_or(NativeMethodExport::Default),
 			attrs: parsed.attrs,

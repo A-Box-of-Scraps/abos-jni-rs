@@ -77,14 +77,14 @@ fn main() {
 
 		let _loader_context = LoaderContext::default();
 
-		let _instance = JBindJavaTypeWrapper::new(env)?;
+		let instance = JBindJavaTypeWrapper::new(env)?;
 		println!("Instantiated JBindJavaTypeWrapper (based on merged type_map)");
 
 		// Test mix_types method
 		println!("\n--- Testing mix_types method ---");
 		let builtin_obj = JBuiltinType::new(env)?;
 		let custom_obj = JCustomType::new(env)?;
-		let s = _instance.mix_types(env, builtin_obj, custom_obj)?;
+		let s = instance.mix_types(env, builtin_obj, custom_obj)?;
 		println!("Result: {}", s.try_to_string(env)?);
 
 		Ok(())

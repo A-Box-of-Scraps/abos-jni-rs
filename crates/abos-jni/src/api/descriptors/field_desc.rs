@@ -7,6 +7,7 @@ use crate::{
 	strings::JNIStr,
 };
 
+// SAFETY: Lookup delegates to the JNI member lookup for the requested ID type, class and signature.
 unsafe impl<'local, 'other_local, 'sig, T, U, V> Desc<'local, JFieldID> for (T, U, V)
 where
 	T: Desc<'local, JClass<'other_local>>,
@@ -20,6 +21,7 @@ where
 	}
 }
 
+// SAFETY: Lookup delegates to the JNI member lookup for the requested ID type, class and signature.
 unsafe impl<'local, 'other_local, 'sig, T, U, V> Desc<'local, JStaticFieldID> for (T, U, V)
 where
 	T: Desc<'local, JClass<'other_local>>,

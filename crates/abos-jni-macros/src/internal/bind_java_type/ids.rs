@@ -18,7 +18,7 @@ pub(super) fn generate_method_ids(
 		let is_static = method.is_static;
 
 		// Use the MethodSignature to generate JNI signature
-		let jni_sig_str = method.method_signature.to_jni_signature(type_mappings).map_err(|e| {
+		let jni_sig_str = method.signature.to_jni_signature(type_mappings).map_err(|e| {
 			syn::Error::new(
 				rust_name.span(),
 				format!("Failed to generate JNI signature for method '{rust_name}': {e}"),
@@ -66,7 +66,7 @@ pub(super) fn generate_field_ids(
 		let field_id_field = format_ident!("{}_field_id", rust_name);
 
 		// Use the FieldSignature to generate JNI signature
-		let field_sig = field.field_signature.to_jni_signature(type_mappings).map_err(|e| {
+		let field_sig = field.signature.to_jni_signature(type_mappings).map_err(|e| {
 			syn::Error::new(
 				rust_name.span(),
 				format!("Failed to generate JNI signature for field '{rust_name}': {e}"),

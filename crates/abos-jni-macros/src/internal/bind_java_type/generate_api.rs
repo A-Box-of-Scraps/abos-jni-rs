@@ -82,11 +82,7 @@ pub(super) fn generate_api_struct(
 	method_id_fields: &[TokenStream],
 	jni: &syn::Path,
 ) -> TokenStream {
-	let priv_field = if let Some(priv_ty) = priv_type {
-		quote! { private: #priv_ty, }
-	} else {
-		quote! {}
-	};
+	let priv_field = priv_type.map_or_else(|| quote! {}, |priv_ty| quote! { private: #priv_ty, });
 
 	let api_visibility = VisibilitySpec::PubCrate.clamp_to(type_visibility).to_tokens();
 	quote! {
@@ -103,7 +99,10 @@ pub(super) fn generate_api_struct(
 }
 
 /// Generate the `API::get()` method
-#[allow(clippy::too_many_arguments)]
+#[allow(
+	clippy::too_many_arguments,
+	reason = "Code generation needs the independent binding metadata and JNI paths."
+)]
 pub(super) fn generate_api_get_method(
 	api_name: &Ident,
 	type_name: &Ident,
@@ -124,76 +123,39 @@ pub(super) fn generate_api_get_method(
 
 	// Generate wrapper functions (outside the impl block)
 	let load_class_wrapper = if load_class_closure.is_some() {
-		quote! {
-			#[allow(unused, non_snake_case)]
-			fn #load_class_wrapper_name<'env_local, F>(
-				env: &mut #jni::Env<'env_local>,
-				loader: &#jni::refs::LoaderContext,
-				initialize: bool,
-				load_class: F,
-			) -> #jni::errors::Result<#jni::objects::JClass<'env_local>>
-			where
-				F: FnOnce(
-					&mut #jni::Env<'env_local>,
-					&#jni::refs::LoaderContext,
-					bool,
-				) -> #jni::errors::Result<#jni::objects::JClass<'env_local>>,
-			{
-				load_class(env, loader, initialize)
-			}
-		}
+		load_class_hook_wrapper(&load_class_wrapper_name, jni)
 	} else {
 		quote! {}
 	};
 
-	#[allow(clippy::collapsible_if)]
-	let init_priv_wrapper = if let Some(priv_type) = priv_type {
-		if init_priv_closure.is_some() {
-			quote! {
-				#[allow(unused, non_snake_case)]
-				fn #init_priv_wrapper_name<'env_local, F>(
-					env: &mut #jni::Env<'env_local>,
-					loader: &#jni::refs::LoaderContext,
-					class: &#jni::objects::JClass,
-					init_priv: F,
-				) -> #jni::errors::Result<#priv_type>
-				where
-					F: FnOnce(
-						&mut #jni::Env<'env_local>,
-						&#jni::refs::LoaderContext,
-						&#jni::objects::JClass,
-					) -> #jni::errors::Result<#priv_type>,
-					#priv_type: Send + Sync
-				{
-					init_priv(env, loader, class)
-				}
-			}
-		} else {
-			quote! {}
-		}
-	} else {
-		quote! {}
+	let init_priv_wrapper = match (priv_type, init_priv_closure) {
+		(Some(priv_type), Some(_)) => init_priv_hook_wrapper(&init_priv_wrapper_name, priv_type, jni),
+		_ => quote! {},
 	};
 
 	// Generate the class loading code
-	let load_class_code = if let Some(closure) = load_class_closure {
-		quote! {
-			#load_class_wrapper_name(env, loader, false, #closure)?
-		}
-	} else {
-		quote! {
-			loader.load_class_for_type::<#type_name>(env, false)?
-		}
-	};
+	let load_class_code = load_class_closure.map_or_else(
+		|| {
+			quote! {
+				loader.load_class_for_type::<#type_name>(env, false)?
+			}
+		},
+		|closure| {
+			quote! {
+				#load_class_wrapper_name(env, loader, false, #closure)?
+			}
+		},
+	);
 
 	// Generate the priv initialization code
-	let init_priv_code = if let Some(closure) = init_priv_closure {
-		quote! {
-			let private = #init_priv_wrapper_name(env, loader, class, #closure)?;
-		}
-	} else {
-		quote! {}
-	};
+	let init_priv_code = init_priv_closure.map_or_else(
+		|| quote! {},
+		|closure| {
+			quote! {
+				let private = #init_priv_wrapper_name(env, loader, class, #closure)?;
+			}
+		},
+	);
 
 	// Generate IsAssignable checks for all is_instance_of types
 	let is_instance_of_checks =
@@ -206,31 +168,10 @@ pub(super) fn generate_api_get_method(
 		quote! {}
 	};
 
-	let api_construction = if priv_type.is_some() {
-		quote! {
-			// All of the CStr literals have been validated at compile time and
-			// since they have been encoded as MUTF-8 they can be safely cast as
-			// a JNIStr without a runtime check.
-			unsafe {
-				Self {
-					class: env.new_global_ref(class)?,
-					private,
-					#(#method_id_inits)*
-				}
-			}
-		}
-	} else {
-		quote! {
-			// All of the CStr literals have been validated at compile time and
-			// since they have been encoded as MUTF-8 they can be safely cast as
-			// a JNIStr without a runtime check.
-			unsafe {
-				Self {
-					class: env.new_global_ref(class)?,
-					#(#method_id_inits)*
-				}
-			}
-		}
+	let private_field = priv_type.map(|_| quote! { private, });
+	let api_construction = quote! {
+		// Compile-time encoded modified UTF-8 names are valid JNIStr values.
+		unsafe { Self { class: env.new_global_ref(class)?, #private_field #(#method_id_inits)* } }
 	};
 
 	Ok(quote! {
@@ -309,4 +250,47 @@ pub(super) fn generate_api_get_method(
 			}
 		}
 	})
+}
+
+fn load_class_hook_wrapper(load_class_wrapper_name: &Ident, jni: &syn::Path) -> TokenStream {
+	quote! {
+		#[allow(unused, non_snake_case)]
+		fn #load_class_wrapper_name<'env_local, F>(
+			env: &mut #jni::Env<'env_local>,
+			loader: &#jni::refs::LoaderContext,
+			initialize: bool,
+			load_class: F,
+		) -> #jni::errors::Result<#jni::objects::JClass<'env_local>>
+		where
+			F: FnOnce(
+				&mut #jni::Env<'env_local>,
+				&#jni::refs::LoaderContext,
+				bool,
+			) -> #jni::errors::Result<#jni::objects::JClass<'env_local>>,
+		{
+			load_class(env, loader, initialize)
+		}
+	}
+}
+
+fn init_priv_hook_wrapper(init_priv_wrapper_name: &Ident, priv_type: &Ident, jni: &syn::Path) -> TokenStream {
+	quote! {
+		#[allow(unused, non_snake_case)]
+		fn #init_priv_wrapper_name<'env_local, F>(
+			env: &mut #jni::Env<'env_local>,
+			loader: &#jni::refs::LoaderContext,
+			class: &#jni::objects::JClass,
+			init_priv: F,
+		) -> #jni::errors::Result<#priv_type>
+		where
+			F: FnOnce(
+				&mut #jni::Env<'env_local>,
+				&#jni::refs::LoaderContext,
+				&#jni::objects::JClass,
+			) -> #jni::errors::Result<#priv_type>,
+			#priv_type: Send + Sync
+		{
+			init_priv(env, loader, class)
+		}
+	}
 }

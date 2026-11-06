@@ -9,7 +9,10 @@
 use abos_jni::strings::JNIStr;
 use abos_jni_macros::jni_str;
 
-#[allow(unused)]
+#[allow(
+	unused,
+	reason = "Include compile-time string examples even when they are not printed."
+)]
 fn main() {
 	// Basic usage - creates &'static JNIStr with MUTF-8 encoding
 	const CLASS_NAME: &JNIStr = jni_str!("java.lang.String");

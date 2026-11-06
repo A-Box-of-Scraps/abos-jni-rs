@@ -35,6 +35,10 @@ use super::{CharToJavaError, CharTryFromError, DecodeUtf16Error, TryFrom, jchar,
 /// [`codePoints`]:
 ///     https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html#codePoints()
 /// [surrogate pair]: https://en.wikipedia.org/wiki/Surrogate_pair
+///
+/// # Panics
+///
+/// Panics if the UTF-16 decoder unexpectedly yields no result for the single input code unit.
 pub fn char_from_java(char: jchar) -> std::result::Result<char, DecodeUtf16Error> {
 	char::decode_utf16([char])
 		.next()
@@ -95,7 +99,7 @@ pub const fn char_to_java(char: char) -> std::result::Result<jchar, CharToJavaEr
 /// [`String.codePointAt`]: https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html#codePointAt(int)
 #[must_use]
 pub fn char_to_java_int(char: char) -> jint {
-	u32::from(char) as jint
+	u32::from(char).cast_signed()
 }
 
 /// Converts a Java `int` to a Rust `char`.
@@ -117,7 +121,7 @@ pub fn char_to_java_int(char: char) -> jint {
 ///
 /// [`String.codePointAt`]: https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html#codePointAt(int)
 pub fn char_from_java_int(jint: jint) -> std::result::Result<char, CharTryFromError> {
-	char::try_from(jint as u32)
+	char::try_from(jint.cast_unsigned())
 }
 
 // jlong

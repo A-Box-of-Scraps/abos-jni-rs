@@ -42,6 +42,10 @@ impl JList<'_> {
 		since = "0.22.0",
 		note = "use JList::cast_local instead or Env::new_cast_local_ref/cast_local/as_cast_local or Env::new_cast_global_ref/cast_global/as_cast_global"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error if resolving or calling the Java list or iterator methods fails, including pending Java exceptions.
 	pub fn from_env<'any_local>(
 		env: &mut Env<'_>,
 		obj: impl Reference + Into<JObject<'any_local>> + AsRef<JObject<'any_local>>,
@@ -50,6 +54,10 @@ impl JList<'_> {
 	}
 
 	/// Append an element to the list
+	///
+	/// # Errors
+	///
+	/// Returns an error if resolving or calling the Java list or iterator methods fails, including pending Java exceptions.
 	pub fn add(&self, env: &Env, value: &JObject) -> Result<bool> {
 		self.as_collection().add(env, value)
 	}
@@ -63,6 +71,10 @@ impl JList<'_> {
 	/// - `UnsupportedOperationException` - if the remove operation is not supported
 	/// - `ClassCastException` - if the element type isn't compatible with the set
 	/// - `NullPointerException` - if the given element is null and the set does not allow null values
+	///
+	/// # Errors
+	///
+	/// Returns an error if resolving or calling the Java list or iterator methods fails, including pending Java exceptions.
 	pub fn remove_item(&self, env: &Env<'_>, value: &JObject) -> Result<bool> {
 		self.as_collection().remove(env, value)
 	}
@@ -72,16 +84,28 @@ impl JList<'_> {
 	/// # Throws
 	///
 	/// - `UnsupportedOperationException` - if the clear operation is not supported
+	///
+	/// # Errors
+	///
+	/// Returns an error if resolving or calling the Java list or iterator methods fails, including pending Java exceptions.
 	pub fn clear(&self, env: &Env<'_>) -> Result<()> {
 		self.as_collection().clear(env)
 	}
 
 	/// Get the size of the list
+	///
+	/// # Errors
+	///
+	/// Returns an error if resolving or calling the Java list or iterator methods fails, including pending Java exceptions.
 	pub fn size(&self, env: &Env) -> Result<jint> {
 		self.as_collection().size(env)
 	}
 
 	/// Returns `true` if this list is empty.
+	///
+	/// # Errors
+	///
+	/// Returns an error if resolving or calling the Java list or iterator methods fails, including pending Java exceptions.
 	pub fn is_empty(&self, env: &Env<'_>) -> Result<bool> {
 		self.as_collection().is_empty(env)
 	}
@@ -97,6 +121,10 @@ impl JList<'_> {
 		since = "0.22.0",
 		note = "java.util.List has no pop() method. This non-standard utility will be removed from a future version"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error if resolving or calling the Java list or iterator methods fails, including pending Java exceptions.
 	pub fn pop<'other_local_2>(&self, env: &mut Env<'other_local_2>) -> Result<Option<JObject<'other_local_2>>> {
 		let size = self.size(env)?;
 		if size == 0 {
@@ -135,6 +163,14 @@ impl JList<'_> {
 	/// Alternatively, if the list is known to have a small, predictable size,
 	/// the loop could be wrapped in [`Env::with_local_frame`] to delete all of
 	/// the local references at once.
+	#[expect(
+		clippy::iter_not_returning_iterator,
+		reason = "Java iteration is fallible and requires an Env argument for each step."
+	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error if resolving or calling the Java list or iterator methods fails, including pending Java exceptions.
 	pub fn iter<'env_local>(&self, env: &mut Env<'env_local>) -> Result<JIterator<'env_local>> {
 		self.as_collection().iterator(env)
 	}

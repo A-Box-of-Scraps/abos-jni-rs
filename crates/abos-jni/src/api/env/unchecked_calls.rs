@@ -15,6 +15,10 @@ impl<'local> Env<'local> {
 	///
 	/// The provided `JMethodID` must be valid, and match the types and number of arguments, and return type.
 	/// If these are incorrect, the JVM may crash. The `JMethodID` must also match the passed type.
+	///
+	/// # Errors
+	///
+	/// Returns an error if descriptor resolution fails or the Java invocation reports an exception.
 	pub unsafe fn call_static_method_unchecked<'other_local, T, U>(
 		&mut self,
 		class: T,
@@ -26,11 +30,12 @@ impl<'local> Env<'local> {
 		T: Desc<'local, JClass<'other_local>>,
 		U: Desc<'local, JStaticMethodID>,
 	{
+		use crate::signature::Primitive::{Boolean, Byte, Char, Double, Float, Int, Long, Short, Void};
+		use JavaType::{Array, Object, Primitive};
+
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		use crate::signature::Primitive::{Boolean, Byte, Char, Double, Float, Int, Long, Short, Void};
-		use JavaType::{Array, Object, Primitive};
 
 		let class = class.lookup(self)?;
 
@@ -86,6 +91,10 @@ impl<'local> Env<'local> {
 	///
 	/// The provided `JMethodID` must be valid, and match the types and number of arguments, and return type.
 	/// If these are incorrect, the JVM may crash. The `JMethodID` must also match the passed type.
+	///
+	/// # Errors
+	///
+	/// Returns an error if descriptor resolution fails or the Java invocation reports an exception.
 	pub unsafe fn call_method_unchecked<'other_local, O, T>(
 		&mut self,
 		obj: O,
@@ -97,11 +106,12 @@ impl<'local> Env<'local> {
 		O: AsRef<JObject<'other_local>>,
 		T: Desc<'local, JMethodID>,
 	{
+		use crate::signature::Primitive::{Boolean, Byte, Char, Double, Float, Int, Long, Short, Void};
+		use JavaType::{Array, Object, Primitive};
+
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		use crate::signature::Primitive::{Boolean, Byte, Char, Double, Float, Int, Long, Short, Void};
-		use JavaType::{Array, Object, Primitive};
 
 		let method_id = method_id.lookup(self)?.as_ref().into_raw();
 
@@ -153,6 +163,10 @@ impl<'local> Env<'local> {
 	///
 	/// The provided `JClass`, `JMethodID` must be valid, and match the types and number of arguments, and return type.
 	/// If these are incorrect, the JVM may crash. The `JMethodID` must also match the passed type.
+	///
+	/// # Errors
+	///
+	/// Returns an error if descriptor resolution fails or the Java invocation reports an exception.
 	pub unsafe fn call_nonvirtual_method_unchecked<'other_local, O, T, U>(
 		&mut self,
 		obj: O,
@@ -166,11 +180,12 @@ impl<'local> Env<'local> {
 		T: Desc<'local, JClass<'other_local>>,
 		U: Desc<'local, JMethodID>,
 	{
+		use crate::signature::Primitive::{Boolean, Byte, Char, Double, Float, Int, Long, Short, Void};
+		use JavaType::{Array, Object, Primitive};
+
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		use crate::signature::Primitive::{Boolean, Byte, Char, Double, Float, Int, Long, Short, Void};
-		use JavaType::{Array, Object, Primitive};
 
 		let method_id = method_id.lookup(self)?.as_ref().into_raw();
 		let class = class.lookup(self)?;

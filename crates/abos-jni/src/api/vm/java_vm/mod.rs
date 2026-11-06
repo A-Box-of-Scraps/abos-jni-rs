@@ -174,7 +174,9 @@ static JAVA_VM_SINGLETON: std::sync::OnceLock<JavaVM> = std::sync::OnceLock::new
 #[derive(Debug, Clone)]
 pub struct JavaVM(*mut sys::JavaVM);
 
+// SAFETY: A JavaVM handle is VM-wide; each thread obtains its own JNI environment before using it.
 unsafe impl Send for JavaVM {}
+// SAFETY: The invocation interface supports concurrent threads, and Env values remain thread-local.
 unsafe impl Sync for JavaVM {}
 
 /// Tracks the number of logical attachments managed by this crate.
@@ -216,6 +218,7 @@ pub unsafe fn sys_attach_current_thread(
 		),
 		group: config.group.as_ref().map_or(ptr::null_mut(), Reference::as_raw),
 	};
+	// SAFETY: The live VM receives writable out-parameter storage and attachment arguments valid for the call.
 	let res = unsafe {
 		java_vm_call_unchecked!(
 			vm,
@@ -306,6 +309,7 @@ pub unsafe fn sys_detach_current_thread(
 
 	if allow_jni {
 		// Check if thread is actually attached before attempting to detach
+		// SAFETY: This routine runs on the detaching thread and uses the temporary guard only within this scope.
 		let was_attached = match unsafe { vm.sys_get_env_attachment() } {
 			Ok(mut guard) => {
 				// Optional defensive cross-check: verify env matches current thread
@@ -342,6 +346,7 @@ pub unsafe fn sys_detach_current_thread(
 
 		if was_attached {
 			// Only actually detach if thread is still attached
+			// SAFETY: The current thread is attached and the temporary environment guard has already been released.
 			unsafe {
 				java_vm_call_unchecked!(vm, v1_1, DetachCurrentThread);
 			}

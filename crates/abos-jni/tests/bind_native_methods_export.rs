@@ -45,6 +45,8 @@ native_method_test! {
 	test_body: |env| {
 		let obj = TestNoArgs::new(env)?;
 
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
+
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
 			let ret = Java_com_example_TestNativeExports_noArgs__(unowned, obj);
@@ -80,7 +82,7 @@ impl TestPrimitiveArgsNativeInterface for TestPrimitiveArgsAPI {
 		b: jlong,
 		c: jboolean,
 	) -> Result<jint, Self::Error> {
-		Ok(a + b as jint + jint::from(c))
+		Ok(a + jint::try_from(b).expect("fixture argument fits jint") + jint::from(c))
 	}
 }
 
@@ -90,6 +92,8 @@ native_method_test! {
 	api: TestPrimitiveArgsAPI,
 	test_body: |env| {
 		let obj = TestPrimitiveArgs::new(env)?;
+
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
 
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
@@ -135,6 +139,8 @@ native_method_test! {
 		let obj = TestPrimitiveArrayArgs::new(env)?;
 		let int_arr = env.new_int_array(5)?;
 		let byte_arr = env.new_byte_array(3)?;
+
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
 
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
@@ -183,6 +189,8 @@ native_method_test! {
 		let obj = TestObjectArgs::new(env)?;
 		let str_arg = env.new_string("test")?;
 		let obj_arg = env.new_string("object")?;
+
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
 
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
@@ -233,6 +241,8 @@ native_method_test! {
 		let str_arr = JObjectArray::<JString>::new(env, 2, JString::null())?;
 		let obj_arr = JObjectArray::<JObject>::new(env, 2, JObject::null())?;
 
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
+
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
 			Java_com_example_TestNativeExports_objectArrayArgs___3Ljava_lang_String_2_3Ljava_lang_Object_2(
@@ -273,6 +283,8 @@ native_method_test! {
 	api: TestOverloadedNoArgsAPI,
 	test_body: |env| {
 		let obj = TestOverloadedNoArgs::new(env)?;
+
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
 
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
@@ -317,6 +329,8 @@ native_method_test! {
 	api: TestOverloadedIntAPI,
 	test_body: |env| {
 		let obj = TestOverloadedInt::new(env)?;
+
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
 
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
@@ -364,6 +378,8 @@ native_method_test! {
 		let obj = TestOverloadedString::new(env)?;
 		let input = env.new_string("hello")?;
 
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
+
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
 			let result = Java_com_example_TestNativeExports_overloaded__Ljava_lang_String_2(
@@ -405,6 +421,8 @@ native_method_test! {
 	api: TestUnicodeAPI,
 	test_body: |env| {
 		let obj = TestUnicode::new(env)?;
+
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
 
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
@@ -449,6 +467,8 @@ native_method_test! {
 	test_body: |env| {
 		let obj = TestUnderscore::new(env)?;
 
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
+
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
 			Java_com_example_TestNativeExports_method_1with_1underscore__(unowned, obj);
@@ -488,6 +508,8 @@ native_method_test! {
 	api: TestManualExportAPI,
 	test_body: |env| {
 		let obj = TestManualExport::new(env)?;
+
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
 
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
@@ -540,6 +562,8 @@ rusty_fork::rusty_fork_test! {
 			TestInnerClassAPI::get(env, &loader)?;
 
 			let obj = TestInnerClass::new(env)?;
+
+			// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
 
 			unsafe {
 				let unowned = EnvUnowned::from_raw(env.get_raw());

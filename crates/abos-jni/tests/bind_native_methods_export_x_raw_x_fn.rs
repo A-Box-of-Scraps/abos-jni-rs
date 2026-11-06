@@ -152,6 +152,10 @@ native_method_test! {
 // Test 4: fn= + Not Raw + Export (property syntax)
 // ====================================================================================
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn method4_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: TestCombo4<'local>,
@@ -298,6 +302,10 @@ native_method_test! {
 // Test 8: fn= + Not Raw + Not Exported
 // ====================================================================================
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn static_method_non_exported_impl<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
@@ -408,6 +416,10 @@ native_method_test! {
 // Test 11: Mixed - fn= (not raw) + Trait (not raw) in one binding
 // ====================================================================================
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn method_non_exported_fn_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: TestCombo12<'local>,
@@ -524,13 +536,13 @@ native_method_test! {
 
 #[test]
 fn test_exported_symbols_exist() {
-	let _fn1 = Java_com_example_TestNativeCombinations_method1__I;
-	let _fn2 = Java_com_example_TestNativeCombinations_method2__I;
-	let _fn3 = Java_com_example_TestNativeCombinations_method3__I;
-	let _fn4 = Java_com_example_TestNativeCombinations_method4__I;
-	let _fn5 = Java_com_example_TestNativeCombinations_staticMethod1__I;
-	let _fn6 = Java_com_example_TestNativeCombinations_staticMethod2__I;
-	let _fn7 = Java_com_example_TestNativeCombinations_staticMethod3__I;
+	std::hint::black_box(Java_com_example_TestNativeCombinations_method1__I);
+	std::hint::black_box(Java_com_example_TestNativeCombinations_method2__I);
+	std::hint::black_box(Java_com_example_TestNativeCombinations_method3__I);
+	std::hint::black_box(Java_com_example_TestNativeCombinations_method4__I);
+	std::hint::black_box(Java_com_example_TestNativeCombinations_staticMethod1__I);
+	std::hint::black_box(Java_com_example_TestNativeCombinations_staticMethod2__I);
+	std::hint::black_box(Java_com_example_TestNativeCombinations_staticMethod3__I);
 
 	println!("All exported symbols verified!");
 }

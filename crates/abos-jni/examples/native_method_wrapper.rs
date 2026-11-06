@@ -115,7 +115,7 @@ impl JNativeMethodWrapper<'_> {
 		_this: JNativeMethodWrapper<'local>,
 		handle: CommonHandle,
 	) -> Result<JString<'local>, MyError> {
-		// Safely: we assume the handle is a valid CStr pointer for this example
+		// SAFETY: The example caller passes the live, terminated C string allocated for this handle.
 		let c_str = unsafe { CStr::from_ptr(handle.0) };
 		let str_slice = c_str.to_str().map_err(MyError::InvalidUtf8)?;
 		let response = format!("Processed resource: {str_slice}");
@@ -142,6 +142,7 @@ fn main() {
 		println!("--- Registering Native Methods (via wrapper macro) ---");
 		let class = JNativeMethodWrapper::lookup_class(env, &LoaderContext::default())?;
 		let class: &JClass = &class;
+		// SAFETY: The fixture class declares the names and JNI signatures supplied by these native-method descriptors.
 		unsafe {
 			env.register_native_methods(class, NATIVE_METHODS)?;
 		}

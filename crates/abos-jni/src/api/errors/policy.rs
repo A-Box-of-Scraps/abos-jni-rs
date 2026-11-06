@@ -108,6 +108,10 @@ pub trait ErrorPolicy<T, E> {
 	/// If this returns an `Err` then `on_internal_jni_error` will be called.
 	///
 	/// If this panics then `on_internal_panic` will be called.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the policy cannot handle the failure or chooses to propagate it to its caller.
 	fn on_error<'unowned_env_local: 'native_method, 'native_method>(
 		env: &mut Env<'unowned_env_local>,
 		cap: &mut Self::Captures<'unowned_env_local, 'native_method>,
@@ -122,6 +126,10 @@ pub trait ErrorPolicy<T, E> {
 	/// If this returns an `Err` then `on_internal_jni_error` will be called.
 	///
 	/// If this panics then `on_internal_panic` will be called.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the policy cannot handle the failure or chooses to propagate it to its caller.
 	fn on_panic<'unowned_env_local: 'native_method, 'native_method>(
 		env: &mut Env<'unowned_env_local>,
 		captures: &mut Self::Captures<'unowned_env_local, 'native_method>,
@@ -197,7 +205,7 @@ impl<T: Default, E: std::error::Error> ErrorPolicy<T, E> for ThrowRuntimeExAndDe
 		// Note: `env.throw()` will return `Err(Error::JavaException)` after throwing but in this case
 		// (where we are going to be letting the exception propagate to Java), we want to ensure we
 		// don't return that as an error
-		let _ = env.throw(err_string);
+		drop(env.throw(err_string));
 		Ok(T::default())
 	}
 
@@ -222,7 +230,7 @@ impl<T: Default, E: std::error::Error> ErrorPolicy<T, E> for ThrowRuntimeExAndDe
 		// Note: `env.throw()` will return `Err(Error::JavaException)` after throwing but in this case
 		// (where we are going to be letting the exception propagate to Java), we want to ensure we
 		// don't return that as an error
-		let _ = env.throw(format!("Rust panic: {panic_string}"));
+		drop(env.throw(format!("Rust panic: {panic_string}")));
 		Ok(T::default())
 	}
 }

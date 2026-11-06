@@ -11,15 +11,26 @@
 ///
 /// This helper compiles the specified Java file and returns the path to the
 /// output directory containing the compiled .class files.
-#[allow(dead_code)]
+#[allow(
+	dead_code,
+	reason = "Shared test and example helpers are used by different subsets of binaries."
+)]
 #[must_use]
+///
+/// # Panics
+///
+/// Panics if preparing the output directory or compiling the Java fixture fails.
 pub fn compile_test_class(test_name: &str, java_file: &str) -> std::path::PathBuf {
 	let out_dir = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
 		.join("jni_macros_tests")
 		.join(test_name);
 
 	// Clean up any existing output
-	let _ = std::fs::remove_dir_all(&out_dir);
+	match std::fs::remove_dir_all(&out_dir) {
+		Ok(()) => {}
+		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+		Err(error) => panic!("Failed to remove previous test output: {error}"),
+	}
 	std::fs::create_dir_all(&out_dir).expect("Failed to create test output directory");
 
 	let _classes = abos_javac::Build::new().file(java_file).output_dir(&out_dir).compile();
@@ -31,14 +42,29 @@ pub fn compile_test_class(test_name: &str, java_file: &str) -> std::path::PathBu
 ///
 /// This helper loads a compiled Java class file into the JVM using a system class loader.
 /// The class should be in the package `com.example`.
-#[allow(dead_code)]
+#[allow(
+	dead_code,
+	reason = "Shared test and example helpers are used by different subsets of binaries."
+)]
+///
+/// # Errors
+///
+/// Returns an error if the class cannot be defined in the selected class loader.
+///
+/// # Panics
+///
+/// Panics if the class file is missing or unreadable, or the system class loader cannot be obtained.
 pub fn load_test_class<'local>(
 	env: &mut abos_jni::Env<'local>,
 	out_dir: &std::path::Path,
 	class_name: &str,
 ) -> abos_jni::errors::Result<abos_jni::objects::JClass<'local>> {
 	let class_path = out_dir.join(format!("com/example/{class_name}.class"));
-	assert!(class_path.exists(), "{class_name}.class not found at {class_path:?}");
+	assert!(
+		class_path.exists(),
+		"{class_name}.class not found at {}",
+		class_path.display()
+	);
 
 	let class_bytes = std::fs::read(&class_path).unwrap_or_else(|_| panic!("Failed to read {class_name}.class"));
 
@@ -116,13 +142,13 @@ macro_rules! native_method_test {
             #[test]
             $(#[$attribute])*
             fn $test_name() {
-                #[allow(clippy::crate_in_macro_def)]
+                #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                 let out_dir = $crate::native_methods_utils::compile_test_class(
                     stringify!($test_name),
                     concat!("tests/java/", $java_class)
                 );
 
-                #[allow(clippy::crate_in_macro_def)]
+                #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                 $crate::util::attach_current_thread(|$env| {
                     let class_name = $java_class
                         .trim_end_matches(".java")
@@ -130,11 +156,12 @@ macro_rules! native_method_test {
                         .last()
                         .expect("Invalid Java class path");
 
-                    #[allow(clippy::crate_in_macro_def)]
+                    #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                     let $class = $crate::native_methods_utils::load_test_class($env, &out_dir, class_name)?;
 
                     // Register native methods
                     let methods: &[abos_jni::NativeMethod] = $methods;
+                    // SAFETY: The fixture class declares the names and JNI signatures supplied by these native-method descriptors.
                     unsafe {
                         $env.register_native_methods(&$class, methods)?;
                     }
@@ -160,13 +187,13 @@ macro_rules! native_method_test {
             #[test]
             $(#[$attribute])*
             fn $test_name() {
-                #[allow(clippy::crate_in_macro_def)]
+                #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                 let out_dir = $crate::native_methods_utils::compile_test_class(
                     stringify!($test_name),
                     concat!("tests/java/", $java_class)
                 );
 
-                #[allow(clippy::crate_in_macro_def)]
+                #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                 let result = $crate::util::attach_current_thread(|$env| {
                     let class_name = $java_class
                         .trim_end_matches(".java")
@@ -174,11 +201,12 @@ macro_rules! native_method_test {
                         .last()
                         .expect("Invalid Java class path");
 
-                    #[allow(clippy::crate_in_macro_def)]
+                    #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                     let $class = $crate::native_methods_utils::load_test_class($env, &out_dir, class_name)?;
 
                     // Register native methods
                     let methods: &[abos_jni::NativeMethod] = $methods;
+                    // SAFETY: The fixture class declares the names and JNI signatures supplied by these native-method descriptors.
                     unsafe {
                         $env.register_native_methods(&$class, methods)?;
                     }

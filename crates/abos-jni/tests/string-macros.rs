@@ -179,6 +179,12 @@ fn test_unicode_in_class_name() {
 
 #[test]
 fn test_const_context() {
+	// Test in const fn
+	const fn get_class_name() -> &'static CStr {
+		jni_cstr!("const.fn.Test")
+	}
+	const CLASS: &CStr = get_class_name();
+
 	// Verify macros work in const contexts
 	const CONST_CSTR: &CStr = jni_cstr!("const.test");
 	const CONST_JSTR: &JNIStr = jni_str!("const.test");
@@ -186,12 +192,6 @@ fn test_const_context() {
 	assert_eq!(CONST_CSTR.to_str().expect("test string is valid UTF-8"), "const.test");
 	assert_eq!(CONST_CSTR.to_bytes(), CONST_JSTR.to_bytes());
 
-	// Test in const fn
-	const fn get_class_name() -> &'static CStr {
-		jni_cstr!("const.fn.Test")
-	}
-
-	const CLASS: &CStr = get_class_name();
 	assert_eq!(CLASS.to_str().expect("test string is valid UTF-8"), "const.fn.Test");
 }
 

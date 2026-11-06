@@ -65,6 +65,7 @@ native_method_test! {
 		let obj = TestCatchUnwindFalse::new(env)?;
 
 		// Call the method - this will panic and abort because catch_unwind = false
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
 			let _ret = Java_com_example_TestNativeCatchUnwind_methodThatPanics0__(unowned, obj);
@@ -72,8 +73,9 @@ native_method_test! {
 
 		// We should never reach here
 		eprintln!("ERROR: Should have aborted!");
+		#[expect(clippy::exit, reason = "Terminate the subprocess fixture without introducing a second panic.")]
 		std::process::exit(1);
-		#[allow(unreachable_code)]
+		#[allow(unreachable_code, reason = "The test closure must type-check as returning Result even though this fixture exits.")]
 		Ok(())
 	}
 }
@@ -166,6 +168,7 @@ native_method_test! {
 		// error policy inside the native method wrapper and converted to a Java exception.
 		// Since we're calling from Rust (not Java), we won't see the Java exception,
 		// but the important thing is that it doesn't panic.
+		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
 		let result = panic::catch_unwind(panic::AssertUnwindSafe(|| unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
 			Java_com_example_TestNativeCatchUnwind_methodThatPanics1__(unowned, obj)

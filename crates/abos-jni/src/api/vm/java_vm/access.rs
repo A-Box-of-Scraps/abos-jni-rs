@@ -47,6 +47,7 @@ impl JavaVM {
 	///
 	/// See the 'Safety' rules for [`AttachGuard`]
 	pub(crate) unsafe fn sys_get_env_attachment<'local>(&self) -> Result<AttachGuard<'local>> {
+		// SAFETY: The caller upholds the guard scope rules; GetEnv initializes a thread-local pointer on success.
 		unsafe {
 			let mut ptr = ptr::null_mut();
 			let res = java_vm_call_unchecked!(self, v1_2, GetEnv, &raw mut ptr, JNIVersion::V1_4.into());
@@ -60,6 +61,10 @@ impl JavaVM {
 	///
 	/// Since this calls [`sys::JNIInvokeInterface__1_2::GetEnv`], it will also recognize thread
 	/// attachments that made without using this crate (such as other JNI language bindings).
+	///
+	/// # Errors
+	///
+	/// Returns an error for unexpected JNI failures while querying the current thread's environment.
 	pub fn is_thread_attached(&self) -> Result<bool> {
 		// Safety: we aren't materializing an attachment guard while we already have access to one
 		unsafe {
@@ -123,13 +128,13 @@ impl JavaVM {
 	/// # Safety
 	///
 	/// See the 'Safety' rules for [`AttachGuard`]
+	///
+	/// # Errors
+	///
+	/// Returns an error if the current thread is detached or JNI cannot obtain its environment.
 	pub unsafe fn get_env_attachment<'scope>(&self, _scope: &'scope mut ScopeToken) -> Result<AttachGuard<'scope>> {
-		unsafe {
-			match Self::try_get_nested_env_attach_guard() {
-				Some(guard) => Ok(guard),
-				None => self.sys_get_env_attachment(),
-			}
-		}
+		// SAFETY: The caller upholds the AttachGuard scope rules for the returned guard.
+		unsafe { Self::try_get_nested_env_attach_guard().map_or_else(|| self.sys_get_env_attachment(), Ok) }
 	}
 
 	#[doc(hidden)]
@@ -137,8 +142,9 @@ impl JavaVM {
 		since = "0.22.0",
 		note = "use JavaVM::with_top_local_frame, JavaVM::attach_current_thread or JavaVM::get_env_attachment instead"
 	)]
-	pub unsafe fn get_env<'scope>(&self, _scope: &'scope mut ScopeToken) -> Result<AttachGuard<'scope>> {
-		unsafe { self.get_env_attachment(_scope) }
+	pub unsafe fn get_env<'scope>(&self, scope: &'scope mut ScopeToken) -> Result<AttachGuard<'scope>> {
+		// SAFETY: The caller upholds the same scope requirements as get_env_attachment.
+		unsafe { self.get_env_attachment(scope) }
 	}
 
 	/// Runs a closure within a new JNI stack frame that will be unwound to release all local
@@ -162,11 +168,16 @@ impl JavaVM {
 	///
 	/// See [Env] documentation for rules on limiting yourself to one [Env] reference per-scope to
 	/// avoid exposing code to runtime checks for the top JNI frame (that can panic).
+	///
+	/// # Errors
+	///
+	/// Returns an error if the current thread is detached, its environment or requested local frame is unavailable, or the callback fails.
 	pub fn with_local_frame<F, T, E>(&self, capacity: usize, f: F) -> std::result::Result<T, E>
 	where
 		F: FnOnce(&mut Env) -> std::result::Result<T, E>,
 		E: From<Error>,
 	{
+		// SAFETY: The scope token and guard stay on this stack, and the callback cannot outlive the local frame.
 		unsafe {
 			let mut scope = ScopeToken::default();
 			let mut guard = self.get_env_attachment(&mut scope)?;
@@ -195,11 +206,16 @@ impl JavaVM {
 	///
 	/// See [Env] documentation for rules on limiting yourself to one [Env] reference per-scope to
 	/// avoid exposing code to runtime checks for the top JNI frame (that can panic).
+	///
+	/// # Errors
+	///
+	/// Returns an error if the current thread is detached, its environment or requested local frame is unavailable, or the callback fails.
 	pub fn with_top_local_frame<F, T, E>(&self, f: F) -> std::result::Result<T, E>
 	where
 		F: FnOnce(&mut Env) -> std::result::Result<T, E>,
 		E: From<Error>,
 	{
+		// SAFETY: The scope token and guard stay on this stack and outlive the callback.
 		unsafe {
 			let mut scope = ScopeToken::default();
 			let mut guard = self.get_env_attachment(&mut scope)?;
@@ -287,7 +303,12 @@ impl JavaVM {
 	///
 	/// [destroy]:
 	///     https://docs.oracle.com/en/java/javase/12/docs/specs/jni/invocation.html#unloading-the-vm
+	///
+	/// # Errors
+	///
+	/// Returns an error if the JVM rejects or fails the shutdown request.
 	pub unsafe fn destroy(&self) -> Result<()> {
+		// SAFETY: The caller guarantees VM shutdown is safe and that no JNI references will be used afterward.
 		unsafe {
 			let res = java_vm_call_unchecked!(self, v1_1, DestroyJavaVM);
 			jni_error_code_to_result(res)

@@ -17,7 +17,9 @@ mod util;
 use util::{attach_current_thread, unwrap};
 
 #[test]
-pub fn global_ref_works_in_other_threads() {
+fn global_ref_works_in_other_threads() {
+	static ATOMIC_INT: OnceLock<Global<JObject<'static>>> = OnceLock::new();
+
 	const ITERS_PER_THREAD: usize = 10_000;
 
 	let atomic_integer = attach_current_thread(|env| {
@@ -34,7 +36,6 @@ pub fn global_ref_works_in_other_threads() {
 	})
 	.expect("attached JNI callback succeeds");
 
-	static ATOMIC_INT: OnceLock<Global<JObject<'static>>> = OnceLock::new();
 	ATOMIC_INT.set(atomic_integer).expect("set succeeds");
 
 	let mut join_handlers = Vec::new();
@@ -47,33 +48,21 @@ pub fn global_ref_works_in_other_threads() {
 			let barrier = barrier.clone();
 			let atomic_integer = ATOMIC_INT.get().expect("test bindings initialize");
 
-			let jh = spawn(move || {
-				attach_current_thread(|env| {
-					barrier.wait();
-					for _ in 0..ITERS_PER_THREAD {
-						unwrap(
-							unwrap(
-								env.call_method(atomic_integer, jni_str!("incrementAndGet"), jni_sig!("()I"), &[]),
-								env,
-							)
-							.i(),
-							env,
-						);
-					}
-					Ok(())
-				})
-				.expect("attached JNI callback succeeds");
-			});
+			let jh = spawn(move || increment_in_thread(&barrier, atomic_integer, ITERS_PER_THREAD));
 			join_handlers.push(jh);
 		}
 
+		#[expect(
+			clippy::iter_with_drain,
+			reason = "Reuse the vector allocation in subsequent loop iterations."
+		)]
 		for jh in join_handlers.drain(..) {
 			jh.join().expect("test worker completes without panicking");
 		}
 
 		attach_current_thread(|env| {
 			let atomic_integer = ATOMIC_INT.get().expect("test bindings initialize");
-			let expected = (ITERS_PER_THREAD * thread_num) as jint;
+			let expected = jint::try_from(ITERS_PER_THREAD * thread_num).expect("test iteration count fits jint");
 			assert_eq!(
 				expected,
 				unwrap(
@@ -94,4 +83,22 @@ pub fn global_ref_works_in_other_threads() {
 		})
 		.expect("attached JNI callback succeeds");
 	}
+}
+
+fn increment_in_thread(barrier: &Barrier, atomic_integer: &Global<JObject<'static>>, iterations: usize) {
+	attach_current_thread(|env| {
+		barrier.wait();
+		for _ in 0..iterations {
+			unwrap(
+				unwrap(
+					env.call_method(atomic_integer, jni_str!("incrementAndGet"), jni_sig!("()I"), &[]),
+					env,
+				)
+				.i(),
+				env,
+			);
+		}
+		Ok(())
+	})
+	.expect("attached JNI callback succeeds");
 }

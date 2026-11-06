@@ -17,7 +17,11 @@ macro_rules! bind_exception {
             #[doc = concat!("Returns `Some(Cast<", stringify!($rust_type), ">)` if the throwable is an instance of this exception type")]
             /// or returns `None` if it is not.
             ///
-            /// Returns [Error::NullPtr] if the throwable is null.
+            /// Returns [`Error::NullPtr`] if the throwable is null.
+            ///
+            /// # Errors
+            ///
+            /// Returns `Error::NullPtr` for a null throwable, or an error from resolving the exception class or checking its type.
             pub fn matches<'any, 'from>(
                 env: &crate::Env,
                 throwable: &'from crate::objects::JThrowable<'any>,
@@ -32,12 +36,12 @@ macro_rules! bind_exception {
                 )?;
                 let class: &$crate::objects::JClass = &class;
                 if env.is_instance_of_class(throwable, class)? {
+                    // SAFETY: The preceding instance-of check verified that the throwable has the target exception type.
                     return Ok(Some(unsafe {
                         $crate::refs::Cast::new_unchecked(throwable)
                     }));
-                } else {
-                    return Ok(None);
                 }
+                Ok(None)
             }
         }
     };

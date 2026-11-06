@@ -193,6 +193,7 @@ fn jni_new_object_by_id_str(c: &mut Criterion) {
 
 		c.bench_function("jni_new_object_by_id_str", |b| {
 			b.iter(|| {
+				// SAFETY: The constructor ID was resolved for this class with a no-argument signature.
 				let obj =
 					unsafe { env.new_object_unchecked(class, ctor_id, &[]) }.expect("new object unchecked succeeds");
 				env.delete_local_ref(obj);
@@ -229,6 +230,7 @@ fn jni_new_object_by_id_jclass(c: &mut Criterion) {
 
 		c.bench_function("jni_new_object_by_id_jclass", |b| {
 			b.iter(|| {
+				// SAFETY: The constructor ID was resolved for this class with a no-argument signature.
 				let obj =
 					unsafe { env.new_object_unchecked(&class, ctor_id, &[]) }.expect("new object unchecked succeeds");
 				env.delete_local_ref(obj);
@@ -332,11 +334,12 @@ fn jni_get_string_unchecked(c: &mut Criterion) {
 fn jni_noop_with_local_frame(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
 		const LOCAL_FRAME_SIZE: usize = 32;
+		let mut operation = || {
+			env.with_local_frame(LOCAL_FRAME_SIZE, |_| -> Result<_, abos_jni::errors::Error> { Ok(()) })
+				.expect("local-frame callback succeeds");
+		};
 		c.bench_function("jni_noop_with_local_frame", |b| {
-			b.iter(|| {
-				env.with_local_frame(LOCAL_FRAME_SIZE, |_| -> Result<_, abos_jni::errors::Error> { Ok(()) })
-					.expect("local-frame callback succeeds");
-			});
+			b.iter(&mut operation);
 		});
 		Ok(())
 	})
@@ -349,12 +352,13 @@ fn jni_with_local_frame_returning_local(c: &mut Criterion) {
 		const LOCAL_FRAME_SIZE: usize = 32;
 
 		let class = env.find_class(CLASS_OBJECT).expect("test class can be resolved");
+		let mut operation = || {
+			env.with_local_frame_returning_local::<_, JObject, _>(LOCAL_FRAME_SIZE, |env| {
+				env.new_object(&class, &SIG_OBJECT_CTOR, &[])
+			})
+		};
 		c.bench_function("jni_with_local_frame_returning_local", |b| {
-			b.iter(|| {
-				env.with_local_frame_returning_local::<_, JObject, _>(LOCAL_FRAME_SIZE, |env| {
-					env.new_object(&class, &SIG_OBJECT_CTOR, &[])
-				})
-			});
+			b.iter(&mut operation);
 		});
 		Ok(())
 	})
@@ -369,17 +373,18 @@ fn jni_with_local_frame_returning_global_to_local(c: &mut Criterion) {
 		const LOCAL_FRAME_SIZE: usize = 32;
 
 		let class = env.find_class(CLASS_OBJECT).expect("test class can be resolved");
+		let mut operation = || {
+			let global = env
+				.with_local_frame::<_, Global<JObject<'static>>, abos_jni::errors::Error>(LOCAL_FRAME_SIZE, |env| {
+					let local = env.new_object(&class, &SIG_OBJECT_CTOR, &[])?;
+					let global = env.new_global_ref(local)?;
+					Ok(global)
+				})
+				.expect("test object can be allocated");
+			let _local = env.new_local_ref(global).expect("local reference can be allocated");
+		};
 		c.bench_function("jni_with_local_frame_returning_global_to_local", |b| {
-			b.iter(|| {
-				let global = env
-					.with_local_frame::<_, Global<JObject<'static>>, abos_jni::errors::Error>(LOCAL_FRAME_SIZE, |env| {
-						let local = env.new_object(&class, &SIG_OBJECT_CTOR, &[])?;
-						let global = env.new_global_ref(local)?;
-						Ok(global)
-					})
-					.expect("test object can be allocated");
-				let _local = env.new_local_ref(global).expect("local reference can be allocated");
-			});
+			b.iter(&mut operation);
 		});
 		Ok(())
 	})

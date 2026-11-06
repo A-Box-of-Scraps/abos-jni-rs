@@ -7,6 +7,10 @@ use super::{
 impl<'local> Env<'local> {
 	/// Lock a Java object. The `MonitorGuard` that this returns is responsible
 	/// for ensuring that it gets unlocked.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the object is null, the monitor cannot be acquired, or a Java exception is pending.
 	pub fn lock_obj<'other_local, O>(&self, obj: O) -> Result<MonitorGuard<'local>>
 	where
 		O: AsRef<JObject<'other_local>>,
@@ -18,12 +22,13 @@ impl<'local> Env<'local> {
 		// local reference.
 
 		let inner = obj.as_ref().as_raw();
+		// SAFETY: The object reference is non-null and live; MonitorGuard will release the acquired monitor.
 		let res = unsafe { jni_call_no_post_check_ex!(self, v1_1, MonitorEnter, inner)? };
 		jni_error_code_to_result(res)?;
 
 		Ok(MonitorGuard {
 			obj: inner,
-			life: Default::default(),
+			life: std::marker::PhantomData,
 		})
 	}
 
@@ -31,6 +36,10 @@ impl<'local> Env<'local> {
 	///
 	/// May return [`Error::JavaException`] if called while there is a pending
 	/// exception.
+	///
+	/// # Errors
+	///
+	/// Returns an error if JNI cannot obtain the VM or a Java exception is pending.
 	pub fn get_java_vm(&self) -> Result<JavaVM> {
 		// This avoids calling JNI if we already know the VM pointer
 		JavaVM::from_env(self)
@@ -38,6 +47,10 @@ impl<'local> Env<'local> {
 
 	/// Ensures that at least a given number of local references can be created
 	/// in the current thread.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the capacity does not fit JNI, sufficient local-reference capacity cannot be reserved, or a Java exception is pending.
 	pub fn ensure_local_capacity(&self, capacity: usize) -> Result<()> {
 		let capacity: jint = capacity
 			.try_into()
@@ -82,6 +95,10 @@ impl<'local> Env<'local> {
 	/// **Note** that there is no way for the JVM to report errors if the function pointer is invalid or
 	/// does not match the signature, so incorrect function pointers may lead to crashes or
 	/// undefined behaviour.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class cannot be resolved or the JVM rejects a native method name or signature.
 	pub unsafe fn register_native_methods<'other_local, T>(&mut self, class: T, methods: &[NativeMethod]) -> Result<()>
 	where
 		T: Desc<'local, JClass<'other_local>>,
@@ -96,7 +113,7 @@ impl<'local> Env<'local> {
 				catch |env| {
 					e: crate::exceptions::JNoSuchMethodError => {
 						let msg = e.as_throwable().get_message(env).ok();
-						let msg = if let Some(msg) = msg { msg.to_string() } else { String::new() };
+						let msg = msg.map_or_else(String::new, |msg| msg.to_string());
 						Err(Error::NoSuchMethod(msg))
 					},
 					else => Err(Error::JniCall(JniError::Unknown)),
@@ -105,8 +122,8 @@ impl<'local> Env<'local> {
 				v1_1,
 				RegisterNatives,
 				class.as_ref().as_raw(),
-				methods.as_ptr() as *mut sys::JNINativeMethod,
-				methods.len() as jint
+				methods.as_ptr().cast::<sys::JNINativeMethod>().cast_mut(),
+				jint::try_from(methods.len()).map_err(|_| Error::JniCall(JniError::InvalidArguments))?
 			)?
 		};
 
@@ -117,11 +134,16 @@ impl<'local> Env<'local> {
 	}
 
 	/// Unbind all native methods of class.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class cannot be resolved, unregistration fails, or a Java exception is pending.
 	pub fn unregister_native_methods<'other_local, T>(&mut self, class: T) -> Result<()>
 	where
 		T: Desc<'local, JClass<'other_local>>,
 	{
 		let class = class.lookup(self)?;
+		// SAFETY: The class descriptor remains live during UnregisterNatives.
 		let res = unsafe { jni_call_post_check_ex!(self, v1_1, UnregisterNatives, class.as_ref().as_raw())? };
 
 		// Ensure that `class` isn't dropped before the JNI call returns.
@@ -139,6 +161,10 @@ impl<'local> Env<'local> {
 		since = "0.22.0",
 		note = "use JPrimitiveArray::get_elements instead. This API will be removed in a future version"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array is null, element acquisition fails, or a Java exception is pending.
 	pub unsafe fn get_array_elements<'array_local, T, TArrayRef>(
 		&self,
 		array: TArrayRef,
@@ -160,6 +186,10 @@ impl<'local> Env<'local> {
 		since = "0.22.0",
 		note = "use JPrimitiveArray::get_elements_critical instead. This API will be removed in a future version"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array is null, critical element acquisition fails, or a Java exception is pending.
 	pub unsafe fn get_array_elements_critical<'array_local, T, TArrayRef>(
 		&self,
 		array: TArrayRef,

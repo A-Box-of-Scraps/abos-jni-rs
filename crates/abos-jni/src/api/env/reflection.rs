@@ -3,6 +3,10 @@ use super::{Desc, Env, JClass, JMethodID, JObject, JStaticMethodID, Reference, R
 impl<'local> Env<'local> {
 	/// Convert a [`JMethodID`] into a [`JObject`] with the corresponding
 	/// `java.lang.reflect.Method` or `java.lang.reflect.Constructor` instance.
+	///
+	/// # Errors
+	///
+	/// Returns an error if resolving the class or method descriptor fails, or JNI cannot create the reflected object.
 	pub fn to_reflected_method<'other_local>(
 		&mut self,
 		class: impl Desc<'local, JClass<'other_local>>,
@@ -14,6 +18,10 @@ impl<'local> Env<'local> {
 
 	/// Convert a [`JStaticMethodID`] into a [`JObject`] with the corresponding
 	/// `java.lang.reflect.Method` instance.
+	///
+	/// # Errors
+	///
+	/// Returns an error if resolving the class or method descriptor fails, or JNI cannot create the reflected object.
 	pub fn to_reflected_static_method<'other_local>(
 		&mut self,
 		class: impl Desc<'local, JClass<'other_local>>,
@@ -34,7 +42,10 @@ impl<'local> Env<'local> {
 	///
 	/// `is_static` must correctly indicate whether the method ID is for a static method. (The JNI
 	/// spec does not define what happens if this is incorrect.)
-	#[allow(clippy::wrong_self_convention)]
+	#[allow(
+		clippy::wrong_self_convention,
+		reason = "JNI reflection allocates a local reference and therefore requires a mutable Env."
+	)]
 	pub(super) unsafe fn to_reflected_method_base<'other_local, M>(
 		&mut self,
 		class: impl Desc<'local, JClass<'other_local>>,
@@ -52,6 +63,7 @@ impl<'local> Env<'local> {
 
 		let method_id = to_jmethodid(*method_id.lookup(self)?.as_ref());
 
+		// SAFETY: The caller guarantees is_static matches the resolved method ID; the class remains live during reflection.
 		unsafe {
 			jni_call_post_check_ex_and_null_ret!(
 				self,

@@ -1,4 +1,7 @@
-#![allow(missing_docs)]
+#![allow(
+	missing_docs,
+	reason = "Error variants carry diagnostic descriptions in their thiserror messages."
+)]
 
 use std::char::{CharTryFromError, DecodeUtf16Error};
 
@@ -210,6 +213,10 @@ impl<T> From<::std::sync::TryLockError<T>> for Error {
 	}
 }
 
+///
+/// # Errors
+///
+/// Returns the corresponding JNI error when the status is not `JNI_OK`.
 pub fn jni_error_code_to_result(code: sys::jint) -> Result<()> {
 	match code {
 		sys::JNI_OK => Ok(()),

@@ -32,7 +32,6 @@ custom_keyword!(sig);
 /// Represents a method parameter
 #[derive(Debug, Clone)]
 pub struct Parameter {
-	#[allow(dead_code)]
 	pub name: Ident,
 	pub ty: SigType,
 }

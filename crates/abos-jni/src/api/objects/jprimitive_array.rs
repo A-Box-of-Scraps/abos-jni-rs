@@ -85,14 +85,19 @@ impl<T: TypeArray> std::default::Default for JPrimitiveArray<'_, T> {
 
 impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 	/// Creates a new [`JPrimitiveArray`] of the given `length`.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the length does not fit JNI, allocation fails, or a Java exception is pending.
 	pub fn new<'env_local>(env: &mut Env<'env_local>, length: usize) -> Result<JPrimitiveArray<'env_local, T>> {
-		if length > crate::sys::jsize::MAX as usize {
-			return Err(crate::errors::Error::JniCall(crate::errors::JniError::InvalidArguments));
-		}
+		let length = crate::sys::jsize::try_from(length)
+			.map_err(|_| crate::errors::Error::JniCall(crate::errors::JniError::InvalidArguments))?;
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		env.assert_top();
-		let raw_array = unsafe { T::new_array(env, length as crate::sys::jsize)? };
+		// SAFETY: TypeArray selects the matching JNI primitive allocator, and the checked length fits jsize.
+		let raw_array = unsafe { T::new_array(env, length)? };
+		// SAFETY: The allocator returned a local array of T in the current frame.
 		unsafe { Ok(JPrimitiveArray::from_raw(env, raw_array)) }
 	}
 
@@ -107,6 +112,7 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 	///   JNI stack frame associated with the [Env] `'env_local` lifetime.
 	pub unsafe fn from_raw<'env_local>(env: &Env<'env_local>, raw: jarray) -> JPrimitiveArray<'env_local, T> {
 		JPrimitiveArray {
+			// SAFETY: The caller guarantees raw is a primitive array of T valid for the environment's lifetime.
 			obj: unsafe { JObject::from_raw(env, raw as jobject) },
 			_marker: PhantomData,
 		}
@@ -131,10 +137,15 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 	}
 
 	/// Returns the length of the array.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array is null or a Java exception is pending.
 	pub fn len(&self, env: &Env) -> Result<usize> {
 		let array = null_check!(self.as_raw(), "JPrimitiveArray::len self argument")?;
-		let len = unsafe { jni_call_no_post_check_ex!(env, v1_1, GetArrayLength, array)? } as usize;
-		Ok(len)
+		// SAFETY: The typed array reference is non-null and valid for this Env.
+		let len = unsafe { jni_call_no_post_check_ex!(env, v1_1, GetArrayLength, array)? };
+		usize::try_from(len).map_err(|_| crate::errors::Error::JniCall(crate::errors::JniError::Unknown))
 	}
 
 	/// Returns an [`AutoElements`] to access the elements of the given Java `array`.
@@ -193,6 +204,10 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 	/// [`Env::get_array_elements_critical`] which
 	/// imposes additional restrictions that make it less likely to incur the
 	/// cost of copying the array elements.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array is null, its elements cannot be acquired, or a Java exception is pending.
 	pub unsafe fn get_elements(&self, env: &Env, mode: ReleaseMode) -> Result<AutoElements<'local, T, &Self>> {
 		AutoElements::new(env, self, mode)
 	}
@@ -290,6 +305,10 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 	/// Also see [`get_elements`](Self::get_elements) which has
 	/// fewer restrictions, but is more likely to incur a cost from copying
 	/// the array elements.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array is null, a critical element pointer cannot be acquired, or a Java exception is pending.
 	pub unsafe fn get_elements_critical(
 		&self,
 		env: &Env<'_>,
@@ -310,6 +329,7 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 	/// [`Error::JavaException`] (unless called while there is a pending
 	/// exception).
 	pub fn get_region(&self, env: &Env, start: crate::sys::jsize, buf: &mut [T]) -> Result<()> {
+		// SAFETY: The typed wrapper guarantees the array element type matches T, and the slice supplies valid writable storage.
 		unsafe { T::get_region(env, self.as_raw() as jarray, start, buf) }
 	}
 
@@ -324,6 +344,7 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 	/// This API catches exceptions internally and is not expected to return
 	/// [`Error::JavaException`] (unless called while there is a pending exception).
 	pub fn set_region(&self, env: &Env, start: crate::sys::jsize, buf: &[T]) -> Result<()> {
+		// SAFETY: The typed wrapper guarantees the array element type matches T, and the slice supplies valid readable storage.
 		unsafe { T::set_region(env, self.as_raw() as jarray, start, buf) }
 	}
 }
@@ -366,11 +387,15 @@ pub unsafe trait AsJArrayRaw<'local>: AsRef<JObject<'local>> {
 	}
 }
 
+// SAFETY: JPrimitiveArray contains only a primitive-array reference with the declared local lifetime.
 unsafe impl<'local, T: TypeArray> AsJArrayRaw<'local> for JPrimitiveArray<'local, T> {}
 
 macro_rules! impl_ref_for_jprimitive_array {
 	($type:ident, $class_name:expr, $api_type:ident) => {
-		#[allow(non_camel_case_types)]
+		#[allow(
+			non_camel_case_types,
+			reason = "Generated API identifiers include the lowercase JNI primitive type name."
+		)]
 		pub struct $api_type {
 			class: Global<JClass<'static>>,
 		}
@@ -394,7 +419,7 @@ macro_rules! impl_ref_for_jprimitive_array {
 					let class = env.new_global_ref(&class).unwrap();
 					Ok(Self { class })
 				})?;
-				let _ = API.set(api);
+				drop(API.set(api));
 				Ok(API.get().unwrap())
 			}
 		}
@@ -405,15 +430,15 @@ macro_rules! impl_ref_for_jprimitive_array {
 			/// This will do a runtime (`IsInstanceOf`) check that the object is an instance of `T[]`.
 			///
 			/// Also see these other options for casting local or global references to a [`JPrimitiveArray<T>`]:
-			/// - [Env::as_cast]
-			/// - [Env::new_cast_local_ref]
-			/// - [Env::cast_local]
-			/// - [Env::new_cast_global_ref]
-			/// - [Env::cast_global]
+			/// - [`Env::as_cast`]
+			/// - [`Env::new_cast_local_ref`]
+			/// - [`Env::cast_local`]
+			/// - [`Env::new_cast_global_ref`]
+			/// - [`Env::cast_global`]
 			///
 			/// # Errors
 			///
-			/// Returns [Error::WrongObjectType] if the `IsInstanceOf` check fails.
+			/// Returns [`Error::WrongObjectType`] if the `IsInstanceOf` check fails.
 			pub fn cast_local<'any_local>(
 				env: &mut Env<'_>,
 				obj: impl Reference + Into<JObject<'any_local>> + AsRef<JObject<'any_local>>,
@@ -445,6 +470,7 @@ macro_rules! impl_ref_for_jprimitive_array {
 
 			unsafe fn kind_from_raw<'env>(local_ref: jobject) -> Self::Kind<'env> {
 				JPrimitiveArray {
+					// SAFETY: The caller guarantees a valid local primitive-array reference of this element type.
 					obj: unsafe { JObject::kind_from_raw(local_ref) },
 					_marker: PhantomData,
 				}
@@ -452,6 +478,7 @@ macro_rules! impl_ref_for_jprimitive_array {
 
 			unsafe fn global_kind_from_raw(global_ref: jobject) -> Self::GlobalKind {
 				JPrimitiveArray {
+					// SAFETY: The caller guarantees a valid global primitive-array reference of this element type.
 					obj: unsafe { JObject::global_kind_from_raw(global_ref) },
 					_marker: PhantomData,
 				}

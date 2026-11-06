@@ -75,144 +75,16 @@ impl LoaderContext<'_, '_> {
 	///
 	///
 	/// The strategy for loading the class depends on the loader context (See [Self]).
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class cannot be found, linked or initialized, or a JNI operation fails during loading.
 	pub fn load_class<'env_local>(
 		&self,
 		env: &mut crate::api::env::Env<'env_local>,
 		name: impl AsRef<JNIStr>,
 		initialize: bool,
 	) -> crate::errors::Result<JClass<'env_local>> {
-		/// Convert a binary name or array descriptor (like `"java.lang.String"` or
-		/// `"[Ljava.lang.String;"`) into an internal name like `"java/lang/String"` or
-		/// `"[Ljava/lang/String;"` that can be passed to `FindClass`.
-		fn internal_find_class_name(binary_name: &JNIStr) -> Cow<'_, JNIStr> {
-			let bytes = binary_name.to_bytes();
-			if bytes.contains(&b'.') {
-				// Convert from dot-notation to slash-notation
-				let owned: Vec<u8> = bytes.iter().map(|&b| if b == b'.' { b'/' } else { b }).collect();
-				let cstring =
-					CString::new(owned).expect("replacing class-name separators preserves NUL-free modified UTF-8");
-				let jni_string = unsafe { JNIString::from_cstring(cstring) };
-				Cow::Owned(jni_string)
-			} else {
-				Cow::Borrowed(binary_name)
-			}
-		}
-
-		fn lookup_tccl_with_catch<'local>(
-			env: &mut crate::api::env::Env<'local>,
-		) -> crate::errors::Result<Option<JClassLoader<'local>>> {
-			jni_try!(
-				(env) -> crate::errors::Result<Option<JClassLoader<'local>>> {
-					let current_thread = JThread::current_thread(env)?;
-					let tccl = current_thread.get_context_class_loader(env)?;
-					Ok(Some(tccl))
-				}
-				catch |env| {
-					crate::exceptions::JSecurityException => Ok(None),
-					else => Ok(None)
-				}
-			)
-		}
-
-		fn load_class_with_catch<'any_loader, 'any_local>(
-			env: &mut crate::api::env::Env<'any_local>,
-			name: &JNIStr,
-			initialize: bool,
-			loader: &JClassLoader<'any_loader>,
-		) -> crate::errors::Result<JClass<'any_local>> {
-			jni_try!(
-				(env) -> crate::errors::Result<JClass<'any_local>> {
-					let name_ref = JString::from_jni_str(env, name)?.auto();
-					JClass::for_name_with_loader(env, name_ref, initialize, loader)
-				}
-				catch |env| {
-					// For consistency with `Env::find_class` we internally map
-					// `ClassNotFoundException` into `Error::NoClassDefFound`
-					// (especially considering that `load_class` may fall back
-					// to calling `::find_class()`)
-					e: crate::exceptions::JClassNotFoundException => {
-						let cause: &JThrowable = &e.as_throwable();
-						let cause = env.new_global_ref(cause).ok();
-						Err(Error::NoClassDefFound {
-							requested: name.to_string(),
-							cause
-						})
-					},
-					e: crate::exceptions::JExceptionInInitializerError => {
-						let exception = e.get_exception(env);
-						let exception = if let Ok(exception) = exception {
-							env.new_global_ref(exception).ok()
-						} else {
-							None
-						};
-						Err(Error::ExceptionInInitializer { exception })
-					},
-					e: crate::exceptions::JLinkageError => {
-						let cause: &JThrowable = &e.as_throwable();
-						let cause = env.new_global_ref(cause).ok();
-						Err(Error::LinkageError {
-							requested: name.to_string(),
-							cause
-						})
-					},
-					crate::exceptions::JSecurityException =>
-						Err(Error::SecurityViolation),
-					crate::exceptions::JOutOfMemoryError =>
-						Err(Error::JniCall(JniError::NoMemory)),
-					else => Err(Error::NullPtr("Unexpected Exception")),
-				}
-			)
-		}
-
-		fn find_class<'local>(
-			env: &mut crate::api::env::Env<'local>,
-			name: &JNIStr,
-		) -> crate::errors::Result<JClass<'local>> {
-			let internal_name = internal_find_class_name(name);
-			env.find_class(&internal_name)
-		}
-
-		fn lookup_class_with_fallbacks<'local>(
-			env: &mut crate::api::env::Env<'local>,
-			name: &JNIStr,
-			initialize: bool,
-			candidate: Option<&JObject>,
-		) -> crate::errors::Result<JClass<'local>> {
-			if let Some(tccl) = lookup_tccl_with_catch(env)? {
-				match load_class_with_catch(env, name, initialize, &tccl) {
-					Ok(class) => return Ok(class),
-					Err(Error::NoClassDefFound { .. }) => {
-						// Try the next fallback
-					}
-					Err(e) => return Err(e),
-				}
-			}
-
-			if let Some(candidate) = candidate {
-				let candidate_class = env.get_object_class(candidate)?;
-				let loader = jni_try!(
-					(env) -> crate::errors::Result<Option<JClassLoader<'local>>> {
-						Ok(Some(candidate_class.get_class_loader(env)?))
-					}
-					catch |env| {
-						crate::exceptions::JSecurityException => Ok(None),
-						else => Ok(None)
-					}
-				)?;
-				if let Some(loader) = loader {
-					match load_class_with_catch(env, name, initialize, &loader) {
-						Ok(class) => return Ok(class),
-						Err(Error::NoClassDefFound { .. }) => {
-							// Try the next fallback
-						}
-						Err(e) => return Err(e),
-					}
-				}
-			}
-
-			find_class(env, name)
-		}
-
 		let name = name.as_ref();
 		match self {
 			LoaderContext::None => env.with_local_frame_returning_local::<_, JClass, _>(5, |env| {
@@ -232,28 +104,16 @@ impl LoaderContext<'_, '_> {
 	/// dots.
 	///
 	/// If possible, prefer to use [`Self::load_class`] to avoid a redundant name format conversion.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class cannot be found, linked or initialized, or a JNI operation fails during loading.
 	pub fn find_class<'env_local>(
 		&self,
 		env: &mut crate::api::env::Env<'env_local>,
 		name: impl AsRef<JNIStr>,
 		initialize: bool,
 	) -> crate::errors::Result<JClass<'env_local>> {
-		/// Convert an internal name or array descriptor (like `"java/lang/String"` or
-		/// `"[Ljava/lang/String;"`) into a binary name like `"java.lang.String"` or
-		/// `"[Ljava.lang.String;"` that can be passed to [`LoaderContext::load_class`].
-		fn internal_to_binary_class_name(internal: &JNIStr) -> Cow<'_, JNIStr> {
-			let bytes = internal.to_bytes();
-			if bytes.contains(&b'/') {
-				// Convert from slash-notation to dot-notation
-				let owned: Vec<u8> = bytes.iter().map(|&b| if b == b'/' { b'.' } else { b }).collect();
-				let cstring =
-					CString::new(owned).expect("replacing class-name separators preserves NUL-free modified UTF-8");
-				let jni_string = unsafe { JNIString::from_cstring(cstring) };
-				Cow::Owned(jni_string)
-			} else {
-				Cow::Borrowed(internal)
-			}
-		}
 		let internal_name = internal_to_binary_class_name(name.as_ref());
 		self.load_class(env, &internal_name, initialize)
 	}
@@ -267,6 +127,10 @@ impl LoaderContext<'_, '_> {
 	/// class could not be found.
 	///
 	/// The strategy for loading the class depends on the loader context (See [Self]).
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class cannot be found, linked or initialized, or a JNI operation fails during loading.
 	pub fn load_class_for_type<'env_local, T: Reference>(
 		&self,
 		env: &mut crate::api::env::Env<'env_local>,
@@ -274,5 +138,147 @@ impl LoaderContext<'_, '_> {
 	) -> crate::errors::Result<JClass<'env_local>> {
 		let class_name = T::class_name();
 		self.load_class(env, &class_name, initialize)
+	}
+}
+
+/// Convert a binary name or array descriptor (like `"java.lang.String"` or
+/// `"[Ljava.lang.String;"`) into an internal name like `"java/lang/String"` or
+/// `"[Ljava/lang/String;"` that can be passed to `FindClass`.
+fn internal_find_class_name(binary_name: &JNIStr) -> Cow<'_, JNIStr> {
+	let bytes = binary_name.to_bytes();
+	if bytes.contains(&b'.') {
+		// Convert from dot-notation to slash-notation
+		let owned: Vec<u8> = bytes.iter().map(|&b| if b == b'.' { b'/' } else { b }).collect();
+		let cstring = CString::new(owned).expect("replacing class-name separators preserves NUL-free modified UTF-8");
+		// SAFETY: Replacing ASCII class-name separators preserves the original valid modified UTF-8.
+		let jni_string = unsafe { JNIString::from_cstring(cstring) };
+		Cow::Owned(jni_string)
+	} else {
+		Cow::Borrowed(binary_name)
+	}
+}
+
+fn lookup_tccl_with_catch<'local>(
+	env: &mut crate::api::env::Env<'local>,
+) -> crate::errors::Result<Option<JClassLoader<'local>>> {
+	jni_try!(
+		(env) -> crate::errors::Result<Option<JClassLoader<'local>>> {
+			let current_thread = JThread::current_thread(env)?;
+			let tccl = current_thread.get_context_class_loader(env)?;
+			Ok(Some(tccl))
+		}
+		catch |env| {
+			crate::exceptions::JSecurityException => Ok(None),
+			else => Ok(None)
+		}
+	)
+}
+
+fn load_class_with_catch<'any_loader, 'any_local>(
+	env: &mut crate::api::env::Env<'any_local>,
+	name: &JNIStr,
+	initialize: bool,
+	loader: &JClassLoader<'any_loader>,
+) -> crate::errors::Result<JClass<'any_local>> {
+	jni_try!(
+		(env) -> crate::errors::Result<JClass<'any_local>> {
+			let name_ref = JString::from_jni_str(env, name)?.auto();
+			JClass::for_name_with_loader(env, name_ref, initialize, loader)
+		}
+		catch |env| {
+			// For consistency with `Env::find_class` we internally map
+			// `ClassNotFoundException` into `Error::NoClassDefFound`
+			// (especially considering that `load_class` may fall back
+			// to calling `::find_class()`)
+			e: crate::exceptions::JClassNotFoundException => {
+				let cause: &JThrowable = &e.as_throwable();
+				let cause = env.new_global_ref(cause).ok();
+				Err(Error::NoClassDefFound {
+					requested: name.to_string(),
+					cause
+				})
+			},
+			e: crate::exceptions::JExceptionInInitializerError => {
+				let exception = e.get_exception(env);
+				let exception = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
+				Err(Error::ExceptionInInitializer { exception })
+			},
+			e: crate::exceptions::JLinkageError => {
+				let cause: &JThrowable = &e.as_throwable();
+				let cause = env.new_global_ref(cause).ok();
+				Err(Error::LinkageError {
+					requested: name.to_string(),
+					cause
+				})
+			},
+			crate::exceptions::JSecurityException =>
+				Err(Error::SecurityViolation),
+			crate::exceptions::JOutOfMemoryError =>
+				Err(Error::JniCall(JniError::NoMemory)),
+			else => Err(Error::NullPtr("Unexpected Exception")),
+		}
+	)
+}
+
+fn find_class<'local>(env: &mut crate::api::env::Env<'local>, name: &JNIStr) -> crate::errors::Result<JClass<'local>> {
+	let internal_name = internal_find_class_name(name);
+	env.find_class(&internal_name)
+}
+
+fn lookup_class_with_fallbacks<'local>(
+	env: &mut crate::api::env::Env<'local>,
+	name: &JNIStr,
+	initialize: bool,
+	candidate: Option<&JObject>,
+) -> crate::errors::Result<JClass<'local>> {
+	if let Some(tccl) = lookup_tccl_with_catch(env)? {
+		match load_class_with_catch(env, name, initialize, &tccl) {
+			Ok(class) => return Ok(class),
+			Err(Error::NoClassDefFound { .. }) => {
+				// Try the next fallback
+			}
+			Err(e) => return Err(e),
+		}
+	}
+
+	if let Some(candidate) = candidate {
+		let candidate_class = env.get_object_class(candidate)?;
+		let loader = jni_try!(
+			(env) -> crate::errors::Result<Option<JClassLoader<'local>>> {
+				Ok(Some(candidate_class.get_class_loader(env)?))
+			}
+			catch |env| {
+				crate::exceptions::JSecurityException => Ok(None),
+				else => Ok(None)
+			}
+		)?;
+		if let Some(loader) = loader {
+			match load_class_with_catch(env, name, initialize, &loader) {
+				Ok(class) => return Ok(class),
+				Err(Error::NoClassDefFound { .. }) => {
+					// Try the next fallback
+				}
+				Err(e) => return Err(e),
+			}
+		}
+	}
+
+	find_class(env, name)
+}
+
+/// Convert an internal name or array descriptor (like `"java/lang/String"` or
+/// `"[Ljava/lang/String;"`) into a binary name like `"java.lang.String"` or
+/// `"[Ljava.lang.String;"` that can be passed to [`LoaderContext::load_class`].
+fn internal_to_binary_class_name(internal: &JNIStr) -> Cow<'_, JNIStr> {
+	let bytes = internal.to_bytes();
+	if bytes.contains(&b'/') {
+		// Convert from slash-notation to dot-notation
+		let owned: Vec<u8> = bytes.iter().map(|&b| if b == b'/' { b'.' } else { b }).collect();
+		let cstring = CString::new(owned).expect("replacing class-name separators preserves NUL-free modified UTF-8");
+		// SAFETY: Replacing ASCII class-name separators preserves the original valid modified UTF-8.
+		let jni_string = unsafe { JNIString::from_cstring(cstring) };
+		Cow::Owned(jni_string)
+	} else {
+		Cow::Borrowed(internal)
 	}
 }

@@ -13,70 +13,14 @@ impl Parse for SignatureInput {
 
 		let mut signature: Option<Signature> = None;
 
-		let jni_path = crate::internal::utils::parse_jni_crate_override(&input)?;
+		let jni_path = crate::internal::utils::parse_jni_crate_override(input)?;
 
 		// Initialize TypeMappings unconditionally now that we have jni_crate
 		let mut type_mappings = TypeMappings::new(&jni_path);
 
 		// Parse remaining properties/arguments
 		while !input.is_empty() {
-			// Check if this looks like a named property ('<ident> = <value>' or '<ident> { ... }')
-			let is_named_property = {
-				let fork = input.fork();
-				if fork.peek(Ident) {
-					if let Ok(_ident) = fork.parse::<Ident>() {
-						fork.peek(Token![=]) || fork.peek(syn::token::Brace)
-					} else {
-						false
-					}
-				} else {
-					false
-				}
-			};
-
-			if is_named_property {
-				// Parse named property
-				let prop_name = input.parse::<Ident>()?;
-				let prop_str = prop_name.to_string();
-
-				match prop_str.as_str() {
-					"jni" => {
-						// jni can only be the first property
-						return Err(syn::Error::new(
-							prop_name.span(),
-							"jni property must be the first property if specified",
-						));
-					}
-					"sig" => {
-						input.parse::<Token![=]>()?;
-						if signature.is_some() {
-							return Err(syn::Error::new(
-								prop_name.span(),
-								"signature specified multiple times (either as unnamed argument or with 'sig =')",
-							));
-						}
-						signature = Some(parse_signature(input, &type_mappings)?);
-					}
-					"type_map" => {
-						type_mappings.parse_mappings(input)?;
-					}
-					_ => {
-						return Err(syn::Error::new(
-							prop_name.span(),
-							format!("unknown property '{prop_str}'. Valid properties are: sig, type_map, jni"),
-						));
-					}
-				}
-			} else {
-				// Unnamed argument - assume it's the signature
-				if signature.is_some() {
-					return Err(syn::Error::new(
-						input.span(),
-						"signature specified multiple times (either as unnamed argument or with 'sig =')",
-					));
-				}
-				signature = Some(parse_signature(input, &type_mappings)?);
-			}
+			parse_input_entry(input, &mut signature, &mut type_mappings)?;
 
 			if !input.is_empty() {
 				input.parse::<Token![,]>()?;
@@ -96,6 +40,68 @@ impl Parse for SignatureInput {
 			type_mappings,
 		})
 	}
+}
+
+fn parse_input_entry(
+	input: ParseStream,
+	signature: &mut Option<Signature>,
+	type_mappings: &mut TypeMappings,
+) -> Result<()> {
+	// Check if this looks like a named property ('<ident> = <value>' or '<ident> { ... }')
+	let is_named_property = {
+		let fork = input.fork();
+		if fork.peek(Ident) {
+			fork.parse::<Ident>()
+				.is_ok_and(|_ident| fork.peek(Token![=]) || fork.peek(syn::token::Brace))
+		} else {
+			false
+		}
+	};
+
+	if is_named_property {
+		// Parse named property
+		let prop_name = input.parse::<Ident>()?;
+		let prop_str = prop_name.to_string();
+
+		match prop_str.as_str() {
+			"jni" => {
+				// jni can only be the first property
+				return Err(syn::Error::new(
+					prop_name.span(),
+					"jni property must be the first property if specified",
+				));
+			}
+			"sig" => {
+				input.parse::<Token![=]>()?;
+				if signature.is_some() {
+					return Err(syn::Error::new(
+						prop_name.span(),
+						"signature specified multiple times (either as unnamed argument or with 'sig =')",
+					));
+				}
+				*signature = Some(parse_signature(input, type_mappings)?);
+			}
+			"type_map" => {
+				type_mappings.parse_mappings(input)?;
+			}
+			_ => {
+				return Err(syn::Error::new(
+					prop_name.span(),
+					format!("unknown property '{prop_str}'. Valid properties are: sig, type_map, jni"),
+				));
+			}
+		}
+	} else {
+		// Unnamed argument - assume it's the signature
+		if signature.is_some() {
+			return Err(syn::Error::new(
+				input.span(),
+				"signature specified multiple times (either as unnamed argument or with 'sig =')",
+			));
+		}
+		*signature = Some(parse_signature(input, type_mappings)?);
+	}
+	Ok(())
 }
 
 /// Parse a signature (method or field) from input
@@ -154,20 +160,14 @@ pub(super) fn parse_signature(input: ParseStream, type_mappings: &TypeMappings) 
 
 		let mut parameters = Vec::new();
 
-		if !args_content.is_empty() {
-			let mut param_index = 0;
-			loop {
-				let param = parse_parameter_with_index(&args_content, param_index, type_mappings)?;
-				parameters.push(param);
-				param_index += 1;
-
-				if args_content.is_empty() {
-					break;
-				}
+		while !args_content.is_empty() {
+			parameters.push(parse_parameter_with_index(
+				&args_content,
+				parameters.len(),
+				type_mappings,
+			)?);
+			if !args_content.is_empty() {
 				args_content.parse::<Token![,]>()?;
-				if args_content.is_empty() {
-					break;
-				}
 			}
 		}
 

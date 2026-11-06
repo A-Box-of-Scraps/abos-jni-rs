@@ -6,6 +6,7 @@ pub fn attach_current_thread_guard_scope() {
 	let (_vm, _guard) = {
 		let vm = jvm();
 		let vm = vm.as_ref().clone();
+		// SAFETY: The scope token outlives the guard, which stays on this thread and is dropped in stack order.
 		let guard = unsafe {
 			vm.attach_current_thread_guard(Default::default, &mut scope)
 				.expect("thread attaches to the test JVM")
@@ -167,6 +168,7 @@ pub fn call_static_method_unchecked_ok() {
 		let abs_method_id = env
 			.get_static_method_id(&math_class, MATH_ABS_METHOD_NAME, MATH_ABS_SIGNATURE)
 			.expect("test static method can be resolved");
+		// SAFETY: The ID was looked up for Math.abs(int), and the argument and return types match.
 		let val: jint = unsafe {
 			env.call_static_method_unchecked(
 				&math_class,
@@ -195,6 +197,7 @@ pub fn call_new_object_unchecked_ok() {
 		let ctor_method_id = env
 			.get_method_id(&string_class, jni_str!("<init>"), jni_sig!("(Ljava/lang/String;)V"))
 			.expect("test method can be resolved");
+		// SAFETY: The constructor ID belongs to String(String), and the live string argument matches that signature.
 		let val: JObject =
 			unsafe { env.new_object_unchecked(&string_class, ctor_method_id, &[JValue::from(&test_str).as_jni()]) }
 				.expect("Env#new_object_unchecked should return JValue");

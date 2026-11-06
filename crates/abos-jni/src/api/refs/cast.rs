@@ -88,10 +88,15 @@ impl<'any, 'from, To: Reference> Cast<'any, 'from, To> {
 	/// Note: this API is agnostic about whether the reference is local or global because the `Cast`
 	/// wrapper doesn't give ownership over the reference and so you can't accidentally attempt to
 	/// delete it using the wrong JNI API.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongObjectType` if the runtime type does not match, or propagates class-lookup and JNI errors.
 	pub unsafe fn from_raw<'env_local>(env: &Env<'env_local>, from: &'from jobject) -> Result<Self>
 	where
 		'any: 'from,
 	{
+		// SAFETY: The caller guarantees that the borrowed raw reference is valid for the source lifetime.
 		let from = unsafe { JObject::from_raw(env, *from) };
 		let from = &from; // make it clear, we don't own `from`
 
@@ -199,6 +204,7 @@ impl<'local, To: Reference> AsRef<To::Kind<'local>> for Cast<'local, '_, To> {
 	}
 }
 
+// SAFETY: The wrapper delegates raw access and construction to To, preserving its reference kind and lifetimes.
 unsafe impl<To: Reference> Reference for Cast<'_, '_, To> {
 	type Kind<'local> = To::Kind<'local>;
 	type GlobalKind = To::GlobalKind;
@@ -219,10 +225,12 @@ unsafe impl<To: Reference> Reference for Cast<'_, '_, To> {
 	}
 
 	unsafe fn kind_from_raw<'env>(local_ref: jobject) -> Self::Kind<'env> {
+		// SAFETY: The caller guarantees the local reference type and lifetime required by the delegated constructor.
 		unsafe { To::kind_from_raw(local_ref) }
 	}
 
 	unsafe fn global_kind_from_raw(global_ref: jobject) -> Self::GlobalKind {
+		// SAFETY: The caller guarantees the global reference type required by the delegated constructor.
 		unsafe { To::global_kind_from_raw(global_ref) }
 	}
 }

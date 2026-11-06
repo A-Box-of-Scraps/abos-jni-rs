@@ -21,9 +21,8 @@ impl<'obj_ref> JValue<'obj_ref> {
 				l: ::std::ptr::null_mut(),
 			},
 		};
-		trace!("converted {:?} to jvalue {:?}", self, unsafe {
-			::std::mem::transmute::<jvalue, u64>(val)
-		});
+		// Only the active union member is initialized, so log the typed value rather than all union bytes.
+		trace!("converted {self:?} to jvalue");
 		val
 	}
 
@@ -87,6 +86,10 @@ impl<'obj_ref> JValue<'obj_ref> {
 	}
 
 	/// Try to unwrap to an Object.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn l(self) -> Result<&'obj_ref JObject<'obj_ref>> {
 		match self {
 			Self::Object(obj) => Ok(obj),
@@ -95,6 +98,10 @@ impl<'obj_ref> JValue<'obj_ref> {
 	}
 
 	/// Try to unwrap to a boolean.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn z(self) -> Result<bool> {
 		match self {
 			Self::Bool(b) => Ok(b == JNI_TRUE),
@@ -103,6 +110,10 @@ impl<'obj_ref> JValue<'obj_ref> {
 	}
 
 	/// Try to unwrap to a byte.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn b(self) -> Result<jbyte> {
 		match self {
 			Self::Byte(b) => Ok(b),
@@ -111,6 +122,10 @@ impl<'obj_ref> JValue<'obj_ref> {
 	}
 
 	/// Try to unwrap to a char.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn c(self) -> Result<jchar> {
 		match self {
 			Self::Char(b) => Ok(b),
@@ -137,6 +152,10 @@ impl<'obj_ref> JValue<'obj_ref> {
 	}
 
 	/// Try to unwrap to a double.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn d(self) -> Result<jdouble> {
 		match self {
 			Self::Double(b) => Ok(b),
@@ -145,6 +164,10 @@ impl<'obj_ref> JValue<'obj_ref> {
 	}
 
 	/// Try to unwrap to a float.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn f(self) -> Result<jfloat> {
 		match self {
 			Self::Float(b) => Ok(b),
@@ -153,6 +176,10 @@ impl<'obj_ref> JValue<'obj_ref> {
 	}
 
 	/// Try to unwrap to an int.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn i(self) -> Result<jint> {
 		match self {
 			Self::Int(b) => Ok(b),
@@ -175,6 +202,10 @@ impl<'obj_ref> JValue<'obj_ref> {
 	}
 
 	/// Try to unwrap to a long.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn j(self) -> Result<jlong> {
 		match self {
 			Self::Long(b) => Ok(b),
@@ -183,6 +214,10 @@ impl<'obj_ref> JValue<'obj_ref> {
 	}
 
 	/// Try to unwrap to a short.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn s(self) -> Result<jshort> {
 		match self {
 			Self::Short(b) => Ok(b),
@@ -191,6 +226,10 @@ impl<'obj_ref> JValue<'obj_ref> {
 	}
 
 	/// Try to unwrap to a void.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn v(self) -> Result<()> {
 		match self {
 			Self::Void => Ok(()),

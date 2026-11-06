@@ -155,6 +155,7 @@ where
 		// would cause undefined behavior.
 		let self_md = ManuallyDrop::new(self);
 
+		// SAFETY: ManuallyDrop prevents a second drop, and the consumed wrapper is not accessed after moving out its object.
 		unsafe {
 			// Move `obj` out of `self` and return it.
 			//
@@ -290,10 +291,12 @@ where
 	}
 
 	unsafe fn kind_from_raw<'env>(local_ref: jobject) -> Self::Kind<'env> {
+		// SAFETY: The caller guarantees the local reference type and lifetime required by the delegated constructor.
 		unsafe { T::kind_from_raw(local_ref) }
 	}
 
 	unsafe fn global_kind_from_raw(global_ref: jobject) -> Self::GlobalKind {
+		// SAFETY: The caller guarantees the global reference type required by the delegated constructor.
 		unsafe { T::global_kind_from_raw(global_ref) }
 	}
 }

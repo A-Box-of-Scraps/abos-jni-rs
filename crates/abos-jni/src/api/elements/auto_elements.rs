@@ -49,6 +49,7 @@ where
 	/// `len` must be the correct length (number of elements) of the given `array`
 	unsafe fn new_with_len(env: &Env<'_>, array: TArrayRef, len: usize, mode: ReleaseMode) -> Result<Self> {
 		let mut is_copy: jboolean = true;
+		// SAFETY: The typed array has element type T; is_copy is valid writable storage and the guard retains the array.
 		let ptr = unsafe { T::get_elements(env, array.as_ref().as_raw(), &mut is_copy) }?;
 		Ok(AutoElements {
 			array,
@@ -62,6 +63,7 @@ where
 
 	pub(crate) fn new(env: &Env<'_>, array: TArrayRef, mode: ReleaseMode) -> Result<Self> {
 		let len = array.as_ref().len(env)?;
+		// SAFETY: The length was obtained from the same typed array retained by the returned guard.
 		unsafe { Self::new_with_len(env, array, len, mode) }
 	}
 
@@ -71,7 +73,12 @@ where
 	}
 
 	/// Commits the changes to the array, if it is a copy
+	///
+	/// # Errors
+	///
+	/// Returns an error if the JVM is unavailable or the array elements cannot be committed.
 	pub fn commit(&mut self) -> Result<()> {
+		// SAFETY: JNI_COMMIT is a valid release mode and keeps the acquired element storage available.
 		unsafe { self.release_array_elements(sys::JNI_COMMIT) }
 	}
 
@@ -89,6 +96,7 @@ where
 		//   we can call `JavaVM::singleton()` without an error.
 		// - Since `self` is associated with a local reference frame lifetime we know that the
 		//   thread is attached and so `with_top_local_frame()` can't return an error.
+		// SAFETY: The guard retains the array and its acquired pointer; the caller supplies a valid release mode.
 		JavaVM::singleton()?.with_top_local_frame(|env| unsafe {
 			T::release_elements(env, self.array.as_ref().as_raw(), self.ptr, mode)
 		})
@@ -165,6 +173,7 @@ where
 	type Target = [T];
 
 	fn deref(&self) -> &Self::Target {
+		// SAFETY: The guard keeps len initialized elements alive, and the borrow prevents mutation through this guard.
 		unsafe { std::slice::from_raw_parts(self.ptr.as_ptr(), self.len) }
 	}
 }
@@ -175,6 +184,7 @@ where
 	TArrayRef: AsRef<JPrimitiveArray<'array_local, T>> + Reference,
 {
 	fn deref_mut(&mut self) -> &mut Self::Target {
+		// SAFETY: The guard keeps len initialized elements alive, and the mutable borrow grants exclusive access.
 		unsafe { std::slice::from_raw_parts_mut(self.ptr.as_mut(), self.len) }
 	}
 }

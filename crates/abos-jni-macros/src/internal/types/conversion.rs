@@ -59,16 +59,16 @@ pub fn sig_type_to_rust_type_core(
 		},
 		SigType::Object(class_name) => {
 			// Check if there's a type mapping for this Java class
-			if let Some(rust_type) = type_mappings.map_java_class_to_rust_type(class_name) {
-				// Parse the rust path and generate the type
-				let path_str = rust_type.path();
-				let path: syn::Path =
-					syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
-				quote! { #path<#lifetime> }
-			} else {
-				// Use JObject for unmapped class types
-				quote! { #jni::objects::JObject<#lifetime> }
-			}
+			type_mappings.map_java_class_to_rust_type(class_name).map_or_else(
+				|| quote! { #jni::objects::JObject<#lifetime> },
+				|rust_type| {
+					// Parse the rust path and generate the type
+					let path_str = rust_type.path();
+					let path: syn::Path =
+						syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
+					quote! { #path<#lifetime> }
+				},
+			)
 		}
 		SigType::Array(element_type, dimensions) => {
 			// First, resolve the innermost array dimension (the actual array of elements)
@@ -76,59 +76,7 @@ pub fn sig_type_to_rust_type_core(
 			// - JPrimitiveArray<prim_type> for primitive arrays
 			// - JObjectArray<RustType> for arrays of mapped types
 			// - JObjectArray (defaulting to JObjectArray<JObject>) for unmapped object arrays
-			let innermost_array = match &**element_type {
-				SigType::Alias(alias) => {
-					match type_mappings.map_alias(alias) {
-						Some(ConcreteType::Primitive { primitive, .. }) => {
-							let prim_ident = match primitive {
-								PrimitiveType::Void => {
-									// This should be unreachable since void array elements are rejected during parsing
-									unreachable!("void cannot be used as an array element type")
-								}
-								PrimitiveType::Boolean => quote! { jboolean },
-								PrimitiveType::Byte => quote! { jbyte },
-								PrimitiveType::Char => quote! { jchar },
-								PrimitiveType::Short => quote! { jshort },
-								PrimitiveType::Int => quote! { jint },
-								PrimitiveType::Long => quote! { jlong },
-								PrimitiveType::Float => quote! { jfloat },
-								PrimitiveType::Double => quote! { jdouble },
-							};
-							quote! { #jni::objects::JPrimitiveArray<#lifetime, #jni::sys::#prim_ident> }
-						}
-						Some(ConcreteType::Object {
-							reference_type: rust_type,
-							..
-						}) => {
-							let path_str = rust_type.path();
-							let path: syn::Path = syn::parse_str(path_str)
-								.unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
-							quote! { #jni::objects::JObjectArray<#lifetime, #path<#lifetime>> }
-						}
-						None => {
-							// Should have been validated while parsing
-							unreachable!("Unknown type: {}", alias);
-						}
-					}
-				}
-				SigType::Object(class_name) => {
-					// Check for type mapping for array element type
-					if let Some(rust_type) = type_mappings.map_java_class_to_rust_type(class_name) {
-						let path_str = rust_type.path();
-						let path: syn::Path =
-							syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
-						quote! { #jni::objects::JObjectArray<#lifetime, #path<#lifetime>> }
-					} else {
-						// Object array with unmapped type
-						quote! { #jni::objects::JObjectArray<#lifetime> }
-					}
-				}
-				SigType::Array(_inner_element_type, _dimensions) => {
-					// An array of arrays should be represented via `Array(_, dimensions > 1)`, not by nesting
-					// ArgType::Array as the element type.
-					unreachable!("Multi-dimensional arrays should not be represented by nesting ArgType::Array")
-				}
-			};
+			let innermost_array = array_element_type(element_type, lifetime, type_mappings, jni);
 
 			// Now wrap with JObjectArray for each additional dimension beyond the first
 			let mut result = innermost_array;
@@ -136,6 +84,57 @@ pub fn sig_type_to_rust_type_core(
 				result = quote! { #jni::objects::JObjectArray<#lifetime, #result> };
 			}
 			result
+		}
+	}
+}
+
+fn array_element_type(
+	element_type: &SigType,
+	lifetime: &TokenStream,
+	type_mappings: &TypeMappings,
+	jni: &syn::Path,
+) -> TokenStream {
+	match element_type {
+		SigType::Alias(alias) => {
+			match type_mappings.map_alias(alias) {
+				Some(ConcreteType::Primitive { primitive, .. }) => {
+					if primitive == PrimitiveType::Void {
+						unreachable!("void cannot be used as an array element type");
+					}
+					let prim_ident = quote::format_ident!("j{}", primitive.jni_name().to_lowercase());
+					quote! { #jni::objects::JPrimitiveArray<#lifetime, #jni::sys::#prim_ident> }
+				}
+				Some(ConcreteType::Object {
+					reference_type: rust_type,
+					..
+				}) => {
+					let path_str = rust_type.path();
+					let path: syn::Path =
+						syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
+					quote! { #jni::objects::JObjectArray<#lifetime, #path<#lifetime>> }
+				}
+				None => {
+					// Should have been validated while parsing
+					unreachable!("Unknown type: {}", alias);
+				}
+			}
+		}
+		SigType::Object(class_name) => {
+			// Check for type mapping for array element type
+			type_mappings.map_java_class_to_rust_type(class_name).map_or_else(
+				|| quote! { #jni::objects::JObjectArray<#lifetime> },
+				|rust_type| {
+					let path_str = rust_type.path();
+					let path: syn::Path =
+						syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
+					quote! { #jni::objects::JObjectArray<#lifetime, #path<#lifetime>> }
+				},
+			)
+		}
+		SigType::Array(_inner_element_type, _dimensions) => {
+			// An array of arrays should be represented via `Array(_, dimensions > 1)`, not by nesting
+			// ArgType::Array as the element type.
+			unreachable!("Multi-dimensional arrays should not be represented by nesting ArgType::Array")
 		}
 	}
 }

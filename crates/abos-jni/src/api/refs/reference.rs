@@ -342,6 +342,10 @@ pub unsafe trait Reference: Sized {
 	/// Note that it's recommended to allow the slow path to race, without
 	/// locking to avoid any risk of deadlocks, for example through class
 	/// initialization re-entry.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class cannot be loaded or its global reference cannot be created.
 	fn lookup_class<'caller>(
 		env: &Env<'_>,
 		loader_context: &LoaderContext,
@@ -378,6 +382,7 @@ pub unsafe trait Reference: Sized {
 	/// (this is a `Safety` requirement of the `Reference` trait).
 	///
 	unsafe fn kind_from_raw<'env>(reference: jobject) -> Self::Kind<'env> {
+		// SAFETY: TransparentReference guarantees jobject layout; the caller supplies a valid reference for the requested lifetime.
 		unsafe { std::mem::transmute_copy(&reference) }
 	}
 
@@ -400,6 +405,7 @@ pub unsafe trait Reference: Sized {
 	/// reference (this is a `Safety` requirement of the `Reference` trait).
 	///
 	unsafe fn global_kind_from_raw(global_ref: jobject) -> Self::GlobalKind {
+		// SAFETY: TransparentReference guarantees jobject layout; the caller supplies a valid global reference.
 		unsafe { std::mem::transmute_copy(&global_ref) }
 	}
 }
@@ -446,10 +452,12 @@ where
 	}
 
 	unsafe fn kind_from_raw<'env>(local_ref: jobject) -> Self::Kind<'env> {
+		// SAFETY: The caller guarantees the local reference type and lifetime required by the delegated constructor.
 		unsafe { T::kind_from_raw(local_ref) }
 	}
 
 	unsafe fn global_kind_from_raw(global_ref: jobject) -> Self::GlobalKind {
+		// SAFETY: The caller guarantees the global reference type required by the delegated constructor.
 		unsafe { T::global_kind_from_raw(global_ref) }
 	}
 }

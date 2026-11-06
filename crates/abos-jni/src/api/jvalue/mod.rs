@@ -24,7 +24,10 @@ use crate::api::env::Env;
 /// See also [`JValue`], which is used for Java method call parameters. It is
 /// different from this type in that it *borrows* an object reference instead
 /// of owning one.
-#[allow(missing_docs)]
+#[allow(
+	missing_docs,
+	reason = "Each variant names the JNI value type stored in its payload."
+)]
 #[derive(Debug)]
 pub enum JValueOwned<'local> {
 	Object(JObject<'local>),
@@ -48,7 +51,10 @@ pub enum JValueOwned<'local> {
 /// See also [`JValueOwned`], which is used for Java method return values. It is
 /// different from this type in that it *owns* an object reference instead
 /// of borrowing one.
-#[allow(missing_docs)]
+#[allow(
+	missing_docs,
+	reason = "Each variant names the JNI value type stored in its payload."
+)]
 #[derive(Clone, Copy, Debug)]
 pub enum JValue<'obj_ref> {
 	Object(&'obj_ref JObject<'obj_ref>),

@@ -22,6 +22,10 @@ use crate::JavaVM;
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum JvmError {
+	/// The number of initialization options does not fit a JNI integer.
+	#[error("too many JVM options: {0}")]
+	TooManyOptions(usize),
+
 	/// [`InitArgsBuilder::option`] or [`InitArgsBuilder::try_option`] was used, but the supplied
 	/// string contains a U+0000 code point (except at the end).
 	///
@@ -80,10 +84,11 @@ impl JvmError {
 	/// Returns the JVM option that caused the error, if it was caused by one.
 	pub fn opt_string(&self) -> Option<&str> {
 		match self {
-			Self::NullOptString(opt_string) => Some(opt_string),
-			Self::OptStringTooLong { opt_string, .. } => Some(opt_string),
-			Self::OptStringNotRepresentable { opt_string, .. } => Some(opt_string),
-			Self::OptStringTranscodeFailure { opt_string, .. } => Some(opt_string),
+			Self::TooManyOptions(_) => None,
+			Self::NullOptString(opt_string)
+			| Self::OptStringTooLong { opt_string, .. }
+			| Self::OptStringNotRepresentable { opt_string, .. }
+			| Self::OptStringTranscodeFailure { opt_string, .. } => Some(opt_string),
 		}
 		.map(String::as_str)
 	}
@@ -91,10 +96,11 @@ impl JvmError {
 	#[cfg(all(test, windows))]
 	fn opt_string_mut(&mut self) -> Option<&mut String> {
 		match self {
-			Self::NullOptString(opt_string) => Some(opt_string),
-			Self::OptStringTooLong { opt_string, .. } => Some(opt_string),
-			Self::OptStringNotRepresentable { opt_string, .. } => Some(opt_string),
-			Self::OptStringTranscodeFailure { opt_string, .. } => Some(opt_string),
+			Self::TooManyOptions(_) => None,
+			Self::NullOptString(opt_string)
+			| Self::OptStringTooLong { opt_string, .. }
+			| Self::OptStringNotRepresentable { opt_string, .. }
+			| Self::OptStringTranscodeFailure { opt_string, .. } => Some(opt_string),
 		}
 	}
 }
@@ -106,7 +112,7 @@ const SPECIAL_OPTIONS_C: &[&CStr] = &[c"vfprintf", c"abort", c"exit"];
 /// Builder for `JavaVM` `InitArgs`.
 ///
 /// *This API requires "invocation" feature to be enabled,
-/// see ["Launching JVM from Rust"](struct.JavaVM.html#launching-jvm-from-rust).*
+/// see [Launching JVM from Rust](struct.JavaVM.html#launching-jvm-from-rust).*
 #[derive(Debug)]
 pub struct InitArgsBuilder<'a> {
 	opts: Result<Vec<Cow<'a, CStr>>, JvmError>,
@@ -128,7 +134,7 @@ impl<'a> InitArgsBuilder<'a> {
 	/// Create a new default `InitArgsBuilder`
 	#[must_use]
 	pub fn new() -> Self {
-		Default::default()
+		InitArgsBuilder::default()
 	}
 
 	/// Adds a JVM option, such as `-Djavax.net.debug=all`.
@@ -157,6 +163,7 @@ impl<'a> InitArgsBuilder<'a> {
 	/// [`InitArgsBuilder::build`] instead.
 	///
 	/// [jni-options]: https://docs.oracle.com/en/java/javase/11/docs/specs/jni/invocation.html#jni_createjavavm
+	#[must_use]
 	pub fn option(mut self, opt_string: impl AsRef<str> + Into<Cow<'a, str>>) -> Self {
 		if let Err(error) = self.try_option(opt_string) {
 			self.opts = Err(error);
@@ -200,10 +207,7 @@ impl<'a> InitArgsBuilder<'a> {
 		let opt_string = opt_string.into();
 
 		// If there is already a deferred error, do nothing.
-		let opts = match &mut self.opts {
-			Ok(ok) => ok,
-			Err(_) => return Ok(()),
-		};
+		let Ok(opts) = &mut self.opts else { return Ok(()) };
 
 		// If the option is the empty string, then skip everything else and pass a constant empty
 		// C string. This isn't just an optimization; Win32 `WideCharToMultiByte` will **fail** if
@@ -253,14 +257,12 @@ impl<'a> InitArgsBuilder<'a> {
 	/// This method does not fail, and will neither return nor defer an error.
 	///
 	/// [jni-options]: https://docs.oracle.com/en/java/javase/11/docs/specs/jni/invocation.html#jni_createjavavm
+	#[must_use]
 	pub fn option_encoded(mut self, opt_string: impl Into<Cow<'a, CStr>>) -> Self {
 		let opt_string = opt_string.into();
 
 		// If there is already a deferred error, do nothing.
-		let opts = match &mut self.opts {
-			Ok(ok) => ok,
-			Err(_) => return self,
-		};
+		let Ok(opts) = &mut self.opts else { return self };
 
 		// If this is one of the special options, do nothing.
 		if SPECIAL_OPTIONS_C.contains(&&*opt_string) {
@@ -302,9 +304,10 @@ impl<'a> InitArgsBuilder<'a> {
 	/// # Errors
 	///
 	/// If a call to [`InitArgsBuilder::option`] caused a deferred error, it is returned from this
-	/// method.
+	/// method. Also returns [`JvmError::TooManyOptions`] if the option count does not fit JNI.
 	pub fn build(self) -> Result<InitArgs<'a>, JvmError> {
 		let opt_strings = self.opts?;
+		let option_count = checked_option_count(opt_strings.len())?;
 
 		let opts: Vec<JavaVMOption> = opt_strings
 			.iter()
@@ -319,7 +322,7 @@ impl<'a> InitArgsBuilder<'a> {
 				version: self.version.into(),
 				ignoreUnrecognized: self.ignore_unrecognized as _,
 				options: opts.as_ptr().cast_mut(),
-				nOptions: opts.len() as _,
+				nOptions: option_count,
 			},
 			_opts: opts,
 			_opt_strings: opt_strings,
@@ -330,6 +333,10 @@ impl<'a> InitArgsBuilder<'a> {
 	///
 	/// If a call to [`InitArgsBuilder::option`] caused a deferred error, then this method returns
 	/// a reference to that error.
+	///
+	/// # Errors
+	///
+	/// Returns the deferred error from an earlier attempt to add an invalid JVM option.
 	pub fn options(&self) -> Result<&[Cow<'a, CStr>], &JvmError> {
 		self.opts.as_ref().map(Vec::as_slice)
 	}
@@ -338,7 +345,7 @@ impl<'a> InitArgsBuilder<'a> {
 /// `JavaVM` `InitArgs`.
 ///
 /// *This API requires "invocation" feature to be enabled,
-/// see ["Launching JVM from Rust"](struct.JavaVM.html#launching-jvm-from-rust).*
+/// see [Launching JVM from Rust](struct.JavaVM.html#launching-jvm-from-rust).*
 #[derive(Debug)]
 pub struct InitArgs<'a> {
 	inner: JavaVMInitArgs,
@@ -353,8 +360,35 @@ pub struct InitArgs<'a> {
 }
 
 impl InitArgs<'_> {
-	#[allow(dead_code)]
+	#[allow(
+		dead_code,
+		reason = "The pointer is used only when the host JVM invocation feature is enabled."
+	)]
 	pub(crate) const fn inner_ptr(&self) -> *mut c_void {
 		&raw const self.inner as _
+	}
+}
+
+fn checked_option_count(count: usize) -> Result<i32, JvmError> {
+	i32::try_from(count).map_err(|_| JvmError::TooManyOptions(count))
+}
+
+#[cfg(test)]
+mod tests {
+	use super::{JvmError, checked_option_count};
+
+	#[test]
+	fn option_count_respects_jni_integer_range() {
+		let limit = usize::try_from(i32::MAX).expect("JNI integer limit fits usize");
+		assert_eq!(checked_option_count(0).expect("zero options fit"), 0);
+		assert_eq!(
+			checked_option_count(limit).expect("maximum option count fits"),
+			i32::MAX
+		);
+		for count in [limit + 1, usize::MAX] {
+			let error = checked_option_count(count).expect_err("oversized option count is rejected");
+			assert!(matches!(error, JvmError::TooManyOptions(actual) if actual == count));
+			assert!(error.opt_string().is_none());
+		}
 	}
 }

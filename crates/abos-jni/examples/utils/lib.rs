@@ -1,5 +1,8 @@
 #![cfg(feature = "invocation")]
-#![allow(dead_code)]
+#![allow(
+	dead_code,
+	reason = "Shared test and example helpers are used by different subsets of binaries."
+)]
 
 use std::path::{Path, PathBuf};
 use std::sync::Once;
@@ -28,35 +31,30 @@ where
 }
 
 fn setup_javac_output_dir() -> PathBuf {
-	let build_dir = if let Some(dir) = option_env!("JAVA_BUILD_DIR") {
-		PathBuf::from(dir)
-	} else {
-		let target_dir = if let Some(target_dir) = option_env!("CARGO_TARGET_DIR") {
-			PathBuf::from(target_dir)
-		} else if let Some(out_dir) = option_env!("OUT_DIR") {
-			// OUT_DIR is something like .../target/debug/build/jni-macros-xxxx/out
-			let mut path = PathBuf::from(out_dir);
-			while path.file_name().is_some() {
-				if path.file_name().expect("build output path has a final component") == "target" {
-					break;
-				}
-				path.pop();
-			}
-			let cachedir_tag = path.join("CACHEDIR.TAG");
-			assert!(
-				Path::exists(&cachedir_tag),
-				"Couldn't find 'target' directory from OUT_DIR"
-			);
-			path
-		} else {
-			PathBuf::from("target")
-		};
-		target_dir.join("examples-java-classes")
-	};
+	let build_dir =
+		option_env!("JAVA_BUILD_DIR").map_or_else(|| java_target_dir().join("examples-java-classes"), PathBuf::from);
 
 	std::fs::create_dir_all(&build_dir).unwrap_or_else(|e| panic!("Failed to create javac output directory: {e}"));
 
 	build_dir
+}
+
+fn java_target_dir() -> PathBuf {
+	if let Some(target) = option_env!("CARGO_TARGET_DIR") {
+		return PathBuf::from(target);
+	}
+	let Some(output) = option_env!("OUT_DIR") else {
+		return PathBuf::from("target");
+	};
+	let mut path = PathBuf::from(output);
+	while path.file_name().is_some_and(|name| name != "target") {
+		path.pop();
+	}
+	assert!(
+		Path::exists(&path.join("CACHEDIR.TAG")),
+		"Couldn't find 'target' directory from OUT_DIR"
+	);
+	path
 }
 
 fn jni_macros_dir() -> PathBuf {
@@ -121,6 +119,7 @@ macro_rules! define_stub_type {
 				value.0
 			}
 		}
+		// SAFETY: The wrapper preserves JObject reference identity and delegates construction to its local/global constructors.
 		unsafe impl Reference for $rust_type<'_> {
 			type Kind<'local> = $rust_type<'local>;
 			type GlobalKind = $rust_type<'static>;
@@ -147,7 +146,7 @@ macro_rules! define_stub_type {
 						let class: abos_jni::objects::JClass =
 							loader_context.load_class_for_type::<Self>(env, false)?;
 						let global_class = env.new_global_ref(&class)?;
-						let _ = CLASS.set(global_class);
+						drop(CLASS.set(global_class));
 						Ok(CLASS.get().unwrap())
 					})?
 				};
@@ -156,15 +155,20 @@ macro_rules! define_stub_type {
 			}
 
 			unsafe fn kind_from_raw<'env>(reference: jni2::sys::jobject) -> Self::Kind<'env> {
+				// SAFETY: The caller supplies a valid local reference of the declared Java type and lifetime.
 				unsafe { $rust_type(JObject::kind_from_raw(reference)) }
 			}
 
 			unsafe fn global_kind_from_raw(global_ref: jni2::sys::jobject) -> Self::GlobalKind {
+				// SAFETY: The caller supplies a valid global reference of the declared Java type.
 				unsafe { $rust_type(JObject::global_kind_from_raw(global_ref)) }
 			}
 		}
 		impl<'local> $rust_type<'local> {
-			#[allow(dead_code)]
+			#[allow(
+				dead_code,
+				reason = "Shared test and example helpers are used by different subsets of binaries."
+			)]
 			pub fn new(env: &mut Env<'local>) -> jni2::errors::Result<Self> {
 				let class = Self::lookup_class(env, &jni2::refs::LoaderContext::default())?;
 				let class: &JClass = class.as_ref();

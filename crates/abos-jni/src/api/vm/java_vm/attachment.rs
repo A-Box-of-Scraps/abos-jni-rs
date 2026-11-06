@@ -46,6 +46,10 @@ impl JavaVM {
 	///
 	/// See [Env] documentation for rules on limiting yourself to one [Env] reference per-scope to
 	/// avoid exposing code to runtime checks for the top JNI frame that can panic.
+	///
+	/// # Errors
+	///
+	/// Returns an error if attachment or local-frame setup fails, the callback returns an error, or the configured exception policy catches a Java exception.
 	pub fn attach_current_thread<F, T, E>(&self, callback: F) -> std::result::Result<T, E>
 	where
 		F: FnOnce(&mut Env) -> std::result::Result<T, E>,
@@ -86,6 +90,10 @@ impl JavaVM {
 	///
 	/// See [Env] documentation for rules on limiting yourself to one [Env] reference per-scope to
 	/// avoid exposing code to runtime checks for the top JNI frame that can panic.
+	///
+	/// # Errors
+	///
+	/// Returns an error if attachment or local-frame setup fails, the callback returns an error, or the configured exception policy catches a Java exception.
 	pub fn attach_current_thread_for_scope<F, T, E>(&self, callback: F) -> std::result::Result<T, E>
 	where
 		F: FnOnce(&mut Env) -> std::result::Result<T, E>,
@@ -135,6 +143,10 @@ impl JavaVM {
 	///
 	/// See [Env] documentation for rules on limiting yourself to one [Env] reference per-scope to
 	/// avoid exposing code to runtime checks for the top JNI frame that can panic.
+	///
+	/// # Errors
+	///
+	/// Returns an error if attachment or local-frame setup fails, the callback returns an error, or the configured exception policy catches a Java exception.
 	pub fn attach_current_thread_with_config<'config, F, C, T, E>(
 		&self,
 		config: C,
@@ -166,14 +178,9 @@ impl JavaVM {
 				}
 				None
 			}
-			AttachmentExceptionPolicy::PreReThrowPostCatch => {
-				if let Some(e) = env.exception_occurred() {
-					env.exception_clear();
-					Some(e)
-				} else {
-					None
-				}
-			}
+			AttachmentExceptionPolicy::PreReThrowPostCatch => env.exception_occurred().inspect(|_| {
+				env.exception_clear();
+			}),
 		};
 
 		let ret = if let Some(capacity) = capacity {
@@ -266,6 +273,10 @@ impl JavaVM {
 	/// This can be achieved by hiding the scope and guard from safe code, only exposing a temporary [`Env`]
 	/// reference (as in the example above).
 	///
+	///
+	/// # Errors
+	///
+	/// Returns an error if the thread cannot be attached or its JNI environment cannot be obtained.
 	pub unsafe fn attach_current_thread_guard<'config, 'scope, F>(
 		&self,
 		config: F,
@@ -344,6 +355,10 @@ impl JavaVM {
 	/// If there is a need to detach a thread before it terminates, then it's possible that a scoped
 	/// attachment via [`JavaVM::attach_current_thread_for_scope`] could be used so that the
 	/// detachment would happen automatically.
+	///
+	/// # Errors
+	///
+	/// Returns an error if active attachment guards prevent detachment or JNI detachment fails.
 	pub fn detach_current_thread(&self) -> Result<()> {
 		if THREAD_GUARD_NEST_LEVEL.get() != 0 {
 			return Err(Error::ThreadAttachmentGuarded);

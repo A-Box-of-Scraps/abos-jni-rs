@@ -16,6 +16,10 @@ use rusty_fork::rusty_fork_test;
 // Native method implementations
 // ====================================================================================
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn native_add_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: abos_jni::objects::JObject<'local>,
@@ -25,6 +29,14 @@ const fn native_add_impl<'local>(
 	Ok(a + b)
 }
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
+#[expect(
+	clippy::needless_pass_by_value,
+	reason = "The native-method wrapper requires JNI reference arguments by value."
+)]
 fn native_log_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: abos_jni::objects::JObject<'local>,
@@ -40,6 +52,7 @@ fn native_array_add_impl<'local>(
 	arr: JPrimitiveArray<'local, jint>,
 	value: jint,
 ) -> Result<JPrimitiveArray<'local, jint>, abos_jni::errors::Error> {
+	// SAFETY: The fixture does not access these arrays concurrently, and element guards drop before returning to Java.
 	unsafe {
 		let mut elem = arr.get_elements(env, abos_jni::elements::ReleaseMode::CopyBack)?;
 		for i in 0..elem.len() {
@@ -55,6 +68,7 @@ fn native_2d_array_invert_impl<'local>(
 	_class: JClass<'local>,
 	arr: JObjectArray<'local, JPrimitiveArray<'local, jboolean>>,
 ) -> Result<JObjectArray<'local, JPrimitiveArray<'local, jboolean>>, abos_jni::errors::Error> {
+	// SAFETY: The fixture does not access these arrays concurrently, and element guards drop before returning to Java.
 	unsafe {
 		for i in 0..arr.len(env)? {
 			let row = arr.get_element(env, i)?.auto();
@@ -94,6 +108,10 @@ fn native_get_message_impl<'local>(
 	Ok(result)
 }
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn native_get_version_impl<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
@@ -101,6 +119,10 @@ const fn native_get_version_impl<'local>(
 	Ok(100)
 }
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn native_string_array_echo_impl<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
@@ -109,6 +131,10 @@ const fn native_string_array_echo_impl<'local>(
 	Ok(arr)
 }
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn native_2d_string_array_echo_impl<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
@@ -131,10 +157,11 @@ native_method_test! {
 		},
 	],
 	test_body: |env, class| {
-		let obj = new_object!(env, class)?;
-
 		// Call via Java wrapper method
 		use abos_jni::{jni_sig, jni_str};
+
+		let obj = new_object!(env, class)?;
+
 		let result = env.call_method(
 			&obj,
 			jni_str!("callNativeAdd"),
@@ -169,11 +196,12 @@ native_method_test! {
 		},
 	],
 	test_body: |env, class| {
+		use abos_jni::{jni_sig, jni_str};
+
 		let obj = new_object!(env, class)?;
 
 		let message = JString::from_str(env, "test log message")?;
 
-		use abos_jni::{jni_sig, jni_str};
 		env.call_method(
 			&obj,
 			jni_str!("nativeLog"),
@@ -199,13 +227,14 @@ native_method_test! {
 		},
 	],
 	test_body: |env, class| {
+		use abos_jni::{jni_sig, jni_str};
+
 		let obj = new_object!(env, class)?;
 
 		let arr = env.new_int_array(5)?;
 		let data = [1, 2, 3, 4, 5];
 		arr.set_region(env, 0, &data)?;
 
-		use abos_jni::{jni_sig, jni_str};
 		let result = env.call_method(
 			&obj,
 			jni_str!("nativeArrayAdd"),
@@ -237,6 +266,9 @@ native_method_test! {
 		},
 	],
 	test_body: |env, class| {
+		// Invert the array
+		use abos_jni::{jni_sig, jni_str};
+
 		// Create a 2D boolean array [[true, false], [false, true]]
 		let inner1 = env.new_boolean_array(2)?;
 		inner1.set_region(env, 0, &[true, false])?;
@@ -246,8 +278,6 @@ native_method_test! {
 		let outer = JObjectArray::<JBooleanArray>::new(env, 2, inner1)?;
 		outer.set_element(env, 1, inner2)?;
 
-		// Invert the array
-		use abos_jni::{jni_sig, jni_str};
 		let result = env.call_static_method(
 			class,
 			jni_str!("native2DArrayInvert"),
@@ -290,10 +320,11 @@ native_method_test! {
 		},
 	],
 	test_body: |env, class| {
-		let obj = new_object!(env, class)?;
-
 		// Test native method can call Java setter (via method call)
 		use abos_jni::{jni_sig, jni_str};
+
+		let obj = new_object!(env, class)?;
+
 		env.call_method(
 			&obj,
 			jni_str!("nativeSetCounter"),
@@ -360,13 +391,14 @@ native_method_test! {
 		},
 	],
 	test_body: |env, class| {
+		use abos_jni::{jni_sig, jni_str};
+
 		let str1 = JString::from_str(env, "hello")?;
 		let str2 = JString::from_str(env, "world")?;
 
 		let arr = JObjectArray::<JString>::new(env, 2, &str1)?;
 		arr.set_element(env, 1, &str2)?;
 
-		use abos_jni::{jni_sig, jni_str};
 		let result = env.call_static_method(
 			class,
 			jni_str!("nativeStringArrayEcho"),
@@ -400,6 +432,9 @@ native_method_test! {
 		},
 	],
 	test_body: |env, class| {
+		// Call native method
+		use abos_jni::{jni_sig, jni_str};
+
 		let str1 = JString::from_str(env, "foo")?;
 		let str2 = JString::from_str(env, "bar")?;
 		let str3 = JString::from_str(env, "baz")?;
@@ -414,8 +449,6 @@ native_method_test! {
 		let arr = JObjectArray::<JObjectArray<JString>>::new(env, 2, &row1)?;
 		arr.set_element(env, 1, &row2)?;
 
-		// Call native method
-		use abos_jni::{jni_sig, jni_str};
 		let result = env.call_static_method(
 			class,
 			jni_str!("native2DStringArrayEcho"),

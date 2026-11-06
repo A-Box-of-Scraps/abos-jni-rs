@@ -79,7 +79,7 @@ fn test_static_primitive_fields() {
 		assert_eq!(int_val, 42);
 
 		let long_val = TestFields::static_long_field(env)?;
-		assert_eq!(long_val, 9876543210);
+		assert_eq!(long_val, 9_876_543_210);
 
 		let bool_val = TestFields::static_boolean_field(env)?;
 		assert!(bool_val);
@@ -173,10 +173,7 @@ fn test_instance_primitive_fields() {
 
 		// First, check attempts to get/set instances fields with a null reference
 
-		let res = TestFields::null().int_field(env);
-		assert!(matches!(res, Err(abos_jni::errors::Error::NullPtr(_))));
-		let res = TestFields::null().set_int_field(env, 0);
-		assert!(matches!(res, Err(abos_jni::errors::Error::NullPtr(_))));
+		assert_null_field_errors(env);
 
 		let obj = TestFields::new(env)?;
 
@@ -211,17 +208,7 @@ fn test_instance_primitive_fields() {
 		let short_val = obj.short_field(env)?;
 		assert_eq!(short_val, 300);
 
-		let float_val = obj.float_field(env)?;
-		assert!((float_val - 1.5).abs() < 0.01);
-		obj.set_float_field(env, 3.5)?;
-		let float_val = obj.float_field(env)?;
-		assert!((float_val - 3.5).abs() < 0.01);
-
-		let double_val = obj.double_field(env)?;
-		assert!((double_val - 2.5).abs() < 0.01);
-		obj.set_double_field(env, 4.5)?;
-		let double_val = obj.double_field(env)?;
-		assert!((double_val - 4.5).abs() < 0.01);
+		check_floating_fields(env, &obj)?;
 
 		let char_val = obj.char_field(env)?;
 		assert_eq!(char_val, 'A' as u16);
@@ -359,8 +346,7 @@ fn load_test_fields_class(env: &mut Env, out_dir: &Path) -> abos_jni::errors::Re
 	let class_loader =
 		abos_jni::objects::JClassLoader::get_system_class_loader(env).expect("Failed to get system class loader");
 
-	env.define_class(Some(jni_str!("com/example/TestFields")), &class_loader, &class_bytes)
-		.expect("Failed to define TestFields class");
+	env.define_class(Some(jni_str!("com/example/TestFields")), &class_loader, &class_bytes)?;
 
 	Ok(())
 }
@@ -372,7 +358,11 @@ fn setup_test_output(test_name: &str) -> PathBuf {
 		.join(test_name);
 
 	// Clean up any existing output
-	let _ = fs::remove_dir_all(&out_dir);
+	match fs::remove_dir_all(&out_dir) {
+		Ok(()) => {}
+		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+		Err(error) => panic!("Failed to remove previous test output: {error}"),
+	}
 	fs::create_dir_all(&out_dir).expect("Failed to create test output directory");
 
 	out_dir
@@ -456,4 +446,27 @@ fn test_non_null_field_validation() {
 	})
 	.expect("Non-null field validation test failed");
 }
+}
+
+fn check_floating_fields(env: &abos_jni::Env, obj: &TestFields) -> abos_jni::errors::Result<()> {
+	let float_val = obj.float_field(env)?;
+	assert!((float_val - 1.5).abs() < 0.01);
+	obj.set_float_field(env, 3.5)?;
+	let float_val = obj.float_field(env)?;
+	assert!((float_val - 3.5).abs() < 0.01);
+
+	let double_val = obj.double_field(env)?;
+	assert!((double_val - 2.5).abs() < 0.01);
+	obj.set_double_field(env, 4.5)?;
+	let double_val = obj.double_field(env)?;
+	assert!((double_val - 4.5).abs() < 0.01);
+
+	Ok(())
+}
+
+fn assert_null_field_errors(env: &abos_jni::Env) {
+	let res = TestFields::null().int_field(env);
+	assert!(matches!(res, Err(abos_jni::errors::Error::NullPtr(_))));
+	let res = TestFields::null().set_int_field(env, 0);
+	assert!(matches!(res, Err(abos_jni::errors::Error::NullPtr(_))));
 }

@@ -124,6 +124,7 @@ impl<'a> AttachConfig<'a> {
 
 	/// Sets the name of the thread as seen by the JVM and operating system.
 	#[deprecated(since = "0.22.2", note = "Use `thread_name` instead")]
+	#[must_use]
 	pub fn name<S: AsRef<str>>(mut self, name: S) -> Self {
 		self.deprecated_thread_name = Some(JNIString::from(name.as_ref()));
 		self

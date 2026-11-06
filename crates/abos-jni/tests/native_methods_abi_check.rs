@@ -37,6 +37,10 @@ native_method_test! {
 	}
 }
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn native_method_registered_as_static<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>, // Static registration expects JClass
@@ -66,6 +70,10 @@ native_method_test! {
 	}
 }
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn native_static_method_registered_as_instance<'local>(
 	_env: &mut Env<'local>,
 	_this: abos_jni::objects::JObject<'local>, // Instance registration expects JObject
@@ -107,6 +115,10 @@ native_method_test! {
 	}
 }
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn native_method_correct<'local>(
 	_env: &mut Env<'local>,
 	_this: abos_jni::objects::JObject<'local>,
@@ -115,6 +127,10 @@ const fn native_method_correct<'local>(
 	Ok(value * 2)
 }
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn native_static_method_correct<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
@@ -217,8 +233,9 @@ native_method_test! {
 
 		// We should never reach here
 		eprintln!("ERROR: Should have aborted!");
+		#[expect(clippy::exit, reason = "Terminate the subprocess fixture without introducing a second panic.")]
 		std::process::exit(1);
-		#[allow(unreachable_code)]
+		#[allow(unreachable_code, reason = "The test closure must type-check as returning Result even though this fixture exits.")]
 		Ok(())
 	}
 }

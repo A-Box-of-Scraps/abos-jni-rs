@@ -12,7 +12,7 @@ mod util;
 use util::{attach_current_thread, unwrap};
 
 #[test]
-pub fn jlist_push_and_iterate() {
+fn jlist_push_and_iterate() {
 	attach_current_thread(|env| {
 		let data = &[
 			jni_str!("hello"),
@@ -42,7 +42,7 @@ pub fn jlist_push_and_iterate() {
 
 		// Verify the list size
 		let size = unwrap(list.size(env), env);
-		assert_eq!(size, data.len() as jint);
+		assert_eq!(size, jint::try_from(data.len()).expect("test list length fits jint"));
 
 		// Collect the values using the JList iterator
 		let mut collected = Vec::new();
@@ -66,7 +66,7 @@ pub fn jlist_push_and_iterate() {
 }
 
 #[test]
-pub fn jlist_get_and_set() {
+fn jlist_get_and_set() {
 	attach_current_thread(|env| {
 		// Create a new ArrayList
 		let list_object = unwrap(
@@ -112,7 +112,7 @@ pub fn jlist_get_and_set() {
 }
 
 #[test]
-pub fn jlist_insert_and_remove() {
+fn jlist_insert_and_remove() {
 	attach_current_thread(|env| {
 		// Create a new ArrayList
 		let list_object = unwrap(
@@ -174,7 +174,7 @@ pub fn jlist_insert_and_remove() {
 }
 
 #[test]
-pub fn jlist_size_and_remove() {
+fn jlist_size_and_remove() {
 	attach_current_thread(|env| {
 		// Create a new ArrayList
 		let list_object = unwrap(
@@ -236,7 +236,7 @@ pub fn jlist_size_and_remove() {
 }
 
 #[test]
-pub fn jlist_iterator_empty() {
+fn jlist_iterator_empty() {
 	attach_current_thread(|env| {
 		// Create an empty ArrayList
 		let list_object = unwrap(
@@ -266,7 +266,7 @@ pub fn jlist_iterator_empty() {
 }
 
 #[test]
-pub fn jlist_iterator_with_auto() {
+fn jlist_iterator_with_auto() {
 	attach_current_thread(|env| {
 		let data = &[jni_str!("item1"), jni_str!("item2"), jni_str!("item3")];
 

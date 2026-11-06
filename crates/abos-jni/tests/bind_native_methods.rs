@@ -76,6 +76,7 @@ impl TestNativeMethodsNativeInterface for TestNativeMethodsAPI {
 		arr: JPrimitiveArray<'local, jint>,
 		value: jint,
 	) -> Result<JPrimitiveArray<'local, jint>, Self::Error> {
+		// SAFETY: The fixture does not access these arrays concurrently, and element guards drop before returning to Java.
 		unsafe {
 			let mut elem = arr.get_elements(env, abos_jni::elements::ReleaseMode::CopyBack)?;
 			for i in 0..elem.len() {
@@ -91,6 +92,7 @@ impl TestNativeMethodsNativeInterface for TestNativeMethodsAPI {
 		_class: JClass<'local>,
 		arr: JObjectArray<'local, JPrimitiveArray<'local, jboolean>>,
 	) -> Result<JObjectArray<'local, JPrimitiveArray<'local, jboolean>>, Self::Error> {
+		// SAFETY: The fixture does not access these arrays concurrently, and element guards drop before returning to Java.
 		unsafe {
 			for i in 0..arr.len(env)? {
 				let row = arr.get_element(env, i)?.auto();
@@ -335,15 +337,15 @@ native_method_test! {
 	java_class: "com/example/TestNativeMethods.java",
 	api: TestNativeMethodsAPI,
 	test_body: |env| {
-		let _obj = TestNativeMethods::new(env)?;
+		let obj = TestNativeMethods::new(env)?;
 
-		let result = _obj.native_invocation_test(env)?;
+		let result = obj.native_invocation_test(env)?;
 		assert_eq!(result, 42);
 
 		#[cfg(feature = "_cfg_test")]
 		{
 			// This should compile and run if _cfg_test feature is enabled
-			let result = _obj.native_cfg_test(env)?;
+			let result = obj.native_cfg_test(env)?;
 			assert_eq!(result, 123);
 		}
 		Ok(())

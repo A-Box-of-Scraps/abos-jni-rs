@@ -45,6 +45,10 @@ impl JIterator<'_> {
 	/// Alternatively, if the collection is known to have a small, predictable
 	/// size, the loop could be wrapped in [`Env::with_local_frame`] to delete
 	/// all of the local references at once.
+	///
+	/// # Errors
+	///
+	/// Propagates JNI failures from checking or advancing the iterator. See above for how iteration exceptions are handled.
 	pub fn next<'env_local>(&self, env: &mut Env<'env_local>) -> Result<Option<JObject<'env_local>>> {
 		match self._next(env) {
 			Ok(v) => Ok(Some(v)),

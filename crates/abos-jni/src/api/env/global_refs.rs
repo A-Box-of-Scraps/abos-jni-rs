@@ -9,6 +9,10 @@ impl Env<'_> {
 	///
 	/// If you use this API to try and upgrade a [`Weak`] then it may return
 	/// [`Error::ObjectFreed`] if the object has been garbage collected.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the JVM cannot allocate a global reference or a weak source reference has already been collected.
 	pub fn new_global_ref<'any_local, O>(&self, obj: O) -> Result<Global<O::GlobalKind>>
 	where
 		O: Reference + AsRef<JObject<'any_local>>,
@@ -91,7 +95,7 @@ impl Env<'_> {
 		To: Reference,
 	{
 		if obj.is_null() {
-			return Ok(Default::default());
+			return Ok(Global::default());
 		}
 
 		if self.is_instance_of_cast_type::<To>(obj.as_ref())? {
@@ -161,7 +165,7 @@ impl Env<'_> {
 		To: Reference,
 	{
 		if obj.is_null() {
-			return Ok(Default::default());
+			return Ok(Global::default());
 		}
 
 		if self.is_instance_of_cast_type::<To>(obj.as_ref())? {
@@ -189,6 +193,10 @@ impl Env<'_> {
 	///
 	/// Attempting to create a [`Weak`] for a `null` reference will return an
 	/// [`Error::ObjectFreed`] error.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the JVM cannot allocate a weak global reference or a weak source reference has already been collected.
 	pub fn new_weak_ref<O>(&self, obj: O) -> Result<Weak<O::GlobalKind>>
 	where
 		O: Reference,

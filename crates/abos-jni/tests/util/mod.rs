@@ -7,7 +7,10 @@ use abos_jni::{
 
 mod example_proxy;
 
-#[allow(unused_imports)]
+#[allow(
+	unused_imports,
+	reason = "Shared tests re-export helpers that are not used by every test binary."
+)]
 pub use example_proxy::AtomicIntegerProxy;
 
 pub fn jvm() -> &'static Arc<JavaVM> {
@@ -22,7 +25,10 @@ pub fn jvm() -> &'static Arc<JavaVM> {
 	})
 }
 
-#[allow(dead_code)]
+#[allow(
+	dead_code,
+	reason = "Shared test and example helpers are used by different subsets of binaries."
+)]
 pub fn call_java_abs(env: &mut Env, value: i32) -> i32 {
 	env.call_static_method(
 		jni_str!("java/lang/Math"),
@@ -35,7 +41,10 @@ pub fn call_java_abs(env: &mut Env, value: i32) -> i32 {
 	.expect("JNI result contains an int")
 }
 
-#[allow(dead_code)]
+#[allow(
+	dead_code,
+	reason = "Shared test and example helpers are used by different subsets of binaries."
+)]
 pub fn attach_current_thread<F, T>(callback: F) -> abos_jni::errors::Result<T>
 where
 	F: FnOnce(&mut Env) -> abos_jni::errors::Result<T>,
@@ -43,7 +52,10 @@ where
 	jvm().attach_current_thread(|env| callback(env))
 }
 
-#[allow(dead_code)]
+#[allow(
+	dead_code,
+	reason = "Shared test and example helpers are used by different subsets of binaries."
+)]
 pub fn attach_current_thread_for_scope<F, T>(callback: F) -> abos_jni::errors::Result<T>
 where
 	F: FnOnce(&mut Env) -> abos_jni::errors::Result<T>,
@@ -51,12 +63,18 @@ where
 	jvm().attach_current_thread_for_scope(|env| callback(env))
 }
 
-#[allow(dead_code)]
+#[allow(
+	dead_code,
+	reason = "Shared test and example helpers are used by different subsets of binaries."
+)]
 pub fn is_thread_attached() -> bool {
 	jvm().is_thread_attached().expect("An unexpected JNI error occurred")
 }
 
-#[allow(dead_code)]
+#[allow(
+	dead_code,
+	reason = "Shared test and example helpers are used by different subsets of binaries."
+)]
 pub fn detach_current_thread() -> Result<()> {
 	jvm().detach_current_thread()
 }
@@ -71,10 +89,14 @@ pub fn detach_current_thread() -> Result<()> {
 ///
 /// There must be no active `AttachGuards` for the thread when this is called,
 /// otherwise we're breaking jni crate safety invariants.
-#[allow(dead_code)]
+#[allow(
+	dead_code,
+	reason = "Shared test and example helpers are used by different subsets of binaries."
+)]
 pub unsafe fn sys_detach_current_thread() {
 	let vm = jvm();
 	let jvm: *mut abos_jni_sys::JavaVM = vm.get_raw();
+	// SAFETY: The caller guarantees that this thread has no remaining JNI guards or references in use.
 	unsafe { ((*(*jvm)).v1_4.DetachCurrentThread)(jvm) };
 }
 
@@ -85,7 +107,10 @@ pub fn print_exception(env: &Env) {
 	}
 }
 
-#[allow(dead_code)]
+#[allow(
+	dead_code,
+	reason = "Shared test and example helpers are used by different subsets of binaries."
+)]
 pub fn unwrap<T>(res: Result<T>, env: &Env) -> T {
 	res.unwrap_or_else(|e| {
 		print_exception(env);
@@ -94,10 +119,17 @@ pub fn unwrap<T>(res: Result<T>, env: &Env) -> T {
 }
 
 // Generic helper function to load any test class
-#[allow(dead_code)]
+#[allow(
+	dead_code,
+	reason = "Shared test and example helpers are used by different subsets of binaries."
+)]
 pub fn load_test_class(env: &mut Env, out_dir: &std::path::Path, class_name: &str) -> abos_jni::errors::Result<()> {
 	let class_path = out_dir.join(format!("com/example/{class_name}.class"));
-	assert!(class_path.exists(), "{class_name}.class not found at {class_path:?}");
+	assert!(
+		class_path.exists(),
+		"{class_name}.class not found at {}",
+		class_path.display()
+	);
 
 	let class_bytes = std::fs::read(&class_path).unwrap_or_else(|_| panic!("Failed to read {class_name}.class"));
 
@@ -107,18 +139,23 @@ pub fn load_test_class(env: &mut Env, out_dir: &std::path::Path, class_name: &st
 	let class_internal_name = format!("com/example/{class_name}");
 	let class_jni = abos_jni::strings::JNIString::new(class_internal_name.as_str());
 
-	env.define_class(Some(&class_jni), &class_loader, &class_bytes)
-		.unwrap_or_else(|_| panic!("Failed to define {class_name} class"));
+	env.define_class(Some(&class_jni), &class_loader, &class_bytes)?;
 
 	Ok(())
 }
 
 // Helper function to set up test output directory
-#[allow(dead_code)]
+#[allow(
+	dead_code,
+	reason = "Shared test and example helpers are used by different subsets of binaries."
+)]
 pub fn setup_test_output(test_name: &str) -> std::path::PathBuf {
 	// We use option_env unwrap so this utilities module can be used from trybuild tests
 	// (which won't have CARGO_TARGET_TMPDIR set) - assuming those tests don't need this function.
-	#[allow(clippy::option_env_unwrap)]
+	#[allow(
+		clippy::option_env_unwrap,
+		reason = "Trybuild fixtures lack CARGO_TARGET_TMPDIR; only runtime tests call this helper."
+	)]
 	let out_dir = std::path::PathBuf::from(
 		option_env!("CARGO_TARGET_TMPDIR").expect("CARGO_TARGET_TMPDIR environment variable not set"),
 	)
@@ -126,7 +163,11 @@ pub fn setup_test_output(test_name: &str) -> std::path::PathBuf {
 	.join(test_name);
 
 	// Clean up any existing output
-	let _ = std::fs::remove_dir_all(&out_dir);
+	match std::fs::remove_dir_all(&out_dir) {
+		Ok(()) => {}
+		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+		Err(error) => panic!("Failed to remove previous test output: {error}"),
+	}
 	std::fs::create_dir_all(&out_dir).expect("Failed to create test output directory");
 
 	out_dir

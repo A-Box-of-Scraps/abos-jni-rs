@@ -23,6 +23,7 @@ impl Env<'_> {
 		start: jsize,
 		buf: &mut [jboolean],
 	) -> Result<()> {
+		// SAFETY: The typed array matches the JNI primitive type, and the slice supplies valid storage for the region.
 		unsafe { <jboolean as TypeArraySealed>::get_region(self, array.as_ref().as_raw(), start, buf) }
 	}
 
@@ -45,6 +46,7 @@ impl Env<'_> {
 		start: jsize,
 		buf: &mut [jbyte],
 	) -> Result<()> {
+		// SAFETY: The typed array matches the JNI primitive type, and the slice supplies valid storage for the region.
 		unsafe { <jbyte as TypeArraySealed>::get_region(self, array.as_ref().as_raw(), start, buf) }
 	}
 
@@ -67,6 +69,7 @@ impl Env<'_> {
 		start: jsize,
 		buf: &mut [jchar],
 	) -> Result<()> {
+		// SAFETY: The typed array matches the JNI primitive type, and the slice supplies valid storage for the region.
 		unsafe { <jchar as TypeArraySealed>::get_region(self, array.as_ref().as_raw(), start, buf) }
 	}
 
@@ -89,6 +92,7 @@ impl Env<'_> {
 		start: jsize,
 		buf: &mut [jshort],
 	) -> Result<()> {
+		// SAFETY: The typed array matches the JNI primitive type, and the slice supplies valid storage for the region.
 		unsafe { <jshort as TypeArraySealed>::get_region(self, array.as_ref().as_raw(), start, buf) }
 	}
 
@@ -111,6 +115,7 @@ impl Env<'_> {
 		start: jsize,
 		buf: &mut [jint],
 	) -> Result<()> {
+		// SAFETY: The typed array matches the JNI primitive type, and the slice supplies valid storage for the region.
 		unsafe { <jint as TypeArraySealed>::get_region(self, array.as_ref().as_raw(), start, buf) }
 	}
 
@@ -133,6 +138,7 @@ impl Env<'_> {
 		start: jsize,
 		buf: &mut [jlong],
 	) -> Result<()> {
+		// SAFETY: The typed array matches the JNI primitive type, and the slice supplies valid storage for the region.
 		unsafe { <jlong as TypeArraySealed>::get_region(self, array.as_ref().as_raw(), start, buf) }
 	}
 
@@ -155,6 +161,7 @@ impl Env<'_> {
 		start: jsize,
 		buf: &mut [jfloat],
 	) -> Result<()> {
+		// SAFETY: The typed array matches the JNI primitive type, and the slice supplies valid storage for the region.
 		unsafe { <jfloat as TypeArraySealed>::get_region(self, array.as_ref().as_raw(), start, buf) }
 	}
 
@@ -177,6 +184,7 @@ impl Env<'_> {
 		start: jsize,
 		buf: &mut [jdouble],
 	) -> Result<()> {
+		// SAFETY: The typed array matches the JNI primitive type, and the slice supplies valid storage for the region.
 		unsafe { <jdouble as TypeArraySealed>::get_region(self, array.as_ref().as_raw(), start, buf) }
 	}
 
@@ -186,12 +194,17 @@ impl Env<'_> {
 		since = "0.22.0",
 		note = "use JBooleanArray::set_region instead; this method will be removed in a future version"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error for a null array, an invalid array region, or a pending Java exception.
 	pub fn set_boolean_array_region<'other_local>(
 		&self,
 		array: impl AsRef<JBooleanArray<'other_local>>,
 		start: jsize,
 		buf: &[jboolean],
 	) -> Result<()> {
+		// SAFETY: The typed array matches the JNI primitive type, and the slice supplies valid storage for the region.
 		unsafe { <jboolean as TypeArraySealed>::set_region(self, array.as_ref().as_raw(), start, buf) }
 	}
 
@@ -201,12 +214,17 @@ impl Env<'_> {
 		since = "0.22.0",
 		note = "use JByteArray::set_region instead; this method will be removed in a future version"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error for a null array, an invalid array region, or a pending Java exception.
 	pub fn set_byte_array_region<'other_local>(
 		&self,
 		array: impl AsRef<JByteArray<'other_local>>,
 		start: jsize,
 		buf: &[jbyte],
 	) -> Result<()> {
+		// SAFETY: The typed array matches the JNI primitive type, and the slice supplies valid storage for the region.
 		unsafe { <jbyte as TypeArraySealed>::set_region(self, array.as_ref().as_raw(), start, buf) }
 	}
 
@@ -216,12 +234,17 @@ impl Env<'_> {
 		since = "0.22.0",
 		note = "use JCharArray::set_region instead; this method will be removed in a future version"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error for a null array, an invalid array region, or a pending Java exception.
 	pub fn set_char_array_region<'other_local>(
 		&self,
 		array: impl AsRef<JCharArray<'other_local>>,
 		start: jsize,
 		buf: &[jchar],
 	) -> Result<()> {
+		// SAFETY: The typed array matches the JNI primitive type, and the slice supplies valid storage for the region.
 		unsafe { <jchar as TypeArraySealed>::set_region(self, array.as_ref().as_raw(), start, buf) }
 	}
 
@@ -231,12 +254,17 @@ impl Env<'_> {
 		since = "0.22.0",
 		note = "use JShortArray::set_region instead; this method will be removed in a future version"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error for a null array, an invalid array region, or a pending Java exception.
 	pub fn set_short_array_region<'other_local>(
 		&self,
 		array: impl AsRef<JShortArray<'other_local>>,
 		start: jsize,
 		buf: &[jshort],
 	) -> Result<()> {
+		// SAFETY: The typed array matches the JNI primitive type, and the slice supplies valid storage for the region.
 		unsafe { <jshort as TypeArraySealed>::set_region(self, array.as_ref().as_raw(), start, buf) }
 	}
 
@@ -246,12 +274,17 @@ impl Env<'_> {
 		since = "0.22.0",
 		note = "use JIntArray::set_region instead; this method will be removed in a future version"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error for a null array, an invalid array region, or a pending Java exception.
 	pub fn set_int_array_region<'other_local>(
 		&self,
 		array: impl AsRef<JIntArray<'other_local>>,
 		start: jsize,
 		buf: &[jint],
 	) -> Result<()> {
+		// SAFETY: The typed array matches the JNI primitive type, and the slice supplies valid storage for the region.
 		unsafe { <jint as TypeArraySealed>::set_region(self, array.as_ref().as_raw(), start, buf) }
 	}
 
@@ -261,12 +294,17 @@ impl Env<'_> {
 		since = "0.22.0",
 		note = "use JLongArray::set_region instead; this method will be removed in a future version"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error for a null array, an invalid array region, or a pending Java exception.
 	pub fn set_long_array_region<'other_local>(
 		&self,
 		array: impl AsRef<JLongArray<'other_local>>,
 		start: jsize,
 		buf: &[jlong],
 	) -> Result<()> {
+		// SAFETY: The typed array matches the JNI primitive type, and the slice supplies valid storage for the region.
 		unsafe { <jlong as TypeArraySealed>::set_region(self, array.as_ref().as_raw(), start, buf) }
 	}
 
@@ -276,12 +314,17 @@ impl Env<'_> {
 		since = "0.22.0",
 		note = "use JFloatArray::set_region instead; this method will be removed in a future version"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error for a null array, an invalid array region, or a pending Java exception.
 	pub fn set_float_array_region<'other_local>(
 		&self,
 		array: impl AsRef<JFloatArray<'other_local>>,
 		start: jsize,
 		buf: &[jfloat],
 	) -> Result<()> {
+		// SAFETY: The typed array matches the JNI primitive type, and the slice supplies valid storage for the region.
 		unsafe { <jfloat as TypeArraySealed>::set_region(self, array.as_ref().as_raw(), start, buf) }
 	}
 
@@ -291,12 +334,17 @@ impl Env<'_> {
 		since = "0.22.0",
 		note = "use JDoubleArray::set_region instead; this method will be removed in a future version"
 	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error for a null array, an invalid array region, or a pending Java exception.
 	pub fn set_double_array_region<'other_local>(
 		&self,
 		array: impl AsRef<JDoubleArray<'other_local>>,
 		start: jsize,
 		buf: &[jdouble],
 	) -> Result<()> {
+		// SAFETY: The typed array matches the JNI primitive type, and the slice supplies valid storage for the region.
 		unsafe { <jdouble as TypeArraySealed>::set_region(self, array.as_ref().as_raw(), start, buf) }
 	}
 }

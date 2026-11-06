@@ -11,6 +11,7 @@
 
 use proc_macro2::TokenStream;
 use quote::ToTokens;
+use std::fmt::Write as _;
 use syn::parse_quote;
 use syn::spanned::Spanned;
 
@@ -108,33 +109,8 @@ pub fn jni_mangle2(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 	function.attrs.extend([parse_quote!(#[allow(non_snake_case)])]);
 
-	// Check ABI - must be "system" or unspecified
-	if let Some(ref abi) = function.sig.abi {
-		if let Some(ref name) = abi.name {
-			if name.value() != "system" {
-				return syn::Error::new(
-					name.span(),
-					format!(
-						"`jni_mangle` attributed functions must use `extern \"system\"` ABI, found `extern \"{}\"`",
-						name.value()
-					),
-				)
-				.to_compile_error();
-			}
-			// ABI is already "system", keep it as is
-		} else {
-			// extern with no explicit ABI string - set to "system"
-			function.sig.abi = Some(syn::Abi {
-				extern_token: abi.extern_token,
-				name: Some(syn::LitStr::new("system", function.sig.ident.span())),
-			});
-		}
-	} else {
-		// No ABI specified - set to "system"
-		function.sig.abi = Some(syn::Abi {
-			extern_token: Default::default(),
-			name: Some(syn::LitStr::new("system", function.sig.ident.span())),
-		});
+	if let Err(error) = set_system_abi(&mut function) {
+		return error.to_compile_error();
 	}
 
 	if !matches!(function.vis, syn::Visibility::Public(_)) {
@@ -146,6 +122,33 @@ pub fn jni_mangle2(attr: TokenStream, item: TokenStream) -> TokenStream {
 	}
 
 	function.into_token_stream()
+}
+
+fn set_system_abi(function: &mut syn::ItemFn) -> syn::Result<()> {
+	if let Some(abi) = &function.sig.abi
+		&& let Some(name) = &abi.name
+	{
+		if name.value() != "system" {
+			return Err(syn::Error::new(
+				name.span(),
+				format!(
+					"`jni_mangle` attributed functions must use `extern \"system\"` ABI, found `extern \"{}\"`",
+					name.value()
+				),
+			));
+		}
+		return Ok(());
+	}
+	let extern_token = function
+		.sig
+		.abi
+		.as_ref()
+		.map_or_else(syn::token::Extern::default, |abi| abi.extern_token);
+	function.sig.abi = Some(syn::Abi {
+		extern_token,
+		name: Some(syn::LitStr::new("system", function.sig.ident.span())),
+	});
+	Ok(())
 }
 
 /// Ensures that `namespace` appears roughly like a valid package name.
@@ -160,6 +163,23 @@ pub fn jni_mangle2(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// valid JVM code! Otherwise, making it more restrictive is appreciated as long as it's confirmed
 /// to work with multiple JVM-compatible languages.
 fn valid_namespace(namespace: &str) -> bool {
+	fn is_valid_ident(ident: &str) -> bool {
+		/// These shouldn't occur as the first character of an identifier.
+		const FORBIDDEN_START_CHARS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+		if ident.is_empty() {
+			return false;
+		}
+
+		for c in FORBIDDEN_START_CHARS {
+			if ident.starts_with(*c) {
+				return false;
+			}
+		}
+
+		true
+	}
+
 	/// These shouldn't occur _anywhere_ in the package name.
 	const FORBIDDEN_CHARS: &[char] = &[
 		' ', ',', ':', ';', '|', '\\', '/', '!', '@', '#', '%', '^', '&', '*', '(', ')', '{', '}', '[', ']', '-', '`',
@@ -180,23 +200,6 @@ fn valid_namespace(namespace: &str) -> bool {
 	// Check for consecutive dots (which would create empty identifiers)
 	if namespace.contains("..") {
 		return false;
-	}
-
-	fn is_valid_ident(ident: &str) -> bool {
-		/// These shouldn't occur as the first character of an identifier.
-		const FORBIDDEN_START_CHARS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-
-		if ident.is_empty() {
-			return false;
-		}
-
-		for c in FORBIDDEN_START_CHARS {
-			if ident.starts_with(*c) {
-				return false;
-			}
-		}
-
-		true
 	}
 
 	for ident in namespace.split('.') {
@@ -266,9 +269,7 @@ pub fn snake_case_to_lower_camel_case(s: &str) -> String {
 				result.push(c);
 			} else {
 				// Use Unicode-aware uppercase conversion on the first non-digit character
-				for upper_c in c.to_uppercase() {
-					result.push(upper_c);
-				}
+				result.extend(c.to_uppercase());
 				capitalize_next = false;
 			}
 		} else {
@@ -321,7 +322,7 @@ pub fn create_jni_fn_name(namespace: &str, fn_name: &str, signature: Option<&str
 				// Handle ASCII alphanumeric and safe characters
 				_ if c.is_ascii_alphanumeric() => result.push(c),
 				// Everything else (including '$' and non-ASCII) gets encoded
-				_ => result.push_str(&format!("_0{:04x}", c as u32)),
+				_ => write!(result, "_0{:04x}", u32::from(c)).expect("writing to String cannot fail"),
 			}
 		}
 		result
@@ -338,7 +339,7 @@ pub fn create_jni_fn_name(namespace: &str, fn_name: &str, signature: Option<&str
 				_ if c.is_ascii_alphanumeric() => result.push(c),
 				_ => {
 					// Non-ASCII character or other special chars - encode as _0xxxx
-					result.push_str(&format!("_0{:04x}", c as u32));
+					write!(result, "_0{:04x}", u32::from(c)).expect("writing to String cannot fail");
 				}
 			}
 		}
@@ -352,15 +353,14 @@ pub fn create_jni_fn_name(namespace: &str, fn_name: &str, signature: Option<&str
 
 	if let Some(sig) = signature {
 		// Extract only the argument types (between parentheses), ignoring return type
-		#[allow(clippy::collapsible_if)]
-		if let Some(start) = sig.find('(') {
-			if let Some(end) = sig.find(')') {
-				let args = &sig[start + 1..end];
-				// Always add __ when signature is provided (indicates overloaded method)
-				result.push_str("__");
-				if !args.is_empty() {
-					result.push_str(&mangle_signature_args(args));
-				}
+		if let Some(start) = sig.find('(')
+			&& let Some(end) = sig.find(')')
+		{
+			let args = &sig[start + 1..end];
+			// Always add __ when signature is provided (indicates overloaded method)
+			result.push_str("__");
+			if !args.is_empty() {
+				result.push_str(&mangle_signature_args(args));
 			}
 		}
 	}

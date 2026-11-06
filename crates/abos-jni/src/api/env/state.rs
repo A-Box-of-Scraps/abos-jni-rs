@@ -11,7 +11,10 @@ impl Env<'_> {
 	/// lower than the one given.
 	///
 	/// Returns `JavaException` if called while there is a pending exception.
-	#[allow(unused)]
+	#[allow(
+		unused,
+		reason = "Keep the shared JNI-version validation helper available to version-gated operations."
+	)]
 	pub(super) fn ensure_version(&self, version: JNIVersion) -> Result<()> {
 		if self.version()? < version {
 			Err(Error::UnsupportedVersion)
@@ -54,6 +57,10 @@ impl Env<'_> {
 	///
 	/// See the safety documentation for [`AttachGuard`] for more details.
 	#[inline]
+	///
+	/// # Panics
+	///
+	/// Panics if the environment is not associated with the current top JNI frame.
 	pub fn assert_top(&self) {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
@@ -102,6 +109,10 @@ See the jni-rs Env documentation for more details.
 	/// Get the JNI version that this [`Env`] supports.
 	///
 	/// This can return an error if called while there is a pending JNI exception
+	///
+	/// # Errors
+	///
+	/// Returns an error if a Java exception is pending when the version is queried.
 	pub fn version(&self) -> Result<JNIVersion> {
 		// Safety: GetVersion is 1.1 API that must be valid
 		Ok(JNIVersion::from(unsafe {

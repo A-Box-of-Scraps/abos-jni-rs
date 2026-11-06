@@ -23,9 +23,7 @@ impl<'local> Env<'local> {
 		buf: *const jbyte,
 		buf_len: usize,
 	) -> Result<JClass<'local>> {
-		if buf_len > jsize::MAX as usize {
-			return Err(Error::JniCall(JniError::InvalidArguments));
-		}
+		let buf_len = jsize::try_from(buf_len).map_err(|_| Error::JniCall(JniError::InvalidArguments))?;
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
@@ -61,7 +59,7 @@ impl<'local> Env<'local> {
 				name,
 				loader.as_raw(),
 				buf,
-				buf_len as jsize
+				buf_len
 			)
 			.map(|class| JClass::from_raw(self, class))
 		}
@@ -99,6 +97,14 @@ impl<'local> Env<'local> {
 	///
 	/// In particular Android's ART runtime does not support it, since all classes must be
 	/// pre-compiled into DEX format.
+	#[expect(
+		clippy::needless_pass_by_value,
+		reason = "The public API accepts both owned and borrowed names through AsRef."
+	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error for malformed or circular class definitions, security violations, allocation failures, or pending Java exceptions.
 	pub fn define_class<'any_loader, N, L>(&mut self, name: Option<N>, loader: L, buf: &[u8]) -> Result<JClass<'local>>
 	where
 		N: AsRef<JNIStr>,
@@ -141,6 +147,14 @@ impl<'local> Env<'local> {
 	///
 	/// In particular Android's ART runtime does not support it, since all classes must be
 	/// pre-compiled into DEX format.
+	#[expect(
+		clippy::needless_pass_by_value,
+		reason = "The public API accepts both owned and borrowed names through AsRef."
+	)]
+	///
+	/// # Errors
+	///
+	/// Returns an error for malformed or circular class definitions, security violations, allocation failures, or pending Java exceptions.
 	pub fn define_class_jbyte<'any_loader, N, L>(
 		&mut self,
 		name: Option<N>,
@@ -206,6 +220,10 @@ impl<'local> Env<'local> {
 	/// [`Env::load_class`] can work on Android if a loader has been set up for
 	/// the current thread (see: [`JThread::set_context_class_loader`]) and if you
 	/// use the `android-activity` crate this may be done for you.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class cannot be resolved or initialized, or a Java exception is already pending.
 	pub fn find_class<S>(&mut self, name: S) -> Result<JClass<'local>>
 	where
 		S: AsRef<JNIStr>,
@@ -327,6 +345,10 @@ impl<'local> Env<'local> {
 	///
 	/// If you use the `android-activity` crate, it may set up the context class
 	/// loader for you.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class cannot be loaded or initialized, or a JNI call fails during loading.
 	pub fn load_class<S>(&mut self, name: S) -> Result<JClass<'local>>
 	where
 		S: AsRef<JNIStr>,
@@ -349,6 +371,7 @@ impl<'local> Env<'local> {
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let class = class.lookup(self)?;
+		// SAFETY: The class descriptor is valid and the returned local class reference is tied to the current frame.
 		let superclass = unsafe {
 			JClass::from_raw(
 				self,
@@ -383,6 +406,10 @@ impl<'local> Env<'local> {
 	// (currently it just needs the `&mut self` for the sake of `Desc<JClass>::lookup`)
 	//
 	/// Tests whether class1 is assignable from class2.
+	///
+	/// # Errors
+	///
+	/// Returns an error if either class descriptor cannot be resolved or a Java exception is pending.
 	pub fn is_assignable_from<'other_local_1, 'other_local_2, T, U>(&mut self, class1: T, class2: U) -> Result<bool>
 	where
 		T: Desc<'local, JClass<'other_local_1>>,
@@ -443,6 +470,10 @@ impl<'local> Env<'local> {
 	///
 	/// See [JNI documentation](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#IsInstanceOf)
 	/// for details.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class descriptor cannot be resolved or a Java exception is pending.
 	pub fn is_instance_of<'other_local_1, 'other_local_2, O, T>(&mut self, object: O, class: T) -> Result<bool>
 	where
 		O: AsRef<JObject<'other_local_1>>,
@@ -456,6 +487,10 @@ impl<'local> Env<'local> {
 	/// returns false.
 	///
 	/// Returns [`Error::JavaException`] if called while there is a pending Java exception
+	///
+	/// # Errors
+	///
+	/// Returns `Error::JavaException` if a Java exception is pending.
 	pub fn is_same_object<'other_local_1, 'other_local_2, O, T>(&self, ref1: O, ref2: T) -> Result<bool>
 	where
 		O: AsRef<JObject<'other_local_1>>,

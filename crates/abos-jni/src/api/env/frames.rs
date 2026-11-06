@@ -54,14 +54,14 @@ impl<'local> Env<'local> {
 	pub(super) unsafe fn pop_local_frame<'frame_local, T: Reference>(
 		&self,
 		result: T::Kind<'frame_local>,
-	) -> Result<T::Kind<'local>> {
+	) -> T::Kind<'local> {
 		let result: JObject<'frame_local> = result.into();
 		// Safety:
 		// This method is safe to call in case of pending exceptions (see chapter 2 of the spec)
 		// We check for JNI > 1.2 in `from_raw`
 		unsafe {
 			let raw = ex_safe_jni_call_no_post_check_ex!(self, v1_2, PopLocalFrame, result.into_raw());
-			Ok(T::kind_from_raw(raw))
+			T::kind_from_raw(raw)
 		}
 	}
 
@@ -85,6 +85,10 @@ impl<'local> Env<'local> {
 	/// See top-level [Env] documentation for rules on limiting yourself to one
 	/// [Env] reference per-scope to avoid exposing code to runtime checks for
 	/// the top JNI frame (that can panic).
+	///
+	/// # Errors
+	///
+	/// Returns an error if capacity does not fit JNI, a local frame cannot be allocated, or the callback returns an error.
 	pub fn with_local_frame<F, T, E>(&self, capacity: usize, f: F) -> std::result::Result<T, E>
 	where
 		F: FnOnce(&mut Env) -> std::result::Result<T, E>,
@@ -101,7 +105,7 @@ impl<'local> Env<'local> {
 			let env = guard.borrow_env_mut();
 			self.push_local_frame(capacity)?;
 			let ret = catch_unwind(AssertUnwindSafe(|| f(env)));
-			self.pop_local_frame::<JObject>(JObject::null())?;
+			self.pop_local_frame::<JObject>(JObject::null());
 			drop(guard);
 
 			match ret {
@@ -130,6 +134,10 @@ impl<'local> Env<'local> {
 	/// a local frame as special-case optimization, this alternative to `with_local_frame` exposes
 	/// that capability to return a local reference without needing to create a temporary
 	/// [`Global`].
+	///
+	/// # Errors
+	///
+	/// Returns an error if capacity does not fit JNI, a local frame cannot be allocated, or the callback returns an error.
 	pub fn with_local_frame_returning_local<F, T, E>(
 		&mut self,
 		capacity: usize,
@@ -148,6 +156,7 @@ impl<'local> Env<'local> {
 			.try_into()
 			.map_err(|_| Error::JniCall(JniError::InvalidArguments))?;
 
+		// SAFETY: The nested guard tracks the pushed JNI frame, which is popped before the guard drops on every callback outcome.
 		unsafe {
 			// Inner scope to ensure drop order: `Result` -> `env` -> `guard`, before we potentially call `resume_unwind`.
 			let panic_payload = {
@@ -160,15 +169,15 @@ impl<'local> Env<'local> {
 
 				match catch_unwind(AssertUnwindSafe(|| f(env))) {
 					Ok(Ok(obj)) => {
-						let obj = self.pop_local_frame::<T>(obj)?;
+						let obj = self.pop_local_frame::<T>(obj);
 						return Ok(obj);
 					}
 					Ok(Err(err)) => {
-						self.pop_local_frame::<T>(T::null())?;
+						self.pop_local_frame::<T>(T::null());
 						return Err(err);
 					}
 					Err(payload) => {
-						self.pop_local_frame::<T>(T::null())?;
+						self.pop_local_frame::<T>(T::null());
 						payload
 					}
 				}
@@ -204,11 +213,16 @@ impl<'local> Env<'local> {
 	///
 	/// See top-level [Env] documentation for rules on limiting yourself to one [Env] reference
 	/// per-scope to avoid exposing code to runtime checks for the top JNI frame (that can panic).
+	///
+	/// # Errors
+	///
+	/// Propagates the error returned by the callback.
 	pub fn with_top_local_frame<F, T, E>(&self, f: F) -> std::result::Result<T, E>
 	where
 		F: FnOnce(&mut Env) -> std::result::Result<T, E>,
 		E: From<Error>,
 	{
+		// SAFETY: The nested guard borrows the current attached thread's environment and drops after the callback.
 		unsafe {
 			let mut guard = AttachGuard::from_unowned(self.get_raw());
 			f(guard.borrow_env_mut())

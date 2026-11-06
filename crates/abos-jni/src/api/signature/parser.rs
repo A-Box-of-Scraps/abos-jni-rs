@@ -50,14 +50,14 @@ pub(super) fn parse_array(input: &str) -> Result<(JavaType, &str)> {
 
 /// Parse an object type descriptor (`Lclassname;`).
 pub(super) fn parse_object(input: &str) -> Result<(JavaType, &str)> {
-	let input = input
-		.strip_prefix('L')
-		.ok_or_else(|| Error::ParseFailed("expected 'L' for object type".into()))?;
-
 	// JVMS §4.2.2: unqualified names must not contain '.', ';', '[', or '/'
 	pub(super) const fn is_unqualified(c: char) -> bool {
 		!matches!(c, '.' | ';' | '[' | '/')
 	}
+
+	let input = input
+		.strip_prefix('L')
+		.ok_or_else(|| Error::ParseFailed("expected 'L' for object type".into()))?;
 
 	let bytes = input.as_bytes();
 	let mut i = 0;
@@ -143,12 +143,12 @@ pub(super) fn parse_args(input: &str) -> Result<(Vec<JavaType>, &str)> {
 /// Note: we initially return a placeholder signature string, which is replaced later
 pub(super) fn parse_method_sig(input: &str) -> Result<(RuntimeMethodSignature, &str)> {
 	let (args, rest) = parse_args(input)?;
-	let (ret, rest) = parse_type(rest)?;
+	let (return_type, rest) = parse_type(rest)?;
 	Ok((
 		RuntimeMethodSignature {
 			sig: JNIString::new(""),
 			args,
-			ret,
+			ret: return_type,
 		},
 		rest,
 	))

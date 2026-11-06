@@ -74,6 +74,7 @@ impl ::std::ops::Deref for JNIString {
 	type Target = JNIStr;
 
 	fn deref(&self) -> &Self::Target {
+		// SAFETY: JNIString owns terminated modified UTF-8, retained for this borrow.
 		unsafe { JNIStr::from_ptr(self.internal.as_ptr()) }
 	}
 }
@@ -95,6 +96,7 @@ where
 	fn from(other: T) -> Self {
 		let enc = mutf8::encode(other.as_ref()).into_owned();
 		Self {
+			// SAFETY: Modified UTF-8 encoding replaces embedded NULs, so enc contains no zero bytes.
 			internal: unsafe { CString::from_vec_unchecked(enc) },
 		}
 	}
@@ -256,16 +258,14 @@ const fn is_valid_mutf8_cstr(cstr: &CStr) -> bool {
 			let b1 = bytes[i + 1];
 			let b2 = bytes[i + 2];
 
-			if b0 == 0xE0 {
-				// Avoid overlongs for U+0800..: 0xE0 0xA0..0xBF 0x80..0xBF
-				if !(b1 >= 0xA0 && b1 <= 0xBF) || (b2 & 0xC0) != 0x80 {
-					return false;
-				}
+			// Reject overlong encodings after E0; modified UTF-8 permits surrogate code units after ED.
+			let valid_second = if b0 == 0xE0 {
+				b1 >= 0xA0 && b1 <= 0xBF
 			} else {
-				// In MUTF-8, surrogates (0xED 0xA0..0xBF 0x80..0xBF) are allowed.
-				if (b1 & 0xC0) != 0x80 || (b2 & 0xC0) != 0x80 {
-					return false;
-				}
+				(b1 & 0xC0) == 0x80
+			};
+			if !valid_second || (b2 & 0xC0) != 0x80 {
+				return false;
 			}
 
 			i += 3;
@@ -299,6 +299,7 @@ impl JNIStr {
 	/// [modified UTF-8]: https://en.wikipedia.org/wiki/UTF-8#Modified_UTF-8
 	#[must_use]
 	pub const unsafe fn from_ptr<'a>(ptr: *const c_char) -> &'a Self {
+		// SAFETY: The caller guarantees a live terminated modified-UTF-8 string; JNIStr is transparent over CStr.
 		unsafe { &*(std::ptr::from_ref::<CStr>(CStr::from_ptr(ptr)) as *const Self) }
 	}
 
@@ -329,6 +330,7 @@ impl JNIStr {
 	#[must_use]
 	pub const unsafe fn from_cstr_unchecked(cstr: &CStr) -> &Self {
 		// The reason we don't just use `from_ptr` here is that `CStr::from_ptr` is not yet a `const fn`.
+		// SAFETY: The caller guarantees modified UTF-8 and JNIStr is transparent over CStr.
 		unsafe { &*(std::ptr::from_ref::<CStr>(cstr) as *const Self) }
 	}
 

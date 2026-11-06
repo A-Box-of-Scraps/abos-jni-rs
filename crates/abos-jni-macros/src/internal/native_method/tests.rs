@@ -25,7 +25,7 @@ fn qualified_shorthand_preserves_owner_path() {
 	assert_eq!(owner.segments.len(), 2);
 	assert!(!owner.segments.trailing_punct());
 	assert_eq!(parsed.fn_path.segments.len(), 3);
-	assert!(parsed.jni_crate.segments[0].ident == "renamed_jni");
+	assert_eq!(parsed.jni_crate.segments[0].ident, "renamed_jni");
 }
 
 #[test]

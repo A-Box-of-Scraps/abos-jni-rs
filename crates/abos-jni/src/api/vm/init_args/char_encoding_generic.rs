@@ -22,11 +22,9 @@ pub(super) unsafe fn bytes_to_cstr<'a>(
 	original: Option<Cow<'_, str>>,
 ) -> Result<Cow<'a, CStr>, JvmError> {
 	// Check if it has a null byte at the end already. If not, add one.
-	let mut null_byte_added = false;
-
-	if s.last() != Some(&0) {
+	let null_byte_added = s.last() != Some(&0);
+	if null_byte_added {
 		s.to_mut().push(0);
-		null_byte_added = true;
 	}
 
 	// This function is called if conversion fails because the string has a null byte
@@ -34,25 +32,23 @@ pub(super) unsafe fn bytes_to_cstr<'a>(
 	let convert_error = move |s: Cow<'a, [u8]>| -> JvmError {
 		// We need to get back to a `String` in order to insert it into the error. How
 		// to do that depends on whether we were given a separate original or not.
-		let s: String = {
-			if let Some(original) = original {
-				// Yes, there is a separate original. Use that.
-				original.into_owned()
-			} else {
+		let s: String = original.map_or_else(
+			|| {
 				// No, `s` *is* the original. Strip off the null byte if we
 				// added one, then assume the rest is valid UTF-8.
 				let mut s: Vec<u8> = s.into_owned();
 
 				if null_byte_added {
-					let _removed_null_byte: Option<u8> = s.pop();
-					debug_assert_eq!(_removed_null_byte, Some(0));
+					let removed_null_byte: Option<u8> = s.pop();
+					debug_assert_eq!(removed_null_byte, Some(0));
 				}
 
 				// Safety: The caller of this function asserts that this is valid UTF-8. We
 				// have not changed it other than adding a null byte at the end.
 				unsafe { String::from_utf8_unchecked(s) }
-			}
-		};
+			},
+			std::borrow::Cow::into_owned,
+		);
 
 		JvmError::NullOptString(s)
 	};

@@ -16,9 +16,9 @@ abos_jni_macros::bind_java_type! {
 	Baz => "java.baz.Baz"
 }
 
-// Test with other attributes (like #[allow(dead_code)])
+// Test with other attributes (like #[allow(dead_code, reason = "Verify that user-supplied attributes are accepted on generated bindings.")])
 abos_jni_macros::bind_java_type! {
-	#[allow(dead_code)]
+	#[allow(dead_code, reason = "Verify that user-supplied attributes are accepted on generated bindings.")]
 	/// Custom docs with other attributes
 	Qux => "java.qux.Qux"
 }

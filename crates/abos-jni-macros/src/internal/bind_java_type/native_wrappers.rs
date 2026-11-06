@@ -4,7 +4,10 @@ use super::{
 };
 
 /// Generate wrapper functions for native methods as API struct methods
-#[allow(clippy::too_many_arguments)]
+#[allow(
+	clippy::too_many_arguments,
+	reason = "Code generation needs the independent binding metadata and JNI paths."
+)]
 pub(super) fn generate_native_wrappers(
 	type_name: &Ident,
 	api_name: &Ident,
@@ -14,7 +17,7 @@ pub(super) fn generate_native_wrappers(
 	type_mappings: &TypeMappings,
 	default_native_methods_catch_unwind: bool,
 	default_abi_check: AbiCheck,
-	default_error_policy: &Option<syn::Path>,
+	default_error_policy: Option<&syn::Path>,
 	jni: &syn::Path,
 ) -> TokenStream {
 	let mut wrappers = Vec::new();
@@ -40,7 +43,10 @@ pub(super) fn generate_native_wrappers(
 }
 
 /// Generate a single native method wrapper as an API struct method
-#[allow(clippy::too_many_arguments)]
+#[allow(
+	clippy::too_many_arguments,
+	reason = "Code generation needs the independent binding metadata and JNI paths."
+)]
 pub(super) fn generate_single_native_wrapper(
 	type_name: &Ident,
 	method: &NativeMethod,
@@ -49,7 +55,7 @@ pub(super) fn generate_single_native_wrapper(
 	type_mappings: &TypeMappings,
 	default_native_methods_catch_unwind: bool,
 	default_abi_check: AbiCheck,
-	default_error_policy: &Option<syn::Path>,
+	default_error_policy: Option<&syn::Path>,
 	jni: &syn::Path,
 ) -> TokenStream {
 	let rust_name = &method.rust_name;
@@ -69,14 +75,14 @@ pub(super) fn generate_single_native_wrapper(
 
 	// Add method parameters using parameter names from signature
 	// Use native trait arg type (without AsRef) to match the trait signature
-	for param in &method.method_signature.parameters {
+	for param in &method.signature.parameters {
 		let param_name = &param.name;
 		let rust_type = sig_type_to_rust_native_trait_arg_type(&param.ty, &lifetime, type_mappings, jni);
 		params.push(quote! { #param_name: #rust_type });
 	}
 
 	// Get return type
-	let return_type = sig_type_to_rust_return_type(&method.method_signature.return_type, &lifetime, type_mappings, jni);
+	let return_type = sig_type_to_rust_return_type(&method.signature.return_type, &lifetime, type_mappings, jni);
 
 	let need_abi_check = method.abi_check.unwrap_or(default_abi_check);
 	let abi_check = generate_native_method_abi_check(
@@ -94,117 +100,15 @@ pub(super) fn generate_single_native_wrapper(
 		quote! { with_env_no_catch }
 	};
 
-	// Generate the wrapper body based on native_fn and is_raw combination
-	let wrapper_body = match (&method.native_fn, method.is_raw) {
-		// Direct raw function (fn = raw path)
-		(Some(raw_fn), true) => {
-			// Call the function directly with unowned env - no with_env wrapper
-			let mut call_args = vec![quote! { unowned_env }];
-			if method.is_static {
-				call_args.push(quote! { class });
-			} else {
-				call_args.push(quote! { this });
-			}
-			for param in &method.method_signature.parameters {
-				let param_name = &param.name;
-				call_args.push(quote! { #param_name });
-			}
-
-			quote! {
-				#abi_check
-
-				#raw_fn(#(#call_args),*)
-			}
-		}
-		// Direct safe function (fn = path)
-		(Some(safe_fn), false) => {
-			// Wrap with EnvUnowned::with_env and error handling but skip trait
-			let mut call_args = vec![quote! { env }];
-			if method.is_static {
-				call_args.push(quote! { class });
-			} else {
-				call_args.push(quote! { this });
-			}
-			for param in &method.method_signature.parameters {
-				let param_name = &param.name;
-				call_args.push(quote! { #param_name });
-			}
-
-			// Get error policy with fallback chain:
-			// 1. method.error_policy if specified
-			// 2. default_error_policy if specified
-			// 3. abos_jni::errors::ThrowRuntimeExAndDefault
-			let error_policy = method
-				.error_policy
-				.as_ref()
-				.or(default_error_policy.as_ref())
-				.map_or_else(|| quote! { #jni::errors::ThrowRuntimeExAndDefault }, |p| quote! { #p });
-
-			quote! {
-				unowned_env
-					.#with_env_api(|env| {
-						#abi_check
-
-						#safe_fn(#(#call_args),*)
-					})
-					.resolve::<#error_policy>()
-			}
-		}
-		// Trait-based raw method (raw = true, no fn)
-		(None, true) => {
-			// Call trait method directly without with_env wrapper
-			let mut call_args = vec![quote! { unowned_env }];
-			if method.is_static {
-				call_args.push(quote! { class });
-			} else {
-				call_args.push(quote! { this });
-			}
-			for param in &method.method_signature.parameters {
-				let param_name = &param.name;
-				call_args.push(quote! { #param_name });
-			}
-
-			quote! {
-				#abi_check
-
-				<#api_name as #trait_name>::#rust_name(#(#call_args),*)
-			}
-		}
-		// Trait-based safe method (default: no fn, raw = false)
-		(None, false) => {
-			// Use trait method with with_env wrapper and error handling
-			let mut call_args = vec![quote! { env }];
-			if method.is_static {
-				call_args.push(quote! { class });
-			} else {
-				call_args.push(quote! { this });
-			}
-			for param in &method.method_signature.parameters {
-				let param_name = &param.name;
-				call_args.push(quote! { #param_name });
-			}
-
-			// Get error policy with fallback chain:
-			// 1. method.error_policy if specified
-			// 2. default_error_policy if specified
-			// 3. abos_jni::errors::ThrowRuntimeExAndDefault
-			let error_policy = method
-				.error_policy
-				.as_ref()
-				.or(default_error_policy.as_ref())
-				.map_or_else(|| quote! { #jni::errors::ThrowRuntimeExAndDefault }, |p| quote! { #p });
-
-			quote! {
-				unowned_env
-					.#with_env_api(|env| {
-						#abi_check
-
-						<#api_name as #trait_name>::#rust_name(#(#call_args),*)
-					})
-					.resolve::<#error_policy>()
-			}
-		}
-	};
+	let wrapper_body = wrapper_body(
+		method,
+		api_name,
+		trait_name,
+		&abi_check,
+		&with_env_api,
+		default_error_policy,
+		jni,
+	);
 
 	// Extract cfg attributes to apply to the wrapper function
 	let cfg_attrs = extract_cfg_attrs(&method.attrs);
@@ -217,5 +121,43 @@ pub(super) fn generate_single_native_wrapper(
 		) -> #return_type {
 			#wrapper_body
 		}
+	}
+}
+
+fn wrapper_body(
+	method: &NativeMethod,
+	api_name: &Ident,
+	trait_name: &Ident,
+	abi_check: &TokenStream,
+	with_env_api: &TokenStream,
+	default_error_policy: Option<&syn::Path>,
+	jni: &syn::Path,
+) -> TokenStream {
+	let rust_name = &method.rust_name;
+	let callable = method.native_fn.as_ref().map_or_else(
+		|| quote! { <#api_name as #trait_name>::#rust_name },
+		|path| quote! { #path },
+	);
+	let environment = if method.is_raw {
+		quote! { unowned_env }
+	} else {
+		quote! { env }
+	};
+	let receiver = if method.is_static {
+		quote! { class }
+	} else {
+		quote! { this }
+	};
+	let parameters = method.signature.parameters.iter().map(|param| &param.name);
+	let call = quote! { #callable(#environment, #receiver, #(#parameters),*) };
+	if method.is_raw {
+		return quote! { #abi_check #call };
+	}
+	let error_policy = method.error_policy.as_ref().or(default_error_policy).map_or_else(
+		|| quote! { #jni::errors::ThrowRuntimeExAndDefault },
+		|policy| quote! { #policy },
+	);
+	quote! {
+		unowned_env.#with_env_api(|env| { #abi_check #call }).resolve::<#error_policy>()
 	}
 }

@@ -91,11 +91,11 @@ pub struct EnvOutcome<'local, T, E> {
 }
 
 impl<'local, T, E> EnvOutcome<'local, T, E> {
-	pub(crate) fn new(raw_env: *mut crate::sys::JNIEnv, outcome: Outcome<T, E>) -> Self {
+	pub(crate) const fn new(raw_env: *mut crate::sys::JNIEnv, outcome: Outcome<T, E>) -> Self {
 		Self {
 			raw_env,
 			outcome,
-			_invariant: Default::default(),
+			_invariant: std::marker::PhantomData,
 		}
 	}
 
@@ -129,6 +129,7 @@ impl<'local, T, E> EnvOutcome<'local, T, E> {
 		F: FnOnce() -> <P as ErrorPolicy<T, E>>::Captures<'local, 'native_method>,
 		'local: 'native_method,
 	{
+		// SAFETY: EnvOutcome retains the native call's environment and lifetime, and the nested guard drops before returning.
 		unsafe {
 			let mut guard: AttachGuard<'local> = AttachGuard::from_unowned(self.raw_env);
 			let env = guard.borrow_env_mut();
@@ -288,6 +289,10 @@ impl<'local> EnvUnowned<'local> {
 	///
 	/// The assigned lifetime must not outlive the JNI stack frame that owns the
 	/// `Env` pointer. For example it would _never_ be safe to use `'static`.
+	///
+	/// # Panics
+	///
+	/// Panics if the raw pointer is null.
 	pub unsafe fn from_raw(ptr: *mut abos_jni_sys::JNIEnv) -> Self {
 		assert!(!ptr.is_null(), "EnvUnowned pointer must not be null");
 		Self {

@@ -10,7 +10,10 @@ use crate::{Env, jni_sig};
 
 /// A primitive java type. These are the things that can be represented without
 /// an object.
-#[allow(missing_docs)]
+#[allow(
+	missing_docs,
+	reason = "Signature representations expose JNI type names and their component data."
+)]
 #[derive(Eq, PartialEq, Debug, Clone, Copy)]
 pub enum Primitive {
 	Boolean, // Z
@@ -49,7 +52,10 @@ impl fmt::Display for Primitive {
 /// In the past this did use to track object names and array details, but it proved to have a
 /// significant hidden cost that was redundant while those details were never used (at least
 /// internally).
-#[allow(missing_docs)]
+#[allow(
+	missing_docs,
+	reason = "Signature representations expose JNI type names and their component data."
+)]
 #[derive(Eq, PartialEq, Debug, Clone, Copy)]
 pub enum JavaType {
 	Primitive(Primitive),
@@ -98,7 +104,10 @@ pub type ReturnType = JavaType;
 /// If you need to parse method signatures at runtime, use
 /// [`RuntimeMethodSignature::from_str`] followed by
 /// [`RuntimeMethodSignature::method_signature`].
-#[allow(missing_docs)]
+#[allow(
+	missing_docs,
+	reason = "Signature representations expose JNI type names and their component data."
+)]
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct MethodSignature<'sig, 'args> {
 	sig: &'sig JNIStr,
@@ -158,7 +167,10 @@ impl From<&Self> for MethodSignature<'_, '_> {
 /// If you need to parse field signatures at runtime, use
 /// [`RuntimeFieldSignature::from_str`] followed by
 /// [`RuntimeFieldSignature::field_signature`].
-#[allow(missing_docs)]
+#[allow(
+	missing_docs,
+	reason = "Signature representations expose JNI type names and their component data."
+)]
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct FieldSignature<'sig> {
 	sig: &'sig JNIStr,
@@ -213,7 +225,10 @@ impl<'sig> FieldSignature<'sig> {
 ///
 /// A reference to `RuntimeSignature` can be converted into a `Signature`, which
 /// is used by the JNI functions, such as `call_(object|static)_method`.
-#[allow(missing_docs)]
+#[allow(
+	missing_docs,
+	reason = "Signature representations expose JNI type names and their component data."
+)]
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct RuntimeMethodSignature {
 	sig: JNIString,
@@ -253,7 +268,14 @@ where
 
 impl RuntimeMethodSignature {
 	/// Parse a method signature string into a `RuntimeMethodSignature` enum.
-	#[allow(clippy::should_implement_trait)]
+	#[allow(
+		clippy::should_implement_trait,
+		reason = "This existing parser accepts any AsRef<str>, unlike FromStr::from_str."
+	)]
+	///
+	/// # Errors
+	///
+	/// Returns a parse error if the input is not a complete, valid JNI signature.
 	pub fn from_str<S: AsRef<str>>(s: S) -> Result<Self> {
 		let input = s.as_ref();
 		match parse_method_sig(input)? {
@@ -309,7 +331,10 @@ impl fmt::Display for RuntimeMethodSignature {
 /// A reference to `RuntimeFieldSignature` can be converted into a
 /// `FieldSignature`, which is used by the JNI functions, such as
 /// `(get|set)_(static)_field`.
-#[allow(missing_docs)]
+#[allow(
+	missing_docs,
+	reason = "Signature representations expose JNI type names and their component data."
+)]
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct RuntimeFieldSignature {
 	sig: JNIString,
@@ -345,7 +370,14 @@ where
 
 impl RuntimeFieldSignature {
 	/// Parse a field signature string into a `RuntimeFieldSignature`.
-	#[allow(clippy::should_implement_trait)]
+	#[allow(
+		clippy::should_implement_trait,
+		reason = "This existing parser accepts any AsRef<str>, unlike FromStr::from_str."
+	)]
+	///
+	/// # Errors
+	///
+	/// Returns a parse error if the input is not a complete, valid JNI signature.
 	pub fn from_str<S: AsRef<str>>(s: S) -> Result<Self> {
 		let input = s.as_ref();
 		match parse_field_sig(input)? {

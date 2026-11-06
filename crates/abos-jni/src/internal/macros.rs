@@ -405,6 +405,7 @@ mod tests {
 		name: &crate::strings::JNIStr,
 		sig: &crate::strings::JNIStr,
 	) -> crate::errors::Result<crate::sys::jclass> {
+		// SAFETY: The caller guarantees valid class bytes and JNI references; the call checks exceptions and null returns.
 		unsafe {
 			jni_call_with_catch_and_null_check!(
 				catch |env| {
@@ -436,11 +437,7 @@ mod tests {
 
 					e: crate::exceptions::JExceptionInInitializerError => {
 						let exception = e.get_exception(env);
-						let exception = if let Ok(exception) = exception {
-							env.new_global_ref(exception).ok()
-						} else {
-							None
-						};
+						let exception = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
 						Err(Error::ExceptionInInitializer { exception })
 					},
 

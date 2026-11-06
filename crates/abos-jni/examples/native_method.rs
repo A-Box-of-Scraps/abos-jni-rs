@@ -33,11 +33,13 @@ impl ThingHandle {
 	}
 
 	const unsafe fn as_ref(&self) -> &RustThing {
+		// SAFETY: The caller guarantees this handle points to a live RustThing for the borrow.
 		unsafe { &*self.0 }
 	}
 
 	// Safety: only convert back to Box (to drop) when sure handle is no longer shared.
 	pub unsafe fn into_box(self) -> Box<RustThing> {
+		// SAFETY: The caller guarantees exclusive ownership of the pointer originally allocated by Box.
 		unsafe { Box::from_raw(self.0.cast_mut()) }
 	}
 }
@@ -112,6 +114,10 @@ const NATIVE_METHODS: &[NativeMethod] = &[
 
 // Implementation functions for native methods
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn native_add<'local>(
 	_env: &mut Env<'local>,
 	_this: JObject<'local>,
@@ -121,6 +127,10 @@ const fn native_add<'local>(
 	Ok(a + b)
 }
 
+#[expect(
+	clippy::needless_pass_by_value,
+	reason = "The native-method wrapper requires JNI reference arguments by value."
+)]
 fn native_concatenate<'local>(
 	env: &mut Env<'local>,
 	_this: JObject<'local>,
@@ -137,6 +147,7 @@ fn native_process_handle<'local>(
 	_this: JObject<'local>,
 	handle: ThingHandle,
 ) -> Result<JString<'local>, abos_jni::errors::Error> {
+	// SAFETY: The example Java caller returns the handle allocated by Rust without freeing or changing it.
 	let thing_ref = unsafe { handle.as_ref() };
 	let response = format!("RustThing says: {}", thing_ref.message);
 	JString::from_str(env, response)
@@ -146,6 +157,10 @@ const fn native_raw<'local>(_unowned_env: EnvUnowned<'local>, _this: JObject<'lo
 	value * 2
 }
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn native_with_function_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: JObject<'local>,
@@ -154,6 +169,10 @@ const fn native_with_function_impl<'local>(
 	Ok(value * 3)
 }
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn native_no_unwind<'local>(
 	_env: &mut Env<'local>,
 	_this: JObject<'local>,
@@ -174,6 +193,10 @@ const fn native_custom_error_policy<'local>(
 	}
 }
 
+#[expect(
+	clippy::needless_pass_by_value,
+	reason = "The native-method wrapper requires JNI reference arguments by value."
+)]
 fn native_greet<'local>(
 	env: &mut Env<'local>,
 	_class: JClass<'local>,
@@ -183,6 +206,10 @@ fn native_greet<'local>(
 	JString::from_str(env, format!("Hello, {name_str}!"))
 }
 
+#[expect(
+	clippy::unnecessary_wraps,
+	reason = "The native-method wrapper requires a Result-returning callback."
+)]
 const fn native_echo_int_array<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
@@ -200,6 +227,7 @@ fn main() {
 		// Register native methods
 		println!("--- Registering Native Methods ---");
 		let class = env.find_class(jni_str!("com/example/NativeMethodOverview"))?;
+		// SAFETY: The fixture class declares the names and JNI signatures supplied by these native-method descriptors.
 		unsafe {
 			env.register_native_methods(&class, NATIVE_METHODS)?;
 		}
@@ -213,11 +241,12 @@ fn main() {
 		// Call the test method that exercises all native methods
 		println!("\n--- Testing Native Methods ---");
 		let test_method = env.get_method_id(&class, jni_str!("testAllNativeMethods"), &jni_sig!(()->JString))?;
+		// SAFETY: testAllNativeMethods has the looked-up no-argument signature returning String.
 		let result = unsafe {
 			env.call_method_unchecked(&obj, test_method, abos_jni::signature::ReturnType::Object, &[])?
 				.l()?
 		};
-		let result = unsafe { JString::from_raw(env, result.as_raw()) };
+		let result = env.cast_local::<JString>(result)?;
 		println!("Test results: {}", result.try_to_string(env)?);
 
 		// Test the handle method separately
@@ -230,6 +259,7 @@ fn main() {
 		// Call native_process_handle via Java
 		let handle_value = abos_jni::sys::jvalue { j: handle.into() };
 		let handle_method = env.get_method_id(&class, jni_str!("nativeProcessHandle"), &jni_sig!((jlong)->JString))?;
+		// SAFETY: nativeProcessHandle takes the live native handle as a long and returns String.
 		let response = unsafe {
 			env.call_method_unchecked(
 				&obj,
@@ -239,7 +269,7 @@ fn main() {
 			)?
 			.l()?
 		};
-		let response = unsafe { JString::from_raw(env, response.as_raw()) };
+		let response = env.cast_local::<JString>(response)?;
 		println!("nativeProcessHandle response: {}", response.try_to_string(env)?);
 
 		// Safety: we are done with the handle, so convert back to Box to drop

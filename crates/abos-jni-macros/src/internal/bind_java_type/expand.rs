@@ -15,15 +15,7 @@ pub fn bind_java_type_impl(input: TokenStream) -> Result<TokenStream> {
 	let java_class_dotted = java_class.to_java_dotted();
 	let jni = &input.jni_crate;
 
-	// Check if this is a core Java type that cannot be bound without __jni_core = true
-	if input.type_mappings.is_core_java_type(java_class) && !input.jni_core {
-		return Err(syn::Error::new(
-			Span::call_site(),
-			format!(
-				"Cannot create binding for core Java type '{java_class_dotted}'. Core types (java.lang.Object, java.lang.Class, java.lang.Throwable, and java.lang.String) are already provided by the jni crate and cannot be re-bound."
-			),
-		));
-	}
+	validate_core_binding(&input, &java_class_dotted)?;
 
 	// Generate API struct name
 	let api_name = input.api_name.unwrap_or_else(|| format_ident!("{}API", type_name));
@@ -65,12 +57,12 @@ pub fn bind_java_type_impl(input: TokenStream) -> Result<TokenStream> {
 		&java_class_internal,
 		&java_class_dotted,
 		&input.native_methods,
-		&input.native_trait_name,
+		input.native_trait_name.as_ref(),
 		&input.type_mappings,
 		input.native_methods_export,
 		input.native_methods_catch_unwind,
 		input.abi_check,
-		&input.native_methods_error_policy,
+		input.native_methods_error_policy.as_ref(),
 		jni,
 	)?;
 
@@ -101,11 +93,10 @@ pub fn bind_java_type_impl(input: TokenStream) -> Result<TokenStream> {
 		generate_is_instance_of_code(type_name, &input.is_instance_of, &input.type_mappings, jni)?;
 
 	// Generate constructor implementations
-	let constructors_code =
-		generate_constructors(type_name, &api_name, &input.constructors, &input.type_mappings, jni)?;
+	let constructors_code = generate_constructors(type_name, &api_name, &input.constructors, &input.type_mappings, jni);
 
 	// Generate method implementations
-	let methods_impl = generate_methods(&api_name, &input.methods, &input.type_mappings, jni)?;
+	let methods_impl = generate_methods(&api_name, &input.methods, &input.type_mappings, jni);
 
 	// Generate field implementations
 	let fields_impl = generate_fields(&api_name, &input.fields, &input.type_mappings, jni);
@@ -129,4 +120,18 @@ pub fn bind_java_type_impl(input: TokenStream) -> Result<TokenStream> {
 		#instance_impl
 		#native_trait_and_wrappers
 	})
+}
+
+fn validate_core_binding(input: &BindClassInput, java_class_dotted: &str) -> Result<()> {
+	// Check if this is a core Java type that cannot be bound without __jni_core = true
+	if input.type_mappings.is_core_java_type(&input.java_class) && !input.jni_core {
+		return Err(syn::Error::new(
+			Span::call_site(),
+			format!(
+				"Cannot create binding for core Java type '{java_class_dotted}'. Core types (java.lang.Object, java.lang.Class, java.lang.Throwable, and java.lang.String) are already provided by the jni crate and cannot be re-bound."
+			),
+		));
+	}
+
+	Ok(())
 }

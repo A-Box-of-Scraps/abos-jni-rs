@@ -22,7 +22,7 @@ pub(super) fn generate_native_registration_code(
 		let rust_name = &method.rust_name;
 
 		// Use MethodSignature to generate JNI signature
-		let jni_signature = method.method_signature.to_jni_signature(type_mappings).map_err(|e| {
+		let jni_signature = method.signature.to_jni_signature(type_mappings).map_err(|e| {
 			syn::Error::new(
 				rust_name.span(),
 				format!("Failed to generate JNI signature for native method '{rust_name}': {e}"),
@@ -67,7 +67,10 @@ pub(super) fn generate_native_registration_code(
 }
 
 /// Generate exported native method functions for methods marked with export = true
-#[allow(clippy::too_many_arguments)]
+#[allow(
+	clippy::too_many_arguments,
+	reason = "Code generation needs the independent binding metadata and JNI paths."
+)]
 pub(super) fn generate_native_exports(
 	type_name: &Ident,
 	api_name: &Ident,
@@ -115,7 +118,10 @@ pub(super) fn generate_native_exports(
 }
 
 /// Generate a single exported native method function
-#[allow(clippy::too_many_arguments)]
+#[allow(
+	clippy::too_many_arguments,
+	reason = "Code generation needs the independent binding metadata and JNI paths."
+)]
 pub(super) fn generate_single_native_export(
 	type_name: &Ident,
 	api_name: &Ident,
@@ -128,11 +134,8 @@ pub(super) fn generate_single_native_export(
 	let rust_name = &method.rust_name;
 	let wrapper_name = format_ident!("{}_native_method", rust_name);
 
-	// Use custom export name if provided, otherwise use java_name
-	let java_method_name = export_name.as_ref().unwrap_or(&method.java_name);
-
 	// Use MethodSignature to generate JNI signature for mangling
-	let jni_signature = method.method_signature.to_jni_signature(type_mappings).map_err(|e| {
+	let jni_signature = method.signature.to_jni_signature(type_mappings).map_err(|e| {
 		syn::Error::new(
 			rust_name.span(),
 			format!("Failed to generate JNI signature for exported native method '{rust_name}': {e}"),
@@ -140,11 +143,8 @@ pub(super) fn generate_single_native_export(
 	})?;
 
 	// Generate the mangled JNI function name
-	let mangled_name = if let Some(export_name) = export_name {
-		export_name
-	} else {
-		create_jni_fn_name(java_class_dotted, java_method_name, Some(&jni_signature))
-	};
+	let mangled_name =
+		export_name.unwrap_or_else(|| create_jni_fn_name(java_class_dotted, &method.java_name, Some(&jni_signature)));
 	let mangled_ident = format_ident!("{}", mangled_name);
 
 	let lifetime = quote! { 'local };
@@ -160,7 +160,7 @@ pub(super) fn generate_single_native_export(
 	}
 
 	// Add method parameters
-	for param in &method.method_signature.parameters {
+	for param in &method.signature.parameters {
 		let param_name = &param.name;
 		let rust_type = sig_type_to_rust_native_trait_arg_type(&param.ty, &lifetime, type_mappings, jni);
 		params.push(quote! { #param_name: #rust_type });
@@ -173,13 +173,13 @@ pub(super) fn generate_single_native_export(
 	} else {
 		call_args.push(quote! { this });
 	}
-	for param in &method.method_signature.parameters {
+	for param in &method.signature.parameters {
 		let param_name = &param.name;
 		call_args.push(quote! { #param_name });
 	}
 
 	// Get return type
-	let return_type = sig_type_to_rust_return_type(&method.method_signature.return_type, &lifetime, type_mappings, jni);
+	let return_type = sig_type_to_rust_return_type(&method.signature.return_type, &lifetime, type_mappings, jni);
 
 	let no_mangle_attr = if cfg!(has_unsafe_attr) {
 		quote! { #[unsafe(no_mangle)] }

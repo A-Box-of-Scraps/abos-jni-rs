@@ -148,6 +148,7 @@ impl<'local> AttachGuard<'local> {
 		let level = thread_guard_level_push(env);
 
 		let guard = Self {
+			// SAFETY: The caller supplies the current thread's valid JNI environment, and the newly pushed level tracks this guard.
 			env: unsafe { Env::new(env, level, true) },
 		};
 
@@ -183,6 +184,7 @@ impl<'local> AttachGuard<'local> {
 	pub unsafe fn from_unowned(env: *mut sys::JNIEnv) -> Self {
 		let level = thread_guard_level_push(env);
 		let guard = Self {
+			// SAFETY: The caller supplies the current thread's valid JNI environment, and the newly pushed level tracks this guard.
 			env: unsafe { Env::new(env, level, false) },
 		};
 
@@ -239,7 +241,7 @@ impl<'local> AttachGuard<'local> {
 			};
 
 			if let Some(throwable) = throw {
-				let _ = env.throw(throwable);
+				drop(env.throw(throwable));
 			}
 			caught_exception
 		};
@@ -256,6 +258,7 @@ impl<'local> AttachGuard<'local> {
 				new_level, 0,
 				"Spurious AttachGuard that owns its attachment but is nested under another guard"
 			);
+			// SAFETY: This outermost owning guard has popped its level and will not use the environment after detaching.
 			unsafe { sys_detach_current_thread(Some(self.env.raw), &std::thread::current()) }
 		} else {
 			Ok(())
@@ -278,6 +281,10 @@ impl<'local> AttachGuard<'local> {
 	/// This will panic if a guard is dropped out-of-order, with respect to
 	/// other guards. Each [`AttachGuard`] created may be nested with respect
 	/// to other guards and must be dropped or detached in LIFO order.
+	///
+	/// # Errors
+	///
+	/// Returns an error if JNI fails to detach an attachment owned by this guard.
 	pub fn detach(mut self) -> Result<()> {
 		// Safety: we're going to 'forget' the guard afterwards to ensure the
 		// `Drop` implementation isn't run too.
@@ -304,6 +311,10 @@ impl<'local> AttachGuard<'local> {
 	/// This will panic if a guard is dropped out-of-order, with respect to
 	/// other guards. Each [`AttachGuard`] created may be nested with respect
 	/// to other guards and must be dropped or detached in LIFO order.
+	///
+	/// # Errors
+	///
+	/// Returns a caught Java exception or an error from detaching the owned attachment.
 	pub fn detach_with_catch(mut self) -> Result<()> {
 		// Safety: we're going to 'forget' the guard afterwards to ensure the
 		// `Drop` implementation isn't run too.
@@ -332,6 +343,10 @@ impl<'local> AttachGuard<'local> {
 	/// This will panic if a guard is dropped out-of-order, with respect to
 	/// other guards. Each [`AttachGuard`] created may be nested with respect
 	/// to other guards and must be dropped or detached in LIFO order.
+	///
+	/// # Errors
+	///
+	/// Returns a caught Java exception or an error from detaching the owned attachment.
 	pub fn detach_with_catch_and_throw(mut self, throwable: Option<JThrowable<'local>>) -> Result<()> {
 		// Safety: we're going to 'forget' the guard afterwards to ensure the
 		// `Drop` implementation isn't run too.
@@ -347,6 +362,7 @@ impl<'local> AttachGuard<'local> {
 
 impl Drop for AttachGuard<'_> {
 	fn drop(&mut self) {
+		// SAFETY: Drop invokes the detach path once and does not use the environment afterward.
 		if let Err(err) = unsafe { self.detach_impl(false, None) } {
 			// This probably means that something `unsafe` happened to detach the thread already
 			log::error!("Failed to detach current JNI thread: {err}");

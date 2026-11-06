@@ -13,6 +13,10 @@ impl<'local> Env<'local> {
 	///
 	/// This API catches exceptions internally and is not expected to return
 	/// [`Error::JavaException`] (unless called while there is a pending exception).
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class cannot be resolved or instantiated, allocation fails, or a Java exception is pending.
 	pub fn alloc_object<'other_local, T>(&mut self, class: T) -> Result<JObject<'local>>
 	where
 		T: Desc<'local, JClass<'other_local>>,
@@ -21,6 +25,7 @@ impl<'local> Env<'local> {
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let class = class.lookup(self)?;
+		// SAFETY: The descriptor resolves to a live class; the JNI allocator returns a local object reference.
 		let obj = unsafe {
 			jni_call_with_catch_and_null_check!(
                 catch |env| {
@@ -36,6 +41,7 @@ impl<'local> Env<'local> {
 		// Ensure that `class` isn't dropped before the JNI call returns.
 		drop(class);
 
+		// SAFETY: The pointer is a checked local reference allocated in the current frame.
 		Ok(unsafe { JObject::from_raw(self, obj) })
 	}
 
@@ -62,6 +68,14 @@ impl<'local> Env<'local> {
 	///
 	/// This API catches exceptions internally and is not expected to return
 	/// [`Error::JavaException`] (unless called while there is a pending exception).
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class or method cannot be resolved, its signature does not match, or a Java exception is pending.
+	///
+	/// # Panics
+	///
+	/// Panics if JNI returns a null method ID without reporting an exception.
 	pub fn get_method_id<'other_local, 'sig, 'sig_args, C, N, S>(
 		&mut self,
 		class: C,
@@ -77,6 +91,7 @@ impl<'local> Env<'local> {
 		let ffi_name = name.as_ref();
 		let sig = sig.as_ref();
 
+		// SAFETY: The resolved class, method name and signature remain valid during the JNI lookup.
 		let method_id = unsafe {
 			jni_call_with_catch!(
 				catch |env| {
@@ -87,11 +102,7 @@ impl<'local> Env<'local> {
 						}),
 					e: crate::exceptions::JExceptionInInitializerError => {
 						let exception = e.get_exception(env);
-						let exception = if let Ok(exception) = exception {
-							env.new_global_ref(exception).ok()
-						} else {
-							None
-						};
+						let exception = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
 						Err(Error::ExceptionInInitializer { exception })
 					},
 					crate::exceptions::JOutOfMemoryError =>
@@ -115,6 +126,7 @@ impl<'local> Env<'local> {
 			"Spurious null method ID returned, without a pending exception"
 		);
 
+		// SAFETY: The method ID came from JNI and was checked for null.
 		Ok(unsafe { JMethodID::from_raw(method_id) })
 	}
 
@@ -140,6 +152,14 @@ impl<'local> Env<'local> {
 	///
 	/// This API catches exceptions internally and is not expected to return
 	/// [`Error::JavaException`] (unless called while there is a pending exception).
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class or method cannot be resolved, its signature does not match, or a Java exception is pending.
+	///
+	/// # Panics
+	///
+	/// Panics if JNI returns a null method ID without reporting an exception.
 	pub fn get_static_method_id<'other_local, 'sig, 'sig_args, C, N, S>(
 		&mut self,
 		class: C,
@@ -155,6 +175,7 @@ impl<'local> Env<'local> {
 		let ffi_name = name.as_ref();
 		let sig = sig.as_ref();
 
+		// SAFETY: The resolved class, method name and signature remain valid during the JNI lookup.
 		let method_id = unsafe {
 			jni_call_with_catch!(
 				catch |env| {
@@ -165,11 +186,7 @@ impl<'local> Env<'local> {
 						}),
 					e: crate::exceptions::JExceptionInInitializerError => {
 						let exception = e.get_exception(env);
-						let exception = if let Ok(exception) = exception {
-							env.new_global_ref(exception).ok()
-						} else {
-							None
-						};
+						let exception = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
 						Err(Error::ExceptionInInitializer { exception })
 					},
 					crate::exceptions::JOutOfMemoryError =>
@@ -193,6 +210,7 @@ impl<'local> Env<'local> {
 			"Spurious null method ID returned, without a pending exception"
 		);
 
+		// SAFETY: The static method ID came from JNI and was checked for null.
 		Ok(unsafe { JStaticMethodID::from_raw(method_id) })
 	}
 

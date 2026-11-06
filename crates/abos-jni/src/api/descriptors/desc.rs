@@ -86,9 +86,14 @@ pub unsafe trait Desc<'local, T> {
 	/// This will still work without the call to `drop` at the end, but calling
 	/// `drop` ensures that the reference is not accidentally dropped earlier
 	/// than it should be.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the descriptor cannot resolve the requested JNI object or member.
 	fn lookup(self, _: &mut Env<'local>) -> Result<Self::Output>;
 }
 
+// SAFETY: Lookup returns the existing typed value or a borrow without changing its JNI reference kind or lifetime.
 unsafe impl<'local, T> Desc<'local, T> for T
 where
 	T: AsRef<T>,
@@ -100,6 +105,7 @@ where
 	}
 }
 
+// SAFETY: Lookup returns the existing typed value or a borrow without changing its JNI reference kind or lifetime.
 unsafe impl<'local, T> Desc<'local, T> for &T
 where
 	T: AsRef<T>,
@@ -111,6 +117,7 @@ where
 	}
 }
 
+// SAFETY: Lookup returns the existing typed value or a borrow without changing its JNI reference kind or lifetime.
 unsafe impl<'local, 'other_local, T> Desc<'local, T> for Auto<'other_local, T>
 where
 	T: AsRef<T> + Into<JObject<'other_local>>,
@@ -122,6 +129,7 @@ where
 	}
 }
 
+// SAFETY: Lookup returns the existing typed value or a borrow without changing its JNI reference kind or lifetime.
 unsafe impl<'local, 'other_local, T> Desc<'local, T> for &Auto<'other_local, T>
 where
 	T: AsRef<T> + Into<JObject<'other_local>>,
@@ -133,6 +141,7 @@ where
 	}
 }
 
+// SAFETY: Lookup returns the existing typed value or a borrow without changing its JNI reference kind or lifetime.
 unsafe impl<'local, 'obj_ref, T> Desc<'local, T> for &'obj_ref Global<T>
 where
 	T: Reference + AsRef<T> + AsRef<JObject<'static>> + Into<JObject<'static>> + Default + Send + Sync + 'static,

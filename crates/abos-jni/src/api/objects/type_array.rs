@@ -74,10 +74,12 @@ mod type_array_sealed {
 	// TypeArray builder
 	macro_rules! type_array {
         ( $jni_type:ty, $jni_type_name:ident, $new_array:ident, $get_elements:ident, $release_elements:ident, $get_region:ident, $set_region:ident) => {
-            /// $jni_type array access/release impl
+            /// Access and release operations for this primitive array type.
+            // SAFETY: Each invocation pairs the JNI primitive type with its matching array entry points.
             unsafe impl TypeArraySealed for $jni_type {
-                /// Create new Java $jni_type array
+                /// Create a new Java primitive array.
                 unsafe fn new_array(env: &mut Env, length: jsize) -> Result<jarray> {
+                    // SAFETY: The caller supplies a valid Env and a length for the matching primitive-array allocator.
                     let raw_array = unsafe {
                         jni_call_with_catch_and_null_check!(
                             catch |env| {
@@ -90,7 +92,7 @@ mod type_array_sealed {
                     Ok(raw_array)
                 }
 
-                /// Get Java $jni_type array
+                /// Get the elements of a Java primitive array.
                 unsafe fn get_elements(
                     env: &Env,
                     array: jarray,
@@ -98,6 +100,7 @@ mod type_array_sealed {
                 ) -> Result<*mut Self> {
                     // There are no documented exceptions for Get<Primitive>ArrayElements() but
                     // they may return `NULL`.
+                    // SAFETY: The caller guarantees an array of this primitive type and valid storage for the copy flag.
                     let ptr = unsafe {
                         jni_call_with_catch_and_null_check!(
                             catch |env| {
@@ -107,10 +110,10 @@ mod type_array_sealed {
                             },
                             env, v1_1, $get_elements, array, is_copy)?
                     };
-                    Ok(ptr as _)
+                    Ok(ptr.cast())
                 }
 
-                /// Release Java $jni_type array
+                /// Release the elements of a Java primitive array.
                 unsafe fn release_elements(
                     env: &Env,
                     array: jarray,
@@ -120,6 +123,7 @@ mod type_array_sealed {
                     // Release<Primitive>ArrayElements() is safe to call while there is a
                     // pending exception and there are no documented exceptions for
                     // Release<Primitive>ArrayElements()
+                    // SAFETY: The caller supplies the pointer obtained for this array and a valid JNI release mode.
                     unsafe {
                         ex_safe_jni_call_no_post_check_ex!(
                             env,
@@ -140,6 +144,8 @@ mod type_array_sealed {
                     buf: &mut [Self],
                 ) -> Result<()> {
                     let array = null_check!(array, "get_*_array_region array argument")?;
+                    let length = jsize::try_from(buf.len()).map_err(|_| Error::IndexOutOfBounds)?;
+                    // SAFETY: The array has the matching primitive type; the mutable slice provides storage for the requested region.
                     unsafe {
                         Ok(jni_call_with_catch!(
                             catch |env| {
@@ -152,7 +158,7 @@ mod type_array_sealed {
                             $get_region,
                             array,
                             start,
-                            buf.len() as jsize,
+                            length,
                             buf.as_mut_ptr()
                         )?)
                     }
@@ -165,6 +171,8 @@ mod type_array_sealed {
                     buf: &[Self],
                 ) -> Result<()> {
                     let array = null_check!(array, "set_*_array_region array argument")?;
+                    let length = jsize::try_from(buf.len()).map_err(|_| Error::IndexOutOfBounds)?;
+                    // SAFETY: The array has the matching primitive type; the slice provides readable data for the requested region.
                     unsafe {
                         Ok(jni_call_with_catch!(
                             catch |env| {
@@ -177,7 +185,7 @@ mod type_array_sealed {
                             $set_region,
                             array,
                             start,
-                            buf.len() as jsize,
+                            length,
                             buf.as_ptr()
                         )?)
                     }

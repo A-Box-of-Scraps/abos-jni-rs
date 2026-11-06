@@ -94,7 +94,7 @@ struct JniStrInput {
 
 impl Parse for JniStrInput {
 	fn parse(input: syn::parse::ParseStream) -> Result<Self> {
-		let jni_crate = crate::internal::utils::parse_jni_crate_override(&input)?;
+		let jni_crate = crate::internal::utils::parse_jni_crate_override(input)?;
 
 		// Parse comma-separated literals (like concat!)
 		let mut concatenated = String::new();

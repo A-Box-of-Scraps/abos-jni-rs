@@ -62,7 +62,9 @@ pub struct JObject<'local> {
 	lifetime: PhantomData<&'local ()>,
 }
 
+// SAFETY: A static JObject is null or backed by a global reference, neither of which is tied to a thread.
 unsafe impl Send for JObject<'static> {}
+// SAFETY: A static JObject is null or backed by a global reference; JNI operations require the accessing thread's Env.
 unsafe impl Sync for JObject<'static> {}
 
 impl AsRef<Self> for JObject<'_> {
@@ -121,7 +123,7 @@ impl JObjectAPI {
 			let class = env.new_global_ref(class)?;
 			Ok(Self { class })
 		})?;
-		let _ = API.set(api);
+		drop(API.set(api));
 		Ok(API.get().expect("Object bindings have just been initialized"))
 	}
 }
@@ -136,6 +138,7 @@ impl JObject<'_> {
 	/// - The local reference must belong to the current thread and not outlive the
 	///   JNI stack frame associated with the [Env] `'local` lifetime.
 	pub unsafe fn from_raw<'local>(_env: &Env<'local>, raw: jobject) -> JObject<'local> {
+		// SAFETY: The caller supplies a valid raw reference with the lifetime required by kind_from_raw.
 		unsafe { JObject::kind_from_raw(raw) }
 	}
 

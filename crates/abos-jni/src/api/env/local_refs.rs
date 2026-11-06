@@ -98,6 +98,10 @@ impl<'local> Env<'local> {
 	/// ```
 	///
 	/// [`NewLocalRef`]: https://docs.oracle.com/en/java/javase/11/docs/specs/jni/functions.html#newlocalref
+	///
+	/// # Errors
+	///
+	/// Returns an error if the JVM cannot allocate a local reference or a weak source reference has already been collected.
 	pub fn new_local_ref<'any_local, O>(&mut self, obj: O) -> Result<O::Kind<'local>>
 	where
 		O: Reference + AsRef<JObject<'any_local>>,

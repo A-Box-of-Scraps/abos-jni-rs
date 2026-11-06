@@ -135,7 +135,7 @@ impl MethodParser {
 	fn finish(mut self, span: Span) -> Result<NativeMethodStructInput> {
 		let java_method_name = self.method_name.take().ok_or_else(|| syn::Error::new(span,
 			"Missing method name (use 'name = \"javaCamelCaseName\"' or inline signature like 'fn RustType::snake_case_method_name()')"))?;
-		let method_signature = self.signature.take().ok_or_else(|| syn::Error::new(span,
+		let signature = self.signature.take().ok_or_else(|| syn::Error::new(span,
 			"Missing method signature (use 'sig = (args...) -> ret' or inline signature like 'fn RustType::method_name(args...) -> ret')"))?;
 		let fn_path = self.fn_path.take().ok_or_else(|| syn::Error::new(span,
 			"Missing 'fn' and can't infer a default function path without an inline signature like 'fn RustType::method_name(args..) -> ret'."))?;
@@ -146,7 +146,7 @@ impl MethodParser {
 			rust_type: self.rust_type,
 			java_type: self.java_type,
 			java_method_name,
-			method_signature,
+			signature,
 			fn_path,
 			type_mappings: self.type_mappings,
 			is_raw_fn: self.is_raw,
@@ -216,7 +216,7 @@ fn parse_inline_signature(input: ParseStream, mappings: &TypeMappings) -> Result
 
 impl Parse for NativeMethodStructInput {
 	fn parse(input: ParseStream) -> Result<Self> {
-		let jni_crate = crate::internal::utils::parse_jni_crate_override(&input)?;
+		let jni_crate = crate::internal::utils::parse_jni_crate_override(input)?;
 		let mut parser = MethodParser::new(jni_crate);
 		while !input.is_empty() {
 			if is_property(input) {
