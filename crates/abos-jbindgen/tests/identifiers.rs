@@ -1,4 +1,4 @@
-//! Identifier normalization, collision handling, and downstream macro limitations.
+//! Identifier normalization, collision handling, and Java lookup names.
 mod support;
 use abos_jbindgen::{Bindings, Builder, TypeMap};
 use std::{fs, path::PathBuf};
@@ -62,18 +62,29 @@ fn normalizes_explicit_type_member_and_constructor_overrides() -> TestResult {
 }
 
 #[test]
-fn unsupported_java_member_names_fail_early_unless_explicitly_skipped() -> TestResult {
-	let builder: Builder = source_builder(&["UnsupportedNames.java"]);
-	let error: String = builder.clone().generate().expect_err("unsupported field").to_string();
-	assert!(error.contains("$value") && error.contains("skip_signature"), "{error}");
-	let builder: Builder = builder.skip_signature("Lcom/example/UnsupportedNames;->$value:I");
-	let error: String = builder.clone().generate().expect_err("unsupported method").to_string();
-	assert!(error.contains("foo$bar"), "{error}");
-	let bindings: Bindings = builder
-		.skip_signature("Lcom/example/UnsupportedNames;->foo$bar()I")
-		.generate()?;
-	assert!(!bindings.to_string().contains("$value"));
-	assert!(!bindings.to_string().contains("foo$bar"));
+fn dollar_member_names_are_preserved_in_source_and_bytecode_bindings() -> TestResult {
+	let root: TempDir = tempfile::tempdir()?;
+	abos_javac::Build::new()
+		.file(fixture("UnsupportedNames.java"))
+		.output_dir(root.path())
+		.cargo_metadata(false)
+		.try_compile()?;
+	for builder in [
+		source_builder(&["UnsupportedNames.java"]),
+		Builder::new().input_class(root.path().join("com/example/UnsupportedNames.class")),
+	] {
+		let code: String = builder.clone().generate()?.to_string();
+		for expected in ["name = \"$value\"", "name = \"foo$bar\"", "fn foo_bar"] {
+			assert!(code.contains(expected), "missing {expected}: {code}");
+		}
+		let skipped: String = builder
+			.skip_signature("Lcom/example/UnsupportedNames;->$value:I")
+			.skip_signature("Lcom/example/UnsupportedNames;->foo$bar()I")
+			.generate()?
+			.to_string();
+		assert!(!skipped.contains("$value"));
+		assert!(!skipped.contains("foo$bar"));
+	}
 	Ok(())
 }
 

@@ -1,4 +1,4 @@
-use super::{rust_identifier, unique_identifier, validate_java_member_name};
+use super::{rust_identifier, unique_identifier};
 use std::collections::HashSet;
 
 #[test]
@@ -19,16 +19,6 @@ fn normalizes_keywords_characters_and_empty_identifiers() {
 	] {
 		assert_eq!(rust_identifier(input), expected);
 		assert_eq!(rust_identifier(expected), expected);
-	}
-}
-
-#[test]
-fn rejects_java_names_that_would_panic_in_the_downstream_macro() {
-	for name in ["type", "gen", "café", "a\u{301}", "_value"] {
-		assert!(validate_java_member_name(name).is_ok(), "{name}");
-	}
-	for name in ["$value", "foo$bar", "¥", "1bad", "", "a-b"] {
-		assert!(validate_java_member_name(name).is_err(), "{name}");
 	}
 }
 

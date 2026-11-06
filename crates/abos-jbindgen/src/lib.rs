@@ -5,9 +5,8 @@
 //! Original Java names are retained for JNI lookup. Parameter-name collisions gain
 //! additional trailing underscores.
 //!
-//! The current `abos_jni::bind_java_type!` macro cannot represent certain Java member
-//! names, such as names containing `$`. Generation rejects these with an error;
-//! use [`Builder::skip_signature`] to explicitly omit unsupported members.
+//! Java member names containing `$` are preserved for JNI lookup while their
+//! Rust bindings use normalized identifiers.
 //!
 //! Bytecode JAR inputs use a base-only policy: module/package metadata and all
 //! `META-INF/` entries (including multi-release variants) are excluded before

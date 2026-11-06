@@ -92,6 +92,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		let renamed = overrides::com::example::type_::gen_(env)?;
 		renamed.set_value(env, 42)?;
 		assert_eq!(renamed.with_dash(env)?, 42);
+		let dollars = bindings::com::example::UnsupportedNames::new(env)?;
+		dollars.set__value(env, 42)?;
+		assert_eq!(dollars._value(env)?, 42);
+		assert_eq!(dollars.foo_bar(env)?, 42);
+		let tree_dollars = tree::com::example::UnsupportedNames::new(env)?;
+		tree_dollars.set__value(env, 17)?;
+		assert_eq!(tree_dollars._value(env)?, 17);
+		assert_eq!(tree_dollars.foo_bar(env)?, 17);
 		collisions::check(env)?;
 		assert_eq!(modular_jar::fixture::archive::ModularExample::answer(env)?, 42);
 		// Binding generation uses base classes; the JVM still selects its runtime variant.

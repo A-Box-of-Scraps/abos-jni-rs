@@ -139,7 +139,7 @@ impl FieldParser {
 	fn parse_value_property(&mut self, input: ParseStream, mappings: &TypeMappings) -> Result<()> {
 		let lookahead: syn::parse::Lookahead1<'_> = input.lookahead1();
 		if lookahead.peek(name) {
-			self.java_name = parse_name_spec(input)?.0;
+			self.java_name = parse_name_spec(input)?;
 		} else if lookahead.peek(sig) {
 			self.signature = Some(parse_field_sig(input, mappings)?);
 		} else if lookahead.peek(Token![static]) {

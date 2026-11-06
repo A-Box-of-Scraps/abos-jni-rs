@@ -1,7 +1,7 @@
 use super::{
 	Context,
 	documentation::format_javadoc_as_rustdoc,
-	identifiers::{rust_identifier, validate_java_member_name},
+	identifiers::rust_identifier,
 	names::{java_name_to_rust, resolve_type_with_deps},
 	overloads::{generate_unique_overload_names, group_methods_by_name, is_snake_case, resolve_name_collision},
 	signatures::{
@@ -81,7 +81,7 @@ pub(super) fn constructors(context: &mut Context<'_>) -> Result<()> {
 	Ok(())
 }
 
-pub(super) fn fields(context: &mut Context<'_>) -> Result<()> {
+pub(super) fn fields(context: &mut Context<'_>) {
 	let fields: Vec<&FieldInfo> = context
 		.class
 		.fields
@@ -94,11 +94,10 @@ pub(super) fn fields(context: &mut Context<'_>) -> Result<()> {
 		})
 		.collect();
 	if fields.is_empty() {
-		return Ok(());
+		return;
 	}
 	context.body.push_str("    fields {\n");
 	for field in fields {
-		validate_java_member_name(&field.name)?;
 		let dex: String = generate_field_dex_signature(&context.class.class_name, field);
 		let (name, reversible) = member_name(context, &field.name, &dex, field.rust_name_override.as_deref(), None);
 		let setter: Option<String> = if field.is_final {
@@ -139,7 +138,6 @@ pub(super) fn fields(context: &mut Context<'_>) -> Result<()> {
 		}
 	}
 	context.body.push_str("    },\n");
-	Ok(())
 }
 
 fn member_name(
@@ -213,7 +211,6 @@ fn method_binding(
 	reversible: bool,
 	native: bool,
 ) -> Result<()> {
-	validate_java_member_name(&method.name)?;
 	let sig: String = generate_method_signature_with_deps(
 		method,
 		context.types,

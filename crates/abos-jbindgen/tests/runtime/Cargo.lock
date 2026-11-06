@@ -26,7 +26,6 @@ dependencies = [
  "clap",
  "log",
  "thiserror",
- "unicode-ident",
  "zip",
 ]
 

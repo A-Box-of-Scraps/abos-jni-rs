@@ -24,6 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		"MemberCollisions",
 		"MixedMethods",
 		"Identifiers",
+		"UnsupportedNames",
 		"keywords/match",
 	];
 	let sources: Vec<PathBuf> = names

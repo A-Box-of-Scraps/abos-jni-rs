@@ -28,23 +28,6 @@ pub fn rust_identifier(name: &str) -> String {
 	identifier
 }
 
-/// The downstream macro converts explicit Java member names into Rust identifiers,
-/// even though it discards that identifier. Reject names that would make it panic.
-/// Temporary workaround: see JNI-MACROS-001 in docs/ISSUES.md for the fork fix and removal checklist.
-pub fn validate_java_member_name(name: &str) -> crate::Result<()> {
-	let mut characters: std::str::Chars<'_> = name.chars();
-	if characters
-		.next()
-		.is_some_and(|first| first == '_' || unicode_ident::is_xid_start(first))
-		&& characters.all(unicode_ident::is_xid_continue)
-	{
-		return Ok(());
-	}
-	Err(crate::Error::Unsupported(format!(
-		"abos_jni::bind_java_type! cannot represent Java member name {name:?}; omit it with skip_signature"
-	)))
-}
-
 fn is_keyword(name: &str) -> bool {
 	matches!(
 		name,

@@ -42,7 +42,7 @@ pub fn generate_with_type_map(class: &ClassInfo, options: &BindgenOptions, types
 		member_names: HashMap::new(),
 	};
 	members::constructors(&mut context)?;
-	members::fields(&mut context)?;
+	members::fields(&mut context);
 	members::methods(&mut context, false)?;
 	if options.generate_native_interfaces {
 		members::methods(&mut context, true)?;

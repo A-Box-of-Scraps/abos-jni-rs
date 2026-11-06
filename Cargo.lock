@@ -31,7 +31,6 @@ dependencies = [
  "log",
  "tempfile",
  "thiserror",
- "unicode-ident",
  "zip",
 ]
 

@@ -1,7 +1,7 @@
 use super::{
 	AbiCheck, Constructor, Ident, LitBool, LitStr, Method, MethodKind, MethodSignature, NativeMethod,
 	NativeMethodExport, ParseStream, ParsedMethod, Result, SigType, Token, TypeMappings, VisibilitySpec, abi_check,
-	braced, catch_unwind, error_policy, export, format_ident, name, non_null, parenthesized, parse_method_sig,
+	braced, catch_unwind, error_policy, export, name, non_null, parenthesized, parse_method_sig,
 	parse_parameter_with_index, parse_type, raw, sig, snake_case_to_lower_camel_case,
 };
 
@@ -48,19 +48,17 @@ pub(super) fn parse_visibility(input: ParseStream) -> Result<Option<VisibilitySp
 }
 
 /// Parse a name = "value" or name = `rust_name` pair
-pub(super) fn parse_name_spec(input: ParseStream) -> Result<(String, Ident)> {
+pub(super) fn parse_name_spec(input: ParseStream) -> Result<String> {
 	input.parse::<name>()?;
 	input.parse::<Token![=]>()?;
 
 	if input.peek(LitStr) {
 		let lit: LitStr = input.parse::<LitStr>()?;
-		let java_name: String = lit.value();
-		let rust_name: Ident = format_ident!("{}", java_name);
-		Ok((java_name, rust_name))
+		// Java lookup names need not be valid Rust identifiers.
+		Ok(lit.value())
 	} else {
 		let rust_name: Ident = input.parse::<Ident>()?;
-		let java_name: String = rust_name.to_string();
-		Ok((java_name, rust_name))
+		Ok(rust_name.to_string())
 	}
 }
 
@@ -147,7 +145,7 @@ impl MethodOptions {
 	fn parse_property(&mut self, input: ParseStream, mappings: &TypeMappings) -> Result<()> {
 		let lookahead: syn::parse::Lookahead1<'_> = input.lookahead1();
 		if lookahead.peek(name) {
-			self.java_name = Some(parse_name_spec(input)?.0);
+			self.java_name = Some(parse_name_spec(input)?);
 		} else if lookahead.peek(sig) {
 			self.signature = Some(parse_method_sig(input, mappings)?);
 		} else if lookahead.peek(Token![fn]) {

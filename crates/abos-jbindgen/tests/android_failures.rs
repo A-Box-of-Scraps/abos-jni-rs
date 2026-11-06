@@ -29,8 +29,22 @@ fn sdk(failure: Failure) -> TestResult<TempDir> {
 	let root: TempDir = tempfile::tempdir()?;
 	let sources: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/java");
 	let classes: PathBuf = root.path().join("classes");
-	abos_javac::Build::new()
-		.files([sources.join("SimpleClass.java"), sources.join("UnsupportedNames.java")])
+	let fixture: PathBuf = root.path().join("UnsupportedNames.java");
+	let mut source: String = fs::read_to_string(sources.join("UnsupportedNames.java"))?;
+	if matches!(failure, Failure::Generation) {
+		// Missing primitive mappings remain generation errors even when dollar names are supported.
+		source = source.replacen(
+			"public class UnsupportedNames {",
+			"public class UnsupportedNames {
+			public void unsupported(@io.github.jni_rs.jbindgen.RustPrimitive(\"Missing\") int value) {}",
+			1,
+		);
+	}
+	fs::write(&fixture, source)?;
+	let mut java_sources: Vec<PathBuf> = abos_jbindgen_annotations::write_sources(root.path().join("annotations"))?;
+	java_sources.extend([sources.join("SimpleClass.java"), fixture.clone()]);
+	let compiled: Vec<PathBuf> = abos_javac::Build::new()
+		.files(java_sources)
 		.output_dir(&classes)
 		.cargo_metadata(false)
 		.try_compile()?;
@@ -49,7 +63,19 @@ fn sdk(failure: Failure) -> TestResult<TempDir> {
 		bytecode.start_file(entry, SimpleFileOptions::default())?;
 		bytecode.write_all(&bytes)?;
 		stubs.start_file(format!("com/example/{name}.java"), SimpleFileOptions::default())?;
-		stubs.write_all(&fs::read(sources.join(format!("{name}.java")))?)?;
+		let source_path: PathBuf = if name == "UnsupportedNames" {
+			fixture.clone()
+		} else {
+			sources.join(format!("{name}.java"))
+		};
+		stubs.write_all(&fs::read(source_path)?)?;
+	}
+	for class in compiled {
+		let entry: &Path = class.strip_prefix(&classes)?;
+		if entry.starts_with("io") {
+			bytecode.start_file(entry.to_string_lossy(), SimpleFileOptions::default())?;
+			bytecode.write_all(&fs::read(class)?)?;
+		}
 	}
 	bytecode.finish()?;
 	stubs.finish()?;
@@ -84,8 +110,8 @@ fn assert_failure(command: &mut Command, failure: Failure) -> TestResult<Output>
 			);
 		}
 		Failure::Generation => {
-			assert!(stderr.contains("$value"), "missing original error: {stderr}");
-			assert!(stderr.contains("skip_signature"), "missing remediation: {stderr}");
+			assert!(stderr.contains("Missing"), "missing original error: {stderr}");
+			assert!(stderr.contains("primitive type mapping"), "missing cause: {stderr}");
 		}
 	}
 	Ok(output)
@@ -122,7 +148,7 @@ fn library_error_probe() {
 		("generation", Error::AndroidClassGeneration { class_name, source }) => {
 			assert_eq!(class_name, "com.example.UnsupportedNames");
 			assert_eq!(cause, source.to_string());
-			assert!(matches!(*source, Error::Unsupported(_)));
+			assert!(matches!(*source, Error::CodeGen(_)));
 		}
 		(_, error) => panic!("unexpected error for {scenario}: {error:?}"),
 	}
@@ -215,18 +241,13 @@ fn unsupported_members_require_explicit_skips_not_allow_unsupported() -> TestRes
 	let root: TempDir = sdk(Failure::Generation)?;
 	assert_failure(android(root.path()).arg("--allow-unsupported"), Failure::Generation)?;
 	let output: Output = android(root.path())
-		.args([
-			"--skip",
-			"Lcom/example/UnsupportedNames;->$value:I",
-			"--skip",
-			"Lcom/example/UnsupportedNames;->foo$bar()I",
-		])
+		.args(["--skip", "Lcom/example/UnsupportedNames;->unsupported(I)V"])
 		.output()?;
 	assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
 	let code: String = String::from_utf8(output.stdout)?;
 	assert!(code.contains("pub SimpleClass"));
 	assert!(code.contains("pub UnsupportedNames"));
-	assert!(!code.contains("$value"));
-	assert!(!code.contains("foo$bar"));
+	assert!(code.contains("$value"));
+	assert!(code.contains("foo$bar"));
 	Ok(())
 }
