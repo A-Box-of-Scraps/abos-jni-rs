@@ -4,6 +4,7 @@ mod members;
 pub mod names;
 mod overloads;
 pub mod signatures;
+pub mod symbols;
 
 use crate::{BindgenOptions, ClassInfo, ModuleBinding, Result, TypeMap};
 use names::{canonical_java_name, derive_rust_type_name, macro_java_name};
@@ -39,7 +40,7 @@ pub fn generate_with_type_map(class: &ClassInfo, options: &BindgenOptions, types
 		used: HashSet::new(),
 		primitives: HashSet::new(),
 		body: String::new(),
-		member_names: HashMap::new(),
+		member_names: symbols::member_names(class, types),
 	};
 	members::constructors(&mut context)?;
 	members::fields(&mut context);

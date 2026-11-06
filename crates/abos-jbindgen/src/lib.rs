@@ -2,8 +2,10 @@
 //!
 //! Generated identifiers use ASCII spelling: Rust keywords and the JNI macro's `non_null` qualifier gain a trailing underscore,
 //! punctuation becomes underscores, and non-ASCII characters become `_u<hex>_`.
-//! Original Java names are retained for JNI lookup. Parameter-name collisions gain
-//! additional trailing underscores.
+//! Original Java names are retained for JNI lookup. Parameter and member-name collisions gain
+//! additional trailing underscores, including collisions with generated reference methods.
+//! Module-level conflicts between wrapper types, API types, native interfaces, package modules,
+//! and initialization helpers are rejected with diagnostics before Rust code is emitted.
 //!
 //! Java member names containing `$` are preserved for JNI lookup while their
 //! Rust bindings use normalized identifiers.

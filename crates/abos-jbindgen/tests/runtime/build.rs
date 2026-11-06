@@ -25,6 +25,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		"AccessorCollisions",
 		"MemberCollisions",
 		"MixedMethods",
+		"GeneratedMembers",
+		"GeneratedNatives",
+		"GeneratedNativesNativeInterface",
 		"Identifiers",
 		"UnsupportedNames",
 		"keywords/match",
@@ -85,6 +88,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		}
 		builder.generate()?.write_to_file(output.join(format!("{module}.rs")))?;
 	}
+	abos_jbindgen::Builder::new()
+		.input_class(classes.join("com/example/GeneratedMembers.class"))
+		.root_path("crate::generated_members")
+		.name_override("Lcom/example/GeneratedMembers;-><init>()V", "null")
+		.generate()?
+		.write_to_file(output.join("generated_members.rs"))?;
+	abos_jbindgen::Builder::new()
+		.input_class(classes.join("com/example/GeneratedNatives.class"))
+		.root_path("crate::generated_natives")
+		.generate()?
+		.write_to_file(output.join("generated_natives.rs"))?;
+	abos_jbindgen::Builder::new()
+		.input_class(classes.join("com/example/SimpleClass.class"))
+		.root_path("crate::helper_no_init")
+		.rust_type_name("jni_init")
+		.generate_jni_init(false)
+		.generate()?
+		.write_to_file(output.join("helper_no_init.rs"))?;
 	archive_bindings(&output)?;
 	Ok(())
 }

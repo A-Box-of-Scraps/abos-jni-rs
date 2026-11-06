@@ -1,8 +1,9 @@
 use crate::internal::generator::{
 	identifiers::rust_identifier,
 	names::{builtin_jni_types, canonical_java_name, derive_rust_type_name},
+	symbols::GeneratedSymbols,
 };
-use crate::{BindgenOptions, ClassInfo, Error, Result};
+use crate::{BindgenOptions, ClassInfo, Result};
 use std::collections::HashMap;
 /// Maps Java binary names to Rust wrapper type paths.
 ///
@@ -21,7 +22,7 @@ impl TypeMap {
 		options: &BindgenOptions,
 	) -> Result<Self> {
 		let mut map: HashMap<String, String> = HashMap::new();
-		let mut owners: HashMap<String, String> = HashMap::new();
+		let mut symbols: GeneratedSymbols = GeneratedSymbols::default();
 
 		for class_info in classes {
 			// Build the Java type name using class_name which has the full binary name with $ for inner classes
@@ -47,13 +48,7 @@ impl TypeMap {
 			rust_path.push_str("::");
 			rust_path.push_str(&rust_name);
 
-			if let Some(previous) = owners.insert(rust_path.clone(), java_type.clone())
-				&& previous != java_type
-			{
-				return Err(Error::CodeGen(format!(
-					"Java classes {previous:?} and {java_type:?} map to the same Rust type {rust_path:?}; use distinct Rust type names or generate them separately"
-				)));
-			}
+			symbols.register_class(class_info, options, &rust_path)?;
 			map.insert(java_type, rust_path);
 		}
 

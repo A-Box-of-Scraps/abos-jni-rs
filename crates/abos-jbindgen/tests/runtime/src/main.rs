@@ -57,8 +57,21 @@ mod default_bytecode {
 mod default_unmapped {
 	include!(concat!(env!("OUT_DIR"), "/default_unmapped.rs"));
 }
+#[allow(dead_code, non_snake_case)]
+mod generated_members {
+	include!(concat!(env!("OUT_DIR"), "/generated_members.rs"));
+}
+#[allow(dead_code, non_snake_case)]
+mod generated_natives {
+	include!(concat!(env!("OUT_DIR"), "/generated_natives.rs"));
+}
+#[allow(dead_code, non_snake_case, non_camel_case_types)]
+mod helper_no_init {
+	include!(concat!(env!("OUT_DIR"), "/helper_no_init.rs"));
+}
 mod collisions;
 mod default_package;
+mod generated_collisions;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	use bindings::com::example::SimpleClass;
@@ -110,6 +123,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		assert_eq!(tree_dollars._value(env)?, 17);
 		assert_eq!(tree_dollars.foo_bar(env)?, 17);
 		collisions::check(env)?;
+		generated_collisions::check(env)?;
 		default_package::check(env)?;
 		assert_eq!(modular_jar::fixture::archive::ModularExample::answer(env)?, 42);
 		// Binding generation uses base classes; the JVM still selects its runtime variant.
