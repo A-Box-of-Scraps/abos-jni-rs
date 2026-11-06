@@ -253,6 +253,8 @@ struct IdLookup {
 struct JniCallArgs {
 	lifetimes: Vec<TokenStream>,
 	jvalue_conversions: Vec<TokenStream>,
+	reference_args: Vec<TokenStream>,
+	reference_bindings: Vec<TokenStream>,
 	decls: Vec<TokenStream>,
 }
 

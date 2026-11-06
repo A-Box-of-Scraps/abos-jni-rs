@@ -95,8 +95,8 @@ pub type ReturnType = JavaType;
 /// This is a structured representation of a JNI method signature, such as
 /// `(Ljava/lang/String;)Z`.
 ///
-/// The decomposed types are guaranteed to match the signature string and so
-/// they can be used for safe JNI calls without further validation.
+/// The decomposed JNI value categories are guaranteed to match the signature string.
+/// Reference arguments still require runtime assignability checks against the resolved member.
 ///
 /// Most of the time you should use the [`jni_sig!`] macro to derive method
 /// signatures at compile time.
@@ -158,8 +158,8 @@ impl From<&Self> for MethodSignature<'_, '_> {
 /// This is a structured representation of a JNI field signature, such
 /// as `I`.
 ///
-/// The field type is guaranteed to match the signature string and so
-/// it can be used for safe JNI calls without further validation.
+/// The field's JNI value category is guaranteed to match the signature string.
+/// Reference values still require runtime assignability checks against the resolved field.
 ///
 /// Most of the time you should use the [`jni_sig!`] macro to derive field
 /// signatures at compile time.
@@ -202,9 +202,13 @@ impl<'sig> FieldSignature<'sig> {
 		self.ty
 	}
 
-	/// Check if the type of this field is compatible with the given type. This
+	/// Check whether the JNI value categories are compatible. This
 	/// is not quite an equality check on `Self::ty()` because `JavaType::Array`
-	/// signatures are considered compatible with `JavaType::Object` values
+	/// signatures are considered compatible with `JavaType::Object` values.
+	///
+	/// This does not validate reference assignability: `JavaType` does not retain class names
+	/// or array component types. Safe field setters additionally check the actual value
+	/// against the resolved field's runtime class.
 	#[must_use]
 	pub fn type_is_compatible_with(&self, ty: JavaType) -> bool {
 		match (self.ty, ty) {
@@ -220,8 +224,8 @@ impl<'sig> FieldSignature<'sig> {
 /// This is a structured representation of a JNI method signature, such
 /// as `(Ljava/lang/String;)Z`.
 ///
-/// The decomposed types are guaranteed to match the signature string and so
-/// they can be used for safe JNI calls without further validation.
+/// The decomposed JNI value categories are guaranteed to match the signature string.
+/// Reference arguments still require runtime assignability checks against the resolved member.
 ///
 /// A reference to `RuntimeSignature` can be converted into a `Signature`, which
 /// is used by the JNI functions, such as `call_(object|static)_method`.
@@ -325,8 +329,8 @@ impl fmt::Display for RuntimeMethodSignature {
 ///
 /// This is a structured representation of a JNI field signature, such as `[Ljava/lang/String;`.
 ///
-/// The field type is guaranteed to match the signature string and so it can be
-/// used for safe JNI calls without further validation.
+/// The field's JNI value category is guaranteed to match the signature string.
+/// Reference values still require runtime assignability checks against the resolved field.
 ///
 /// A reference to `RuntimeFieldSignature` can be converted into a
 /// `FieldSignature`, which is used by the JNI functions, such as

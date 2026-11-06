@@ -148,6 +148,7 @@ fn generate_constructor(
 	let args: crate::internal::bind_java_type::JniCallArgs =
 		generate_jni_call_args(&constructor.signature.parameters, type_mappings, jni);
 
+	let validation: TokenStream = args.reference_validation(&method_id_field, false);
 	let lifetimes: &Vec<TokenStream> = &args.lifetimes;
 	let decls: &Vec<TokenStream> = &args.decls;
 	let jvalue_conversions: &Vec<TokenStream> = &args.jvalue_conversions;
@@ -176,6 +177,7 @@ fn generate_constructor(
 			#(#decls),*
 		) -> #jni::errors::Result<#type_name<'env_local>> {
 			let api = #api_name::get(env, &#jni::refs::LoaderContext::None)?;
+			#validation
 			let jni_args #jni_args_type = [#(#jvalue_conversions),*];
 
 			unsafe {

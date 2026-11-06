@@ -129,10 +129,24 @@ impl<'a> FieldContext<'a> {
 			&quote! { val },
 			mappings,
 		);
+		let reference_binding: TokenStream = if ty.try_as_primitive(mappings).is_some() {
+			quote! {}
+		} else {
+			quote! { let val: &#jni::objects::JObject = val.as_ref().as_ref(); }
+		};
+		let is_static: bool = field.is_static;
+		let validation: TokenStream = if ty.try_as_primitive(mappings).is_some() {
+			quote! {}
+		} else {
+			quote! {
+				// SAFETY: The cached field ID belongs to this API class and has a reference signature.
+				unsafe { env.__validate_field_reference(api.class.as_ref(), #field_id, #is_static, val)?; }
+			}
+		};
 		let null_check: TokenStream = if field.non_null {
 			quote! {
 				use #jni::refs::Reference as _;
-				if val.as_ref().is_null() { return Err(#jni::errors::Error::NullPtr("Null Object")); }
+				if val.is_null() { return Err(#jni::errors::Error::NullPtr("Null Object")); }
 			}
 		} else {
 			quote! {}
@@ -142,7 +156,9 @@ impl<'a> FieldContext<'a> {
 			#visibility fn #name #lifetime_declaration (#self_param env: &#jni::Env<'env_local>, val: #arg_type) -> #jni::errors::Result<()> {
 				let api = #api_name::get(env, &#jni::refs::LoaderContext::None)?;
 				#class_def
+				#reference_binding
 				#null_check
+				#validation
 				#call
 			}
 		}

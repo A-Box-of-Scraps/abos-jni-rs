@@ -146,6 +146,7 @@ impl<'local> Env<'local> {
 	///
 	/// # Errors
 	///
+	/// Returns [`Error::WrongObjectType`] if a reference value is not assignable to the resolved field type.
 	/// Returns an error if an object or class is null, a member lookup fails, or a JNI field operation reports an exception.
 	pub fn set_field<'other_local, 'sig, O, N, S>(&mut self, obj: O, name: N, sig: S, value: JValue) -> Result<()>
 	where
@@ -163,10 +164,16 @@ impl<'local> Env<'local> {
 
 		let class: crate::refs::Auto<'_, JClass<'_>> = self.get_object_class(obj)?.auto();
 
-		// Safety: We have explicitly checked that the field type matches
-		// the value type and the field ID is going to be looked up dynamically
-		// based on the class, name and signature (so it's safe to use)
-		unsafe { self.set_field_unchecked(obj, (&class, name, sig), value) }
+		let field_id: JFieldID = Desc::<JFieldID>::lookup((&class, name, sig), self)?;
+		if let JValue::Object(object) = value {
+			// SAFETY: The field ID was resolved from this class and reference signature.
+			unsafe {
+				self.__validate_field_reference(&class, field_id.into_raw(), false, object)?;
+			}
+		}
+
+		// SAFETY: The resolved field and value have matching primitive or reference types.
+		unsafe { self.set_field_unchecked(obj, field_id, value) }
 	}
 
 	/// Get a static field without checking the provided type against the actual
@@ -333,6 +340,7 @@ impl<'local> Env<'local> {
 	///
 	/// # Errors
 	///
+	/// Returns [`Error::WrongObjectType`] if a reference value is not assignable to the resolved field type.
 	/// Returns an error if an object or class is null, a member lookup fails, or a JNI field operation reports an exception.
 	pub fn set_static_field<'other_local, 'sig, C, N, S>(
 		&mut self,
@@ -354,7 +362,15 @@ impl<'local> Env<'local> {
 
 		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 
-		// Safety: We have explicitly checked that the field type matches the value type.
-		unsafe { self.set_static_field_unchecked(class.as_ref(), (class.as_ref(), name, sig), value) }
+		let field_id: JStaticFieldID = *Desc::<JStaticFieldID>::lookup((class.as_ref(), name, sig), self)?.as_ref();
+		if let JValue::Object(object) = value {
+			// SAFETY: The field ID was resolved from this class and reference signature.
+			unsafe {
+				self.__validate_field_reference(class.as_ref(), field_id.into_raw(), true, object)?;
+			}
+		}
+
+		// SAFETY: The resolved field and value have matching primitive or reference types.
+		unsafe { self.set_static_field_unchecked(class.as_ref(), field_id, value) }
 	}
 }

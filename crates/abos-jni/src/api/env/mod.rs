@@ -450,6 +450,7 @@ mod global_refs;
 mod local_refs;
 mod method_ids;
 mod native;
+mod reference_validation;
 mod reflection;
 mod rust_fields;
 mod state;

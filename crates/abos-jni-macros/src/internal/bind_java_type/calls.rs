@@ -60,9 +60,33 @@ pub(super) fn generate_jni_call_args(
 		.map(|(name, ty)| quote! { #name: #ty })
 		.collect();
 
+	let reference_args: Vec<TokenStream> = parameters
+		.iter()
+		.enumerate()
+		.filter_map(|(index, param)| {
+			if param.ty.try_as_primitive(type_mappings).is_some() {
+				None
+			} else {
+				let name: &Ident = &param.name;
+				Some(quote! { (#index, #name) })
+			}
+		})
+		.collect();
+
+	let reference_bindings: Vec<TokenStream> = parameters
+		.iter()
+		.filter(|param| param.ty.try_as_primitive(type_mappings).is_none())
+		.map(|param| {
+			let name: &Ident = &param.name;
+			quote! { let #name: &#jni::objects::JObject = #name.as_ref().as_ref(); }
+		})
+		.collect();
+
 	JniCallArgs {
 		lifetimes,
 		jvalue_conversions,
+		reference_args,
+		reference_bindings,
 		decls,
 	}
 }
@@ -184,6 +208,7 @@ fn generate_method(api_name: &Ident, method: &Method, type_mappings: &TypeMappin
 	// Generate JNI call arguments data
 	let args: JniCallArgs = generate_jni_call_args(&method.signature.parameters, type_mappings, jni);
 
+	let validation: TokenStream = args.reference_validation(&method_id_field, is_static);
 	let decls: &Vec<TokenStream> = &args.decls;
 	let jvalue_conversions: &Vec<TokenStream> = &args.jvalue_conversions;
 
@@ -256,6 +281,7 @@ fn generate_method(api_name: &Ident, method: &Method, type_mappings: &TypeMappin
 			#(#decls),*
 		) -> #jni::errors::Result<#return_type> {
 			let api = #api_name::get(env, &#jni::refs::LoaderContext::None)?;
+			#validation
 			let jni_args #jni_args_type = [#(#jvalue_conversions),*];
 
 			#class_def
@@ -284,6 +310,24 @@ pub(super) fn checked_return(jni_call: &TokenStream, non_null: bool, jni: &syn::
 }
 
 impl JniCallArgs {
+	pub(super) fn reference_validation(&self, method_id: &Ident, is_static: bool) -> TokenStream {
+		let references: &Vec<TokenStream> = &self.reference_args;
+		let bindings: &Vec<TokenStream> = &self.reference_bindings;
+		if references.is_empty() {
+			return quote! {};
+		}
+		quote! {
+			// Evaluate AsRef once so validation and invocation use the same objects.
+			#(#bindings)*
+			// SAFETY: The cached ID and reference parameter indices belong to this API class.
+			unsafe {
+				env.__validate_method_reference_args(
+					api.class.as_ref(), api.#method_id.into_raw(), #is_static, &[#(#references),*],
+				)?;
+			}
+		}
+	}
+
 	fn lifetime_declarations(&self) -> TokenStream {
 		let lifetimes: &Vec<TokenStream> = &self.lifetimes;
 		if lifetimes.is_empty() {

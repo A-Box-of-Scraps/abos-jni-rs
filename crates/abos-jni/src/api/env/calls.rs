@@ -1,9 +1,10 @@
+use super::reference_validation::reference_args;
 #[cfg(doc)]
 use crate::jni_sig;
 
 use super::{
-	Desc, Env, Error, IntoAuto, JClass, JMethodID, JNIStr, JObject, JValue, JValueOwned, JavaType, MethodSignature,
-	Primitive, Reference, Result, ReturnType, jvalue,
+	Desc, Env, Error, IntoAuto, JClass, JMethodID, JNIStr, JObject, JStaticMethodID, JValue, JValueOwned, JavaType,
+	MethodSignature, Primitive, Reference, Result, ReturnType, jvalue,
 };
 
 impl<'local> Env<'local> {
@@ -11,11 +12,10 @@ impl<'local> Env<'local> {
 	///
 	/// * Looks up the [`JClass`] for the given object.
 	/// * Looks up the [`JMethodID`] for the object's class/name/signature combination
-	/// * Ensures that the number/types of args matches the signature
+	/// * Checks primitive argument types and reference assignability to the resolved parameter classes
 	/// * Calls [`Self::call_method_unchecked`] with the verified safe arguments.
 	///
-	/// Note: this may cause a Java exception if the arguments are the wrong type, in addition to if the method itself
-	/// throws.
+	/// Incompatible references return [`Error::WrongObjectType`] before the method is invoked.
 	///
 	/// # Example
 	///
@@ -39,6 +39,7 @@ impl<'local> Env<'local> {
 	///
 	/// # Errors
 	///
+	/// Returns [`Error::WrongObjectType`] for incompatible reference arguments.
 	/// Returns an error if class or method lookup fails, arguments do not match the signature, or Java throws an exception.
 	pub fn call_method<'other_local, 'sig, 'sig_args, O, N, S>(
 		&mut self,
@@ -74,28 +75,33 @@ impl<'local> Env<'local> {
 
 		let class: crate::refs::Auto<'_, JClass<'_>> = self.get_object_class(obj)?.auto();
 
+		let method_id: JMethodID = Desc::<JMethodID>::lookup((&class, name, sig), self)?;
+		// SAFETY: The method ID was resolved from this class and signature.
+		unsafe {
+			self.__validate_method_reference_args(&class, method_id.into_raw(), false, &reference_args(args))?;
+		}
+
 		let args: Vec<jvalue> = args.iter().map(super::super::jvalue::JValue::as_jni).collect();
 
 		// SAFETY: We've ensured that the Desc trait will be used to dynamically look up a valid
 		// method ID for the object's class, method name, and signature (or else it will return an
 		// Err). We've also validated the argument counts and types using the same type signature we
 		// fetched the original method ID from.
-		unsafe { self.call_method_unchecked(obj, (&class, name, sig), sig.ret(), &args) }
+		unsafe { self.call_method_unchecked(obj, method_id, sig.ret(), &args) }
 	}
 
 	/// Calls a static method safely. This comes with a number of
 	/// lookups/checks. It
 	///
 	/// * Looks up the [`JMethodID`] for the class/name/signature combination
-	/// * Ensures that the number/types of args matches the signature
-	///   * Cannot check an object's type - but primitive types are matched against each other (including Object)
+	/// * Checks primitive argument types and reference assignability to the resolved parameter classes
 	/// * Calls [`Self::call_static_method_unchecked`] with the verified safe arguments.
 	///
-	/// Note: this may cause a Java exception if the arguments are the wrong
-	/// type, in addition to if the method itself throws.
+	/// Incompatible references return [`Error::WrongObjectType`] before the method is invoked.
 	///
 	/// # Errors
 	///
+	/// Returns [`Error::WrongObjectType`] for incompatible reference arguments.
 	/// Returns an error if class or method lookup fails, arguments do not match the signature, or Java throws an exception.
 	pub fn call_static_method<'other_local, 'sig, 'sig_args, C, N, S>(
 		&mut self,
@@ -130,12 +136,18 @@ impl<'local> Env<'local> {
 		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 		let class: &JClass<'_> = class.as_ref();
 
+		let method_id: JStaticMethodID = *Desc::<JStaticMethodID>::lookup((class, name, sig), self)?.as_ref();
+		// SAFETY: The method ID was resolved from this class and signature.
+		unsafe {
+			self.__validate_method_reference_args(class, method_id.into_raw(), true, &reference_args(args))?;
+		}
+
 		let args: Vec<jvalue> = args.iter().map(super::super::jvalue::JValue::as_jni).collect();
 
 		// SAFETY: We've obtained the method_id above, so it is valid for this class.
 		// We've also validated the argument counts and types using the same type signature
 		// we fetched the original method ID from.
-		unsafe { self.call_static_method_unchecked(class, (class, name, sig), sig.ret(), &args) }
+		unsafe { self.call_static_method_unchecked(class, method_id, sig.ret(), &args) }
 	}
 
 	/// Calls a non-virtual method safely. This comes with a number of
@@ -143,16 +155,14 @@ impl<'local> Env<'local> {
 	///
 	/// * Ensures that the receiver is an instance of the supplied class.
 	/// * Looks up the [`JMethodID`] for the class/name/signature combination
-	/// * Ensures that the number/types of args matches the signature
-	///   * Cannot check an object's type - but primitive types are matched against each other (including Object)
+	/// * Checks primitive argument types and reference assignability to the resolved parameter classes
 	/// * Calls [`Self::call_nonvirtual_method_unchecked`] with the verified safe arguments.
 	///
-	/// Note: this may cause a Java exception if the arguments are the wrong
-	/// type, in addition to if the method itself throws.
+	/// Incompatible references return [`Error::WrongObjectType`] before the method is invoked.
 	///
 	/// # Errors
 	///
-	/// Returns [`Error::WrongObjectType`] if the receiver is not an instance of the supplied class.
+	/// Returns [`Error::WrongObjectType`] for an incompatible receiver or reference argument.
 	/// Returns an error if the receiver is null, class or method lookup fails, arguments do not match the signature,
 	/// or Java throws an exception.
 	pub fn call_nonvirtual_method<'other_local, 'sig, 'sig_args, O, C, N, S>(
@@ -196,12 +206,18 @@ impl<'local> Env<'local> {
 			return Err(Error::WrongObjectType);
 		}
 
+		let method_id: JMethodID = Desc::<JMethodID>::lookup((class, name, sig), self)?;
+		// SAFETY: The method ID was resolved from this class and signature.
+		unsafe {
+			self.__validate_method_reference_args(class, method_id.into_raw(), false, &reference_args(args))?;
+		}
+
 		let args: Vec<jvalue> = args.iter().map(super::super::jvalue::JValue::as_jni).collect();
 
 		// SAFETY: The receiver is an instance of class, and the method ID is resolved from that same class.
 		// We've also validated the argument counts and types using the same type signature
 		// we fetched the original method ID from.
-		unsafe { self.call_nonvirtual_method_unchecked(obj, class, (class, name, sig), sig.ret(), &args) }
+		unsafe { self.call_nonvirtual_method_unchecked(obj, class, method_id, sig.ret(), &args) }
 	}
 
 	/// Create a new object using a constructor. This is done safely using
@@ -209,6 +225,7 @@ impl<'local> Env<'local> {
 	///
 	/// # Errors
 	///
+	/// Returns [`Error::WrongObjectType`] for incompatible reference arguments.
 	/// Returns an error if class or method lookup fails, arguments do not match the signature, or Java throws an exception.
 	pub fn new_object<'other_local, 'sig, 'sig_args, C, S>(
 		&mut self,
@@ -253,6 +270,11 @@ impl<'local> Env<'local> {
 		let class: &JClass<'_> = class.as_ref();
 
 		let method_id: JMethodID = Desc::<JMethodID>::lookup((class, ctor_sig), self)?;
+
+		// SAFETY: The constructor ID was resolved from this class and signature.
+		unsafe {
+			self.__validate_method_reference_args(class, method_id.into_raw(), false, &reference_args(ctor_args))?;
+		}
 
 		let ctor_args: Vec<jvalue> = ctor_args.iter().map(super::super::jvalue::JValue::as_jni).collect();
 		// SAFETY: We've obtained the method_id above, so it is valid for this class.

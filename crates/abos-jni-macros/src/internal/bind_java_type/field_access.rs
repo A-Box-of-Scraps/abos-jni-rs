@@ -136,7 +136,7 @@ pub(super) fn generate_jni_set_field_call(
 	} else {
 		// For objects, arrays, and rust references, we call SetObjectField
 		let call_fn: proc_macro2::Ident = format_ident!("{}ObjectField", call_prefix);
-		(call_fn, quote! { #val.as_ref().as_raw() })
+		(call_fn, quote! { #val.as_raw() })
 	};
 
 	// The JNI spec asserts that `Set<Type>Field` _must_ not be called with a `null` object reference
