@@ -1,3 +1,4 @@
+use super::generator::names::macro_java_name;
 use crate::{BindingInfo, Bindings, Module, ModuleBinding, ModuleEvent, Result, TypeMap};
 use std::{collections::BTreeMap, fmt::Write as _, fs, path::Path};
 
@@ -187,6 +188,7 @@ pub fn write_type_map(map: &TypeMap, path: &Path) -> Result<()> {
 	entries.sort_by_key(|(java, _)| *java);
 	let mut output = String::new();
 	for (java, rust) in entries {
+		let java: String = macro_java_name(java);
 		writeln!(output, "{rust} => \"{java}\"").expect("writing to String");
 	}
 	fs::write(path, output)?;

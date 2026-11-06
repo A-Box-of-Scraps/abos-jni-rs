@@ -49,7 +49,16 @@ mod multi_release_jar {
 mod reversed_jar {
 	include!(concat!(env!("OUT_DIR"), "/reversed_jar.rs"));
 }
+#[allow(dead_code, non_snake_case)]
+mod default_bytecode {
+	include!(concat!(env!("OUT_DIR"), "/default_bytecode.rs"));
+}
+#[allow(dead_code, non_snake_case)]
+mod default_unmapped {
+	include!(concat!(env!("OUT_DIR"), "/default_unmapped.rs"));
+}
 mod collisions;
+mod default_package;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	use bindings::com::example::SimpleClass;
@@ -101,6 +110,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		assert_eq!(tree_dollars._value(env)?, 17);
 		assert_eq!(tree_dollars.foo_bar(env)?, 17);
 		collisions::check(env)?;
+		default_package::check(env)?;
 		assert_eq!(modular_jar::fixture::archive::ModularExample::answer(env)?, 42);
 		// Binding generation uses base classes; the JVM still selects its runtime variant.
 		assert_eq!(multi_release_jar::fixture::archive::VersionedExample::version(env)?, 17);

@@ -13,6 +13,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		"SimpleClass",
 		"Calculator",
 		"NoPackage",
+		"DefaultType",
+		"DefaultPeer",
 		"OuterClass",
 		"Overloads",
 		"AwkwardNames",
@@ -74,6 +76,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.root_path("crate::native_collisions")
 		.generate()?
 		.write_to_file(output.join("native_collisions.rs"))?;
+	for (module, mapped) in [("default_bytecode", true), ("default_unmapped", false)] {
+		let mut builder = abos_jbindgen::Builder::new()
+			.input_class(classes.join("DefaultType.class"))
+			.root_path(format!("crate::{module}"));
+		if mapped {
+			builder = builder.type_mapping("crate::bindings::DefaultPeer", ".DefaultPeer");
+		}
+		builder.generate()?.write_to_file(output.join(format!("{module}.rs")))?;
+	}
 	archive_bindings(&output)?;
 	Ok(())
 }

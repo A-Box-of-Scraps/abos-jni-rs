@@ -1,10 +1,13 @@
 use crate::internal::generator::{
 	identifiers::rust_identifier,
-	names::{builtin_jni_types, derive_rust_type_name},
+	names::{builtin_jni_types, canonical_java_name, derive_rust_type_name},
 };
 use crate::{BindgenOptions, ClassInfo, Error, Result};
 use std::collections::HashMap;
 /// Maps Java binary names to Rust wrapper type paths.
+///
+/// Names are stored with dot-separated packages and no leading dot. Inputs also accept
+/// slash-separated internal names and the binding macro's `.ClassName` default-package spelling.
 #[derive(Debug, Clone)]
 pub struct TypeMap {
 	/// Maps Java fully-qualified class name (e.g., "android.os.Bundle") to Rust type name
@@ -22,11 +25,7 @@ impl TypeMap {
 
 		for class_info in classes {
 			// Build the Java type name using class_name which has the full binary name with $ for inner classes
-			let java_type: String = if class_info.package.is_empty() {
-				format!(".{}", class_info.class_name.replace('/', "."))
-			} else {
-				class_info.class_name.replace('/', ".")
-			};
+			let java_type: String = canonical_java_name(&class_info.class_name).into_owned();
 
 			// Get the simple Rust type name
 			let rust_name: String = derive_rust_type_name(
@@ -65,6 +64,7 @@ impl TypeMap {
 	/// Silently ignores attempts to remap core types (java.lang.String, java.lang.Object, etc.)
 	pub fn merge(&mut self, extra_mappings: Vec<(String, String)>) {
 		for (rust_type, java_type) in extra_mappings {
+			let java_type: String = canonical_java_name(&java_type).into_owned();
 			// Check if this is a core builtin type that cannot be remapped
 			let is_core: bool = builtin_jni_types()
 				.iter()
@@ -82,10 +82,12 @@ impl TypeMap {
 	/// Look up the Rust type name for a Java class
 	#[must_use]
 	pub fn get_rust_type(&self, java_type: &str) -> Option<&str> {
-		self.map.get(java_type).map(std::string::String::as_str)
+		self.map
+			.get(canonical_java_name(java_type).as_ref())
+			.map(std::string::String::as_str)
 	}
 
-	/// Get all mappings (for generating `type_map` blocks)
+	/// Get all mappings with canonical Java binary names (no leading dot for the default package).
 	pub fn iter(&self) -> impl Iterator<Item = (&String, &String)> {
 		self.map.iter()
 	}
@@ -104,6 +106,11 @@ impl TypeMap {
 
 	/// Insert a single type mapping
 	pub fn insert(&mut self, java_type: String, rust_type: String) {
+		let java_type: String = if java_type.starts_with('.') || java_type.contains('/') {
+			canonical_java_name(&java_type).into_owned()
+		} else {
+			java_type
+		};
 		// Check if this is a core builtin type that cannot be remapped
 		let is_core: bool = builtin_jni_types()
 			.iter()

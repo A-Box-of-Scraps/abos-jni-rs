@@ -245,3 +245,76 @@ fn configured_constructor_names_take_precedence_over_annotations() -> TestResult
 	assert!(!configured.contains("fn from_annotation("), "{configured}");
 	Ok(())
 }
+
+#[test]
+fn type_map_normalizes_default_package_and_internal_names() {
+	let mut map = TypeMap::new();
+	map.insert("DefaultType".to_owned(), "First".to_owned());
+	assert_eq!(map.get_rust_type(".DefaultType"), Some("First"));
+	map.merge(vec![("Replacement".to_owned(), ".DefaultType".to_owned())]);
+	assert_eq!(map.len(), 1);
+	assert_eq!(map.get_rust_type("DefaultType"), Some("Replacement"));
+	map.insert(".DefaultType$Child".to_owned(), "Child".to_owned());
+	assert_eq!(map.get_rust_type("DefaultType$Child"), Some("Child"));
+	map.insert("app/Model".to_owned(), "Model".to_owned());
+	assert_eq!(map.get_rust_type("app.Model"), Some("Model"));
+	assert_eq!(map.get_rust_type("app/Model"), Some("Model"));
+	assert!(
+		map.iter()
+			.all(|(java, _)| !java.starts_with('.') && !java.contains('/'))
+	);
+	map.insert("java/lang/String".to_owned(), "BadString".to_owned());
+	map.merge(vec![("BadObject".to_owned(), "java/lang/Object".to_owned())]);
+	assert_eq!(map.len(), 3);
+}
+
+#[test]
+fn default_package_references_use_mappings_and_macro_spelling() -> TestResult {
+	let root: TempDir = tempfile::tempdir()?;
+	abos_javac::Build::new()
+		.files([fixture("DefaultType.java"), fixture("DefaultPeer.java")])
+		.output_dir(root.path())
+		.cargo_metadata(false)
+		.try_compile()?;
+	let bindings: Bindings = source_builder(&["DefaultType.java", "DefaultPeer.java"])
+		.root_path("crate::bindings")
+		.generate()?;
+	let map: TypeMap = bindings.type_map(None);
+	for name in ["DefaultType", "DefaultPeer", "DefaultType$Child"] {
+		assert!(map.get_rust_type(name).is_some());
+		assert_eq!(map.get_rust_type(name), map.get_rust_type(&format!(".{name}")));
+	}
+	let code: String = bindings.to_string();
+	for expected in [
+		"crate::bindings::DefaultType => \".DefaultType\"",
+		"crate::bindings::DefaultPeer => \".DefaultPeer\"",
+		"peer: crate::bindings::DefaultPeer",
+		"fn echo(other: crate::bindings::DefaultType) -> crate::bindings::DefaultType",
+	] {
+		assert!(code.contains(expected), "missing {expected}: {code}");
+	}
+	bindings.write_type_map(root.path().join("types.txt"))?;
+	bindings.write_pub_type_map(root.path().join("public.txt"), "api")?;
+	let exported: String = fs::read_to_string(root.path().join("types.txt"))?;
+	assert!(exported.contains("crate::bindings::DefaultType => \".DefaultType\""));
+	assert!(exported.contains("crate::bindings::DefaultTypeChild => \".DefaultType$Child\""));
+	assert!(fs::read_to_string(root.path().join("public.txt"))?.contains("api::DefaultPeer => \".DefaultPeer\""));
+
+	let builder: Builder = Builder::new()
+		.input_class(root.path().join("DefaultType.class"))
+		.root_path("crate::bytecode");
+	let unmapped: String = builder.clone().generate()?.to_string();
+	assert!(unmapped.contains("peer: \".DefaultPeer\""), "{unmapped}");
+	assert!(unmapped.contains("\".DefaultPeer\"[]"), "{unmapped}");
+	for java in ["DefaultPeer", ".DefaultPeer"] {
+		let mapped: String = builder
+			.clone()
+			.type_mapping("external::Peer", java)
+			.generate()?
+			.to_string();
+		assert!(mapped.contains("external::Peer => \".DefaultPeer\""), "{mapped}");
+		assert!(mapped.contains("peer: external::Peer"), "{mapped}");
+		assert!(mapped.contains("external::Peer[]"), "{mapped}");
+	}
+	Ok(())
+}

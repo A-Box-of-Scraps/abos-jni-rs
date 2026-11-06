@@ -1,6 +1,26 @@
 use super::identifiers::rust_identifier;
 use crate::TypeMap;
-use std::collections::HashSet;
+use std::{borrow::Cow, collections::HashSet};
+/// Use dot-separated binary names internally, without the macro's default-package marker.
+pub fn canonical_java_name(name: &str) -> Cow<'_, str> {
+	let name: &str = name.strip_prefix('.').unwrap_or(name);
+	if name.contains('/') {
+		Cow::Owned(name.replace('/', "."))
+	} else {
+		Cow::Borrowed(name)
+	}
+}
+
+/// The binding macro requires a leading dot for a class in the default package.
+pub fn macro_java_name(name: &str) -> String {
+	let name: Cow<'_, str> = canonical_java_name(name);
+	if name.contains('.') {
+		name.into_owned()
+	} else {
+		format!(".{name}")
+	}
+}
+
 /// Builtin JNI type information
 pub struct BuiltinType {
 	/// Simple Rust type name (e.g., "`JString`")
@@ -220,10 +240,11 @@ pub fn resolve_type_with_deps(
 	used_types: &mut HashSet<String>,
 ) -> String {
 	// Get the base/element type first
-	let base_type: String = type_map.get_rust_type(&type_info.name).map_or_else(
-		|| qualified_name_to_jni_type(&type_info.name).unwrap_or_else(|| format!("\"{}\"", type_info.name)),
+	let java_name: Cow<'_, str> = canonical_java_name(&type_info.name);
+	let base_type: String = type_map.get_rust_type(&java_name).map_or_else(
+		|| qualified_name_to_jni_type(&java_name).unwrap_or_else(|| format!("\"{}\"", macro_java_name(&java_name))),
 		|rust| {
-			used_types.insert(type_info.name.clone());
+			used_types.insert(java_name.to_string());
 			rust.to_owned()
 		},
 	);

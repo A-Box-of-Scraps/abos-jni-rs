@@ -6,7 +6,7 @@ mod overloads;
 pub mod signatures;
 
 use crate::{BindgenOptions, ClassInfo, ModuleBinding, Result, TypeMap};
-use names::derive_rust_type_name;
+use names::{canonical_java_name, derive_rust_type_name, macro_java_name};
 use std::{
 	collections::{HashMap, HashSet},
 	fmt::Write as _,
@@ -51,11 +51,7 @@ pub fn generate_with_type_map(class: &ClassInfo, options: &BindgenOptions, types
 	let mut output: String = String::from("bind_java_type! {\n");
 	members::documentation(&mut output, class.documentation.as_deref(), "    ");
 	let visibility: &str = if options.public_type { "pub " } else { "" };
-	let java_name: String = if class.package.is_empty() {
-		format!(".{}", class.class_name)
-	} else {
-		class.class_name.replace('/', ".")
-	};
+	let java_name: String = macro_java_name(&class.class_name);
 	writeln!(output, "    {visibility}{name} => \"{java_name}\",").expect("writing to String");
 	type_mappings(&context, &mut output);
 	output.push_str(&context.body);
@@ -84,7 +80,7 @@ fn instance_of(context: &mut Context<'_>) {
 	let mut body = String::new();
 	for info in &context.class.instance_of {
 		if let Some(rust) = context.types.get_rust_type(&info.java_type) {
-			context.used.insert(info.java_type.clone());
+			context.used.insert(canonical_java_name(&info.java_type).into_owned());
 			if let Some(stem) = &info.stem {
 				writeln!(body, "        {stem}: {rust},").expect("writing to String");
 			} else {
@@ -109,6 +105,7 @@ fn type_mappings(context: &Context<'_>, output: &mut String) {
 		.collect();
 	mappings.sort_by_key(|(java, _)| *java);
 	for (java, rust) in mappings {
+		let java: String = macro_java_name(java);
 		writeln!(output, "        {rust} => \"{java}\",").expect("writing to String");
 	}
 	let mut primitives: Vec<&String> = context.primitives.iter().collect();
