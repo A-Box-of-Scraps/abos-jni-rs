@@ -134,7 +134,10 @@ fn load_classes_from_jar(env: &mut Env, jar_bytes: &[u8]) -> std::result::Result
 			.by_index(i)
 			.map_err(|e| abos_jni::errors::Error::ParseFailed(format!("Failed to read JAR entry: {e}")))?;
 
-		let name: String = file.name().to_string();
+		let name: String = file
+			.name()
+			.map_err(|e| abos_jni::errors::Error::ParseFailed(format!("Failed to read JAR entry name: {e}")))?
+			.into_owned();
 
 		// Only load .class files, skip META-INF and other resources
 		if std::path::Path::new(&name)

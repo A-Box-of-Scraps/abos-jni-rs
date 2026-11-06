@@ -111,11 +111,13 @@ pub fn visit_jar_classes(
 	let mut archive: zip::ZipArchive<fs::File> = zip::ZipArchive::new(fs::File::open(path)?)?;
 	// Select from the central-directory names before reading class data. Metadata and
 	// versioned entries are never parsed, and host JVM versions do not affect selection.
-	let mut names: Vec<String> = archive
-		.file_names()
-		.filter(|name| is_binding_class_entry(name) && (patterns.is_empty() || matches_any_pattern(name, patterns)))
-		.map(str::to_owned)
-		.collect();
+	let mut names: Vec<String> = Vec::new();
+	for name in archive.file_names() {
+		let name: std::borrow::Cow<'_, str> = name?;
+		if is_binding_class_entry(&name) && (patterns.is_empty() || matches_any_pattern(&name, patterns)) {
+			names.push(name.into_owned());
+		}
+	}
 	names.sort();
 	for name in names {
 		let mut file: zip::read::ZipFile<'_, fs::File> = archive.by_name(&name)?;
