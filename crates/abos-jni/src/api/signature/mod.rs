@@ -419,4 +419,5 @@ impl fmt::Display for RuntimeFieldSignature {
 mod parser;
 use parser::{parse_field_sig, parse_method_sig, parse_type};
 #[cfg(test)]
+#[path = "../../../tests/unit/api/signature.rs"]
 mod tests;

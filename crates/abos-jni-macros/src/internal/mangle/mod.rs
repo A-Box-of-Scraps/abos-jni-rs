@@ -369,4 +369,5 @@ pub fn create_jni_fn_name(namespace: &str, fn_name: &str, signature: Option<&str
 }
 
 #[cfg(test)]
+#[path = "../../../tests/unit/internal/mangle.rs"]
 mod tests;

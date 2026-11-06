@@ -159,4 +159,5 @@ mod expand;
 mod parse;
 pub use expand::*;
 #[cfg(test)]
+#[path = "../../../tests/unit/internal/signature.rs"]
 mod tests;

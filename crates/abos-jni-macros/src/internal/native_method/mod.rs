@@ -339,4 +339,5 @@ fn wrapper_parameters(input: &NativeMethodStructInput, lifetime: &TokenStream) -
 mod parse;
 
 #[cfg(test)]
+#[path = "../../../tests/unit/internal/native_method.rs"]
 mod tests;

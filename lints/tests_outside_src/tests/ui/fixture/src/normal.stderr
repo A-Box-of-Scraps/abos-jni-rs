@@ -1,0 +1,19 @@
+warning: test implementation in src/
+  --> $DIR/normal.rs:2:1
+   |
+LL | #[test]
+   | ^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+   = note: `#[warn(tests_outside_src)]` on by default
+
+warning: test implementation in src/
+  --> $DIR/normal.rs:5:1
+   |
+LL | #[cfg(test)]
+   | ^^^^^^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+
+warning: 2 warnings emitted
+

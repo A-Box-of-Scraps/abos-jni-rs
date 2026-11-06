@@ -121,7 +121,6 @@ fn explicit_type(ty: &rustc_hir::Ty<'_>) -> bool {
 	!visitor.found_inference
 }
 
-#[test]
-fn ui() {
-	dylint_testing::ui_test(env!("CARGO_PKG_NAME"), "ui");
-}
+#[cfg(test)]
+#[path = "../tests/unit/mod.rs"]
+mod tests;

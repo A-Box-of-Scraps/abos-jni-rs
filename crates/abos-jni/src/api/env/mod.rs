@@ -356,11 +356,8 @@ impl Drop for Env<'_> {
 }
 
 #[cfg(test)]
-mod test {
-	use crate::Env;
-	static_assertions::assert_not_impl_any!(Env: Send);
-	static_assertions::assert_not_impl_any!(Env: Sync);
-}
+#[path = "../../../tests/unit/api/env.rs"]
+mod test;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy)]
 /// Native method descriptor for use with [`Env::register_native_methods`].
@@ -449,9 +446,6 @@ impl Drop for MonitorGuard<'_> {
 			.expect("MonitorGuard dropped on detached thread");
 	}
 }
-
-#[cfg(test)]
-static_assertions::assert_not_impl_any!(MonitorGuard: Send);
 
 mod array_regions;
 mod arrays;
