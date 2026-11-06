@@ -84,12 +84,15 @@ run = "mvn --batch-mode --no-transfer-progress -q spotless:check"
 run = "cargo run --manifest-path tools/abos-jni-gen-windows-bindings/Cargo.toml -q"
 
 [tasks.lint]
-depends = ["lint:docs"]
+depends = ["lint:abos-jbindgen:runtime", "lint:docs"]
 env = { DYLINT_RUSTFLAGS = "-D warnings" }
 run = [
   "cargo clippy --workspace --all-targets --all-features -q -- -D warnings",
   "cargo dylint --all --workspace --fail-on-no-libraries -q -- --all-targets --all-features -q",
 ]
+
+[tasks."lint:abos-jbindgen:runtime"]
+run = "cargo clippy --manifest-path crates/abos-jbindgen/tests/runtime/Cargo.toml --all-targets --all-features --locked -q -- -D warnings"
 
 [tasks."lint:abos-jni-sys:systest"]
 run = "cargo clippy --manifest-path tests/abos-jni-sys-systest/Cargo.toml --all-targets -q -- -D warnings"

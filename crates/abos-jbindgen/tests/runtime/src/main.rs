@@ -1,9 +1,17 @@
 //! Execute generated bindings against a real JVM.
 #[allow(dead_code, non_snake_case)]
+#[expect(
+	non_camel_case_types,
+	reason = "Keyword-normalization fixtures intentionally generate match_ and match_API types."
+)]
 mod bindings {
 	include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 #[allow(dead_code, non_snake_case)]
+#[expect(
+	non_camel_case_types,
+	reason = "File-tree fixtures preserve the same keyword-normalized type names as single-file output."
+)]
 mod tree {
 	include!(concat!(env!("OUT_DIR"), "/tree/mod.rs"));
 }
@@ -13,6 +21,10 @@ mod bytecode {
 	include!(concat!(env!("OUT_DIR"), "/bytecode.rs"));
 }
 #[allow(dead_code, non_snake_case)]
+#[expect(
+	non_camel_case_types,
+	reason = "The explicit Rust type-name override tests normalization of type to type_ and type_API."
+)]
 mod overrides {
 	include!(concat!(env!("OUT_DIR"), "/overrides.rs"));
 }
