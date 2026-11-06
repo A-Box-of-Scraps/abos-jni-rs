@@ -15,6 +15,7 @@
 extern crate abos_jni as jni2;
 
 use jni2::bind_java_type;
+use jni2::objects::JString;
 use jni2::refs::LoaderContext;
 
 #[path = "utils/lib.rs"]
@@ -75,16 +76,16 @@ fn main() {
 	utils::attach_current_thread(|env| {
 		utils::load_class(env, "BindJavaTypeWrapper")?;
 
-		let _loader_context = LoaderContext::default();
+		let _loader_context: LoaderContext<'_, '_> = LoaderContext::default();
 
-		let instance = JBindJavaTypeWrapper::new(env)?;
+		let instance: JBindJavaTypeWrapper<'_> = JBindJavaTypeWrapper::new(env)?;
 		println!("Instantiated JBindJavaTypeWrapper (based on merged type_map)");
 
 		// Test mix_types method
 		println!("\n--- Testing mix_types method ---");
-		let builtin_obj = JBuiltinType::new(env)?;
-		let custom_obj = JCustomType::new(env)?;
-		let s = instance.mix_types(env, builtin_obj, custom_obj)?;
+		let builtin_obj: JBuiltinType<'_> = JBuiltinType::new(env)?;
+		let custom_obj: JCustomType<'_> = JCustomType::new(env)?;
+		let s: JString<'_> = instance.mix_types(env, builtin_obj, custom_obj)?;
 		println!("Result: {}", s.try_to_string(env)?);
 
 		Ok(())

@@ -79,16 +79,16 @@ fn test_valid_namespace() {
 
 #[test]
 fn test_code_generation() {
-	let attr = quote::quote! {
+	let attr: proc_macro2::TokenStream = quote::quote! {
 		"com.example.Bar"
 	};
-	let source = quote::quote! {
+	let source: proc_macro2::TokenStream = quote::quote! {
 		pub fn close_it(env: JNIEnv, _: JClass, filename: JString) -> jboolean {
 			unimplemented!()
 		}
 	};
 
-	let expanded = jni_mangle2(attr, source);
+	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
 	// Note: close_it becomes closeIt (lowerCamelCase)
 	assert_eq!(
@@ -108,16 +108,16 @@ fn test_code_generation() {
 
 #[test]
 fn test_unsafe_fn() {
-	let attr = quote::quote! {
+	let attr: proc_macro2::TokenStream = quote::quote! {
 		"com.example.Bar"
 	};
-	let source = quote::quote! {
+	let source: proc_macro2::TokenStream = quote::quote! {
 		pub unsafe fn close_it(env: JNIEnv, _: JClass, filename: JString) -> jboolean {
 			unimplemented!()
 		}
 	};
 
-	let expanded = jni_mangle2(attr, source);
+	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
 	// Note: close_it becomes closeIt (lowerCamelCase)
 	assert_eq!(
@@ -137,15 +137,15 @@ fn test_unsafe_fn() {
 
 #[test]
 fn test_non_function() {
-	let attr = quote::quote! { "com.example.Foo" };
-	let source = quote::quote! {
+	let attr: proc_macro2::TokenStream = quote::quote! { "com.example.Foo" };
+	let source: proc_macro2::TokenStream = quote::quote! {
 		enum NotAFunction {
 			Variant1,
 			Variant2(u8),
 		}
 	};
 
-	let expanded = jni_mangle2(attr, source);
+	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
 	assert_eq!(
 		format!("{expanded}"),
@@ -160,14 +160,14 @@ fn test_non_function() {
 
 #[test]
 fn test_empty_attribute() {
-	let attr = quote::quote! {};
-	let source = quote::quote! {
+	let attr: proc_macro2::TokenStream = quote::quote! {};
+	let source: proc_macro2::TokenStream = quote::quote! {
 		pub fn close_it(env: JNIEnv, _: JClass, filename: JString) -> jboolean {
 			unimplemented!()
 		}
 	};
 
-	let expanded = jni_mangle2(attr, source);
+	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
 	assert_eq!(
 		format!("{expanded}"),
@@ -182,14 +182,14 @@ fn test_empty_attribute() {
 
 #[test]
 fn test_invalid_namespace() {
-	let attr = quote::quote! { "." };
-	let source = quote::quote! {
+	let attr: proc_macro2::TokenStream = quote::quote! { "." };
+	let source: proc_macro2::TokenStream = quote::quote! {
 		pub fn close_it(env: JNIEnv, _: JClass, filename: JString) -> jboolean {
 			unimplemented!()
 		}
 	};
 
-	let expanded = jni_mangle2(attr, source);
+	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
 	assert_eq!(
 		format!("{expanded}"),
@@ -204,17 +204,17 @@ fn test_invalid_namespace() {
 
 #[test]
 fn test_wrong_abi_generates_error() {
-	let attr = quote::quote! { "com.example.Foo" };
-	let source = quote::quote! {
+	let attr: proc_macro2::TokenStream = quote::quote! { "com.example.Foo" };
+	let source: proc_macro2::TokenStream = quote::quote! {
 		pub extern "C" fn closeIt(env: JNIEnv, _: JClass, filename: JString) -> jboolean {
 			unimplemented!()
 		}
 	};
 
-	let expanded = jni_mangle2(attr, source);
+	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
 	// Should generate an error for non-system ABI
-	let expanded_str = format!("{expanded}");
+	let expanded_str: String = format!("{expanded}");
 	assert!(expanded_str.contains("compile_error"));
 	assert!(expanded_str.contains("must use `extern \\\"system\\\"` ABI"));
 	assert!(expanded_str.contains("found `extern \\\"C\\\"`"));
@@ -222,14 +222,14 @@ fn test_wrong_abi_generates_error() {
 
 #[test]
 fn test_system_abi_is_preserved() {
-	let attr = quote::quote! { "com.example.Foo" };
-	let source = quote::quote! {
+	let attr: proc_macro2::TokenStream = quote::quote! { "com.example.Foo" };
+	let source: proc_macro2::TokenStream = quote::quote! {
 		pub extern "system" fn closeIt(env: JNIEnv, _: JClass, filename: JString) -> jboolean {
 			unimplemented!()
 		}
 	};
 
-	let expanded = jni_mangle2(attr, source);
+	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
 	// The "system" ABI should be preserved
 	assert_eq!(
@@ -249,14 +249,14 @@ fn test_system_abi_is_preserved() {
 
 #[test]
 fn test_wrong_visibility() {
-	let attr = quote::quote! { "com.example.Foo" };
-	let source = quote::quote! {
+	let attr: proc_macro2::TokenStream = quote::quote! { "com.example.Foo" };
+	let source: proc_macro2::TokenStream = quote::quote! {
 		fn close_it(env: JNIEnv, _: JClass, filename: JString) -> jboolean {
 			unimplemented!()
 		}
 	};
 
-	let expanded = jni_mangle2(attr, source);
+	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
 	assert_eq!(
 		format!("{expanded}"),
@@ -271,16 +271,16 @@ fn test_wrong_visibility() {
 
 #[test]
 fn test_with_method_name() {
-	let attr = quote::quote! {
+	let attr: proc_macro2::TokenStream = quote::quote! {
 		"com.example.Bar", "customMethod"
 	};
-	let source = quote::quote! {
+	let source: proc_macro2::TokenStream = quote::quote! {
 		pub fn rust_function(env: JNIEnv, _: JClass) -> jboolean {
 			unimplemented!()
 		}
 	};
 
-	let expanded = jni_mangle2(attr, source);
+	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
 	assert_eq!(
 		format!("{expanded}"),
@@ -299,16 +299,16 @@ fn test_with_method_name() {
 
 #[test]
 fn test_with_signature_only() {
-	let attr = quote::quote! {
+	let attr: proc_macro2::TokenStream = quote::quote! {
 		"com.example.Bar", "(I)Z"
 	};
-	let source = quote::quote! {
+	let source: proc_macro2::TokenStream = quote::quote! {
 		pub fn boolMethod(env: JNIEnv, _: JClass) -> jboolean {
 			unimplemented!()
 		}
 	};
 
-	let expanded = jni_mangle2(attr, source);
+	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
 	assert_eq!(
 		format!("{expanded}"),
@@ -327,16 +327,16 @@ fn test_with_signature_only() {
 
 #[test]
 fn test_with_method_name_and_signature() {
-	let attr = quote::quote! {
+	let attr: proc_macro2::TokenStream = quote::quote! {
 		"com.example.Bar", "testMethod", "(Ljava/lang/String;)V"
 	};
-	let source = quote::quote! {
+	let source: proc_macro2::TokenStream = quote::quote! {
 		pub fn rust_func(env: JNIEnv, _: JClass) {
 			unimplemented!()
 		}
 	};
 
-	let expanded = jni_mangle2(attr, source);
+	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
 	assert_eq!(
 		format!("{expanded}"),
@@ -408,16 +408,16 @@ fn test_snake_case_to_lower_camel_case() {
 #[test]
 fn test_snake_case_function_name_conversion() {
 	// Test that snake_case function names are automatically converted to lowerCamelCase
-	let attr = quote::quote! {
+	let attr: proc_macro2::TokenStream = quote::quote! {
 		"com.example.Bar"
 	};
-	let source = quote::quote! {
+	let source: proc_macro2::TokenStream = quote::quote! {
 		pub fn say_hello_world(env: JNIEnv, _: JClass) {
 			unimplemented!()
 		}
 	};
 
-	let expanded = jni_mangle2(attr, source);
+	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
 	assert_eq!(
 		format!("{expanded}"),
@@ -437,16 +437,16 @@ fn test_snake_case_function_name_conversion() {
 #[test]
 fn test_camel_case_function_name_unchanged() {
 	// Test that lowerCamelCase function names remain unchanged (idempotent)
-	let attr = quote::quote! {
+	let attr: proc_macro2::TokenStream = quote::quote! {
 		"com.example.Bar"
 	};
-	let source = quote::quote! {
+	let source: proc_macro2::TokenStream = quote::quote! {
 		pub fn sayHelloWorld(env: JNIEnv, _: JClass) {
 			unimplemented!()
 		}
 	};
 
-	let expanded = jni_mangle2(attr, source);
+	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
 	assert_eq!(
 		format!("{expanded}"),
@@ -466,16 +466,16 @@ fn test_camel_case_function_name_unchanged() {
 #[test]
 fn test_snake_case_with_signature() {
 	// Test that snake_case function names are converted even when signature is present
-	let attr = quote::quote! {
+	let attr: proc_macro2::TokenStream = quote::quote! {
 		"com.example.Bar", "(I)Z"
 	};
-	let source = quote::quote! {
+	let source: proc_macro2::TokenStream = quote::quote! {
 		pub fn check_valid(env: JNIEnv, _: JClass) -> jboolean {
 			unimplemented!()
 		}
 	};
 
-	let expanded = jni_mangle2(attr, source);
+	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
 	assert_eq!(
 		format!("{expanded}"),
@@ -495,16 +495,16 @@ fn test_snake_case_with_signature() {
 #[test]
 fn test_signature_with_no_args() {
 	// Test that signatures with no arguments still add __ suffix (for overloaded methods)
-	let attr = quote::quote! {
+	let attr: proc_macro2::TokenStream = quote::quote! {
 		"com.example.Bar", "()V"
 	};
-	let source = quote::quote! {
+	let source: proc_macro2::TokenStream = quote::quote! {
 		pub fn noArgs(env: JNIEnv, _: JClass) {
 			unimplemented!()
 		}
 	};
 
-	let expanded = jni_mangle2(attr, source);
+	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
 	// Should have __ even with no arguments (indicates overloaded method)
 	assert_eq!(

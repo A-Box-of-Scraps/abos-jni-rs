@@ -15,14 +15,14 @@ pub(super) fn generate_native_registration_code(
 		return Ok(quote! {});
 	}
 
-	let mut native_method_descriptors = Vec::new();
+	let mut native_method_descriptors: Vec<TokenStream> = Vec::new();
 
 	for method in native_methods {
-		let java_name = &method.java_name;
-		let rust_name = &method.rust_name;
+		let java_name: &String = &method.java_name;
+		let rust_name: &Ident = &method.rust_name;
 
 		// Use MethodSignature to generate JNI signature
-		let jni_signature = method.signature.to_jni_signature(type_mappings).map_err(|e| {
+		let jni_signature: String = method.signature.to_jni_signature(type_mappings).map_err(|e| {
 			syn::Error::new(
 				rust_name.span(),
 				format!("Failed to generate JNI signature for native method '{rust_name}': {e}"),
@@ -30,16 +30,16 @@ pub(super) fn generate_native_registration_code(
 		})?;
 
 		// Create CStr literals for name and signature
-		let name_cstr = lit_cstr_mutf8(java_name);
-		let sig_cstr = lit_cstr_mutf8(&jni_signature);
+		let name_cstr: syn::LitCStr = lit_cstr_mutf8(java_name);
+		let sig_cstr: syn::LitCStr = lit_cstr_mutf8(&jni_signature);
 
 		// Always use the generated wrapper function (even for raw_fn)
 		// This ensures type checking and allows exports to work
-		let wrapper_name = format_ident!("{}_native_method", rust_name);
-		let fn_ptr = quote! { Self::#wrapper_name as *mut ::std::ffi::c_void };
+		let wrapper_name: Ident = format_ident!("{}_native_method", rust_name);
+		let fn_ptr: TokenStream = quote! { Self::#wrapper_name as *mut ::std::ffi::c_void };
 
 		// Extract cfg attributes to guard the registration descriptor
-		let cfg_attrs = extract_cfg_attrs(&method.attrs);
+		let cfg_attrs: Vec<syn::Attribute> = extract_cfg_attrs(&method.attrs);
 
 		native_method_descriptors.push(quote! {
 			#(#cfg_attrs)*
@@ -80,11 +80,11 @@ pub(super) fn generate_native_exports(
 	type_mappings: &TypeMappings,
 	jni: &syn::Path,
 ) -> Result<TokenStream> {
-	let mut exports = Vec::new();
+	let mut exports: Vec<TokenStream> = Vec::new();
 
 	for method in native_methods {
 		// Determine if this method should be exported
-		let should_export = match &method.export {
+		let should_export: bool = match &method.export {
 			NativeMethodExport::Default => global_native_methods_export,
 			NativeMethodExport::No => false,
 			NativeMethodExport::WithAutoMangle | NativeMethodExport::WithName(_) => true,
@@ -95,12 +95,12 @@ pub(super) fn generate_native_exports(
 		}
 
 		// Determine the export name (None = auto-mangle)
-		let export_name = match &method.export {
+		let export_name: Option<String> = match &method.export {
 			NativeMethodExport::WithName(name) => Some(name.clone()),
 			_ => None,
 		};
 
-		let export = generate_single_native_export(
+		let export: TokenStream = generate_single_native_export(
 			type_name,
 			api_name,
 			java_class_dotted,
@@ -131,11 +131,11 @@ pub(super) fn generate_single_native_export(
 	type_mappings: &TypeMappings,
 	jni: &syn::Path,
 ) -> Result<TokenStream> {
-	let rust_name = &method.rust_name;
-	let wrapper_name = format_ident!("{}_native_method", rust_name);
+	let rust_name: &Ident = &method.rust_name;
+	let wrapper_name: Ident = format_ident!("{}_native_method", rust_name);
 
 	// Use MethodSignature to generate JNI signature for mangling
-	let jni_signature = method.signature.to_jni_signature(type_mappings).map_err(|e| {
+	let jni_signature: String = method.signature.to_jni_signature(type_mappings).map_err(|e| {
 		syn::Error::new(
 			rust_name.span(),
 			format!("Failed to generate JNI signature for exported native method '{rust_name}': {e}"),
@@ -143,14 +143,14 @@ pub(super) fn generate_single_native_export(
 	})?;
 
 	// Generate the mangled JNI function name
-	let mangled_name =
+	let mangled_name: String =
 		export_name.unwrap_or_else(|| create_jni_fn_name(java_class_dotted, &method.java_name, Some(&jni_signature)));
-	let mangled_ident = format_ident!("{}", mangled_name);
+	let mangled_ident: Ident = format_ident!("{}", mangled_name);
 
-	let lifetime = quote! { 'local };
+	let lifetime: TokenStream = quote! { 'local };
 
 	// Build parameter list for export function (same as wrapper)
-	let mut params = Vec::new();
+	let mut params: Vec<TokenStream> = Vec::new();
 	params.push(quote! { mut unowned_env: #jni::EnvUnowned<#lifetime> });
 
 	if method.is_static {
@@ -161,33 +161,34 @@ pub(super) fn generate_single_native_export(
 
 	// Add method parameters
 	for param in &method.signature.parameters {
-		let param_name = &param.name;
-		let rust_type = sig_type_to_rust_native_trait_arg_type(&param.ty, &lifetime, type_mappings, jni);
+		let param_name: &Ident = &param.name;
+		let rust_type: TokenStream = sig_type_to_rust_native_trait_arg_type(&param.ty, &lifetime, type_mappings, jni);
 		params.push(quote! { #param_name: #rust_type });
 	}
 
 	// Build forwarding call arguments
-	let mut call_args = vec![quote! { unowned_env }];
+	let mut call_args: Vec<TokenStream> = vec![quote! { unowned_env }];
 	if method.is_static {
 		call_args.push(quote! { class });
 	} else {
 		call_args.push(quote! { this });
 	}
 	for param in &method.signature.parameters {
-		let param_name = &param.name;
+		let param_name: &Ident = &param.name;
 		call_args.push(quote! { #param_name });
 	}
 
 	// Get return type
-	let return_type = sig_type_to_rust_return_type(&method.signature.return_type, &lifetime, type_mappings, jni);
+	let return_type: TokenStream =
+		sig_type_to_rust_return_type(&method.signature.return_type, &lifetime, type_mappings, jni);
 
-	let no_mangle_attr = if cfg!(has_unsafe_attr) {
+	let no_mangle_attr: TokenStream = if cfg!(has_unsafe_attr) {
 		quote! { #[unsafe(no_mangle)] }
 	} else {
 		quote! { #[no_mangle] }
 	};
 
-	let cfg_attrs = extract_cfg_attrs(&method.attrs);
+	let cfg_attrs: Vec<syn::Attribute> = extract_cfg_attrs(&method.attrs);
 
 	Ok(quote! {
 		#(#cfg_attrs)*

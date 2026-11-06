@@ -3,8 +3,9 @@ use super::*;
 #[test]
 pub fn get_object_class() {
 	attach_current_thread(|env| {
-		let string = env.new_string("test").expect("test string can be allocated");
-		let result = env.get_object_class(string);
+		let string: abos_jni::objects::JString<'_> = env.new_string("test").expect("test string can be allocated");
+		let result: std::result::Result<abos_jni::objects::JClass<'_>, abos_jni::errors::Error> =
+			env.get_object_class(string);
 		assert!(result.is_ok());
 		assert!(!result.expect("test operation succeeds").is_null());
 
@@ -16,8 +17,8 @@ pub fn get_object_class() {
 #[test]
 pub fn get_object_class_null_arg() {
 	attach_current_thread(|env| {
-		let null_obj = JObject::null();
-		let result = env
+		let null_obj: JObject<'_> = JObject::null();
+		let result: bool = env
 			.get_object_class(null_obj)
 			.map_err(|error| matches!(error, Error::NullPtr(_)))
 			.expect_err("Env#get_object_class should return error for null argument");
@@ -34,11 +35,12 @@ pub fn new_direct_byte_buffer() {
 		let vec: Vec<u8> = vec![0, 1, 2, 3];
 		let (addr, len) = {
 			// (would use buf.into_raw_parts() on nightly)
-			let buf = vec.leak();
+			let buf: &mut [u8] = vec.leak();
 			(buf.as_mut_ptr(), buf.len())
 		};
 		// SAFETY: The leaked allocation keeps this address valid for every Java reference to the buffer.
-		let result = unsafe { env.new_direct_byte_buffer(addr, len) };
+		let result: std::result::Result<JByteBuffer<'_>, abos_jni::errors::Error> =
+			unsafe { env.new_direct_byte_buffer(addr, len) };
 		assert!(result.is_ok());
 		assert!(!result.expect("test operation succeeds").is_null());
 		Ok(())
@@ -50,7 +52,8 @@ pub fn new_direct_byte_buffer() {
 pub fn new_direct_byte_buffer_invalid_addr() {
 	attach_current_thread(|env| {
 		// SAFETY: The null argument is rejected before any JNI call or memory access.
-		let result = unsafe { env.new_direct_byte_buffer(std::ptr::null_mut(), 5) };
+		let result: std::result::Result<JByteBuffer<'_>, abos_jni::errors::Error> =
+			unsafe { env.new_direct_byte_buffer(std::ptr::null_mut(), 5) };
 		assert!(result.is_err());
 
 		Ok(())
@@ -64,14 +67,15 @@ pub fn get_direct_buffer_capacity_ok() {
 		let vec: Vec<u8> = vec![0, 1, 2, 3];
 		let (addr, len) = {
 			// (would use buf.into_raw_parts() on nightly)
-			let buf = vec.leak();
+			let buf: &mut [u8] = vec.leak();
 			(buf.as_mut_ptr(), buf.len())
 		};
 		// SAFETY: The leaked allocation keeps this address valid for every Java reference to the buffer.
-		let result = unsafe { env.new_direct_byte_buffer(addr, len) }.expect("new direct byte buffer succeeds");
+		let result: JByteBuffer<'_> =
+			unsafe { env.new_direct_byte_buffer(addr, len) }.expect("new direct byte buffer succeeds");
 		assert!(!result.is_null());
 
-		let capacity = env
+		let capacity: usize = env
 			.get_direct_buffer_capacity(&result)
 			.expect("get direct buffer capacity succeeds");
 		assert_eq!(capacity, 4);
@@ -84,7 +88,7 @@ pub fn get_direct_buffer_capacity_ok() {
 #[test]
 pub fn get_direct_buffer_capacity_non_direct_buffer() {
 	attach_current_thread(|env| {
-		let buffer = env
+		let buffer: JObject<'_> = env
 			.call_static_method(
 				jni_str!("java/nio/ByteBuffer"),
 				jni_str!("allocate"),
@@ -92,8 +96,8 @@ pub fn get_direct_buffer_capacity_non_direct_buffer() {
 				&[JValue::Int(4)],
 			)?
 			.l()?;
-		let buffer = env.cast_local::<JByteBuffer>(buffer)?;
-		let capacity = env.get_direct_buffer_capacity(&buffer);
+		let buffer: JByteBuffer<'_> = env.cast_local::<JByteBuffer>(buffer)?;
+		let capacity: std::result::Result<usize, abos_jni::errors::Error> = env.get_direct_buffer_capacity(&buffer);
 		assert!(capacity.is_err());
 
 		Ok(())
@@ -104,7 +108,8 @@ pub fn get_direct_buffer_capacity_non_direct_buffer() {
 #[test]
 pub fn get_direct_buffer_capacity_null_arg() {
 	attach_current_thread(|env| {
-		let result = env.get_direct_buffer_capacity(&abos_jni::objects::JByteBuffer::default());
+		let result: std::result::Result<usize, abos_jni::errors::Error> =
+			env.get_direct_buffer_capacity(&abos_jni::objects::JByteBuffer::default());
 		assert!(result.is_err());
 
 		Ok(())
@@ -118,14 +123,15 @@ pub fn get_direct_buffer_address_ok() {
 		let vec: Vec<u8> = vec![0, 1, 2, 3];
 		let (addr, len) = {
 			// (would use buf.into_raw_parts() on nightly)
-			let buf = vec.leak();
+			let buf: &mut [u8] = vec.leak();
 			(buf.as_mut_ptr(), buf.len())
 		};
 		// SAFETY: The leaked allocation keeps this address valid for every Java reference to the buffer.
-		let result = unsafe { env.new_direct_byte_buffer(addr, len) }.expect("new direct byte buffer succeeds");
+		let result: JByteBuffer<'_> =
+			unsafe { env.new_direct_byte_buffer(addr, len) }.expect("new direct byte buffer succeeds");
 		assert!(!result.is_null());
 
-		let dest_buffer = env
+		let dest_buffer: *mut u8 = env
 			.get_direct_buffer_address(&result)
 			.expect("get direct buffer address succeeds");
 		assert_eq!(addr, dest_buffer);
@@ -142,8 +148,8 @@ pub fn get_direct_buffer_address_wrong_arg() {
 
 		// SAFETY: This is not a valid cast and not generally safe but `GetDirectBufferAddress` is
 		// documented to return a null pointer in case the "given object is not a direct java.nio.Buffer".
-		let wrong_obj = unsafe { JByteBuffer::from_raw(env, wrong_obj.into_raw()) };
-		let result = env.get_direct_buffer_address(&wrong_obj);
+		let wrong_obj: JByteBuffer<'_> = unsafe { JByteBuffer::from_raw(env, wrong_obj.into_raw()) };
+		let result: std::result::Result<*mut u8, abos_jni::errors::Error> = env.get_direct_buffer_address(&wrong_obj);
 		assert!(result.is_err());
 
 		Ok(())
@@ -154,7 +160,8 @@ pub fn get_direct_buffer_address_wrong_arg() {
 #[test]
 pub fn get_direct_buffer_address_null_arg() {
 	attach_current_thread(|env| {
-		let result = env.get_direct_buffer_address(&JByteBuffer::null());
+		let result: std::result::Result<*mut u8, abos_jni::errors::Error> =
+			env.get_direct_buffer_address(&JByteBuffer::null());
 		assert!(result.is_err());
 
 		Ok(())

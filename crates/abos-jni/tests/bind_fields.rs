@@ -338,12 +338,12 @@ fn test_cfg_guarded_fields() {
 
 // Helper function to load the TestFields class
 fn load_test_fields_class(env: &mut Env, out_dir: &Path) -> abos_jni::errors::Result<()> {
-	let class_path = out_dir.join("com/example/TestFields.class");
+	let class_path: PathBuf = out_dir.join("com/example/TestFields.class");
 	assert!(class_path.exists(), "TestFields.class not found");
 
-	let class_bytes = fs::read(&class_path).expect("Failed to read TestFields.class");
+	let class_bytes: Vec<u8> = fs::read(&class_path).expect("Failed to read TestFields.class");
 
-	let class_loader =
+	let class_loader: abos_jni::objects::JClassLoader<'_> =
 		abos_jni::objects::JClassLoader::get_system_class_loader(env).expect("Failed to get system class loader");
 
 	env.define_class(Some(jni_str!("com/example/TestFields")), &class_loader, &class_bytes)?;
@@ -353,7 +353,7 @@ fn load_test_fields_class(env: &mut Env, out_dir: &Path) -> abos_jni::errors::Re
 
 // Helper function to set up test output directory
 fn setup_test_output(test_name: &str) -> PathBuf {
-	let out_dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+	let out_dir: PathBuf = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
 		.join("jni_macros_tests")
 		.join(test_name);
 
@@ -449,24 +449,24 @@ fn test_non_null_field_validation() {
 }
 
 fn check_floating_fields(env: &abos_jni::Env, obj: &TestFields) -> abos_jni::errors::Result<()> {
-	let float_val = obj.float_field(env)?;
+	let float_val: f32 = obj.float_field(env)?;
 	assert!((float_val - 1.5).abs() < 0.01);
 	obj.set_float_field(env, 3.5)?;
-	let float_val = obj.float_field(env)?;
+	let float_val: f32 = obj.float_field(env)?;
 	assert!((float_val - 3.5).abs() < 0.01);
 
-	let double_val = obj.double_field(env)?;
+	let double_val: f64 = obj.double_field(env)?;
 	assert!((double_val - 2.5).abs() < 0.01);
 	obj.set_double_field(env, 4.5)?;
-	let double_val = obj.double_field(env)?;
+	let double_val: f64 = obj.double_field(env)?;
 	assert!((double_val - 4.5).abs() < 0.01);
 
 	Ok(())
 }
 
 fn assert_null_field_errors(env: &abos_jni::Env) {
-	let res = TestFields::null().int_field(env);
+	let res: std::result::Result<i32, abos_jni::errors::Error> = TestFields::null().int_field(env);
 	assert!(matches!(res, Err(abos_jni::errors::Error::NullPtr(_))));
-	let res = TestFields::null().set_int_field(env, 0);
+	let res: std::result::Result<(), abos_jni::errors::Error> = TestFields::null().set_int_field(env, 0);
 	assert!(matches!(res, Err(abos_jni::errors::Error::NullPtr(_))));
 }

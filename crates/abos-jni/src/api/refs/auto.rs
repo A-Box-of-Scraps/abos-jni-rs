@@ -153,7 +153,7 @@ where
 
 		// Before we mutilate `self`, make sure its drop code will not be automatically run. That
 		// would cause undefined behavior.
-		let self_md = ManuallyDrop::new(self);
+		let self_md: ManuallyDrop<Auto<'_, T>> = ManuallyDrop::new(self);
 
 		// SAFETY: ManuallyDrop prevents a second drop, and the consumed wrapper is not accessed after moving out its object.
 		unsafe {
@@ -187,7 +187,7 @@ where
 		// performance penalty from constantly checking if it's `None`.
 		//
 		// Safety: `self.obj` is not used again after this `take` call.
-		let obj = unsafe { ManuallyDrop::take(&mut self.obj) };
+		let obj: T = unsafe { ManuallyDrop::take(&mut self.obj) };
 		let obj: JObject = obj.into();
 
 		// Null Objects are a special case that don't need to be explicitly deleted

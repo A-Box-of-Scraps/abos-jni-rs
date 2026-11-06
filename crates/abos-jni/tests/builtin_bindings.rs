@@ -6,7 +6,7 @@ mod util;
 
 #[test]
 fn test_builtin_bindings() {
-	let jvm = util::jvm();
+	let jvm: &std::sync::Arc<abos_jni::JavaVM> = util::jvm();
 
 	jvm.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
 		abos_jni::__test_bindings_init(env, &abos_jni::refs::LoaderContext::default());

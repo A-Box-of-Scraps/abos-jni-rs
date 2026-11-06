@@ -19,10 +19,10 @@ where
 	type Output = Auto<'local, JThrowable<'local>>;
 
 	fn lookup(self, env: &mut Env<'local>) -> Result<Self::Output> {
-		let jmsg = JString::from_jni_str(env, self.1.as_ref())?.auto();
-		let ctor_args = &[JavaType::Object];
+		let jmsg: Auto<'_, JString<'_>> = JString::from_jni_str(env, self.1.as_ref())?.auto();
+		let ctor_args: &[JavaType; 1] = &[JavaType::Object];
 		// Safety: We are sure the arguments and return type are consistent with the signature string.
-		let ctor_sig = unsafe {
+		let ctor_sig: MethodSignature<'_, '_> = unsafe {
 			MethodSignature::from_raw_parts(
 				jni_str!("(Ljava/lang/String;)V"),
 				ctor_args,
@@ -30,7 +30,7 @@ where
 			)
 		};
 		let obj: JObject = env.new_object(self.0, &ctor_sig, &[JValue::from(&jmsg)])?;
-		let throwable = env.cast_local::<JThrowable>(obj)?;
+		let throwable: JThrowable<'_> = env.cast_local::<JThrowable>(obj)?;
 		Ok(throwable.auto())
 	}
 }

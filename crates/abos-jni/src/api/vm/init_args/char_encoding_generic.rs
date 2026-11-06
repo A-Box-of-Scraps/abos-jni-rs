@@ -22,7 +22,7 @@ pub(super) unsafe fn bytes_to_cstr<'a>(
 	original: Option<Cow<'_, str>>,
 ) -> Result<Cow<'a, CStr>, JvmError> {
 	// Check if it has a null byte at the end already. If not, add one.
-	let null_byte_added = s.last() != Some(&0);
+	let null_byte_added: bool = s.last() != Some(&0);
 	if null_byte_added {
 		s.to_mut().push(0);
 	}
@@ -87,20 +87,20 @@ fn test() {
 	use assert_matches::assert_matches;
 
 	{
-		let result = utf8_to_cstr("Hello, world 😎".into()).expect("UTF-8 string can be NUL-terminated");
+		let result: Cow<'_, CStr> = utf8_to_cstr("Hello, world 😎".into()).expect("UTF-8 string can be NUL-terminated");
 		assert_eq!(result.to_bytes_with_nul(), b"Hello, world \xf0\x9f\x98\x8e\0");
 		assert_matches!(result, Cow::Owned(_));
 	}
 
 	{
-		let result = utf8_to_cstr("Hello, world 😎\0".into()).expect("trailing NUL is accepted");
+		let result: Cow<'_, CStr> = utf8_to_cstr("Hello, world 😎\0".into()).expect("trailing NUL is accepted");
 		assert_eq!(result.to_bytes_with_nul(), b"Hello, world \xf0\x9f\x98\x8e\0");
 		assert_matches!(result, Cow::Borrowed(_));
 	}
 
 	{
-		let result = utf8_to_cstr("Hello,\0world".into()).expect_err("interior NUL is rejected");
-		let error_string = assert_matches!(result, JvmError::NullOptString(string) => string);
+		let result: JvmError = utf8_to_cstr("Hello,\0world".into()).expect_err("interior NUL is rejected");
+		let error_string: String = assert_matches!(result, JvmError::NullOptString(string) => string);
 		assert_eq!(error_string, "Hello,\0world");
 	}
 }

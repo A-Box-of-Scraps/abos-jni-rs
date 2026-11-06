@@ -22,8 +22,8 @@ fn global_ref_works_in_other_threads() {
 
 	const ITERS_PER_THREAD: usize = 10_000;
 
-	let atomic_integer = attach_current_thread(|env| {
-		let local_ref = unwrap(
+	let atomic_integer: Global<JObject<'_>> = attach_current_thread(|env| {
+		let local_ref: abos_jni::refs::Auto<'_, JObject<'_>> = unwrap(
 			env.new_object(
 				jni_str!("java/util/concurrent/atomic/AtomicInteger"),
 				jni_sig!("(I)V"),
@@ -38,17 +38,18 @@ fn global_ref_works_in_other_threads() {
 
 	ATOMIC_INT.set(atomic_integer).expect("set succeeds");
 
-	let mut join_handlers = Vec::new();
+	let mut join_handlers: Vec<std::thread::JoinHandle<()>> = Vec::new();
 
 	// Test with a different number of threads (from 2 to 8)
 	for thread_num in 2..9 {
-		let barrier = Arc::new(Barrier::new(thread_num));
+		let barrier: Arc<Barrier> = Arc::new(Barrier::new(thread_num));
 
 		for _ in 0..thread_num {
-			let barrier = barrier.clone();
-			let atomic_integer = ATOMIC_INT.get().expect("test bindings initialize");
+			let barrier: Arc<Barrier> = barrier.clone();
+			let atomic_integer: &Global<JObject<'_>> = ATOMIC_INT.get().expect("test bindings initialize");
 
-			let jh = spawn(move || increment_in_thread(&barrier, atomic_integer, ITERS_PER_THREAD));
+			let jh: std::thread::JoinHandle<()> =
+				spawn(move || increment_in_thread(&barrier, atomic_integer, ITERS_PER_THREAD));
 			join_handlers.push(jh);
 		}
 
@@ -61,8 +62,8 @@ fn global_ref_works_in_other_threads() {
 		}
 
 		attach_current_thread(|env| {
-			let atomic_integer = ATOMIC_INT.get().expect("test bindings initialize");
-			let expected = jint::try_from(ITERS_PER_THREAD * thread_num).expect("test iteration count fits jint");
+			let atomic_integer: &Global<JObject<'_>> = ATOMIC_INT.get().expect("test bindings initialize");
+			let expected: i32 = jint::try_from(ITERS_PER_THREAD * thread_num).expect("test iteration count fits jint");
 			assert_eq!(
 				expected,
 				unwrap(

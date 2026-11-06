@@ -4,7 +4,7 @@ use super::*;
 fn test_java_char_conversion() {
 	attach_current_thread(|env| {
 		// Make a Java `StringBuilder`.
-		let sb = unwrap(
+		let sb: abos_jni::objects::JObject<'_> = unwrap(
 			env.new_object(jni_str!("java/lang/StringBuilder"), jni_sig!("()V"), &[]),
 			env,
 		);
@@ -35,7 +35,7 @@ fn test_java_char_conversion() {
 		);
 
 		// Finish the `StringBuilder` and get a Java `String`.
-		let s = unwrap(
+		let s: abos_jni::objects::JObject<'_> = unwrap(
 			env.call_method(&sb, jni_str!("toString"), jni_sig!("()Ljava/lang/String;"), &[]),
 			env,
 		)
@@ -52,14 +52,14 @@ fn test_java_char_conversion() {
 				deprecated,
 				reason = "Exercise the deprecated character conversion API for compatibility."
 			)]
-			let c = unwrap(
+			let c: std::result::Result<char, abos_jni::errors::Error> = unwrap(
 				env.call_method(&s, jni_str!("charAt"), jni_sig!("(I)C"), &[JValue::Int(0)]),
 				env,
 			)
 			.c_char();
 
 			// That should fail.
-			let c = assert_matches!(
+			let c: std::char::DecodeUtf16Error = assert_matches!(
 				c,
 				Err(Error::InvalidUtf16 { source })
 				=> source
@@ -73,7 +73,7 @@ fn test_java_char_conversion() {
 			// The first character in the string *is* representable in a single UTF-32 unit.
 
 			// Get the UTF-32 unit and unwrap it.
-			let c = unwrap(
+			let c: char = unwrap(
 				env.call_method(&s, jni_str!("codePointAt"), jni_sig!("(I)I"), &[JValue::Int(0)]),
 				env,
 			)
@@ -92,7 +92,7 @@ fn test_java_char_conversion() {
 				deprecated,
 				reason = "Exercise the deprecated character conversion API for compatibility."
 			)]
-			let c = unwrap(
+			let c: char = unwrap(
 				env.call_method(
 					&s,
 					jni_str!("charAt"),

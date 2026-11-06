@@ -4,7 +4,7 @@ use super::*;
 pub fn get_public_field() {
 	attach_current_thread(|env| {
 		// Create a new Point(5, 10)
-		let point = unwrap(
+		let point: abos_jni::refs::Auto<'_, JObject<'_>> = unwrap(
 			env.new_object(
 				jni_str!("java/awt/Point"),
 				jni_sig!("(II)V"),
@@ -15,7 +15,7 @@ pub fn get_public_field() {
 		.auto();
 
 		// Get the x field value
-		let x_value = env
+		let x_value: i32 = env
 			.get_field(&point, jni_str!("x"), jni_sig!("I"))
 			.expect("test field can be read")
 			.i()
@@ -24,7 +24,7 @@ pub fn get_public_field() {
 		assert_eq!(x_value, 5);
 
 		// Get the y field value
-		let y_value = env
+		let y_value: i32 = env
 			.get_field(&point, jni_str!("y"), jni_sig!("I"))
 			.expect("test field can be read")
 			.i()
@@ -41,7 +41,7 @@ pub fn get_public_field() {
 pub fn get_public_field_by_id() {
 	attach_current_thread(|env| {
 		// Create a new Point(5, 10)
-		let point = unwrap(
+		let point: abos_jni::refs::Auto<'_, JObject<'_>> = unwrap(
 			env.new_object(
 				jni_str!("java/awt/Point"),
 				jni_sig!("(II)V"),
@@ -52,14 +52,14 @@ pub fn get_public_field_by_id() {
 		.auto();
 
 		// Get the field ID for x field
-		let field_id = env
+		let field_id: abos_jni::ids::JFieldID = env
 			.get_field_id(jni_str!("java/awt/Point"), jni_str!("x"), jni_sig!("I"))
 			.expect("get field id succeeds");
 
-		let field_type = ReturnType::Primitive(Primitive::Int);
+		let field_type: JavaType = ReturnType::Primitive(Primitive::Int);
 		// Safety: we have just looked up the field ID based on the given class and field_type
 		unsafe {
-			let x_value = env
+			let x_value: i32 = env
 				.get_field_unchecked(&point, field_id, field_type)
 				.expect("get field unchecked succeeds")
 				.i()
@@ -77,7 +77,7 @@ pub fn get_public_field_by_id() {
 pub fn set_public_field() {
 	attach_current_thread(|env| {
 		// Create a new Point(5, 10)
-		let point = unwrap(
+		let point: abos_jni::refs::Auto<'_, JObject<'_>> = unwrap(
 			env.new_object(
 				jni_str!("java/awt/Point"),
 				jni_sig!("(II)V"),
@@ -92,7 +92,7 @@ pub fn set_public_field() {
 			.expect("test field can be assigned");
 
 		// Verify the field was set
-		let x_value = env
+		let x_value: i32 = env
 			.get_field(&point, jni_str!("x"), jni_sig!("I"))
 			.expect("test field can be read")
 			.i()
@@ -105,7 +105,7 @@ pub fn set_public_field() {
 			.expect("test field can be assigned");
 
 		// Verify the field was set
-		let y_value = env
+		let y_value: i32 = env
 			.get_field(&point, jni_str!("y"), jni_sig!("I"))
 			.expect("test field can be read")
 			.i()
@@ -122,7 +122,7 @@ pub fn set_public_field() {
 pub fn set_public_field_by_id() {
 	attach_current_thread(|env| {
 		// Create a new Point(5, 10)
-		let point = unwrap(
+		let point: abos_jni::refs::Auto<'_, JObject<'_>> = unwrap(
 			env.new_object(
 				jni_str!("java/awt/Point"),
 				jni_sig!("(II)V"),
@@ -133,7 +133,7 @@ pub fn set_public_field_by_id() {
 		.auto();
 
 		// Get the field ID for x field
-		let field_id = env
+		let field_id: abos_jni::ids::JFieldID = env
 			.get_field_id(jni_str!("java/awt/Point"), jni_str!("x"), jni_sig!("I"))
 			.expect("get field id succeeds");
 
@@ -145,7 +145,7 @@ pub fn set_public_field_by_id() {
 		}
 
 		// Verify the field was set
-		let x_value = env
+		let x_value: i32 = env
 			.get_field(&point, jni_str!("x"), jni_sig!("I"))
 			.expect("test field can be read")
 			.i()
@@ -231,7 +231,7 @@ rusty_fork::rusty_fork_test! {
 #[test]
 pub fn get_static_public_field() {
 	attach_current_thread(|env| {
-		let min_int_value = env
+		let min_int_value: i32 = env
 			.get_static_field(INTEGER_CLASS, jni_str!("MIN_VALUE"), jni_sig!("I"))
 			.expect("test static field can be read")
 			.i()
@@ -247,14 +247,14 @@ pub fn get_static_public_field() {
 #[test]
 pub fn get_static_public_field_by_id() {
 	attach_current_thread(|env| {
-		let field_id = env
+		let field_id: abos_jni::ids::JStaticFieldID = env
 			.get_static_field_id(INTEGER_CLASS, jni_str!("MIN_VALUE"), jni_sig!("I"))
 			.expect("get static field id succeeds");
 
-		let field_type = JavaType::Primitive(Primitive::Int);
+		let field_type: JavaType = JavaType::Primitive(Primitive::Int);
 		// Safety: we have just looked up the field ID based on the given class and field_type
 		unsafe {
-			let min_int_value = env
+			let min_int_value: i32 = env
 				.get_static_field_unchecked(INTEGER_CLASS, field_id, field_type)
 				.expect("get static field unchecked succeeds")
 				.i()

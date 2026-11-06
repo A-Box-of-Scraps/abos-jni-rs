@@ -201,7 +201,7 @@ impl<T: Default, E: std::error::Error> ErrorPolicy<T, E> for ThrowRuntimeExAndDe
 		if env.exception_check() {
 			return Ok(T::default()); // already thrown
 		}
-		let err_string = format!("Rust error: {err}");
+		let err_string: String = format!("Rust error: {err}");
 		// Note: `env.throw()` will return `Err(Error::JavaException)` after throwing but in this case
 		// (where we are going to be letting the exception propagate to Java), we want to ensure we
 		// don't return that as an error
@@ -214,7 +214,7 @@ impl<T: Default, E: std::error::Error> ErrorPolicy<T, E> for ThrowRuntimeExAndDe
 		_cap: &mut Self::Captures<'unowned_env_local, 'native_method>,
 		payload: Box<dyn std::any::Any + Send + 'static>,
 	) -> crate::errors::Result<T> {
-		let panic_string = match payload.downcast::<&'static str>() {
+		let panic_string: String = match payload.downcast::<&'static str>() {
 			Ok(s) => (*s).to_string(),
 			Err(payload) => {
 				// Since it's possible that dropping a panic payload may itself panic,
@@ -259,7 +259,7 @@ impl<T: Default, E: std::error::Error> ErrorPolicy<T, E> for LogErrorAndDefault 
 		_cap: &mut Self::Captures<'unowned_env_local, 'native_method>,
 		payload: Box<dyn std::any::Any + Send + 'static>,
 	) -> crate::errors::Result<T> {
-		let panic_string = match payload.downcast::<&'static str>() {
+		let panic_string: String = match payload.downcast::<&'static str>() {
 			Ok(s) => (*s).to_string(),
 			Err(payload) => {
 				// Since it's possible that dropping a panic payload may itself panic,
@@ -323,7 +323,7 @@ impl<T: Default, E: std::error::Error> ErrorPolicy<T, E> for LogContextErrorAndD
 		cap: &mut Self::Captures<'unowned_env_local, 'native_method>,
 		payload: Box<dyn std::any::Any + Send + 'static>,
 	) -> crate::errors::Result<T> {
-		let panic_string = match payload.downcast::<&'static str>() {
+		let panic_string: String = match payload.downcast::<&'static str>() {
 			Ok(s) => (*s).to_string(),
 			Err(payload) => {
 				// Since it's possible that dropping a panic payload may itself panic,
@@ -395,7 +395,7 @@ mod tests {
 			.with_env(|env| -> crate::errors::Result<_> {
 				// do stuff that might fail or panic
 				// for the sake of testing, use the context that will also be captured
-				let class = env.get_object_class(&context)?;
+				let class: JClass<'_> = env.get_object_class(&context)?;
 				Ok(class)
 			})
 			.resolve_with::<TestCustomPolicy, _>(|| {
@@ -417,7 +417,7 @@ mod tests {
 			.with_env(|env| -> crate::errors::Result<_> {
 				// do stuff that might fail or panic
 				// for the sake of testing, use the context that will also be captured
-				let class = env.get_object_class(&context)?;
+				let class: JClass<'_> = env.get_object_class(&context)?;
 				Ok(class)
 			})
 			.resolve_with::<LogContextErrorAndDefault, _>(|| format!("In 'logErrorWithContextString' with arg: {arg}"))

@@ -8,7 +8,7 @@ pub(super) fn parse_primitive(input: &str) -> Result<(Primitive, &str)> {
 		.split_first()
 		.ok_or_else(|| Error::ParseFailed("unexpected end of input".into()))?;
 
-	let prim = match first {
+	let prim: Primitive = match first {
 		b'Z' => Primitive::Boolean,
 		b'B' => Primitive::Byte,
 		b'C' => Primitive::Char,
@@ -41,7 +41,7 @@ pub(super) fn parse_non_void_primitive(input: &str) -> Result<(Primitive, &str)>
 
 /// Parse an array type descriptor (`[<element_type>`).
 pub(super) fn parse_array(input: &str) -> Result<(JavaType, &str)> {
-	let input = input
+	let input: &str = input
 		.strip_prefix('[')
 		.ok_or_else(|| Error::ParseFailed("expected '[' for array type".into()))?;
 	let (_, rest) = parse_non_void_type(input)?;
@@ -55,11 +55,11 @@ pub(super) fn parse_object(input: &str) -> Result<(JavaType, &str)> {
 		!matches!(c, '.' | ';' | '[' | '/')
 	}
 
-	let input = input
+	let input: &str = input
 		.strip_prefix('L')
 		.ok_or_else(|| Error::ParseFailed("expected 'L' for object type".into()))?;
 
-	let bytes = input.as_bytes();
+	let bytes: &[u8] = input.as_bytes();
 	let mut i = 0;
 	// Must start with at least one unqualified char (no leading '/')
 	if i >= bytes.len() || !is_unqualified(bytes[i] as char) {
@@ -73,7 +73,7 @@ pub(super) fn parse_object(input: &str) -> Result<(JavaType, &str)> {
 	// Optionally followed by ('/' segment)* where each segment is non-empty
 	while i < bytes.len() && bytes[i] == b'/' {
 		i += 1; // consume '/'
-		let seg_start = i;
+		let seg_start: usize = i;
 		while i < bytes.len() && is_unqualified(bytes[i] as char) {
 			i += 1;
 		}
@@ -119,12 +119,12 @@ pub(super) fn parse_non_void_type(input: &str) -> Result<(JavaType, &str)> {
 
 /// Parse argument types enclosed in parentheses (`(<type>*)`).
 pub(super) fn parse_args(input: &str) -> Result<(Vec<JavaType>, &str)> {
-	let input = input
+	let input: &str = input
 		.strip_prefix('(')
 		.ok_or_else(|| Error::ParseFailed("expected '(' to start arguments".into()))?;
 
-	let mut args = Vec::new();
-	let mut rest = input;
+	let mut args: Vec<JavaType> = Vec::new();
+	let mut rest: &str = input;
 	loop {
 		match rest.as_bytes().first() {
 			Some(b')') => return Ok((args, &rest[1..])),

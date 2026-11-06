@@ -33,13 +33,15 @@ pub extern "system" fn Java_Renderer_render<'local>(
 	unowned_env
 		.with_env(|env| -> abos_jni::errors::Result<_> {
 			// SAFETY: The native callback contract requires mNative to contain the Renderer installed with set_rust_field.
-			let mut renderer = unsafe { env.get_rust_field::<_, _, Renderer>(renderer, jni_str!("mNative"))? };
+			let mut renderer: std::sync::MutexGuard<'_, Renderer> =
+				unsafe { env.get_rust_field::<_, _, Renderer>(renderer, jni_str!("mNative"))? };
 			// SAFETY: The native callback contract requires mNative to contain the Surface installed with set_rust_field.
-			let surface = unsafe { env.get_rust_field::<_, _, Surface>(surface, jni_str!("mNative"))? };
+			let surface: std::sync::MutexGuard<'_, Surface> =
+				unsafe { env.get_rust_field::<_, _, Surface>(surface, jni_str!("mNative"))? };
 			renderer.render(&surface);
 
 			// Check we can still call something requiring `&mut Env` after locking multiple fields
-			let _s = env.new_string("hello")?;
+			let _s: abos_jni::objects::JString<'_> = env.new_string("hello")?;
 
 			Ok(())
 		})

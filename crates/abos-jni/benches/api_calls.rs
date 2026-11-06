@@ -40,7 +40,7 @@ static SIG_LOCAL_DATE_TIME_OF: MethodSignature = jni_sig!("(IIIIIII)Ljava/time/L
 static TEST_STRING_UNICODE: &str = "_񍷕㳧~δ򗊁᪘׷ġ˥쩽|ņ/򖕡ٶԦ萴퀉֒ٞHy󢕒%ӓ娎񢞊ăꊦȮ񳗌";
 
 static VM: LazyLock<JavaVM> = LazyLock::new(|| {
-	let args = InitArgsBuilder::new()
+	let args: abos_jni::InitArgs<'_> = InitArgsBuilder::new()
 		.version(JNIVersion::V1_8)
 		.build()
 		.expect("benchmark JVM arguments are valid");
@@ -65,8 +65,8 @@ fn jni_call_static_abs_method_safe(c: &mut Criterion) {
 
 fn jni_call_static_abs_method_unchecked_str(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
-		let class = CLASS_MATH;
-		let method_id = env
+		let class: &JNIStr = CLASS_MATH;
+		let method_id: abos_jni::ids::JStaticMethodID = env
 			.get_static_method_id(class, METHOD_MATH_ABS, &SIG_MATH_ABS)
 			.expect("test static method can be resolved");
 
@@ -80,8 +80,9 @@ fn jni_call_static_abs_method_unchecked_str(c: &mut Criterion) {
 
 fn jni_call_static_abs_method_unchecked_jclass(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
-		let class = Desc::<JClass>::lookup(CLASS_MATH, env).expect("lookup succeeds");
-		let method_id = env
+		let class: abos_jni::refs::Auto<'_, JClass<'_>> =
+			Desc::<JClass>::lookup(CLASS_MATH, env).expect("lookup succeeds");
+		let method_id: abos_jni::ids::JStaticMethodID = env
 			.get_static_method_id(&class, METHOD_MATH_ABS, &SIG_MATH_ABS)
 			.expect("test static method can be resolved");
 
@@ -97,7 +98,7 @@ fn jni_call_static_date_time_method_safe(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
 		c.bench_function("jni_call_static_date_time_method_safe", |b| {
 			b.iter(|| {
-				let obj = jni_local_date_time_of_safe(env, [1; 7]);
+				let obj: JObject<'_> = jni_local_date_time_of_safe(env, [1; 7]);
 				env.delete_local_ref(obj);
 			});
 		});
@@ -108,14 +109,15 @@ fn jni_call_static_date_time_method_safe(c: &mut Criterion) {
 
 fn jni_call_static_date_time_method_unchecked_jclass(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
-		let class = Desc::<JClass>::lookup(CLASS_LOCAL_DATE_TIME, env).expect("lookup succeeds");
-		let method_id = env
+		let class: abos_jni::refs::Auto<'_, JClass<'_>> =
+			Desc::<JClass>::lookup(CLASS_LOCAL_DATE_TIME, env).expect("lookup succeeds");
+		let method_id: abos_jni::ids::JStaticMethodID = env
 			.get_static_method_id(&class, METHOD_LOCAL_DATE_TIME_OF, &SIG_LOCAL_DATE_TIME_OF)
 			.expect("test static method can be resolved");
 
 		c.bench_function("jni_call_static_date_time_method_unchecked_jclass", |b| {
 			b.iter(|| {
-				let obj = jni_object_call_static_unchecked(
+				let obj: JObject<'_> = jni_object_call_static_unchecked(
 					env,
 					&class,
 					method_id,
@@ -139,8 +141,8 @@ fn jni_call_static_date_time_method_unchecked_jclass(c: &mut Criterion) {
 
 fn jni_call_object_hash_method_safe(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
-		let s = env.new_string("").expect("test string can be allocated");
-		let obj = black_box(JObject::from(s));
+		let s: JString<'_> = env.new_string("").expect("test string can be allocated");
+		let obj: JObject<'_> = black_box(JObject::from(s));
 
 		c.bench_function("jni_call_object_hash_method_safe", |b| {
 			b.iter(|| jni_hash_safe(env, &obj));
@@ -152,10 +154,10 @@ fn jni_call_object_hash_method_safe(c: &mut Criterion) {
 
 fn jni_call_object_hash_method_unchecked(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
-		let s = env.new_string("").expect("test string can be allocated");
-		let obj = black_box(JObject::from(s));
-		let obj_class = env.get_object_class(&obj).expect("get object class succeeds");
-		let method_id = env
+		let s: JString<'_> = env.new_string("").expect("test string can be allocated");
+		let obj: JObject<'_> = black_box(JObject::from(s));
+		let obj_class: JClass<'_> = env.get_object_class(&obj).expect("get object class succeeds");
+		let method_id: abos_jni::ids::JMethodID = env
 			.get_method_id(&obj_class, METHOD_OBJECT_HASH_CODE, &SIG_OBJECT_HASH_CODE)
 			.expect("test method can be resolved");
 
@@ -169,11 +171,11 @@ fn jni_call_object_hash_method_unchecked(c: &mut Criterion) {
 
 fn jni_new_object_str(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
-		let class = CLASS_OBJECT;
+		let class: &JNIStr = CLASS_OBJECT;
 
 		c.bench_function("jni_new_object_str", |b| {
 			b.iter(|| {
-				let obj = env
+				let obj: JObject<'_> = env
 					.new_object(class, &SIG_OBJECT_CTOR, &[])
 					.expect("test object can be allocated");
 				env.delete_local_ref(obj);
@@ -186,15 +188,15 @@ fn jni_new_object_str(c: &mut Criterion) {
 
 fn jni_new_object_by_id_str(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
-		let class = CLASS_OBJECT;
-		let ctor_id = env
+		let class: &JNIStr = CLASS_OBJECT;
+		let ctor_id: abos_jni::ids::JMethodID = env
 			.get_method_id(class, METHOD_CTOR, &SIG_OBJECT_CTOR)
 			.expect("test method can be resolved");
 
 		c.bench_function("jni_new_object_by_id_str", |b| {
 			b.iter(|| {
 				// SAFETY: The constructor ID was resolved for this class with a no-argument signature.
-				let obj =
+				let obj: JObject<'_> =
 					unsafe { env.new_object_unchecked(class, ctor_id, &[]) }.expect("new object unchecked succeeds");
 				env.delete_local_ref(obj);
 			});
@@ -206,11 +208,12 @@ fn jni_new_object_by_id_str(c: &mut Criterion) {
 
 fn jni_new_object_jclass(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
-		let class = Desc::<JClass>::lookup(CLASS_OBJECT, env).expect("lookup succeeds");
+		let class: abos_jni::refs::Auto<'_, JClass<'_>> =
+			Desc::<JClass>::lookup(CLASS_OBJECT, env).expect("lookup succeeds");
 
 		c.bench_function("jni_new_object_jclass", |b| {
 			b.iter(|| {
-				let obj = env
+				let obj: JObject<'_> = env
 					.new_object(&class, &SIG_OBJECT_CTOR, &[])
 					.expect("test object can be allocated");
 				env.delete_local_ref(obj);
@@ -223,15 +226,16 @@ fn jni_new_object_jclass(c: &mut Criterion) {
 
 fn jni_new_object_by_id_jclass(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
-		let class = Desc::<JClass>::lookup(CLASS_OBJECT, env).expect("lookup succeeds");
-		let ctor_id = env
+		let class: abos_jni::refs::Auto<'_, JClass<'_>> =
+			Desc::<JClass>::lookup(CLASS_OBJECT, env).expect("lookup succeeds");
+		let ctor_id: abos_jni::ids::JMethodID = env
 			.get_method_id(&class, METHOD_CTOR, &SIG_OBJECT_CTOR)
 			.expect("test method can be resolved");
 
 		c.bench_function("jni_new_object_by_id_jclass", |b| {
 			b.iter(|| {
 				// SAFETY: The constructor ID was resolved for this class with a no-argument signature.
-				let obj =
+				let obj: JObject<'_> =
 					unsafe { env.new_object_unchecked(&class, ctor_id, &[]) }.expect("new object unchecked succeeds");
 				env.delete_local_ref(obj);
 			});
@@ -243,11 +247,11 @@ fn jni_new_object_by_id_jclass(c: &mut Criterion) {
 
 fn jni_new_global_ref(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
-		let class = CLASS_OBJECT;
-		let obj = env
+		let class: &JNIStr = CLASS_OBJECT;
+		let obj: JObject<'_> = env
 			.new_object(class, &SIG_OBJECT_CTOR, &[])
 			.expect("test object can be allocated");
-		let global_ref = env.new_global_ref(&obj).expect("global reference can be allocated");
+		let global_ref: Global<JObject<'_>> = env.new_global_ref(&obj).expect("global reference can be allocated");
 		env.delete_local_ref(obj);
 
 		c.bench_function("jni_new_global_ref", |b| {
@@ -279,7 +283,7 @@ fn jni_get_java_vm(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
 		c.bench_function("jni_get_java_vm", |b| {
 			b.iter(|| {
-				let _jvm = env.get_java_vm();
+				let _jvm: std::result::Result<JavaVM, abos_jni::errors::Error> = env.get_java_vm();
 			});
 		});
 		Ok(())
@@ -289,7 +293,7 @@ fn jni_get_java_vm(c: &mut Criterion) {
 
 fn jni_get_string(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
-		let string = env
+		let string: JString<'_> = env
 			.new_string(TEST_STRING_UNICODE)
 			.expect("test string can be allocated");
 
@@ -308,7 +312,7 @@ fn jni_get_string(c: &mut Criterion) {
 
 fn jni_get_string_unchecked(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
-		let string = env
+		let string: JString<'_> = env
 			.new_string(TEST_STRING_UNICODE)
 			.expect("test string can be allocated");
 
@@ -351,7 +355,7 @@ fn jni_with_local_frame_returning_local(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
 		const LOCAL_FRAME_SIZE: usize = 32;
 
-		let class = env.find_class(CLASS_OBJECT).expect("test class can be resolved");
+		let class: JClass<'_> = env.find_class(CLASS_OBJECT).expect("test class can be resolved");
 		let mut operation = || {
 			env.with_local_frame_returning_local::<_, JObject, _>(LOCAL_FRAME_SIZE, |env| {
 				env.new_object(&class, &SIG_OBJECT_CTOR, &[])
@@ -372,16 +376,16 @@ fn jni_with_local_frame_returning_global_to_local(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
 		const LOCAL_FRAME_SIZE: usize = 32;
 
-		let class = env.find_class(CLASS_OBJECT).expect("test class can be resolved");
+		let class: JClass<'_> = env.find_class(CLASS_OBJECT).expect("test class can be resolved");
 		let mut operation = || {
-			let global = env
+			let global: Global<JObject<'_>> = env
 				.with_local_frame::<_, Global<JObject<'static>>, abos_jni::errors::Error>(LOCAL_FRAME_SIZE, |env| {
-					let local = env.new_object(&class, &SIG_OBJECT_CTOR, &[])?;
-					let global = env.new_global_ref(local)?;
+					let local: JObject<'_> = env.new_object(&class, &SIG_OBJECT_CTOR, &[])?;
+					let global: Global<JObject<'_>> = env.new_global_ref(local)?;
 					Ok(global)
 				})
 				.expect("test object can be allocated");
-			let _local = env.new_local_ref(global).expect("local reference can be allocated");
+			let _local: JObject<'_> = env.new_local_ref(global).expect("local reference can be allocated");
 		};
 		c.bench_function("jni_with_local_frame_returning_global_to_local", |b| {
 			b.iter(&mut operation);
@@ -456,13 +460,13 @@ fn jni_new_string_with_repeat_permanent_thread_attachments(c: &mut Criterion) {
 
 fn native_arc(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
-		let class = CLASS_OBJECT;
-		let obj = env
+		let class: &JNIStr = CLASS_OBJECT;
+		let obj: JObject<'_> = env
 			.new_object(class, &SIG_OBJECT_CTOR, &[])
 			.expect("test object can be allocated");
-		let global_ref = env.new_global_ref(&obj).expect("global reference can be allocated");
+		let global_ref: Global<JObject<'_>> = env.new_global_ref(&obj).expect("global reference can be allocated");
 		env.delete_local_ref(obj);
-		let arc = Arc::new(global_ref);
+		let arc: Arc<Global<JObject<'_>>> = Arc::new(global_ref);
 
 		c.bench_function("native_arc", |b| {
 			b.iter(|| {
@@ -476,7 +480,7 @@ fn native_arc(c: &mut Criterion) {
 
 fn native_rc(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
-		let rc = Rc::new(env);
+		let rc: Rc<&mut abos_jni::Env<'_>> = Rc::new(env);
 
 		c.bench_function("native_rc", |b| {
 			b.iter(|| {

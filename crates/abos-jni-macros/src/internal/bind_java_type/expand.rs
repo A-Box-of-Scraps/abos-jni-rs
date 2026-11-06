@@ -9,21 +9,22 @@ use super::{
 pub fn bind_java_type_impl(input: TokenStream) -> Result<TokenStream> {
 	let input: BindClassInput = syn::parse2(input)?;
 
-	let type_name = &input.type_name;
-	let java_class = &input.java_class;
-	let java_class_internal = java_class.to_jni_internal();
-	let java_class_dotted = java_class.to_java_dotted();
-	let jni = &input.jni_crate;
+	let type_name: &proc_macro2::Ident = &input.type_name;
+	let java_class: &crate::internal::types::JavaClassName = &input.java_class;
+	let java_class_internal: String = java_class.to_jni_internal();
+	let java_class_dotted: String = java_class.to_java_dotted();
+	let jni: &syn::Path = &input.jni_crate;
 
 	validate_core_binding(&input, &java_class_dotted)?;
 
 	// Generate API struct name
-	let api_name = input.api_name.unwrap_or_else(|| format_ident!("{}API", type_name));
+	let api_name: proc_macro2::Ident = input.api_name.unwrap_or_else(|| format_ident!("{}API", type_name));
 
-	let type_visibility = input.type_visibility.unwrap_or(VisibilitySpec::PubSelf);
+	let type_visibility: VisibilitySpec = input.type_visibility.unwrap_or(VisibilitySpec::PubSelf);
 
 	// Generate the type struct
-	let type_struct = generate_type_struct(type_name, &type_visibility, &input.type_attrs, &java_class_dotted, jni);
+	let type_struct: TokenStream =
+		generate_type_struct(type_name, &type_visibility, &input.type_attrs, &java_class_dotted, jni);
 
 	// Generate constructor method ID fields and initialization code
 	let (constructor_method_id_fields, constructor_method_id_inits) =
@@ -36,12 +37,12 @@ pub fn bind_java_type_impl(input: TokenStream) -> Result<TokenStream> {
 	let (field_id_fields, field_id_inits) = generate_field_ids(&input.fields, &input.type_mappings, jni)?;
 
 	// Combine all ID fields and inits
-	let all_id_fields = [constructor_method_id_fields, method_id_fields, field_id_fields].concat();
+	let all_id_fields: Vec<TokenStream> = [constructor_method_id_fields, method_id_fields, field_id_fields].concat();
 
-	let all_id_inits = [constructor_method_id_inits, method_id_inits, field_id_inits].concat();
+	let all_id_inits: Vec<TokenStream> = [constructor_method_id_inits, method_id_inits, field_id_inits].concat();
 
 	// Generate the API struct
-	let api_struct = generate_api_struct(
+	let api_struct: TokenStream = generate_api_struct(
 		&api_name,
 		&type_visibility,
 		input.priv_type.as_ref(),
@@ -67,7 +68,7 @@ pub fn bind_java_type_impl(input: TokenStream) -> Result<TokenStream> {
 	)?;
 
 	// Generate the API::get() method with native registration integrated
-	let api_get_method = generate_api_get_method(
+	let api_get_method: TokenStream = generate_api_get_method(
 		&api_name,
 		type_name,
 		&java_class_dotted,
@@ -83,26 +84,27 @@ pub fn bind_java_type_impl(input: TokenStream) -> Result<TokenStream> {
 	)?;
 
 	// Generate Reference trait implementation
-	let reference_impl = generate_reference_impl(type_name, &api_name, &java_class_dotted, jni);
+	let reference_impl: TokenStream = generate_reference_impl(type_name, &api_name, &java_class_dotted, jni);
 
 	// Generate base methods (from_raw, null, into_raw)
-	let base_methods = generate_base_methods(type_name, input.sys_type.as_ref(), jni);
+	let base_methods: TokenStream = generate_base_methods(type_name, input.sys_type.as_ref(), jni);
 
 	// Generate is_instance_of methods and From impls
-	let is_instance_of_code =
+	let is_instance_of_code: TokenStream =
 		generate_is_instance_of_code(type_name, &input.is_instance_of, &input.type_mappings, jni)?;
 
 	// Generate constructor implementations
-	let constructors_code = generate_constructors(type_name, &api_name, &input.constructors, &input.type_mappings, jni);
+	let constructors_code: TokenStream =
+		generate_constructors(type_name, &api_name, &input.constructors, &input.type_mappings, jni);
 
 	// Generate method implementations
-	let methods_impl = generate_methods(&api_name, &input.methods, &input.type_mappings, jni);
+	let methods_impl: TokenStream = generate_methods(&api_name, &input.methods, &input.type_mappings, jni);
 
 	// Generate field implementations
-	let fields_impl = generate_fields(&api_name, &input.fields, &input.type_mappings, jni);
+	let fields_impl: TokenStream = generate_fields(&api_name, &input.fields, &input.type_mappings, jni);
 
 	// Wrap instance methods and fields in impl<'local> block
-	let instance_impl = quote! {
+	let instance_impl: TokenStream = quote! {
 		impl<'local> #type_name<'local> {
 			#methods_impl
 			#fields_impl

@@ -258,7 +258,7 @@ fn test_abi_debug_only_in_debug_mode_raw() {
 		.arg("test_abi_debug_only_in_debug_mode_raw_impl")
 		.arg("--nocapture");
 
-	let output = cmd.output().expect("Failed to execute fixture test");
+	let output: std::process::Output = cmd.output().expect("Failed to execute fixture test");
 
 	// The process should have failed (non-zero exit code)
 	assert!(
@@ -267,9 +267,9 @@ fn test_abi_debug_only_in_debug_mode_raw() {
 	);
 
 	// Check the combined output (stderr and stdout) for the ABI check message
-	let stderr = String::from_utf8_lossy(&output.stderr);
-	let stdout = String::from_utf8_lossy(&output.stdout);
-	let combined = format!("{stdout}{stderr}");
+	let stderr: std::borrow::Cow<'_, str> = String::from_utf8_lossy(&output.stderr);
+	let stdout: std::borrow::Cow<'_, str> = String::from_utf8_lossy(&output.stdout);
+	let combined: String = format!("{stdout}{stderr}");
 
 	// The ABI check assertion message should appear in the output
 	assert!(

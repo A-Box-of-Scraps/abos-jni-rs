@@ -80,25 +80,27 @@ pub unsafe fn tls_attach_current_thread<'local>(
 	java_vm: &JavaVM,
 	config: &AttachConfig,
 ) -> Result<AttachGuard<'local>> {
-	let thread = current();
+	let thread: Thread = current();
 
 	// Store in TLS for automatic detachment when thread terminates
-	let env = TLS_ATTACH_GUARD.with(move |f| -> abos_jni::errors::Result<*mut abos_jni::sys::JNIEnv> {
-		// Although it's unlikely, it's possible that the thread was already permanently attached
-		// but some external code manually detached it (this is allowed as long as there are no
-		// active AttachGuards). In this case we don't want to double-increment the attached
-		// threads counter.
-		let inc_attached_count = f.borrow_mut().take().is_none_or(|guard| {
-			// We use `std::mem::forget` to ensure we don't drop the existing guard and
-			// call detach again.
-			std::mem::forget(guard);
-			false
-		});
-		// SAFETY: The caller upholds the attachment contract; the config and thread remain live during attachment.
-		let env = unsafe { sys_attach_current_thread(java_vm, config, &thread, inc_attached_count)? };
-		*f.borrow_mut() = Some(TLSAttachGuard { thread: current() });
-		Ok(env)
-	})?;
+	let env: *mut *const abos_jni_sys::JNINativeInterface_ =
+		TLS_ATTACH_GUARD.with(move |f| -> abos_jni::errors::Result<*mut abos_jni::sys::JNIEnv> {
+			// Although it's unlikely, it's possible that the thread was already permanently attached
+			// but some external code manually detached it (this is allowed as long as there are no
+			// active AttachGuards). In this case we don't want to double-increment the attached
+			// threads counter.
+			let inc_attached_count: bool = f.borrow_mut().take().is_none_or(|guard| {
+				// We use `std::mem::forget` to ensure we don't drop the existing guard and
+				// call detach again.
+				std::mem::forget(guard);
+				false
+			});
+			// SAFETY: The caller upholds the attachment contract; the config and thread remain live during attachment.
+			let env: *mut *const abos_jni_sys::JNINativeInterface_ =
+				unsafe { sys_attach_current_thread(java_vm, config, &thread, inc_attached_count)? };
+			*f.borrow_mut() = Some(TLSAttachGuard { thread: current() });
+			Ok(env)
+		})?;
 
 	// SAFETY: The JNI environment was obtained for this thread and the returned guard tracks its scope.
 	Ok(unsafe { AttachGuard::from_unowned(env) })
@@ -118,7 +120,7 @@ pub fn tls_detach_current_thread() -> Result<()> {
 			|guard| {
 				// Safety: we use `std::mem::forget` to ensure we don't also
 				// run the `Drop` implementation
-				let res = unsafe { guard.detach_impl() };
+				let res: std::result::Result<(), crate::errors::Error> = unsafe { guard.detach_impl() };
 				std::mem::forget(guard);
 				res
 			},

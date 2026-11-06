@@ -10,19 +10,20 @@ pub(super) fn generate_jni_get_field_call(
 	field_id: &TokenStream,
 	type_mappings: &TypeMappings,
 ) -> TokenStream {
-	let call_prefix = if is_static { "GetStatic" } else { "Get" };
+	let call_prefix: &str = if is_static { "GetStatic" } else { "Get" };
 
 	// Determine the JNI function name and return value handling based on the field type
 	let (top_check, call_fn, return_tokens) = if let Some(prim) = field_type.try_as_primitive(type_mappings) {
 		if prim == PrimitiveType::Void {
 			return quote! { Ok(()) };
 		}
-		let call_fn = format_ident!("{}{}Field", call_prefix, prim.jni_name());
+		let call_fn: proc_macro2::Ident = format_ident!("{}{}Field", call_prefix, prim.jni_name());
 		(quote! {}, call_fn, quote! { ret })
 	} else {
 		// For objects, arrays, and rust references, we call GetObjectField
-		let call_fn = format_ident!("{}ObjectField", call_prefix);
-		let return_type_tokens = sig_type_to_rust_return_type(field_type, &quote! { 'env_local }, type_mappings, jni);
+		let call_fn: proc_macro2::Ident = format_ident!("{}ObjectField", call_prefix);
+		let return_type_tokens: TokenStream =
+			sig_type_to_rust_return_type(field_type, &quote! { 'env_local }, type_mappings, jni);
 		(
 			quote! { env.assert_top(); },
 			call_fn,
@@ -32,10 +33,10 @@ pub(super) fn generate_jni_get_field_call(
 
 	// The JNI spec asserts that `Get<Type>Field` _must_ not be called with a `null` object reference
 	// Note: we assume that the class will never be null when getting static fields
-	let null_check = if is_static {
+	let null_check: TokenStream = if is_static {
 		quote! {}
 	} else {
-		let error_msg = format!("Attempted to set '{debug_name}' field with a null object");
+		let error_msg: String = format!("Attempted to set '{debug_name}' field with a null object");
 		quote! {
 			if #this_or_class.is_null() {
 				return Err(#jni::errors::Error::NullPtr(#error_msg));
@@ -90,7 +91,7 @@ pub(super) fn generate_jni_set_field_call(
 	val: &TokenStream,
 	type_mappings: &TypeMappings,
 ) -> TokenStream {
-	let call_prefix = if is_static { "SetStatic" } else { "Set" };
+	let call_prefix: &str = if is_static { "SetStatic" } else { "Set" };
 
 	// Determine the JNI function name and value cast type based on the field type
 	let (call_fn, val_cast) = if let Some(prim) = field_type.try_as_primitive(type_mappings) {
@@ -100,50 +101,50 @@ pub(super) fn generate_jni_set_field_call(
 				return quote! { Ok(()) };
 			}
 			PrimitiveType::Boolean => {
-				let call_fn = format_ident!("{}BooleanField", call_prefix);
+				let call_fn: proc_macro2::Ident = format_ident!("{}BooleanField", call_prefix);
 				(call_fn, quote! { #val as #jni::sys::jboolean })
 			}
 			PrimitiveType::Byte => {
-				let call_fn = format_ident!("{}ByteField", call_prefix);
+				let call_fn: proc_macro2::Ident = format_ident!("{}ByteField", call_prefix);
 				(call_fn, quote! { #val as #jni::sys::jbyte })
 			}
 			PrimitiveType::Char => {
-				let call_fn = format_ident!("{}CharField", call_prefix);
+				let call_fn: proc_macro2::Ident = format_ident!("{}CharField", call_prefix);
 				(call_fn, quote! { #val as #jni::sys::jchar })
 			}
 			PrimitiveType::Short => {
-				let call_fn = format_ident!("{}ShortField", call_prefix);
+				let call_fn: proc_macro2::Ident = format_ident!("{}ShortField", call_prefix);
 				(call_fn, quote! { #val as #jni::sys::jshort })
 			}
 			PrimitiveType::Int => {
-				let call_fn = format_ident!("{}IntField", call_prefix);
+				let call_fn: proc_macro2::Ident = format_ident!("{}IntField", call_prefix);
 				(call_fn, quote! { #val as #jni::sys::jint })
 			}
 			PrimitiveType::Long => {
-				let call_fn = format_ident!("{}LongField", call_prefix);
+				let call_fn: proc_macro2::Ident = format_ident!("{}LongField", call_prefix);
 				(call_fn, quote! { #val as #jni::sys::jlong })
 			}
 			PrimitiveType::Float => {
-				let call_fn = format_ident!("{}FloatField", call_prefix);
+				let call_fn: proc_macro2::Ident = format_ident!("{}FloatField", call_prefix);
 				(call_fn, quote! { #val as #jni::sys::jfloat })
 			}
 			PrimitiveType::Double => {
-				let call_fn = format_ident!("{}DoubleField", call_prefix);
+				let call_fn: proc_macro2::Ident = format_ident!("{}DoubleField", call_prefix);
 				(call_fn, quote! { #val as #jni::sys::jdouble })
 			}
 		}
 	} else {
 		// For objects, arrays, and rust references, we call SetObjectField
-		let call_fn = format_ident!("{}ObjectField", call_prefix);
+		let call_fn: proc_macro2::Ident = format_ident!("{}ObjectField", call_prefix);
 		(call_fn, quote! { #val.as_ref().as_raw() })
 	};
 
 	// The JNI spec asserts that `Set<Type>Field` _must_ not be called with a `null` object reference
 	// Note: we assume that the class will never be null when setting static fields
-	let null_check = if is_static {
+	let null_check: TokenStream = if is_static {
 		quote! {}
 	} else {
-		let error_msg = format!("Attempted to set '{debug_name}' field with a null object");
+		let error_msg: String = format!("Attempted to set '{debug_name}' field with a null object");
 		quote! {
 			if #this_or_class.is_null() {
 				return Err(#jni::errors::Error::NullPtr(#error_msg));

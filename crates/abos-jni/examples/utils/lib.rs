@@ -12,13 +12,13 @@ use abos_jni::{Env, InitArgsBuilder, JNIVersion, JavaVM};
 pub fn jvm() -> JavaVM {
 	static INIT: Once = Once::new();
 	INIT.call_once(|| {
-		let jvm_args = InitArgsBuilder::new()
+		let jvm_args: abos_jni::InitArgs<'_> = InitArgsBuilder::new()
 			.version(JNIVersion::V1_8)
 			.option("-Xcheck:jni")
 			.build()
 			.unwrap_or_else(|e| panic!("{e:#?}"));
 
-		let _jvm = JavaVM::new(jvm_args).unwrap_or_else(|e| panic!("{e:#?}"));
+		let _jvm: JavaVM = JavaVM::new(jvm_args).unwrap_or_else(|e| panic!("{e:#?}"));
 	});
 	JavaVM::singleton().expect("Failed to get singleton JVM")
 }
@@ -31,7 +31,7 @@ where
 }
 
 fn setup_javac_output_dir() -> PathBuf {
-	let build_dir =
+	let build_dir: PathBuf =
 		option_env!("JAVA_BUILD_DIR").map_or_else(|| java_target_dir().join("examples-java-classes"), PathBuf::from);
 
 	std::fs::create_dir_all(&build_dir).unwrap_or_else(|e| panic!("Failed to create javac output directory: {e}"));
@@ -46,7 +46,7 @@ fn java_target_dir() -> PathBuf {
 	let Some(output) = option_env!("OUT_DIR") else {
 		return PathBuf::from("target");
 	};
-	let mut path = PathBuf::from(output);
+	let mut path: PathBuf = PathBuf::from(output);
 	while path.file_name().is_some_and(|name| name != "target") {
 		path.pop();
 	}
@@ -58,19 +58,19 @@ fn java_target_dir() -> PathBuf {
 }
 
 fn jni_macros_dir() -> PathBuf {
-	let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set in environment");
+	let manifest_dir: String = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set in environment");
 	PathBuf::from(manifest_dir)
 }
 
 pub fn compile_class(name: &str) -> Vec<PathBuf> {
-	let out_dir = setup_javac_output_dir();
-	let jni_macros_dir = jni_macros_dir();
+	let out_dir: PathBuf = setup_javac_output_dir();
+	let jni_macros_dir: PathBuf = jni_macros_dir();
 
-	let path = jni_macros_dir
+	let path: PathBuf = jni_macros_dir
 		.join("examples/java/com/example")
 		.join(name)
 		.with_extension("java");
-	let files = abos_javac::Build::new()
+	let files: Vec<PathBuf> = abos_javac::Build::new()
 		.file(path)
 		.output_dir(&out_dir)
 		.cargo_metadata(false) // don't output build.rs lines like "cargo:rerun-if-changed=..."
@@ -83,10 +83,11 @@ pub fn compile_class(name: &str) -> Vec<PathBuf> {
 pub fn define_class(env: &mut Env, class_path: &Path) -> abos_jni::errors::Result<()> {
 	use abos_jni::strings::JNIStr;
 
-	let class_bytes =
+	let class_bytes: Vec<u8> =
 		std::fs::read(class_path).unwrap_or_else(|_| panic!("Failed to read class file: {}", class_path.display()));
 
-	let class_loader = abos_jni::objects::JClassLoader::get_system_class_loader(env)?;
+	let class_loader: abos_jni::objects::JClassLoader<'_> =
+		abos_jni::objects::JClassLoader::get_system_class_loader(env)?;
 
 	env.define_class(Option::<&JNIStr>::None, &class_loader, &class_bytes)?;
 
@@ -94,7 +95,7 @@ pub fn define_class(env: &mut Env, class_path: &Path) -> abos_jni::errors::Resul
 }
 
 pub fn load_class(env: &mut Env, name: &str) -> abos_jni::errors::Result<()> {
-	let files = compile_class(name);
+	let files: Vec<PathBuf> = compile_class(name);
 	for class_file in &files {
 		define_class(env, class_file)?;
 	}

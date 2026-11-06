@@ -94,7 +94,7 @@ where
 	T: AsRef<str>,
 {
 	fn from(other: T) -> Self {
-		let enc = mutf8::encode(other.as_ref()).into_owned();
+		let enc: Vec<u8> = mutf8::encode(other.as_ref()).into_owned();
 		Self {
 			// SAFETY: Modified UTF-8 encoding replaces embedded NULs, so enc contains no zero bytes.
 			internal: unsafe { CString::from_vec_unchecked(enc) },
@@ -110,7 +110,7 @@ impl From<JNIString> for CString {
 
 impl<'str_ref> From<&'str_ref JNIStr> for Cow<'str_ref, str> {
 	fn from(other: &'str_ref JNIStr) -> Self {
-		let bytes = other.as_cstr().to_bytes();
+		let bytes: &[u8] = other.as_cstr().to_bytes();
 		match mutf8::decode(bytes) {
 			Ok(s) => s,
 			Err(e) => {
@@ -142,7 +142,7 @@ impl From<JNIString> for String {
 
 impl std::fmt::Display for JNIStr {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		let s = self.to_str();
+		let s: Cow<'_, str> = self.to_str();
 		write!(f, "{s}")
 	}
 }
@@ -212,11 +212,11 @@ impl JNIString {
 /// - Surrogate range (0xED 0xA0..0xBF 0x80..0xBF) is **allowed** (that's how MUTF-8 represents supplementary chars).
 /// - 4-byte leads (0xF0..0xF7) and beyond are **rejected**.
 const fn is_valid_mutf8_cstr(cstr: &CStr) -> bool {
-	let bytes = cstr.to_bytes();
+	let bytes: &[u8] = cstr.to_bytes();
 
 	let mut i = 0;
 	while i < bytes.len() {
-		let b0 = bytes[i];
+		let b0: u8 = bytes[i];
 
 		// ASCII (not NUL; CStr::to_bytes() strips the trailing NUL and disallows interior NULs)
 		if b0 < 0x80 {
@@ -229,7 +229,7 @@ const fn is_valid_mutf8_cstr(cstr: &CStr) -> bool {
 			if i + 1 >= bytes.len() {
 				return false;
 			}
-			let b1 = bytes[i + 1];
+			let b1: u8 = bytes[i + 1];
 			if b1 != 0x80 {
 				return false;
 			}
@@ -242,7 +242,7 @@ const fn is_valid_mutf8_cstr(cstr: &CStr) -> bool {
 			if i + 1 >= bytes.len() {
 				return false;
 			}
-			let b1 = bytes[i + 1];
+			let b1: u8 = bytes[i + 1];
 			if (b1 & 0xC0) != 0x80 {
 				return false;
 			}
@@ -255,11 +255,11 @@ const fn is_valid_mutf8_cstr(cstr: &CStr) -> bool {
 			if i + 2 >= bytes.len() {
 				return false;
 			}
-			let b1 = bytes[i + 1];
-			let b2 = bytes[i + 2];
+			let b1: u8 = bytes[i + 1];
+			let b2: u8 = bytes[i + 2];
 
 			// Reject overlong encodings after E0; modified UTF-8 permits surrogate code units after ED.
-			let valid_second = if b0 == 0xE0 {
+			let valid_second: bool = if b0 == 0xE0 {
 				b1 >= 0xA0 && b1 <= 0xBF
 			} else {
 				(b1 & 0xC0) == 0x80

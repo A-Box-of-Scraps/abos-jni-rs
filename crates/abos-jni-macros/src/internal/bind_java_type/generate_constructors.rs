@@ -8,19 +8,19 @@ pub(super) fn generate_id_fields_and_inits(
 	lookups: Vec<IdLookup>,
 	jni: &syn::Path,
 ) -> (Vec<TokenStream>, Vec<TokenStream>) {
-	let mut fields = Vec::new();
-	let mut inits = Vec::new();
+	let mut fields: Vec<TokenStream> = Vec::new();
+	let mut inits: Vec<TokenStream> = Vec::new();
 
 	for lookup in lookups {
-		let field_name = lookup.field_name;
-		let field_type = lookup.field_type;
-		let java_name = &lookup.java_name;
-		let signature = &lookup.signature;
-		let lookup_fn = lookup.lookup_fn;
-		let cfg_attrs = &lookup.cfg_attrs;
+		let field_name: Ident = lookup.field_name;
+		let field_type: TokenStream = lookup.field_type;
+		let java_name: &String = &lookup.java_name;
+		let signature: &String = &lookup.signature;
+		let lookup_fn: Ident = lookup.lookup_fn;
+		let cfg_attrs: &Vec<syn::Attribute> = &lookup.cfg_attrs;
 
 		// Create CStr literals for both the name and signature
-		let name_cstr = lit_cstr_mutf8(java_name);
+		let name_cstr: syn::LitCStr = lit_cstr_mutf8(java_name);
 
 		// Add field to API struct with cfg guards
 		fields.push(quote! {
@@ -44,21 +44,21 @@ pub(super) fn generate_constructor_method_ids(
 	type_mappings: &TypeMappings,
 	jni: &syn::Path,
 ) -> Result<(Vec<TokenStream>, Vec<TokenStream>)> {
-	let mut lookups = Vec::new();
+	let mut lookups: Vec<IdLookup> = Vec::new();
 
 	for constructor in constructors {
-		let name = &constructor.name;
-		let method_id_field = format_ident!("{}_method_id", name);
+		let name: &Ident = &constructor.name;
+		let method_id_field: Ident = format_ident!("{}_method_id", name);
 
 		// Use the MethodSignature to generate JNI signature
-		let jni_sig_str = constructor.signature.to_jni_signature(type_mappings).map_err(|e| {
+		let jni_sig_str: String = constructor.signature.to_jni_signature(type_mappings).map_err(|e| {
 			syn::Error::new(
 				name.span(),
 				format!("Failed to generate JNI signature for constructor '{name}': {e}"),
 			)
 		})?;
 
-		let cfg_attrs = extract_cfg_attrs(&constructor.attrs);
+		let cfg_attrs: Vec<syn::Attribute> = extract_cfg_attrs(&constructor.attrs);
 
 		lookups.push(IdLookup {
 			field_name: method_id_field,
@@ -101,7 +101,7 @@ pub(super) fn sig_type_to_rust_arg_type(
 	}
 
 	// For objects, arrays, and rust references, wrap in impl AsRef
-	let concrete_type = sig_type_to_rust_type_core(sig_type, lifetime, type_mappings, jni);
+	let concrete_type: TokenStream = sig_type_to_rust_type_core(sig_type, lifetime, type_mappings, jni);
 	quote! { impl AsRef<#concrete_type> }
 }
 
@@ -127,10 +127,11 @@ pub(super) fn generate_constructors(
 	if constructors.is_empty() {
 		return quote! {};
 	}
-	let implementations = constructors
+	let implementations: TokenStream = constructors
 		.iter()
-		.map(|constructor| generate_constructor(type_name, api_name, constructor, type_mappings, jni));
-	quote! { impl #type_name<'static> { #(#implementations)* } }
+		.map(|constructor| generate_constructor(type_name, api_name, constructor, type_mappings, jni))
+		.collect();
+	quote! { impl #type_name<'static> { #implementations } }
 }
 
 fn generate_constructor(
@@ -140,32 +141,33 @@ fn generate_constructor(
 	type_mappings: &TypeMappings,
 	jni: &syn::Path,
 ) -> TokenStream {
-	let name = &constructor.name;
-	let method_id_field = format_ident!("{}_method_id", name);
+	let name: &Ident = &constructor.name;
+	let method_id_field: Ident = format_ident!("{}_method_id", name);
 
 	// Generate JNI call arguments data
-	let args = generate_jni_call_args(&constructor.signature.parameters, type_mappings, jni);
+	let args: crate::internal::bind_java_type::JniCallArgs =
+		generate_jni_call_args(&constructor.signature.parameters, type_mappings, jni);
 
-	let lifetimes = &args.lifetimes;
-	let decls = &args.decls;
-	let jvalue_conversions = &args.jvalue_conversions;
+	let lifetimes: &Vec<TokenStream> = &args.lifetimes;
+	let decls: &Vec<TokenStream> = &args.decls;
+	let jvalue_conversions: &Vec<TokenStream> = &args.jvalue_conversions;
 
 	// Add lifetime declarations for the function
-	let lifetime_decls = if lifetimes.is_empty() {
+	let lifetime_decls: TokenStream = if lifetimes.is_empty() {
 		quote! { <'env_local> }
 	} else {
 		quote! { <'env_local, #(#lifetimes),*> }
 	};
 
 	// Generate explicit type annotation for jni_args array to handle empty case
-	let jni_args_type = if jvalue_conversions.is_empty() {
+	let jni_args_type: TokenStream = if jvalue_conversions.is_empty() {
 		quote! { : [#jni::sys::jvalue; 0] }
 	} else {
 		quote! {}
 	};
 
 	// Apply attributes to the constructor
-	let attrs = &constructor.attrs;
+	let attrs: &Vec<syn::Attribute> = &constructor.attrs;
 
 	quote! {
 		#(#attrs)*

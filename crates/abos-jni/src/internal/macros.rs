@@ -420,7 +420,7 @@ mod tests {
 
 					e: crate::exceptions::JClassNotFoundException => {
 						let cause: &JThrowable = &e.as_throwable();
-						let cause = env.new_global_ref(cause).ok();
+						let cause: Option<crate::refs::Global<JThrowable<'_>>> = env.new_global_ref(cause).ok();
 						Err(Error::NoClassDefFound {
 							requested: name.to_string(),
 							cause
@@ -428,7 +428,7 @@ mod tests {
 					},
 					e: crate::exceptions::JNoClassDefFoundError => {
 						let cause: &JThrowable = &e.as_throwable();
-						let cause = env.new_global_ref(cause).ok();
+						let cause: Option<crate::refs::Global<JThrowable<'_>>> = env.new_global_ref(cause).ok();
 						Err(Error::NoClassDefFound {
 							requested: name.to_string(),
 							cause
@@ -436,8 +436,8 @@ mod tests {
 					},
 
 					e: crate::exceptions::JExceptionInInitializerError => {
-						let exception = e.get_exception(env);
-						let exception = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
+						let exception: std::result::Result<JThrowable<'_>, crate::errors::Error> = e.get_exception(env);
+						let exception: Option<crate::refs::Global<JThrowable<'_>>> = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
 						Err(Error::ExceptionInInitializer { exception })
 					},
 
@@ -464,7 +464,7 @@ mod tests {
 
 					e: crate::exceptions::JLinkageError => {
 						let cause: &JThrowable = &e.as_throwable();
-						let cause = env.new_global_ref(cause).ok();
+						let cause: Option<crate::refs::Global<JThrowable<'_>>> = env.new_global_ref(cause).ok();
 						Err(Error::LinkageError {
 							requested: name.to_string(),
 							cause
@@ -498,13 +498,13 @@ mod tests {
 	}
 
 	fn _compile_test_jni_try(env: &mut crate::Env<'_>) -> crate::errors::Result<()> {
-		let _res = jni_try! {
+		let _res: crate::objects::JString<'_> = jni_try! {
 			(env) -> crate::errors::Result<crate::objects::JString> {
-				let s = env.new_string("String")?;
+				let s: crate::objects::JString<'_> = env.new_string("String")?;
 
 				{
-					let msg = env.new_string("Test")?;
-					let e = crate::exceptions::JNumberFormatException::new(env, msg)?;
+					let msg: crate::objects::JString<'_> = env.new_string("Test")?;
+					let e: crate::api::exceptions::JNumberFormatException<'_> = crate::exceptions::JNumberFormatException::new(env, msg)?;
 					let e: crate::objects::JThrowable = e.into();
 					env.throw(e)?;
 				}

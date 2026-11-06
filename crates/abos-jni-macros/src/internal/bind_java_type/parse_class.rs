@@ -93,13 +93,13 @@ impl ClassParser {
 
 impl Parse for BindClassInput {
 	fn parse(input: ParseStream) -> Result<Self> {
-		let jni = crate::internal::utils::parse_jni_crate_override(input)?;
+		let jni: syn::Path = crate::internal::utils::parse_jni_crate_override(input)?;
 		let mut parser = ClassParser::new(jni);
 		while !input.is_empty() {
-			let attrs = input.call(syn::Attribute::parse_outer)?;
-			let fork = input.fork();
+			let attrs: Vec<syn::Attribute> = input.call(syn::Attribute::parse_outer)?;
+			let fork: syn::parse::ParseBuffer<'_> = input.fork();
 			// Check the shorthand separator before peeking for '=' to avoid splitting '=>'.
-			let is_property = fork
+			let is_property: bool = fork
 				.call(Ident::parse_any)
 				.is_ok_and(|_| !fork.peek(Token![=>]) && (fork.peek(Token![=]) || fork.peek(syn::token::Brace)));
 			if is_property {
@@ -136,7 +136,7 @@ impl ClassParser {
 
 	fn parse_property(&mut self, input: ParseStream, attrs: Vec<syn::Attribute>) -> Result<()> {
 		// Preserve the public-property suggestions for unknown keys, excluding private extensions.
-		let unknown_property = property_error(input);
+		let unknown_property: syn::Error = property_error(input);
 		let property: Ident = input.parse()?;
 		match property.to_string().as_str() {
 			"rust_type" => self.parse_rust_type(input, &property, attrs)?,
@@ -215,7 +215,7 @@ impl ClassParser {
 		while !input.is_empty() {
 			let key: Ident = input.parse()?;
 			let expression: syn::Expr = parse_value(input)?;
-			let tokens = quote! { #expression };
+			let tokens: TokenStream = quote! { #expression };
 			match key.to_string().as_str() {
 				"load_class" => self.load_class_closure = Some(tokens),
 				"init_priv" => self.init_priv_closure = Some(tokens),
@@ -232,7 +232,7 @@ impl ClassParser {
 		let (Some(type_name), Some(java_class)) = (&self.type_name, &self.java_class) else {
 			return Ok(());
 		};
-		let path = type_name.to_string();
+		let path: String = type_name.to_string();
 		// Explicit mappings and builtins take precedence over the inferred Self mapping.
 		if self.type_mappings.is_core_java_type(java_class) || self.type_mappings.map_alias(&path).is_some() {
 			return Ok(());
@@ -258,11 +258,11 @@ fn parse_block<T>(input: ParseStream, parse: impl FnOnce(ParseStream) -> Result<
 }
 
 fn parse_super_types(input: ParseStream) -> Result<Vec<IsInstanceOfEntry>> {
-	let mut entries = Vec::new();
+	let mut entries: Vec<IsInstanceOfEntry> = Vec::new();
 	while !input.is_empty() {
-		let has_stem =
+		let has_stem: bool =
 			input.peek(Ident) && !input.peek2(Token![::]) && (input.peek2(Token![=]) || input.peek2(Token![:]));
-		let stem = if has_stem {
+		let stem: Option<String> = if has_stem {
 			let ident: Ident = input.parse()?;
 			if input.peek(Token![=]) {
 				input.parse::<Token![=]>()?;
@@ -274,7 +274,7 @@ fn parse_super_types(input: ParseStream) -> Result<Vec<IsInstanceOfEntry>> {
 			None
 		};
 		let path: syn::Path = input.parse()?;
-		let type_alias = quote!(#path).to_string().replace(' ', "");
+		let type_alias: String = quote!(#path).to_string().replace(' ', "");
 		if type_alias == "JObject" || type_alias == "abos_jni::objects::JObject" {
 			return Err(syn::Error::new_spanned(
 				&path,
@@ -290,7 +290,7 @@ fn parse_super_types(input: ParseStream) -> Result<Vec<IsInstanceOfEntry>> {
 }
 
 fn property_error(input: ParseStream) -> syn::Error {
-	let lookahead = input.lookahead1();
+	let lookahead: syn::parse::Lookahead1<'_> = input.lookahead1();
 	lookahead.peek(rust_type);
 	lookahead.peek(rust_type_vis);
 	lookahead.peek(java_type);

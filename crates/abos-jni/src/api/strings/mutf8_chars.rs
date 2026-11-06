@@ -100,7 +100,7 @@ where
 	/// Returns a [`MUTF8Chars`] that will automatically release the underlying
 	/// character array when dropped (see [`Self::release_string_utf_chars`]).
 	pub(crate) fn from_get_string_utf_chars(env: &Env<'_>, obj: StringRef) -> Result<Self> {
-		let obj = null_check!(obj, "get_string_utf_chars obj argument")?;
+		let obj: StringRef = null_check!(obj, "get_string_utf_chars obj argument")?;
 
 		// SAFETY:
 		// - We have checked that the object is not null.
@@ -113,7 +113,7 @@ where
 			let ptr: *const c_char =
 				jni_call_only_check_null_ret!(env, v1_1, GetStringUTFChars, obj.as_raw(), &raw mut is_copy)?;
 
-			let is_copy = is_copy == JNI_TRUE;
+			let is_copy: bool = is_copy == JNI_TRUE;
 			Ok(Self {
 				obj,
 				chars: ptr,
@@ -144,7 +144,7 @@ where
 	/// [`MUTF8Chars::from_raw`] and then dropping it, or by passing the pointer
 	/// to the JNI function `ReleaseStringUTFChars`.
 	pub fn into_raw(self) -> (*const c_char, bool) {
-		let undropped_self = std::mem::ManuallyDrop::new(self);
+		let undropped_self: std::mem::ManuallyDrop<MUTF8Chars<'_, StringRef>> = std::mem::ManuallyDrop::new(self);
 		(undropped_self.chars, undropped_self.is_copy)
 	}
 

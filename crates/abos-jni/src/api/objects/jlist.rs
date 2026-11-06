@@ -126,7 +126,7 @@ impl JList<'_> {
 	///
 	/// Returns an error if resolving or calling the Java list or iterator methods fails, including pending Java exceptions.
 	pub fn pop<'other_local_2>(&self, env: &mut Env<'other_local_2>) -> Result<Option<JObject<'other_local_2>>> {
-		let size = self.size(env)?;
+		let size: i32 = self.size(env)?;
 		if size == 0 {
 			return Ok(None);
 		}

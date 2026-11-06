@@ -20,7 +20,8 @@ fn test_jni_cstr_unicode_emoji() {
 	assert_eq!(EMOJI_CLASS.to_bytes(), b"unicode.Type\xed\xa0\xbd\xed\xb8\x80");
 
 	// Verify roundtrip decode
-	let decoded = simd_cesu8::mutf8::decode(EMOJI_CLASS.to_bytes()).expect("Failed to decode MUTF-8");
+	let decoded: std::borrow::Cow<'_, str> =
+		simd_cesu8::mutf8::decode(EMOJI_CLASS.to_bytes()).expect("Failed to decode MUTF-8");
 	assert_eq!(decoded, "unicode.Type😀");
 }
 
@@ -43,7 +44,8 @@ fn test_jni_str_unicode_emoji() {
 	assert_eq!(EMOJI_CLASS.to_bytes(), b"unicode.Type\xed\xa0\xbd\xed\xb8\x80");
 
 	// Verify roundtrip decode
-	let decoded = simd_cesu8::mutf8::decode(EMOJI_CLASS.to_bytes()).expect("Failed to decode MUTF-8");
+	let decoded: std::borrow::Cow<'_, str> =
+		simd_cesu8::mutf8::decode(EMOJI_CLASS.to_bytes()).expect("Failed to decode MUTF-8");
 	assert_eq!(decoded, "unicode.Type😀");
 }
 

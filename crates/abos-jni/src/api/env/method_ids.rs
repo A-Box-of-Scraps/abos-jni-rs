@@ -24,9 +24,9 @@ impl<'local> Env<'local> {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		let class = class.lookup(self)?;
+		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 		// SAFETY: The descriptor resolves to a live class; the JNI allocator returns a local object reference.
-		let obj = unsafe {
+		let obj: crate::sys::jobject = unsafe {
 			jni_call_with_catch_and_null_check!(
                 catch |env| {
                     crate::exceptions::JInstantiationException =>
@@ -87,12 +87,12 @@ impl<'local> Env<'local> {
 		N: AsRef<JNIStr>,
 		S: AsRef<MethodSignature<'sig, 'sig_args>>,
 	{
-		let class = class.lookup(self)?;
-		let ffi_name = name.as_ref();
-		let sig = sig.as_ref();
+		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
+		let ffi_name: &JNIStr = name.as_ref();
+		let sig: &MethodSignature<'_, '_> = sig.as_ref();
 
 		// SAFETY: The resolved class, method name and signature remain valid during the JNI lookup.
-		let method_id = unsafe {
+		let method_id: crate::sys::jmethodID = unsafe {
 			jni_call_with_catch!(
 				catch |env| {
 					crate::exceptions::JNoSuchMethodError =>
@@ -101,8 +101,8 @@ impl<'local> Env<'local> {
 							sig: sig.sig().to_string(),
 						}),
 					e: crate::exceptions::JExceptionInInitializerError => {
-						let exception = e.get_exception(env);
-						let exception = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
+						let exception: std::result::Result<crate::objects::JThrowable<'_>, crate::errors::Error> = e.get_exception(env);
+						let exception: Option<crate::refs::Global<crate::objects::JThrowable<'_>>> = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
 						Err(Error::ExceptionInInitializer { exception })
 					},
 					crate::exceptions::JOutOfMemoryError =>
@@ -171,12 +171,12 @@ impl<'local> Env<'local> {
 		N: AsRef<JNIStr>,
 		S: AsRef<MethodSignature<'sig, 'sig_args>>,
 	{
-		let class = class.lookup(self)?;
-		let ffi_name = name.as_ref();
-		let sig = sig.as_ref();
+		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
+		let ffi_name: &JNIStr = name.as_ref();
+		let sig: &MethodSignature<'_, '_> = sig.as_ref();
 
 		// SAFETY: The resolved class, method name and signature remain valid during the JNI lookup.
-		let method_id = unsafe {
+		let method_id: crate::sys::jmethodID = unsafe {
 			jni_call_with_catch!(
 				catch |env| {
 					crate::exceptions::JNoSuchMethodError =>
@@ -185,8 +185,8 @@ impl<'local> Env<'local> {
 							sig: sig.sig().to_string(),
 						}),
 					e: crate::exceptions::JExceptionInInitializerError => {
-						let exception = e.get_exception(env);
-						let exception = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
+						let exception: std::result::Result<crate::objects::JThrowable<'_>, crate::errors::Error> = e.get_exception(env);
+						let exception: Option<crate::refs::Global<crate::objects::JThrowable<'_>>> = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
 						Err(Error::ExceptionInInitializer { exception })
 					},
 					crate::exceptions::JOutOfMemoryError =>

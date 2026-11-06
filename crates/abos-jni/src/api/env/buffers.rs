@@ -33,11 +33,11 @@ impl<'local> Env<'local> {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		let data = null_check!(data, "new_direct_byte_buffer data argument")?;
-		let len = jlong::try_from(len).map_err(|_| Error::JniCall(JniError::InvalidArguments))?;
+		let data: *mut u8 = null_check!(data, "new_direct_byte_buffer data argument")?;
+		let len: i64 = jlong::try_from(len).map_err(|_| Error::JniCall(JniError::InvalidArguments))?;
 		// Safety: jni-rs requires JNI >= 1.4
 		unsafe {
-			let obj = jni_call_with_catch_and_null_check!(
+			let obj: crate::sys::jobject = jni_call_with_catch_and_null_check!(
 				catch |env| {
 					crate::exceptions::JIllegalArgumentException =>
 						Err(Error::JniCall(JniError::InvalidArguments)),
@@ -67,11 +67,12 @@ impl<'local> Env<'local> {
 	///
 	/// Returns an error if the buffer is null, JNI cannot expose its direct storage, or a Java exception is pending.
 	pub fn get_direct_buffer_address(&self, buf: &JByteBuffer) -> Result<*mut u8> {
-		let buf = null_check!(buf, "get_direct_buffer_address argument")?;
+		let buf: &JByteBuffer<'_> = null_check!(buf, "get_direct_buffer_address argument")?;
 		// Safety: jni-rs requires JNI >= 1.4 and this is checked in `from_raw`
 		unsafe {
 			// GetDirectBufferAddress has no documented exceptions that it can throw
-			let ptr = jni_call_only_check_null_ret!(self, v1_4, GetDirectBufferAddress, buf.as_raw())?;
+			let ptr: *mut std::ffi::c_void =
+				jni_call_only_check_null_ret!(self, v1_4, GetDirectBufferAddress, buf.as_raw())?;
 			Ok(ptr.cast())
 		}
 	}
@@ -90,10 +91,10 @@ impl<'local> Env<'local> {
 	///
 	/// Returns an error if the buffer is null, is not a supported direct buffer, or a Java exception is pending.
 	pub fn get_direct_buffer_capacity(&self, buf: &JByteBuffer) -> Result<usize> {
-		let buf = null_check!(buf, "get_direct_buffer_capacity argument")?;
+		let buf: &JByteBuffer<'_> = null_check!(buf, "get_direct_buffer_capacity argument")?;
 		// Safety: jni-rs requires JNI >= 1.4 and this is checked in `from_raw`
 		unsafe {
-			let capacity = jni_call_no_post_check_ex!(self, v1_4, GetDirectBufferCapacity, buf.as_raw())?;
+			let capacity: i64 = jni_call_no_post_check_ex!(self, v1_4, GetDirectBufferCapacity, buf.as_raw())?;
 			usize::try_from(capacity).map_err(|_| Error::JniCall(JniError::Unknown))
 		}
 	}

@@ -165,7 +165,7 @@ impl<'local> JValueOwned<'local> {
 	///   pair.
 	#[deprecated = "Use `into_char` to get the raw Java jchar, and then (attempt to) convert it to a Rust char using `char_from_java` if needed. This method is likely to fail and is not recommended."]
 	pub fn c_char(self) -> Result<char> {
-		let char = self.c()?;
+		let char: u16 = self.c()?;
 
 		char_from_java(char).map_err(|source| Error::InvalidUtf16 { source })
 	}
@@ -255,7 +255,7 @@ impl<'local> JValueOwned<'local> {
 	/// * [`Error::InvalidUtf32`]: `self` contains a Java `int`, but it is not a valid UTF-32 unit.
 	#[doc(alias = "i_char")]
 	pub fn i_into_char(self) -> Result<char> {
-		let char = self.i()?;
+		let char: i32 = self.i()?;
 
 		char_from_java_int(char).map_err(|source| Error::InvalidUtf32 { char, source })
 	}

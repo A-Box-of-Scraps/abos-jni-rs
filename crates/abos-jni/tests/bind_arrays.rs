@@ -435,12 +435,12 @@ fn test_create_string_array_static_method() {
 // Helper functions
 
 fn load_test_arrays_class(env: &mut Env, out_dir: &Path) -> abos_jni::errors::Result<()> {
-	let class_path = out_dir.join("com/example/TestArrays.class");
+	let class_path: PathBuf = out_dir.join("com/example/TestArrays.class");
 	assert!(class_path.exists(), "TestArrays.class not found");
 
-	let class_bytes = fs::read(&class_path).expect("Failed to read TestArrays.class");
+	let class_bytes: Vec<u8> = fs::read(&class_path).expect("Failed to read TestArrays.class");
 
-	let class_loader =
+	let class_loader: abos_jni::objects::JClassLoader<'_> =
 		abos_jni::objects::JClassLoader::get_system_class_loader(env).expect("Failed to get system class loader");
 
 	env.define_class(Some(jni_str!("com/example/TestArrays")), &class_loader, &class_bytes)?;
@@ -449,7 +449,7 @@ fn load_test_arrays_class(env: &mut Env, out_dir: &Path) -> abos_jni::errors::Re
 }
 
 fn setup_test_output(test_name: &str) -> PathBuf {
-	let out_dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+	let out_dir: PathBuf = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
 		.join("jni_macros_tests")
 		.join(test_name);
 
@@ -466,26 +466,26 @@ fn setup_test_output(test_name: &str) -> PathBuf {
 }
 
 fn read_int_array(env: &mut Env, array: &JIntArray) -> abos_jni::errors::Result<Vec<i32>> {
-	let len = array.len(env)?;
-	let mut buffer = vec![0i32; len];
+	let len: usize = array.len(env)?;
+	let mut buffer: Vec<i32> = vec![0i32; len];
 	array.get_region(env, 0, &mut buffer)?;
 	Ok(buffer)
 }
 
 fn read_long_array(env: &mut Env, array: &abos_jni::objects::JLongArray) -> abos_jni::errors::Result<Vec<i64>> {
-	let len = array.len(env)?;
-	let mut buffer = vec![0i64; len];
+	let len: usize = array.len(env)?;
+	let mut buffer: Vec<i64> = vec![0i64; len];
 	array.get_region(env, 0, &mut buffer)?;
 	Ok(buffer)
 }
 
 fn read_string_array(env: &mut Env, array: &JObjectArray<JString>) -> abos_jni::errors::Result<Vec<String>> {
-	let len = array.len(env)?;
-	let mut result = Vec::new();
+	let len: usize = array.len(env)?;
+	let mut result: Vec<String> = Vec::new();
 
 	for i in 0..len {
-		let jstring = array.get_element(env, i)?;
-		let rust_string = jstring.to_string();
+		let jstring: JString<'_> = array.get_element(env, i)?;
+		let rust_string: String = jstring.to_string();
 		result.push(rust_string);
 	}
 
@@ -496,10 +496,10 @@ fn create_string_array<'local>(
 	env: &mut Env<'local>,
 	strings: &[&str],
 ) -> abos_jni::errors::Result<JObjectArray<'local, JString<'local>>> {
-	let array = JObjectArray::<JString>::new(env, strings.len(), JString::null())?;
+	let array: JObjectArray<'_, JString<'_>> = JObjectArray::<JString>::new(env, strings.len(), JString::null())?;
 
 	for (i, &s) in strings.iter().enumerate() {
-		let jstring = JString::from_str(env, s)?;
+		let jstring: JString<'_> = JString::from_str(env, s)?;
 		array.set_element(env, i, &jstring)?;
 	}
 
@@ -510,10 +510,11 @@ fn create_2d_int_array<'local>(
 	env: &mut Env<'local>,
 	matrix: &[&[i32]],
 ) -> abos_jni::errors::Result<JObjectArray<'local, JIntArray<'local>>> {
-	let array = JObjectArray::<JIntArray>::new(env, matrix.len(), JIntArray::null())?;
+	let array: JObjectArray<'_, abos_jni::objects::JPrimitiveArray<'_, i32>> =
+		JObjectArray::<JIntArray>::new(env, matrix.len(), JIntArray::null())?;
 
 	for (i, row) in matrix.iter().enumerate() {
-		let row_array = JIntArray::new(env, row.len())?;
+		let row_array: abos_jni::objects::JPrimitiveArray<'_, i32> = JIntArray::new(env, row.len())?;
 		row_array.set_region(env, 0, row)?;
 		array.set_element(env, i, &row_array)?;
 	}

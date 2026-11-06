@@ -129,7 +129,7 @@ impl JavaVM {
 		drop(args);
 
 		// SAFETY: Successful JNI_CreateJavaVM initialized the VM pointer.
-		let vm = unsafe { Self::from_raw(ptr) };
+		let vm: Self = unsafe { Self::from_raw(ptr) };
 
 		// JNI_CreateJavaVM will implicitly attach the calling thread to the JVM.
 		//
@@ -178,20 +178,27 @@ impl JavaVM {
 			Ok(jvm.clone())
 		} else {
 			// Determine the path to the shared library.
-			let libjvm_path = libjvm_path()?;
-			let libjvm_path_string = libjvm_path.as_ref().to_string_lossy().into_owned();
+			let libjvm_path: P = libjvm_path()?;
+			let libjvm_path_string: String = libjvm_path.as_ref().to_string_lossy().into_owned();
 
 			// Try to load it.
 			// SAFETY: This API loads a JNI VM implementation; the library is retained for the lifetime of the created VM.
-			let libjvm = match unsafe { libloading::Library::new(libjvm_path.as_ref()) } {
+			let libjvm: libloading::Library = match unsafe { libloading::Library::new(libjvm_path.as_ref()) } {
 				Ok(ok) => ok,
 				Err(error) => return Err(StartJvmError::LoadError(libjvm_path_string, error)),
 			};
 
 			// SAFETY: The loaded JVM library exports JNI_CreateJavaVM with the expected ABI and remains loaded for VM use.
-			let result = unsafe {
+			let result: std::result::Result<Self, StartJvmError> = unsafe {
 				// Try to find the `JNI_CreateJavaVM` function in the loaded library.
-				let create_fn = libjvm
+				let create_fn: libloading::Symbol<
+					'_,
+					unsafe extern "system" fn(
+						*mut *mut *const abos_jni_sys::JNIInvokeInterface_,
+						*mut *mut std::ffi::c_void,
+						*mut std::ffi::c_void,
+					) -> i32,
+				> = libjvm
 					.get(b"JNI_CreateJavaVM\0")
 					.map_err(|error| StartJvmError::LoadError(libjvm_path_string.clone(), error))?;
 
@@ -289,9 +296,9 @@ impl JavaVM {
 		if let Some(jvm) = JAVA_VM_SINGLETON.get() {
 			Ok(jvm.clone())
 		} else {
-			let mut raw = ptr::null_mut();
+			let mut raw: *mut *const abos_jni_sys::JNIInvokeInterface_ = ptr::null_mut();
 			// SAFETY: The current Env is valid and the output VM pointer is writable.
-			let res = unsafe { jni_call_no_post_check_ex!(env, v1_1, GetJavaVM, &raw mut raw)? };
+			let res: i32 = unsafe { jni_call_no_post_check_ex!(env, v1_1, GetJavaVM, &raw mut raw)? };
 			jni_error_code_to_result(res)?;
 
 			// Safety: The pointer from GetJavaVM should be valid

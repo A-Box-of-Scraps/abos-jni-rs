@@ -11,32 +11,32 @@ pub(super) fn generate_jni_call_args(
 	jni: &syn::Path,
 ) -> JniCallArgs {
 	// Generate unique lifetime for each argument
-	let lifetimes: Vec<_> = (0..parameters.len())
+	let lifetimes: Vec<TokenStream> = (0..parameters.len())
 		.map(|i| {
-			let lt_name = format!("local_{i}");
+			let lt_name: String = format!("local_{i}");
 			let lt = syn::Lifetime::new(&format!("'{lt_name}"), Span::call_site());
 			quote! { #lt }
 		})
 		.collect();
 
 	// Use parameter names from the signature
-	let names: Vec<_> = parameters.iter().map(|param| param.name.clone()).collect();
+	let names: Vec<Ident> = parameters.iter().map(|param| param.name.clone()).collect();
 
-	let types: Vec<_> = parameters
+	let types: Vec<TokenStream> = parameters
 		.iter()
 		.zip(lifetimes.iter())
 		.map(|(param, lt)| sig_type_to_rust_arg_type(&param.ty, lt, type_mappings, jni))
 		.collect();
 
 	// Generate jvalue conversion for each argument
-	let jvalue_conversions: Vec<_> = parameters
+	let jvalue_conversions: Vec<TokenStream> = parameters
 		.iter()
 		.zip(names.iter())
 		.map(|(param, name)| {
 			param.ty.try_as_primitive(type_mappings).map_or_else(
 				|| quote! { #jni::objects::JValue::Object(#name.as_ref()).as_jni() },
 				|primitive| {
-					let converter = match primitive {
+					let converter: TokenStream = match primitive {
 						PrimitiveType::Boolean => quote! { #jni::objects::JValue::Bool },
 						PrimitiveType::Byte => quote! { #jni::objects::JValue::Byte },
 						PrimitiveType::Char => quote! { #jni::objects::JValue::Char },
@@ -54,7 +54,7 @@ pub(super) fn generate_jni_call_args(
 		})
 		.collect();
 
-	let decls: Vec<_> = names
+	let decls: Vec<TokenStream> = names
 		.iter()
 		.zip(types.iter())
 		.map(|(name, ty)| quote! { #name: #ty })
@@ -82,14 +82,14 @@ pub(super) fn generate_jni_call_for_return_type(
 	jni_args: &TokenStream,
 	type_mappings: &TypeMappings,
 ) -> TokenStream {
-	let call_prefix = if is_static { "CallStatic" } else { "Call" };
+	let call_prefix: &str = if is_static { "CallStatic" } else { "Call" };
 
 	// Determine the JNI function name and return value handling based on the return type
 	let (top_check, call_fn, return_tokens) = return_type.try_as_primitive(type_mappings).map_or_else(
 		|| {
 			// For objects, arrays, and rust references, we call CallObjectMethodA
-			let call_fn = format_ident!("{}ObjectMethodA", call_prefix);
-			let return_type_tokens =
+			let call_fn: Ident = format_ident!("{}ObjectMethodA", call_prefix);
+			let return_type_tokens: TokenStream =
 				sig_type_to_rust_return_type(return_type, &quote! { 'env_local }, type_mappings, jni);
 			(
 				quote! { env.assert_top(); },
@@ -98,8 +98,8 @@ pub(super) fn generate_jni_call_for_return_type(
 			)
 		},
 		|prim| {
-			let call_fn = format_ident!("{}{}MethodA", call_prefix, prim.jni_name());
-			let value = if prim == PrimitiveType::Void {
+			let call_fn: Ident = format_ident!("{}{}MethodA", call_prefix, prim.jni_name());
+			let value: TokenStream = if prim == PrimitiveType::Void {
 				quote! { () }
 			} else {
 				quote! { ret }
@@ -110,10 +110,10 @@ pub(super) fn generate_jni_call_for_return_type(
 
 	// The JNI spec asserts that `Call<Type>MethodA` _must_ not be called with a `null` object reference
 	// Note: we assume that the class will never be null when calling static methods
-	let null_check = if is_static {
+	let null_check: TokenStream = if is_static {
 		quote! {}
 	} else {
-		let error_msg = format!("Attempted to call '{debug_name}' with a null object");
+		let error_msg: String = format!("Attempted to call '{debug_name}' with a null object");
 		quote! {
 			if #this_or_class.is_null() {
 				return Err(#jni::errors::Error::NullPtr(#error_msg));
@@ -162,7 +162,7 @@ pub(super) fn generate_methods(
 	type_mappings: &TypeMappings,
 	jni: &syn::Path,
 ) -> TokenStream {
-	let mut method_impls = Vec::new();
+	let mut method_impls: Vec<TokenStream> = Vec::new();
 
 	for method in methods {
 		method_impls.push(generate_method(api_name, method, type_mappings, jni));
@@ -176,26 +176,26 @@ pub(super) fn generate_methods(
 }
 
 fn generate_method(api_name: &Ident, method: &Method, type_mappings: &TypeMappings, jni: &syn::Path) -> TokenStream {
-	let rust_name = &method.rust_name;
-	let method_id_field = format_ident!("{}_method_id", rust_name);
-	let visibility = method.visibility.to_tokens();
-	let is_static = method.is_static;
+	let rust_name: &Ident = &method.rust_name;
+	let method_id_field: Ident = format_ident!("{}_method_id", rust_name);
+	let visibility: TokenStream = method.visibility.to_tokens();
+	let is_static: bool = method.is_static;
 
 	// Generate JNI call arguments data
-	let args = generate_jni_call_args(&method.signature.parameters, type_mappings, jni);
+	let args: JniCallArgs = generate_jni_call_args(&method.signature.parameters, type_mappings, jni);
 
-	let decls = &args.decls;
-	let jvalue_conversions = &args.jvalue_conversions;
+	let decls: &Vec<TokenStream> = &args.decls;
+	let jvalue_conversions: &Vec<TokenStream> = &args.jvalue_conversions;
 
 	// Determine environment type based on return type (primitives use &Env, objects use &mut Env)
-	let env_type = if method.signature.return_type.try_as_primitive(type_mappings).is_some() {
+	let env_type: TokenStream = if method.signature.return_type.try_as_primitive(type_mappings).is_some() {
 		quote! { &#jni::Env<'env_local> }
 	} else {
 		quote! { &mut #jni::Env<'env_local> }
 	};
 
 	// Generate return type
-	let return_type = sig_type_to_rust_return_type(
+	let return_type: TokenStream = sig_type_to_rust_return_type(
 		&method.signature.return_type,
 		&quote! { 'env_local },
 		type_mappings,
@@ -203,26 +203,26 @@ fn generate_method(api_name: &Ident, method: &Method, type_mappings: &TypeMappin
 	);
 
 	// Add lifetime declarations for the function
-	let lifetime_decls = args.lifetime_declarations();
+	let lifetime_decls: TokenStream = args.lifetime_declarations();
 
-	let self_param = if is_static {
+	let self_param: TokenStream = if is_static {
 		quote! {}
 	} else {
 		quote! { &self, }
 	};
 
 	// Generate explicit type annotation for jni_args array to handle empty case
-	let jni_args_type = args.array_annotation(jni);
+	let jni_args_type: TokenStream = args.array_annotation(jni);
 
 	// Generate the this_or_class expression
-	let this_or_class = if is_static {
+	let this_or_class: TokenStream = if is_static {
 		quote! { class }
 	} else {
 		quote! { self }
 	};
 
 	// Generate the method body with JNI call
-	let jni_call = generate_jni_call_for_return_type(
+	let jni_call: TokenStream = generate_jni_call_for_return_type(
 		&method.java_name,
 		&method.signature.return_type,
 		is_static,
@@ -233,7 +233,7 @@ fn generate_method(api_name: &Ident, method: &Method, type_mappings: &TypeMappin
 		type_mappings,
 	);
 
-	let class_def = if is_static {
+	let class_def: TokenStream = if is_static {
 		quote! {
 			use #jni::refs::Reference as _;
 			let class: &#jni::objects::JClass = api.class.as_ref();
@@ -243,10 +243,10 @@ fn generate_method(api_name: &Ident, method: &Method, type_mappings: &TypeMappin
 	};
 
 	// Apply attributes to the method
-	let attrs = &method.attrs;
+	let attrs: &Vec<syn::Attribute> = &method.attrs;
 
 	// Generate null check if non_null is true
-	let null_check_and_return = checked_return(&jni_call, method.non_null, jni);
+	let null_check_and_return: TokenStream = checked_return(&jni_call, method.non_null, jni);
 
 	quote! {
 		#(#attrs)*
@@ -285,7 +285,7 @@ pub(super) fn checked_return(jni_call: &TokenStream, non_null: bool, jni: &syn::
 
 impl JniCallArgs {
 	fn lifetime_declarations(&self) -> TokenStream {
-		let lifetimes = &self.lifetimes;
+		let lifetimes: &Vec<TokenStream> = &self.lifetimes;
 		if lifetimes.is_empty() {
 			quote! { <'env_local> }
 		} else {

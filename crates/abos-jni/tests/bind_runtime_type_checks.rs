@@ -30,10 +30,10 @@ bind_java_type! {
 #[should_panic(expected = "Type mapping mismatch")]
 fn test_incorrect_type_mapping_panics() {
 	// Use attach_current_thread to get an Env reference for the runtime test
-	let result = util::attach_current_thread(|env| {
+	let result: std::result::Result<(), abos_jni::errors::Error> = util::attach_current_thread(|env| {
 		// Try to access the API, which will trigger the type mapping checks
 		// We need to actually initialize the API to trigger the checks
-		let loader = abos_jni::refs::LoaderContext::None;
+		let loader: abos_jni::refs::LoaderContext<'_, '_> = abos_jni::refs::LoaderContext::None;
 		JTestTypeAPI::get(env, &loader)?;
 
 		// This should panic before we get here due to the type mapping assertion
@@ -62,11 +62,11 @@ bind_java_type! {
 #[test]
 fn test_correct_type_mapping_passes() {
 	// Use attach_current_thread to get an Env reference for the runtime test
-	let result = util::attach_current_thread(|env| {
+	let result: std::result::Result<(), abos_jni::errors::Error> = util::attach_current_thread(|env| {
 		// Try to access the API, which will trigger the type mapping checks
 		// This should succeed because the type mapping is correct
-		let loader = abos_jni::refs::LoaderContext::None;
-		let _api = JTestTypeCorrectAPI::get(env, &loader)?;
+		let loader: abos_jni::refs::LoaderContext<'_, '_> = abos_jni::refs::LoaderContext::None;
+		let _api: &JTestTypeCorrectAPI = JTestTypeCorrectAPI::get(env, &loader)?;
 
 		// If we get here, the type mapping check passed
 		Ok(())

@@ -137,8 +137,8 @@ impl Parse for JavaClassName {
 	fn parse(input: ParseStream) -> Result<Self> {
 		// Check if it's a string literal
 		if input.peek(syn::LitStr) {
-			let lit = input.parse::<syn::LitStr>()?;
-			let class_str = lit.value();
+			let lit: syn::LitStr = input.parse::<syn::LitStr>()?;
+			let class_str: String = lit.value();
 
 			// Split by dots
 			let parts: Vec<&str> = class_str.split('.').collect();
@@ -149,7 +149,7 @@ impl Parse for JavaClassName {
 				));
 			}
 
-			let class = parts
+			let class: String = parts
 				.last()
 				.expect("splitting a class name yields at least one component")
 				.to_string();
@@ -169,12 +169,12 @@ impl Parse for JavaClassName {
 		// Check for dot-prefixed default package class (e.g., .NoPackage)
 		if input.peek(Token![.]) {
 			input.parse::<Token![.]>()?;
-			let mut class_name = input.parse::<Ident>()?.to_string();
+			let mut class_name: String = input.parse::<Ident>()?.to_string();
 
 			// Parse inner classes if any and concatenate with $
 			while input.peek(Token![::]) {
 				input.parse::<Token![::]>()?;
-				let inner = input.parse::<Ident>()?;
+				let inner: Ident = input.parse::<Ident>()?;
 				class_name.push('$');
 				class_name.push_str(&inner.to_string());
 			}
@@ -189,27 +189,27 @@ impl Parse for JavaClassName {
 		// This ensures we don't consume a token that might be a primitive type or Rust type
 		if input.peek(Ident) && input.peek2(Token![.]) {
 			// Parse as ident-based syntax: package.Class
-			let mut segments = Vec::new();
-			let first = input.parse::<Ident>()?;
+			let mut segments: Vec<String> = Vec::new();
+			let first: Ident = input.parse::<Ident>()?;
 			segments.push(first.to_string());
 
 			// Parse dot-separated package/class segments
 			while input.peek(Token![.]) {
 				input.parse::<Token![.]>()?;
-				let segment = input.parse::<Ident>()?;
+				let segment: Ident = input.parse::<Ident>()?;
 				segments.push(segment.to_string());
 			}
 
 			// Parse inner classes (separated by ::) and concatenate with $
-			let mut inner_class_parts = Vec::new();
+			let mut inner_class_parts: Vec<String> = Vec::new();
 			while input.peek(Token![::]) {
 				input.parse::<Token![::]>()?;
-				let inner = input.parse::<Ident>()?;
+				let inner: Ident = input.parse::<Ident>()?;
 				inner_class_parts.push(inner.to_string());
 			}
 
 			// Build the class name: last segment + any inner classes joined with $
-			let mut class = segments.pop().expect("the class path contains a name");
+			let mut class: String = segments.pop().expect("the class path contains a name");
 			if !inner_class_parts.is_empty() {
 				class.push('$');
 				class.push_str(&inner_class_parts.join("$"));
@@ -251,7 +251,7 @@ impl SigType {
 			},
 			Self::Object(class) => Ok(class.to_jni_descriptor()),
 			Self::Array(elem, dims) => {
-				let elem_desc = elem.to_jni_descriptor(type_mappings)?;
+				let elem_desc: String = elem.to_jni_descriptor(type_mappings)?;
 				let mut result = String::new();
 				for _ in 0..*dims {
 					result.push('[');
@@ -283,9 +283,9 @@ pub fn parse_type(input: ParseStream, type_mappings: &TypeMappings) -> Result<Si
 	// Check for array syntax [...]
 	if input.peek(token::Bracket) {
 		let content;
-		let bracket_span = input.span();
+		let bracket_span: Span = input.span();
 		syn::bracketed!(content in input);
-		let elem_type = parse_type(&content, type_mappings)?;
+		let elem_type: SigType = parse_type(&content, type_mappings)?;
 
 		// Validate that the element type can be used in an array
 		validate_array_element_type(&elem_type, type_mappings, bracket_span)?;
@@ -317,23 +317,23 @@ pub fn parse_type(input: ParseStream, type_mappings: &TypeMappings) -> Result<Si
 
 	// Try to parse as Java class name first (handles string literals, .NoPackage, and package.Class)
 	// This is done speculatively - if it fails, we'll try other interpretations
-	let base_type = if let Ok(java_class) = input.parse::<JavaClassName>() {
+	let base_type: SigType = if let Ok(java_class) = input.parse::<JavaClassName>() {
 		SigType::Object(java_class)
 	} else {
 		// Not a Java class name, so it must be a TypeMappings type (could be
 		// primitive lie jint/i32 or Reference like
 		// JString/abos_jni::objects::JString)
-		let path = input.parse::<syn::Path>()?;
-		let path_str = path_to_string_no_spaces(&path);
+		let path: syn::Path = input.parse::<syn::Path>()?;
+		let path_str: String = path_to_string_no_spaces(&path);
 
 		SigType::Alias(path_str)
 	};
 
 	// Check for suffix array syntax (applies to all base types)
 	let mut dims = 0;
-	let mut first_bracket_span = None;
+	let mut first_bracket_span: Option<Span> = None;
 	while input.peek(token::Bracket) {
-		let bracket_span = input.span();
+		let bracket_span: Span = input.span();
 		if first_bracket_span.is_none() {
 			first_bracket_span = Some(bracket_span);
 		}
@@ -492,7 +492,7 @@ impl AbiCheck {
 
 impl Parse for AbiCheck {
 	fn parse(input: ParseStream) -> Result<Self> {
-		let lookahead = input.lookahead1();
+		let lookahead: syn::parse::Lookahead1<'_> = input.lookahead1();
 		if lookahead.peek(Always) {
 			input.parse::<Always>()?;
 			Ok(Self::Always)

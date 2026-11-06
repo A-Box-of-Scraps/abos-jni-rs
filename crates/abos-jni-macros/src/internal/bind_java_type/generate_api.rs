@@ -12,12 +12,12 @@ pub(super) fn generate_type_struct(
 	jni: &syn::Path,
 ) -> TokenStream {
 	// Check if there's a doc attribute in type_attrs
-	let has_doc_attr = type_attrs.iter().any(|attr| attr.path().is_ident("doc"));
+	let has_doc_attr: bool = type_attrs.iter().any(|attr| attr.path().is_ident("doc"));
 
-	let jni_path_str = path_to_string_no_spaces(jni);
+	let jni_path_str: String = path_to_string_no_spaces(jni);
 
 	// Generate default doc comment if no doc attribute provided
-	let doc_attr = if has_doc_attr {
+	let doc_attr: TokenStream = if has_doc_attr {
 		quote! {}
 	} else {
 		quote! {
@@ -33,7 +33,7 @@ how to cast them, and local reference frame lifetimes.
 		}
 	};
 
-	let type_visibility = type_visibility.to_tokens();
+	let type_visibility: TokenStream = type_visibility.to_tokens();
 
 	quote! {
 		#(#type_attrs)*
@@ -82,9 +82,9 @@ pub(super) fn generate_api_struct(
 	method_id_fields: &[TokenStream],
 	jni: &syn::Path,
 ) -> TokenStream {
-	let priv_field = priv_type.map_or_else(|| quote! {}, |priv_ty| quote! { private: #priv_ty, });
+	let priv_field: TokenStream = priv_type.map_or_else(|| quote! {}, |priv_ty| quote! { private: #priv_ty, });
 
-	let api_visibility = VisibilitySpec::PubCrate.clamp_to(type_visibility).to_tokens();
+	let api_visibility: TokenStream = VisibilitySpec::PubCrate.clamp_to(type_visibility).to_tokens();
 	quote! {
 		#[allow(non_snake_case)]
 		#api_visibility struct #api_name {
@@ -118,23 +118,23 @@ pub(super) fn generate_api_get_method(
 	jni: &syn::Path,
 ) -> Result<TokenStream> {
 	// Generate wrapper function names to avoid conflicts
-	let load_class_wrapper_name = format_ident!("__{}_load_class_wrapper", type_name.to_string().to_lowercase());
-	let init_priv_wrapper_name = format_ident!("__{}_init_priv_wrapper", type_name.to_string().to_lowercase());
+	let load_class_wrapper_name: Ident = format_ident!("__{}_load_class_wrapper", type_name.to_string().to_lowercase());
+	let init_priv_wrapper_name: Ident = format_ident!("__{}_init_priv_wrapper", type_name.to_string().to_lowercase());
 
 	// Generate wrapper functions (outside the impl block)
-	let load_class_wrapper = if load_class_closure.is_some() {
+	let load_class_wrapper: TokenStream = if load_class_closure.is_some() {
 		load_class_hook_wrapper(&load_class_wrapper_name, jni)
 	} else {
 		quote! {}
 	};
 
-	let init_priv_wrapper = match (priv_type, init_priv_closure) {
+	let init_priv_wrapper: TokenStream = match (priv_type, init_priv_closure) {
 		(Some(priv_type), Some(_)) => init_priv_hook_wrapper(&init_priv_wrapper_name, priv_type, jni),
 		_ => quote! {},
 	};
 
 	// Generate the class loading code
-	let load_class_code = load_class_closure.map_or_else(
+	let load_class_code: TokenStream = load_class_closure.map_or_else(
 		|| {
 			quote! {
 				loader.load_class_for_type::<#type_name>(env, false)?
@@ -148,7 +148,7 @@ pub(super) fn generate_api_get_method(
 	);
 
 	// Generate the priv initialization code
-	let init_priv_code = init_priv_closure.map_or_else(
+	let init_priv_code: TokenStream = init_priv_closure.map_or_else(
 		|| quote! {},
 		|closure| {
 			quote! {
@@ -158,18 +158,18 @@ pub(super) fn generate_api_get_method(
 	);
 
 	// Generate IsAssignable checks for all is_instance_of types
-	let is_instance_of_checks =
+	let is_instance_of_checks: TokenStream =
 		generate_is_instance_of_assignable_checks(type_name, java_class, is_instance_of, type_mappings, jni)?;
 
 	// Generate type mapping assertions
-	let type_mapping_runtime_checks = if abi_check.requires_abi_check() {
+	let type_mapping_runtime_checks: TokenStream = if abi_check.requires_abi_check() {
 		generate_type_mapping_checks(type_mappings, jni)
 	} else {
 		quote! {}
 	};
 
-	let private_field = priv_type.map(|_| quote! { private, });
-	let api_construction = quote! {
+	let private_field: Option<TokenStream> = priv_type.map(|_| quote! { private, });
+	let api_construction: TokenStream = quote! {
 		// Compile-time encoded modified UTF-8 names are valid JNIStr values.
 		unsafe { Self { class: env.new_global_ref(class)?, #private_field #(#method_id_inits)* } }
 	};

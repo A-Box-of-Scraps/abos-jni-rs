@@ -23,7 +23,7 @@ fn weak_ref_works_in_other_threads() {
 	attach_current_thread(|env| {
 		static ATOMIC_INT: OnceLock<Weak<JObject<'static>>> = OnceLock::new();
 
-		let atomic_integer_local = unwrap(
+		let atomic_integer_local: abos_jni::refs::Auto<'_, JObject<'_>> = unwrap(
 			env.new_object(
 				jni_str!("java/util/concurrent/atomic/AtomicInteger"),
 				jni_sig!("(I)V"),
@@ -32,21 +32,22 @@ fn weak_ref_works_in_other_threads() {
 			env,
 		)
 		.auto();
-		let atomic_integer_weak = unwrap(env.new_weak_ref(&atomic_integer_local), env);
+		let atomic_integer_weak: Weak<JObject<'_>> = unwrap(env.new_weak_ref(&atomic_integer_local), env);
 
 		ATOMIC_INT.set(atomic_integer_weak).expect("set succeeds");
 
-		let mut join_handlers = Vec::new();
+		let mut join_handlers: Vec<std::thread::JoinHandle<()>> = Vec::new();
 
 		// Test with a different number of threads (from 2 to 8)
 		for thread_num in 2..9 {
-			let barrier = Arc::new(Barrier::new(thread_num));
+			let barrier: Arc<Barrier> = Arc::new(Barrier::new(thread_num));
 
 			for _ in 0..thread_num {
-				let barrier = barrier.clone();
-				let atomic_integer = ATOMIC_INT.get().expect("test bindings initialize");
+				let barrier: Arc<Barrier> = barrier.clone();
+				let atomic_integer: &Weak<JObject<'_>> = ATOMIC_INT.get().expect("test bindings initialize");
 
-				let jh = spawn(move || increment_in_thread(&barrier, atomic_integer, ITERS_PER_THREAD));
+				let jh: std::thread::JoinHandle<()> =
+					spawn(move || increment_in_thread(&barrier, atomic_integer, ITERS_PER_THREAD));
 				join_handlers.push(jh);
 			}
 
@@ -58,7 +59,7 @@ fn weak_ref_works_in_other_threads() {
 				jh.join().expect("test worker completes without panicking");
 			}
 
-			let expected = jint::try_from(ITERS_PER_THREAD * thread_num).expect("test iteration count fits jint");
+			let expected: i32 = jint::try_from(ITERS_PER_THREAD * thread_num).expect("test iteration count fits jint");
 			assert_eq!(
 				expected,
 				unwrap(
@@ -88,7 +89,7 @@ fn weak_ref_is_actually_weak() {
 		// This test uses `with_local_frame` to work around issue #109.
 
 		for _ in 0..100 {
-			let obj_local = unwrap(
+			let obj_local: abos_jni::refs::Auto<'_, JObject<'_>> = unwrap(
 				env.with_local_frame_returning_local::<_, JObject, _>(2, |env| {
 					env.new_object(jni_str!("java/lang/Object"), jni_sig!("()V"), &[])
 				}),
@@ -96,9 +97,10 @@ fn weak_ref_is_actually_weak() {
 			)
 			.auto();
 
-			let obj_weak = unwrap(env.new_weak_ref(&obj_local), env);
+			let obj_weak: Weak<JObject<'_>> = unwrap(env.new_weak_ref(&obj_local), env);
 
-			let obj_weak2 = unwrap(obj_weak.clone_in_jvm(env), env).expect("weak ref should not be null");
+			let obj_weak2: Weak<JObject<'_>> =
+				unwrap(obj_weak.clone_in_jvm(env), env).expect("weak ref should not be null");
 
 			run_gc(env);
 
@@ -133,7 +135,7 @@ fn increment_in_thread(barrier: &Barrier, atomic_integer: &Weak<JObject<'static>
 	attach_current_thread(|env| {
 		barrier.wait();
 		for _ in 0..iterations {
-			let atomic_integer = unwrap(atomic_integer.upgrade_local(env), env)
+			let atomic_integer: abos_jni::refs::Auto<'_, JObject<'_>> = unwrap(atomic_integer.upgrade_local(env), env)
 				.expect("AtomicInteger shouldn't have been GC'd yet")
 				.auto();
 			unwrap(
@@ -162,7 +164,7 @@ fn run_gc(env: &mut Env) {
 
 fn assert_weak_live(env: &mut Env, obj_weak: &Weak<JObject<'static>>, obj_local: &JObject<'_>) {
 	{
-		let obj_local_from_weak = unwrap(obj_weak.upgrade_local(env), env)
+		let obj_local_from_weak: abos_jni::refs::Auto<'_, JObject<'_>> = unwrap(obj_weak.upgrade_local(env), env)
 			.expect("object shouldn't have been GC'd yet")
 			.auto();
 
@@ -174,7 +176,7 @@ fn assert_weak_live(env: &mut Env, obj_weak: &Weak<JObject<'static>>, obj_local:
 	}
 
 	{
-		let obj_global_from_weak =
+		let obj_global_from_weak: abos_jni::refs::Global<JObject<'_>> =
 			unwrap(obj_weak.upgrade_global(env), env).expect("object shouldn't have been GC'd yet");
 
 		assert!(!obj_global_from_weak.is_null());
@@ -199,13 +201,14 @@ fn assert_weak_live(env: &mut Env, obj_weak: &Weak<JObject<'static>>, obj_local:
 
 fn assert_weak_collected(env: &mut Env, obj_weak: &Weak<JObject<'static>>) {
 	{
-		let obj_local_from_weak = unwrap(obj_weak.upgrade_local(env), env);
+		let obj_local_from_weak: Option<JObject<'_>> = unwrap(obj_weak.upgrade_local(env), env);
 
 		assert!(obj_local_from_weak.is_none(), "object should have been GC'd");
 	}
 
 	{
-		let obj_global_from_weak = unwrap(obj_weak.upgrade_global(env), env);
+		let obj_global_from_weak: Option<abos_jni::refs::Global<JObject<'_>>> =
+			unwrap(obj_weak.upgrade_global(env), env);
 
 		assert!(obj_global_from_weak.is_none(), "object should have been GC'd");
 	}

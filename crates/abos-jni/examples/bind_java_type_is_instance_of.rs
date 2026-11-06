@@ -15,6 +15,7 @@
 
 use abos_jni::objects::{JCollection, JList};
 use abos_jni::refs::LoaderContext;
+use abos_jni::{objects::JString, refs::Cast};
 use abos_jni_macros::bind_java_type;
 
 #[path = "utils/lib.rs"]
@@ -46,43 +47,43 @@ fn main() {
 
 		// Get the API (requires LoaderContext for class loading)
 		// This loads the class and caches method/field IDs
-		let _api = JInstanceOfAPI::get(env, &LoaderContext::default())?;
+		let _api: &JInstanceOfAPI = JInstanceOfAPI::get(env, &LoaderContext::default())?;
 
-		let instance = JInstanceOf::new(env)?;
+		let instance: JInstanceOf<'_> = JInstanceOf::new(env)?;
 		println!("Created empty JInstanceOf instance");
 
 		// Call methods from our custom class via the API
-		let item = env.new_string("hello")?;
+		let item: JString<'_> = env.new_string("hello")?;
 		instance.add_upper(env, &item)?;
 		println!("Added upper-case element to list");
 
 		// Demonstrate as_list() method (generated because we used a stem name)
 		println!("\nUsing as_list() method (generated from stem name):");
-		let as_list = instance.as_list();
-		let size = as_list.size(env)?;
+		let as_list: Cast<'_, '_, JList<'_>> = instance.as_list();
+		let size: i32 = as_list.size(env)?;
 		println!("  List size: {size}");
 
 		// Add an item to the list
-		let item = env.new_string("World")?;
+		let item: JString<'_> = env.new_string("World")?;
 		as_list.add(env, &item)?;
 
-		let new_size = as_list.size(env)?;
+		let new_size: i32 = as_list.size(env)?;
 		println!("  List size after adding another item: {new_size}");
 
 		// Demonstrate AsRef trait conversion to &JList
 		println!("\nUsing AsRef trait to convert to &JList:");
 		let as_list_from: &JList = instance.as_ref();
-		let size_from = as_list_from.size(env)?;
+		let size_from: i32 = as_list_from.size(env)?;
 		println!("  List size (via AsRef): {size_from}");
 
 		println!("\nUsing AsRef trait to convert &JList to &JCollection:");
 		let as_collection_via_list: &JCollection = as_list_from.as_ref();
-		let size_collection_via_list = as_collection_via_list.size(env)?;
+		let size_collection_via_list: i32 = as_collection_via_list.size(env)?;
 		println!("  Collection size (via AsRef from &JList): {size_collection_via_list}");
 
 		println!("\nUsing Into trait to convert JInstanceOf to JCollection:");
 		let as_collection_from: JCollection = instance.into();
-		let size_collection_from = as_collection_from.size(env)?;
+		let size_collection_from: i32 = as_collection_from.size(env)?;
 		println!("  Collection size (via Into): {size_collection_from}");
 
 		Ok(())

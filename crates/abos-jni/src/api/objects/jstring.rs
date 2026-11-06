@@ -69,8 +69,8 @@ impl std::fmt::Display for JString<'_> {
 					// Note: there's no risk of side effects from an exception being thrown.
 					// A `GetStringUTFChars` failure may result in a `NullPtr` error that
 					// is handled below as a general JNI error.
-					let mutf8_chars = self.mutf8_chars(env)?;
-					let s = mutf8_chars.to_str();
+					let mutf8_chars: MUTF8Chars<'_, &JString<'_>> = self.mutf8_chars(env)?;
+					let s: std::borrow::Cow<'_, str> = mutf8_chars.to_str();
 					write!(f, "{s}")?;
 					Ok(())
 				})
@@ -234,7 +234,7 @@ impl JString<'_> {
 	///
 	/// Returns an [`Error::NullPtr`] if this [`JString`] is null.
 	pub fn try_to_string(&self, env: &Env<'_>) -> Result<String> {
-		let mutf8_chars = self.mutf8_chars(env)?;
+		let mutf8_chars: MUTF8Chars<'_, &JString<'_>> = self.mutf8_chars(env)?;
 		Ok(mutf8_chars.to_string())
 	}
 }

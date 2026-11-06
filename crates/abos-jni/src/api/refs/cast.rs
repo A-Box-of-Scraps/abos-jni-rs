@@ -97,8 +97,8 @@ impl<'any, 'from, To: Reference> Cast<'any, 'from, To> {
 		'any: 'from,
 	{
 		// SAFETY: The caller guarantees that the borrowed raw reference is valid for the source lifetime.
-		let from = unsafe { JObject::from_raw(env, *from) };
-		let from = &from; // make it clear, we don't own `from`
+		let from: JObject<'_> = unsafe { JObject::from_raw(env, *from) };
+		let from: &JObject<'_> = &from; // make it clear, we don't own `from`
 
 		// Note we can't just chain up to Cast::new since the from lifetime would be incorrect.
 

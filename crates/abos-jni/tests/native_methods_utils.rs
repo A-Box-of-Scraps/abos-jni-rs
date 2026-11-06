@@ -21,7 +21,7 @@
 ///
 /// Panics if preparing the output directory or compiling the Java fixture fails.
 pub fn compile_test_class(test_name: &str, java_file: &str) -> std::path::PathBuf {
-	let out_dir = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+	let out_dir: std::path::PathBuf = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
 		.join("jni_macros_tests")
 		.join(test_name);
 
@@ -33,7 +33,7 @@ pub fn compile_test_class(test_name: &str, java_file: &str) -> std::path::PathBu
 	}
 	std::fs::create_dir_all(&out_dir).expect("Failed to create test output directory");
 
-	let _classes = abos_javac::Build::new().file(java_file).output_dir(&out_dir).compile();
+	let _classes: Vec<std::path::PathBuf> = abos_javac::Build::new().file(java_file).output_dir(&out_dir).compile();
 
 	out_dir
 }
@@ -59,19 +59,20 @@ pub fn load_test_class<'local>(
 	out_dir: &std::path::Path,
 	class_name: &str,
 ) -> abos_jni::errors::Result<abos_jni::objects::JClass<'local>> {
-	let class_path = out_dir.join(format!("com/example/{class_name}.class"));
+	let class_path: std::path::PathBuf = out_dir.join(format!("com/example/{class_name}.class"));
 	assert!(
 		class_path.exists(),
 		"{class_name}.class not found at {}",
 		class_path.display()
 	);
 
-	let class_bytes = std::fs::read(&class_path).unwrap_or_else(|_| panic!("Failed to read {class_name}.class"));
+	let class_bytes: Vec<u8> =
+		std::fs::read(&class_path).unwrap_or_else(|_| panic!("Failed to read {class_name}.class"));
 
-	let class_loader =
+	let class_loader: abos_jni::objects::JClassLoader<'_> =
 		abos_jni::objects::JClassLoader::get_system_class_loader(env).expect("Failed to get system class loader");
 
-	let class_internal_name = format!("com/example/{class_name}");
+	let class_internal_name: String = format!("com/example/{class_name}");
 	let class_jni = abos_jni::strings::JNIString::new(class_internal_name.as_str());
 
 	env.define_class(Some(&class_jni), &class_loader, &class_bytes)

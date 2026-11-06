@@ -10,7 +10,7 @@ pub(super) fn generate_fields(
 	mappings: &TypeMappings,
 	jni: &syn::Path,
 ) -> TokenStream {
-	let mut accessors = Vec::new();
+	let mut accessors: Vec<TokenStream> = Vec::new();
 	for field in fields {
 		let context = FieldContext::new(field, api_name, mappings, jni);
 		if let Some(name) = &field.getter_name {
@@ -36,7 +36,7 @@ struct FieldContext<'a> {
 
 impl<'a> FieldContext<'a> {
 	fn new(field: &'a Field, api_name: &'a Ident, mappings: &'a TypeMappings, jni: &'a syn::Path) -> Self {
-		let id = format_ident!("{}_field_id", field.rust_name);
+		let id: Ident = format_ident!("{}_field_id", field.rust_name);
 		let (self_param, receiver, class_def) = if field.is_static {
 			(
 				quote! {},
@@ -72,18 +72,18 @@ impl<'a> FieldContext<'a> {
 			receiver,
 			class_def,
 		} = self;
-		let visibility = field.getter_visibility.to_tokens();
-		let attributes = accessor_attributes(field, &field.getter_attrs, true);
-		let ty = &field.signature.field_type;
-		let env_type = if ty.try_as_primitive(mappings).is_some() {
+		let visibility: TokenStream = field.getter_visibility.to_tokens();
+		let attributes: Vec<syn::Attribute> = accessor_attributes(field, &field.getter_attrs, true);
+		let ty: &crate::internal::types::SigType = &field.signature.field_type;
+		let env_type: TokenStream = if ty.try_as_primitive(mappings).is_some() {
 			quote! { &#jni::Env<'env_local> }
 		} else {
 			quote! { &mut #jni::Env<'env_local> }
 		};
-		let return_type = sig_type_to_rust_return_type(ty, &quote! { 'env_local }, mappings, jni);
-		let call =
+		let return_type: TokenStream = sig_type_to_rust_return_type(ty, &quote! { 'env_local }, mappings, jni);
+		let call: TokenStream =
 			generate_jni_get_field_call(&field.java_name, ty, field.is_static, jni, receiver, field_id, mappings);
-		let call = super::calls::checked_return(&call, field.non_null, jni);
+		let call: TokenStream = super::calls::checked_return(&call, field.non_null, jni);
 		quote! {
 			#(#attributes)*
 			#visibility fn #name<'env_local>(#self_param env: #env_type) -> #jni::errors::Result<#return_type> {
@@ -105,21 +105,21 @@ impl<'a> FieldContext<'a> {
 			receiver,
 			class_def,
 		} = self;
-		let visibility = field.setter_visibility.to_tokens();
-		let attributes = accessor_attributes(field, &field.setter_attrs, false);
-		let ty = &field.signature.field_type;
-		let lifetime = if ty.try_as_primitive(mappings).is_some() {
+		let visibility: TokenStream = field.setter_visibility.to_tokens();
+		let attributes: Vec<syn::Attribute> = accessor_attributes(field, &field.setter_attrs, false);
+		let ty: &crate::internal::types::SigType = &field.signature.field_type;
+		let lifetime: TokenStream = if ty.try_as_primitive(mappings).is_some() {
 			quote! {}
 		} else {
 			quote! { 'local_field }
 		};
-		let lifetime_declaration = if lifetime.is_empty() {
+		let lifetime_declaration: TokenStream = if lifetime.is_empty() {
 			quote! { <'env_local> }
 		} else {
 			quote! { <'env_local, #lifetime> }
 		};
-		let arg_type = sig_type_to_rust_arg_type(ty, &lifetime, mappings, jni);
-		let call = generate_jni_set_field_call(
+		let arg_type: TokenStream = sig_type_to_rust_arg_type(ty, &lifetime, mappings, jni);
+		let call: TokenStream = generate_jni_set_field_call(
 			&field.java_name,
 			ty,
 			field.is_static,
@@ -129,7 +129,7 @@ impl<'a> FieldContext<'a> {
 			&quote! { val },
 			mappings,
 		);
-		let null_check = if field.non_null {
+		let null_check: TokenStream = if field.non_null {
 			quote! {
 				use #jni::refs::Reference as _;
 				if val.as_ref().is_null() { return Err(#jni::errors::Error::NullPtr("Null Object")); }
@@ -150,7 +150,7 @@ impl<'a> FieldContext<'a> {
 }
 
 fn accessor_attributes(field: &Field, explicit: &[syn::Attribute], getter: bool) -> Vec<syn::Attribute> {
-	let mut attrs = if explicit.is_empty() {
+	let mut attrs: Vec<syn::Attribute> = if explicit.is_empty() {
 		field
 			.attrs
 			.iter()
@@ -158,16 +158,16 @@ fn accessor_attributes(field: &Field, explicit: &[syn::Attribute], getter: bool)
 			.cloned()
 			.collect()
 	} else {
-		let mut attrs = extract_cfg_attrs(&field.attrs);
+		let mut attrs: Vec<syn::Attribute> = extract_cfg_attrs(&field.attrs);
 		attrs.extend_from_slice(explicit);
 		attrs
 	};
 	if !attrs.iter().any(|attr| attr.path().is_ident("doc")) {
-		let java_name = &field.java_name;
-		let doc = if getter {
+		let java_name: &String = &field.java_name;
+		let doc: syn::Attribute = if getter {
 			syn::parse_quote! { #[doc = concat!("Gets the `", #java_name, "` field.")] }
 		} else {
-			let getter = &field.getter_name;
+			let getter: &Option<Ident> = &field.getter_name;
 			syn::parse_quote! { #[doc = concat!("Sets the `", #java_name, "` field.\n\nSee [`Self::", stringify!(#getter), "`] for more details.")] }
 		};
 		attrs.insert(0, doc);

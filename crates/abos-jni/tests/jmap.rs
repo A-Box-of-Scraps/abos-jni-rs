@@ -13,14 +13,15 @@ use util::{attach_current_thread, unwrap};
 #[test]
 fn jmap_push_and_iterate() {
 	attach_current_thread(|env| {
-		let data = &[jni_str!("hello"), jni_str!("world"), jni_str!("from"), jni_str!("test")];
+		let data: &[&abos_jni::strings::JNIStr; 4] =
+			&[jni_str!("hello"), jni_str!("world"), jni_str!("from"), jni_str!("test")];
 
 		// Create a new map. Use LinkedHashMap to have predictable iteration order
-		let map_object = unwrap(
+		let map_object: JObject<'_> = unwrap(
 			env.new_object(jni_str!("java/util/LinkedHashMap"), jni_sig!("()V"), &[]),
 			env,
 		);
-		let map = unwrap(JMap::cast_local(env, map_object), env);
+		let map: JMap<'_> = unwrap(JMap::cast_local(env, map_object), env);
 
 		// Push all strings
 		unwrap(
@@ -33,13 +34,13 @@ fn jmap_push_and_iterate() {
 		);
 
 		// Collect the keys using the JMap iterator
-		let mut collected = Vec::new();
+		let mut collected: Vec<abos_jni::strings::JNIString> = Vec::new();
 		unwrap(
 			map.iter(env).and_then(|mut iter| {
 				while let Some(e) = iter.next(env)? {
-					let value = e.value(env)?;
-					let s = env.cast_local::<JString>(value)?;
-					let s = s.mutf8_chars(env)?;
+					let value: JObject<'_> = e.value(env)?;
+					let s: JString<'_> = env.cast_local::<JString>(value)?;
+					let s: abos_jni::strings::MUTF8Chars<'_, &JString<'_>> = s.mutf8_chars(env)?;
 
 					collected.push(s.to_owned());
 				}
@@ -48,7 +49,7 @@ fn jmap_push_and_iterate() {
 			env,
 		);
 
-		let orig = data.to_vec();
+		let orig: Vec<&abos_jni::strings::JNIStr> = data.to_vec();
 		assert_eq!(orig, collected);
 		Ok(())
 	})

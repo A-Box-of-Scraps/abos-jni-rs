@@ -9,7 +9,7 @@ use abos_jni::{InitArgsBuilder, JavaVM, jni_sig, jni_str, objects::JString};
 
 #[test]
 fn invocation_character_encoding() {
-	let jvm_args = InitArgsBuilder::new()
+	let jvm_args: abos_jni::InitArgs<'_> = InitArgsBuilder::new()
 		.version(abos_jni::JNIVersion::V1_8)
 		.option("-Xcheck:jni")
 		// U+00A0 NO-BREAK SPACE is the only non-ASCII character that's present in all parts of
@@ -21,14 +21,14 @@ fn invocation_character_encoding() {
 		.build()
 		.unwrap_or_else(|e| panic!("{e:#?}"));
 
-	let jvm = JavaVM::new(jvm_args).unwrap_or_else(|e| panic!("{e:#?}"));
+	let jvm: JavaVM = JavaVM::new(jvm_args).unwrap_or_else(|e| panic!("{e:#?}"));
 
 	jvm.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
 		println!("creating new_string, env = {:?}", env.get_raw());
-		let prop_name = env.new_string("nbsp").expect("test string can be allocated");
+		let prop_name: JString<'_> = env.new_string("nbsp").expect("test string can be allocated");
 
 		println!("calling getProperty");
-		let prop_value = env
+		let prop_value: abos_jni::objects::JObject<'_> = env
 			.call_static_method(
 				jni_str!("java/lang/System"),
 				jni_str!("getProperty"),
@@ -38,8 +38,8 @@ fn invocation_character_encoding() {
 			.expect("static method call succeeds")
 			.l()
 			.expect("JNI result contains an object");
-		let prop_value = env.cast_local::<JString>(prop_value)?;
-		let prop_value_str = prop_value
+		let prop_value: JString<'_> = env.cast_local::<JString>(prop_value)?;
+		let prop_value_str: abos_jni::strings::MUTF8Chars<'_, &JString<'_>> = prop_value
 			.mutf8_chars(env)
 			.expect("modified UTF-8 characters are accessible");
 		let prop_value_str: Cow<str> = prop_value_str.to_str();

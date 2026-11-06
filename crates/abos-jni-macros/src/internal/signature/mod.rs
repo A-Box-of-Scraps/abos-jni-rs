@@ -46,7 +46,7 @@ pub struct MethodSignature {
 impl MethodSignature {
 	/// Convert to JNI method signature string
 	pub fn to_jni_signature(&self, type_mappings: &TypeMappings) -> Result<String> {
-		let mut result = String::from("(");
+		let mut result: String = String::from("(");
 
 		for param in &self.parameters {
 			result.push_str(&param.ty.to_jni_descriptor(type_mappings)?);
@@ -67,11 +67,11 @@ pub fn parse_method_sig(input: ParseStream, type_mappings: &TypeMappings) -> Res
 	let args_content;
 	parenthesized!(args_content in input);
 
-	let mut parameters = Vec::new();
+	let mut parameters: Vec<Parameter> = Vec::new();
 	let mut param_index = 0;
 
 	while !args_content.is_empty() {
-		let param = parse_parameter_with_index(&args_content, param_index, type_mappings)?;
+		let param: Parameter = parse_parameter_with_index(&args_content, param_index, type_mappings)?;
 		parameters.push(param);
 		param_index += 1;
 
@@ -80,7 +80,7 @@ pub fn parse_method_sig(input: ParseStream, type_mappings: &TypeMappings) -> Res
 		}
 	}
 
-	let return_type = if input.peek(Token![->]) {
+	let return_type: SigType = if input.peek(Token![->]) {
 		input.parse::<Token![->]>()?;
 		parse_type(input, type_mappings)?
 	} else {
@@ -111,7 +111,7 @@ impl FieldSignature {
 pub fn parse_field_sig(input: ParseStream, type_mappings: &TypeMappings) -> Result<FieldSignature> {
 	input.parse::<sig>()?;
 	input.parse::<Token![=]>()?;
-	let field_type = parse_type(input, type_mappings)?;
+	let field_type: SigType = parse_type(input, type_mappings)?;
 	Ok(FieldSignature { field_type })
 }
 
@@ -137,13 +137,13 @@ impl Signature {
 pub fn parse_parameter_with_index(input: ParseStream, index: usize, type_mappings: &TypeMappings) -> Result<Parameter> {
 	if input.peek(Ident) && input.peek2(Token![:]) {
 		// Named parameter
-		let name = input.parse::<Ident>()?;
+		let name: Ident = input.parse::<Ident>()?;
 		input.parse::<Token![:]>()?;
-		let ty = parse_type(input, type_mappings)?;
+		let ty: SigType = parse_type(input, type_mappings)?;
 		Ok(Parameter { name, ty })
 	} else {
 		// Unnamed parameter - generate fallback name
-		let ty = parse_type(input, type_mappings)?;
+		let ty: SigType = parse_type(input, type_mappings)?;
 		let name = Ident::new(&format!("arg{index}"), Span::call_site());
 		Ok(Parameter { name, ty })
 	}

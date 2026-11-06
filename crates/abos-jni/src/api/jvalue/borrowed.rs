@@ -146,7 +146,7 @@ impl<'obj_ref> JValue<'obj_ref> {
 	/// * [`Error::InvalidUtf16`]: `self` contains a Java `char`, but it is one half of a surrogate
 	///   pair.
 	pub fn c_char(self) -> Result<char> {
-		let char = self.c()?;
+		let char: u16 = self.c()?;
 
 		char_from_java(char).map_err(|source| Error::InvalidUtf16 { source })
 	}
@@ -196,7 +196,7 @@ impl<'obj_ref> JValue<'obj_ref> {
 	/// * [`Error::WrongJValueType`]: `self` does not contain a Java `int`.
 	/// * [`Error::InvalidUtf32`]: `self` contains a Java `int`, but it is not a valid UTF-32 unit.
 	pub fn i_char(self) -> Result<char> {
-		let char = self.i()?;
+		let char: i32 = self.i()?;
 
 		char_from_java_int(char).map_err(|source| Error::InvalidUtf32 { char, source })
 	}

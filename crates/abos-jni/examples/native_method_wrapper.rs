@@ -116,9 +116,9 @@ impl JNativeMethodWrapper<'_> {
 		handle: CommonHandle,
 	) -> Result<JString<'local>, MyError> {
 		// SAFETY: The example caller passes the live, terminated C string allocated for this handle.
-		let c_str = unsafe { CStr::from_ptr(handle.0) };
-		let str_slice = c_str.to_str().map_err(MyError::InvalidUtf8)?;
-		let response = format!("Processed resource: {str_slice}");
+		let c_str: &CStr = unsafe { CStr::from_ptr(handle.0) };
+		let str_slice: &str = c_str.to_str().map_err(MyError::InvalidUtf8)?;
+		let response: String = format!("Processed resource: {str_slice}");
 		Ok(JString::from_str(env, response)?)
 	}
 
@@ -150,14 +150,14 @@ fn main() {
 
 		// Create an instance
 		println!("\n--- Creating Instance ---");
-		let obj = JNativeMethodWrapper::new(env)?;
+		let obj: JNativeMethodWrapper<'_> = JNativeMethodWrapper::new(env)?;
 		println!("Created NativeMethodWrapper instance");
 
 		// Test process_resource with a CStr handle
 		println!("\n--- Testing process_resource ---");
 		let resource_data = c"my_resource_data";
-		let resource_handle = CommonHandle(resource_data.as_ptr());
-		let obj = env
+		let resource_handle: CommonHandle = CommonHandle(resource_data.as_ptr());
+		let obj: JObject<'_> = env
 			.call_method(
 				&obj,
 				my_jni_str!("processResource"),
@@ -165,16 +165,16 @@ fn main() {
 				&[JValue::Long(resource_handle.into())],
 			)?
 			.l()?;
-		let s = JString::cast_local(env, obj)?;
+		let s: JString<'_> = JString::cast_local(env, obj)?;
 		println!("Result: {}", s.try_to_string(env)?);
 
 		// Test mix_types with JCommonBuiltinType and JCustomType
 		// Note: we refer to CustomType via the full Java type name here so we
 		// don't need to pass a type_map for just one usage
 		println!("\n--- Testing mix_types ---");
-		let builtin_obj = JBuiltinType::new(env)?;
-		let custom_obj = JCustomType::new(env)?;
-		let result = env
+		let builtin_obj: JBuiltinType<'_> = JBuiltinType::new(env)?;
+		let custom_obj: JCustomType<'_> = JCustomType::new(env)?;
+		let result: JObject<'_> = env
 			.call_static_method(
 				class,
 				my_jni_str!("mixTypes"),

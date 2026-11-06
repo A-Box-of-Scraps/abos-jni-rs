@@ -50,7 +50,7 @@ where
 	unsafe fn new_with_len(env: &Env<'_>, array: TArrayRef, len: usize, mode: ReleaseMode) -> Result<Self> {
 		let mut is_copy: jboolean = true;
 		// SAFETY: The typed array has element type T; is_copy is valid writable storage and the guard retains the array.
-		let ptr = unsafe { T::get_elements(env, array.as_ref().as_raw(), &mut is_copy) }?;
+		let ptr: *mut T = unsafe { T::get_elements(env, array.as_ref().as_raw(), &mut is_copy) }?;
 		Ok(AutoElements {
 			array,
 			len,
@@ -62,7 +62,7 @@ where
 	}
 
 	pub(crate) fn new(env: &Env<'_>, array: TArrayRef, mode: ReleaseMode) -> Result<Self> {
-		let len = array.as_ref().len(env)?;
+		let len: usize = array.as_ref().len(env)?;
 		// SAFETY: The length was obtained from the same typed array retained by the returned guard.
 		unsafe { Self::new_with_len(env, array, len, mode) }
 	}
@@ -146,7 +146,8 @@ where
 {
 	fn drop(&mut self) {
 		// Safety: `self.mode` is valid and the array has not yet been released.
-		let res = unsafe { self.release_array_elements(self.mode as i32) };
+		let res: std::result::Result<(), crate::errors::Error> =
+			unsafe { self.release_array_elements(self.mode as i32) };
 
 		match res {
 			Ok(()) => {}

@@ -14,12 +14,13 @@ fn test_java_integers() {
 
 		for value in -10..10 {
 			env.with_local_frame(16, |env| -> Result<()> {
-				let integer_value =
+				let integer_value: abos_jni::objects::JObject<'_> =
 					env.new_object(jni_str!("java/lang/Integer"), jni_sig!("(I)V"), &[JValue::Int(value)])?;
 
-				let values_array = env.new_object_array(array_length, jni_str!("java/lang/Integer"), &integer_value)?;
+				let values_array: abos_jni::objects::JObjectArray<'_> =
+					env.new_object_array(array_length, jni_str!("java/lang/Integer"), &integer_value)?;
 
-				let result = env
+				let result: i32 = env
 					.call_static_method(
 						jni_str!("java/util/Arrays"),
 						jni_str!("binarySearch"),

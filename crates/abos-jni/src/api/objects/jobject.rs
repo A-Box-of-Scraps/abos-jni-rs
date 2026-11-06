@@ -118,9 +118,9 @@ impl JObjectAPI {
 		// really concerned about a small amount of redundant work if multiple
 		// threads race here.
 
-		let api = env.with_local_frame(8, |env| -> crate::errors::Result<_> {
-			let class = env.find_class(jni_str!("java/lang/Object"))?;
-			let class = env.new_global_ref(class)?;
+		let api: Self = env.with_local_frame(8, |env| -> crate::errors::Result<_> {
+			let class: JClass<'_> = env.find_class(jni_str!("java/lang/Object"))?;
+			let class: Global<JClass<'_>> = env.new_global_ref(class)?;
 			Ok(Self { class })
 		})?;
 		drop(API.set(api));
@@ -192,7 +192,7 @@ unsafe impl Reference for JObject<'_> {
 	) -> crate::errors::Result<impl Deref<Target = Global<JClass<'static>>> + 'caller> {
 		// As a special-case; we ignore loader_context just to be clear that there's no risk of
 		// recursion. (`LoaderContext::load_class` depends on the `JObjectAPI`)
-		let api = JObjectAPI::get(env)?;
+		let api: &JObjectAPI = JObjectAPI::get(env)?;
 		Ok(&api.class)
 	}
 

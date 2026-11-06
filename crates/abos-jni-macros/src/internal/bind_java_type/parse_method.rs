@@ -28,7 +28,7 @@ pub(super) fn parse_visibility(input: ParseStream) -> Result<Option<VisibilitySp
 				Ok(Some(VisibilitySpec::PubSuper))
 			} else if content.peek(Token![in]) {
 				content.parse::<Token![in]>()?;
-				let path = content.parse::<syn::Path>()?;
+				let path: syn::Path = content.parse::<syn::Path>()?;
 				Ok(Some(VisibilitySpec::PubInPath(path)))
 			} else {
 				Err(syn::Error::new(
@@ -53,13 +53,13 @@ pub(super) fn parse_name_spec(input: ParseStream) -> Result<(String, Ident)> {
 	input.parse::<Token![=]>()?;
 
 	if input.peek(LitStr) {
-		let lit = input.parse::<LitStr>()?;
-		let java_name = lit.value();
-		let rust_name = format_ident!("{}", java_name);
+		let lit: LitStr = input.parse::<LitStr>()?;
+		let java_name: String = lit.value();
+		let rust_name: Ident = format_ident!("{}", java_name);
 		Ok((java_name, rust_name))
 	} else {
-		let rust_name = input.parse::<Ident>()?;
-		let java_name = rust_name.to_string();
+		let rust_name: Ident = input.parse::<Ident>()?;
+		let java_name: String = rust_name.to_string();
 		Ok((java_name, rust_name))
 	}
 }
@@ -81,9 +81,9 @@ struct MethodOptions {
 
 /// Parse shorthand or property-block syntax and validate the selected method kind.
 pub(super) fn parse_method(input: ParseStream, type_mappings: &TypeMappings, kind: MethodKind) -> Result<ParsedMethod> {
-	let attrs = input.call(syn::Attribute::parse_outer)?;
-	let visibility = parse_visibility(input)?;
-	let mut options = MethodOptions::default();
+	let attrs: Vec<syn::Attribute> = input.call(syn::Attribute::parse_outer)?;
+	let visibility: Option<VisibilitySpec> = parse_visibility(input)?;
+	let mut options: MethodOptions = MethodOptions::default();
 	options.parse_qualifiers(input)?;
 	if !input.peek(Token![fn]) {
 		return Err(syn::Error::new(
@@ -103,8 +103,8 @@ pub(super) fn parse_method(input: ParseStream, type_mappings: &TypeMappings, kin
 			"Method must be followed by parentheses (shorthand syntax) or braces (block syntax)",
 		));
 	}
-	let java_name_overridden = options.java_name.is_some();
-	let parsed = options.finish(rust_name, attrs, visibility)?;
+	let java_name_overridden: bool = options.java_name.is_some();
+	let parsed: ParsedMethod = options.finish(rust_name, attrs, visibility)?;
 	validate_method(&parsed, kind, java_name_overridden, type_mappings)?;
 	Ok(parsed)
 }
@@ -145,7 +145,7 @@ impl MethodOptions {
 	}
 
 	fn parse_property(&mut self, input: ParseStream, mappings: &TypeMappings) -> Result<()> {
-		let lookahead = input.lookahead1();
+		let lookahead: syn::parse::Lookahead1<'_> = input.lookahead1();
 		if lookahead.peek(name) {
 			self.java_name = Some(parse_name_spec(input)?.0);
 		} else if lookahead.peek(sig) {
@@ -203,10 +203,10 @@ impl MethodOptions {
 			}
 			self.export = Some(NativeMethodExport::WithAutoMangle);
 		}
-		let signature = self
+		let signature: MethodSignature = self
 			.signature
 			.ok_or_else(|| syn::Error::new(rust_name.span(), "Method must have a signature"))?;
-		let java_name = self
+		let java_name: String = self
 			.java_name
 			.unwrap_or_else(|| snake_case_to_lower_camel_case(&rust_name.to_string()));
 		Ok(ParsedMethod {
@@ -247,14 +247,14 @@ fn parse_export(input: ParseStream) -> Result<NativeMethodExport> {
 fn parse_shorthand(input: ParseStream, mappings: &TypeMappings) -> Result<MethodSignature> {
 	let content;
 	parenthesized!(content in input);
-	let mut parameters = Vec::new();
+	let mut parameters: Vec<crate::internal::signature::Parameter> = Vec::new();
 	while !content.is_empty() {
 		parameters.push(parse_parameter_with_index(&content, parameters.len(), mappings)?);
 		if !content.is_empty() {
 			content.parse::<Token![,]>()?;
 		}
 	}
-	let return_type = if input.peek(Token![->]) {
+	let return_type: SigType = if input.peek(Token![->]) {
 		input.parse::<Token![->]>()?;
 		parse_type(input, mappings)?
 	} else {
@@ -293,7 +293,7 @@ fn validate_method(
 }
 
 fn validate_constructor(method: &ParsedMethod, name_overridden: bool) -> Result<()> {
-	let checks = [
+	let checks: [(bool, &str); 4] = [
 		(
 			name_overridden,
 			"Cannot override 'name' for constructors - the Java constructor name is always '<init>'",
@@ -315,7 +315,7 @@ fn validate_native_method(method: &ParsedMethod) -> Result<()> {
 	if !method.is_raw {
 		return Ok(());
 	}
-	let checks = [
+	let checks: [(bool, &str); 3] = [
 		(
 			method.error_policy.is_some(),
 			"Cannot specify 'error_policy' when using 'raw' - error_policy only applies to safe wrappers that use with_env",
@@ -333,7 +333,7 @@ fn validate_native_method(method: &ParsedMethod) -> Result<()> {
 }
 
 fn validate_non_native_method(method: &ParsedMethod) -> Result<()> {
-	let checks = [
+	let checks: [(bool, &str); 6] = [
 		(
 			method.error_policy.is_some(),
 			"Only native methods can have 'error_policy'",
@@ -364,10 +364,10 @@ fn validate_options(method: &ParsedMethod, checks: &[(bool, &str)]) -> Result<()
 
 /// Parse constructors block
 pub(super) fn parse_constructors(input: ParseStream, type_mappings: &TypeMappings) -> Result<Vec<Constructor>> {
-	let mut constructors = Vec::new();
+	let mut constructors: Vec<Constructor> = Vec::new();
 
 	while !input.is_empty() {
-		let parsed = parse_method(input, type_mappings, MethodKind::Constructor)?;
+		let parsed: ParsedMethod = parse_method(input, type_mappings, MethodKind::Constructor)?;
 
 		constructors.push(Constructor {
 			name: parsed.rust_name,
@@ -385,10 +385,10 @@ pub(super) fn parse_constructors(input: ParseStream, type_mappings: &TypeMapping
 
 /// Parse methods block
 pub(super) fn parse_methods(input: ParseStream, type_mappings: &TypeMappings) -> Result<Vec<Method>> {
-	let mut methods = Vec::new();
+	let mut methods: Vec<Method> = Vec::new();
 
 	while !input.is_empty() {
-		let parsed = parse_method(input, type_mappings, MethodKind::Method)?;
+		let parsed: ParsedMethod = parse_method(input, type_mappings, MethodKind::Method)?;
 
 		methods.push(Method {
 			visibility: parsed.visibility.unwrap_or(VisibilitySpec::Public),
@@ -413,11 +413,11 @@ pub(super) fn parse_native_methods(
 	input: ParseStream,
 	type_mappings: &TypeMappings,
 ) -> Result<(Vec<NativeMethod>, Vec<Method>)> {
-	let mut native_methods = Vec::new();
-	let mut methods = Vec::new();
+	let mut native_methods: Vec<NativeMethod> = Vec::new();
+	let mut methods: Vec<Method> = Vec::new();
 
 	while !input.is_empty() {
-		let parsed = parse_method(input, type_mappings, MethodKind::NativeMethod)?;
+		let parsed: ParsedMethod = parse_method(input, type_mappings, MethodKind::NativeMethod)?;
 
 		if let Some(visibility) = parsed.visibility {
 			methods.push(Method {

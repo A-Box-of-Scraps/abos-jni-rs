@@ -18,7 +18,7 @@ fn nested_attach() {
 	jvm().detach_current_thread().expect("test JVM is available");
 	assert_eq!(jvm().threads_attached(), 0);
 
-	let thread = spawn(|| {
+	let thread: std::thread::JoinHandle<()> = spawn(|| {
 		assert_eq!(jvm().threads_attached(), 0);
 		check_nested_attach(jvm());
 		assert_eq!(jvm().threads_attached(), 1);

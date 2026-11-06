@@ -37,12 +37,12 @@ impl<'local> Env<'local> {
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 
-		let class = class.lookup(self)?;
+		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 
-		let method_id = method_id.lookup(self)?.as_ref().into_raw();
+		let method_id: crate::sys::jmethodID = method_id.lookup(self)?.as_ref().into_raw();
 
-		let class_raw = class.as_ref().as_raw();
-		let jni_args = args.as_ptr();
+		let class_raw: crate::sys::jobject = class.as_ref().as_raw();
+		let jni_args: *const abos_jni_sys::jvalue = args.as_ptr();
 
 		macro_rules! invoke {
 			($call:ident -> $ret:ty) => {{
@@ -52,11 +52,11 @@ impl<'local> Env<'local> {
 		}
 
 		// Safety: we're sure we're calling the correct JNI method based on `ret` type
-		let ret = unsafe {
+		let ret: JValueOwned<'_> = unsafe {
 			match ret {
 				Object | Array => {
-					let obj = invoke!(CallStaticObjectMethodA -> jobject);
-					let obj = JObject::from_raw(self, obj);
+					let obj: crate::sys::jobject = invoke!(CallStaticObjectMethodA -> jobject);
+					let obj: JObject<'_> = JObject::from_raw(self, obj);
 					JValueOwned::from(obj)
 				}
 				Primitive(Boolean) => invoke!(CallStaticBooleanMethodA -> bool).into(),
@@ -113,11 +113,11 @@ impl<'local> Env<'local> {
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 
-		let method_id = method_id.lookup(self)?.as_ref().into_raw();
+		let method_id: crate::sys::jmethodID = method_id.lookup(self)?.as_ref().into_raw();
 
-		let obj = obj.as_ref().as_raw();
+		let obj: crate::sys::jobject = obj.as_ref().as_raw();
 
-		let jni_args = args.as_ptr();
+		let jni_args: *const abos_jni_sys::jvalue = args.as_ptr();
 
 		macro_rules! invoke {
 			($call:ident -> $ret:ty) => {{
@@ -127,11 +127,11 @@ impl<'local> Env<'local> {
 		}
 
 		// Safety: we're sure we're calling the correct JNI method based on `ret_ty` type
-		let ret = unsafe {
+		let ret: JValueOwned<'_> = unsafe {
 			match ret_ty {
 				Object | Array => {
-					let obj = invoke!(CallObjectMethodA -> jobject);
-					let obj = JObject::from_raw(self, obj);
+					let obj: crate::sys::jobject = invoke!(CallObjectMethodA -> jobject);
+					let obj: JObject<'_> = JObject::from_raw(self, obj);
 					JValueOwned::from(obj)
 				}
 				Primitive(Boolean) => invoke!(CallBooleanMethodA -> bool).into(),
@@ -187,13 +187,13 @@ impl<'local> Env<'local> {
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 
-		let method_id = method_id.lookup(self)?.as_ref().into_raw();
-		let class = class.lookup(self)?;
+		let method_id: crate::sys::jmethodID = method_id.lookup(self)?.as_ref().into_raw();
+		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 
-		let obj = obj.as_ref().as_raw();
-		let class_raw = class.as_ref().as_raw();
+		let obj: crate::sys::jobject = obj.as_ref().as_raw();
+		let class_raw: crate::sys::jobject = class.as_ref().as_raw();
 
-		let jni_args = args.as_ptr();
+		let jni_args: *const abos_jni_sys::jvalue = args.as_ptr();
 
 		macro_rules! invoke {
 			($call:ident -> $ret:ty) => {{
@@ -203,11 +203,11 @@ impl<'local> Env<'local> {
 		}
 
 		// Safety: we're sure we're calling the correct JNI method based on `ret_ty` type
-		let ret = unsafe {
+		let ret: JValueOwned<'_> = unsafe {
 			match ret_ty {
 				Object | Array => {
-					let obj = invoke!(CallNonvirtualObjectMethodA -> jobject);
-					let obj = JObject::from_raw(self, obj);
+					let obj: crate::sys::jobject = invoke!(CallNonvirtualObjectMethodA -> jobject);
+					let obj: JObject<'_> = JObject::from_raw(self, obj);
 					JValueOwned::from(obj)
 				}
 				Primitive(Boolean) => invoke!(CallNonvirtualBooleanMethodA -> bool).into(),

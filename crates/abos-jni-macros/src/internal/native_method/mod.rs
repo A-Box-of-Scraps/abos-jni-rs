@@ -88,7 +88,7 @@ pub fn generate_native_method_abi_check(
 
 	// Check at runtime that the method was correctly registered as static or instance
 	// We assume this can't change dynamically so we use Once to only check once
-	let abi_check_ensure_env = if is_raw {
+	let abi_check_ensure_env: TokenStream = if is_raw {
 		quote! {
 			let mut _guard = unsafe {
 				#jni::AttachGuard::from_unowned(unowned_env.as_raw())
@@ -98,7 +98,7 @@ pub fn generate_native_method_abi_check(
 	} else {
 		quote! {}
 	};
-	let abi_assertion = if is_static {
+	let abi_assertion: TokenStream = if is_static {
 		quote! {
 			let is_class_reciever = env.is_instance_of(&class, lang_class_class).expect("Failed to check 2nd arg type for native method ABI check");
 			assert!(is_class_reciever, "Native method '{}' was registered as static but called as instance method", stringify!(#method_name));
@@ -110,7 +110,7 @@ pub fn generate_native_method_abi_check(
 		}
 	};
 
-	let type_mapping_runtime_checks = check_type_mappings.map_or_else(
+	let type_mapping_runtime_checks: TokenStream = check_type_mappings.map_or_else(
 		|| quote! {},
 		|type_mappings| generate_type_mapping_checks(type_mappings, jni),
 	);
@@ -166,7 +166,7 @@ pub fn generate_native_method_abi_check(
 /// Generate the `NativeMethod` descriptor and optional exported wrapper.
 pub fn native_method_impl(input: TokenStream) -> Result<TokenStream> {
 	let input: NativeMethodStructInput = syn::parse2(input)?;
-	let signature = input
+	let signature: String = input
 		.signature
 		.to_jni_signature(&input.type_mappings)
 		.map_err(|error| {
@@ -176,7 +176,8 @@ pub fn native_method_impl(input: TokenStream) -> Result<TokenStream> {
 			)
 		})?;
 	let wrapper = NativeWrapper::new(&input);
-	let method = wrapper.method_block(&lit_cstr_mutf8(&input.java_method_name), &lit_cstr_mutf8(&signature));
+	let method: TokenStream =
+		wrapper.method_block(&lit_cstr_mutf8(&input.java_method_name), &lit_cstr_mutf8(&signature));
 	if matches!(input.export, NativeMethodExport::No) {
 		Ok(quote! { const { #method } })
 	} else {
@@ -196,24 +197,24 @@ struct NativeWrapper<'a> {
 
 impl<'a> NativeWrapper<'a> {
 	fn new(input: &'a NativeMethodStructInput) -> Self {
-		let lifetime = quote! { 'local };
-		let parameters = wrapper_parameters(input, &lifetime);
-		let mut arguments = vec![if input.is_static {
+		let lifetime: TokenStream = quote! { 'local };
+		let parameters: Vec<TokenStream> = wrapper_parameters(input, &lifetime);
+		let mut arguments: Vec<TokenStream> = vec![if input.is_static {
 			quote! { class }
 		} else {
 			quote! { this }
 		}];
 		for parameter in &input.signature.parameters {
-			let name = &parameter.name;
+			let name: &Ident = &parameter.name;
 			arguments.push(quote! { #name });
 		}
-		let return_type = sig_type_to_rust_type_core(
+		let return_type: TokenStream = sig_type_to_rust_type_core(
 			&input.signature.return_type,
 			&lifetime,
 			&input.type_mappings,
 			&input.jni_crate,
 		);
-		let abi_check = generate_native_method_abi_check(
+		let abi_check: TokenStream = generate_native_method_abi_check(
 			&input.jni_crate,
 			&input.java_method_name,
 			input.abi_check,
@@ -233,20 +234,20 @@ impl<'a> NativeWrapper<'a> {
 	}
 
 	fn call_body(&self) -> TokenStream {
-		let input = self.input;
-		let jni = &input.jni_crate;
-		let function = &input.fn_path;
-		let arguments = &self.arguments;
-		let abi_check = &self.abi_check;
+		let input: &NativeMethodStructInput = self.input;
+		let jni: &syn::Path = &input.jni_crate;
+		let function: &syn::Path = &input.fn_path;
+		let arguments: &Vec<TokenStream> = &self.arguments;
+		let abi_check: &TokenStream = &self.abi_check;
 		if input.is_raw_fn {
 			return quote! { #abi_check #function(unowned_env, #(#arguments),*) };
 		}
-		let with_env_api = if input.catch_unwind {
+		let with_env_api: TokenStream = if input.catch_unwind {
 			quote! { with_env }
 		} else {
 			quote! { with_env_no_catch }
 		};
-		let policy = input.error_policy.as_ref().map_or_else(
+		let policy: TokenStream = input.error_policy.as_ref().map_or_else(
 			|| quote! { #jni::errors::ThrowRuntimeExAndDefault },
 			|path| quote! { #path },
 		);
@@ -256,12 +257,12 @@ impl<'a> NativeWrapper<'a> {
 	}
 
 	fn method_block(&self, name_cstr: &syn::LitCStr, sig_cstr: &syn::LitCStr) -> TokenStream {
-		let jni = &self.input.jni_crate;
-		let name = &self.name;
-		let lifetime = &self.lifetime;
-		let parameters = &self.parameters;
-		let return_type = &self.return_type;
-		let body = self.call_body();
+		let jni: &syn::Path = &self.input.jni_crate;
+		let name: &Ident = &self.name;
+		let lifetime: &TokenStream = &self.lifetime;
+		let parameters: &Vec<TokenStream> = &self.parameters;
+		let return_type: &TokenStream = &self.return_type;
+		let body: TokenStream = self.call_body();
 		quote! {
 			extern "system" fn #name<#lifetime>(#(#parameters),*) -> #return_type { #body }
 			// The generated wrapper enforces the declared signature and ABI; literals are validated modified UTF-8.
@@ -276,11 +277,11 @@ impl<'a> NativeWrapper<'a> {
 	}
 
 	fn export(&self, signature: &str, method: &TokenStream) -> Result<TokenStream> {
-		let input = self.input;
-		let mangled_name = if let NativeMethodExport::WithName(name) = &input.export {
+		let input: &NativeMethodStructInput = self.input;
+		let mangled_name: String = if let NativeMethodExport::WithName(name) = &input.export {
 			name.clone()
 		} else {
-			let class = input.java_type.as_ref().ok_or_else(|| {
+			let class: &JavaClassName = input.java_type.as_ref().ok_or_else(|| {
 				syn::Error::new_spanned(
 					&input.fn_path,
 					"java_type is required for an automatically mangled export",
@@ -288,16 +289,16 @@ impl<'a> NativeWrapper<'a> {
 			})?;
 			create_jni_fn_name(&class.to_java_dotted(), &input.java_method_name, Some(signature))
 		};
-		let export_attr = if cfg!(has_unsafe_attr) {
+		let export_attr: TokenStream = if cfg!(has_unsafe_attr) {
 			quote! { #[unsafe(export_name = #mangled_name)] }
 		} else {
 			quote! { #[export_name = #mangled_name] }
 		};
-		let name = &self.name;
-		let lifetime = &self.lifetime;
-		let parameters = &self.parameters;
-		let arguments = &self.arguments;
-		let return_type = &self.return_type;
+		let name: &Ident = &self.name;
+		let lifetime: &TokenStream = &self.lifetime;
+		let parameters: &Vec<TokenStream> = &self.parameters;
+		let arguments: &Vec<TokenStream> = &self.arguments;
+		let return_type: &TokenStream = &self.return_type;
 		Ok(quote! {
 			const {
 				#[doc(hidden)]
@@ -312,8 +313,8 @@ impl<'a> NativeWrapper<'a> {
 }
 
 fn wrapper_parameters(input: &NativeMethodStructInput, lifetime: &TokenStream) -> Vec<TokenStream> {
-	let jni = &input.jni_crate;
-	let mut parameters = vec![if input.is_raw_fn {
+	let jni: &syn::Path = &input.jni_crate;
+	let mut parameters: Vec<TokenStream> = vec![if input.is_raw_fn {
 		quote! { unowned_env: #jni::EnvUnowned<#lifetime> }
 	} else {
 		quote! { mut unowned_env: #jni::EnvUnowned<#lifetime> }
@@ -321,15 +322,15 @@ fn wrapper_parameters(input: &NativeMethodStructInput, lifetime: &TokenStream) -
 	if input.is_static {
 		parameters.push(quote! { class: #jni::objects::JClass<#lifetime> });
 	} else {
-		let ty = input.rust_type.as_ref().map_or_else(
+		let ty: TokenStream = input.rust_type.as_ref().map_or_else(
 			|| quote! { #jni::objects::JObject<#lifetime> },
 			|path| quote! { #path<#lifetime> },
 		);
 		parameters.push(quote! { this: #ty });
 	}
 	for parameter in &input.signature.parameters {
-		let name = &parameter.name;
-		let ty = sig_type_to_rust_type_core(&parameter.ty, lifetime, &input.type_mappings, jni);
+		let name: &Ident = &parameter.name;
+		let ty: TokenStream = sig_type_to_rust_type_core(&parameter.ty, lifetime, &input.type_mappings, jni);
 		parameters.push(quote! { #name: #ty });
 	}
 	parameters

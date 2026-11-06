@@ -439,7 +439,7 @@ impl Drop for MonitorGuard<'_> {
 				// This also means we can assume the `IllegalMonitorStateException`
 				// exception can't be thrown due to the current thread not owning
 				// the monitor.
-				let res = unsafe { ex_safe_jni_call_no_post_check_ex!(env, v1_1, MonitorExit, self.obj) };
+				let res: i32 = unsafe { ex_safe_jni_call_no_post_check_ex!(env, v1_1, MonitorExit, self.obj) };
 				if let Err(err) = jni_error_code_to_result(res) {
 					log::error!("error releasing java monitor: {err}");
 				}

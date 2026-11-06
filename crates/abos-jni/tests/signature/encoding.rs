@@ -1,17 +1,18 @@
 use super::*;
+use abos_jni::strings::JNIStr;
 
 #[test]
 fn test_mutf8_encoding_basic_ascii() {
 	use abos_jni_macros::{jni_sig_cstr, jni_sig_jstr};
 
 	// Basic ASCII should be the same in MUTF-8
-	let sig = jni_sig!((a: java.lang.String) -> void);
+	let sig: abos_jni::signature::MethodSignature<'_, '_> = jni_sig!((a: java.lang.String) -> void);
 	assert_eq!(sig.sig().to_bytes(), b"(Ljava/lang/String;)V");
 
 	let cstr_sig = jni_sig_cstr!((a: java.lang.String) -> void);
 	assert_eq!(cstr_sig.to_bytes(), b"(Ljava/lang/String;)V");
 
-	let jstr_sig = jni_sig_jstr!((a: java.lang.String) -> void);
+	let jstr_sig: &JNIStr = jni_sig_jstr!((a: java.lang.String) -> void);
 	assert_eq!(jstr_sig.to_bytes(), b"(Ljava/lang/String;)V");
 }
 
@@ -23,14 +24,14 @@ fn test_mutf8_encoding_unicode_emoji() {
 	// The emoji 😀 (U+1F600) in MUTF-8 is encoded as surrogate pairs:
 	// U+1F600 -> UTF-16 surrogate pair: D83D DE00
 	// In MUTF-8: ED A0 BD ED B8 80
-	let sig = jni_sig!((a: "unicode.Type😀") -> bool);
+	let sig: abos_jni::signature::MethodSignature<'_, '_> = jni_sig!((a: "unicode.Type😀") -> bool);
 	let expected = b"(Lunicode/Type\xed\xa0\xbd\xed\xb8\x80;)Z";
 	assert_eq!(sig.sig().to_bytes(), expected);
 
 	let cstr_sig = jni_sig_cstr!((a: "unicode.Type😀") -> bool);
 	assert_eq!(cstr_sig.to_bytes(), expected);
 
-	let jstr_sig = jni_sig_jstr!((a: "unicode.Type😀") -> bool);
+	let jstr_sig: &JNIStr = jni_sig_jstr!((a: "unicode.Type😀") -> bool);
 	assert_eq!(jstr_sig.to_bytes(), expected);
 }
 
@@ -39,14 +40,14 @@ fn test_mutf8_encoding_unicode_field() {
 	use abos_jni_macros::{jni_sig_cstr, jni_sig_jstr};
 
 	// Test Unicode emoji in field signature
-	let sig = jni_sig!("unicode.Field😀");
+	let sig: abos_jni::signature::FieldSignature<'_> = jni_sig!("unicode.Field😀");
 	let expected = b"Lunicode/Field\xed\xa0\xbd\xed\xb8\x80;";
 	assert_eq!(sig.sig().to_bytes(), expected);
 
 	let cstr_sig = jni_sig_cstr!("unicode.Field😀");
 	assert_eq!(cstr_sig.to_bytes(), expected);
 
-	let jstr_sig = jni_sig_jstr!("unicode.Field😀");
+	let jstr_sig: &JNIStr = jni_sig_jstr!("unicode.Field😀");
 	assert_eq!(jstr_sig.to_bytes(), expected);
 }
 
@@ -79,9 +80,10 @@ fn test_all_three_macros_produce_same_encoding() {
 	use abos_jni_macros::{jni_sig_cstr, jni_sig_jstr};
 
 	// All three macros should produce the same byte sequence for the signature
-	let sig = jni_sig!((a: jint, b: java.lang.String) -> java.lang.Object);
+	let sig: abos_jni::signature::MethodSignature<'_, '_> =
+		jni_sig!((a: jint, b: java.lang.String) -> java.lang.Object);
 	let cstr_sig = jni_sig_cstr!((a: jint, b: java.lang.String) -> java.lang.Object);
-	let jstr_sig = jni_sig_jstr!((a: jint, b: java.lang.String) -> java.lang.Object);
+	let jstr_sig: &JNIStr = jni_sig_jstr!((a: jint, b: java.lang.String) -> java.lang.Object);
 
 	assert_eq!(sig.sig().to_bytes(), cstr_sig.to_bytes());
 	assert_eq!(sig.sig().to_bytes(), jstr_sig.to_bytes());
@@ -258,13 +260,13 @@ fn test_field_signatures_all_variants() {
 	use abos_jni_macros::{jni_sig_cstr, jni_sig_jstr, jni_sig_str};
 
 	// Test that field signatures work with all macro variants
-	let field_sig = jni_sig!(java.util.List);
+	let field_sig: abos_jni::signature::FieldSignature<'_> = jni_sig!(java.util.List);
 	assert_eq!(field_sig.sig().to_bytes(), b"Ljava/util/List;");
 
 	let cstr_field = jni_sig_cstr!(java.util.List);
 	assert_eq!(cstr_field.to_bytes(), b"Ljava/util/List;");
 
-	let jstr_field = jni_sig_jstr!(java.util.List);
+	let jstr_field: &JNIStr = jni_sig_jstr!(java.util.List);
 	assert_eq!(jstr_field.to_bytes(), b"Ljava/util/List;");
 
 	assert_eq!(STR_FIELD, "Ljava/util/List;");
@@ -277,13 +279,13 @@ fn test_raw_signature_all_variants() {
 	use abos_jni_macros::{jni_sig_cstr, jni_sig_jstr, jni_sig_str};
 
 	// Test raw signatures with all macro variants
-	let sig = jni_sig!("(ILjava/lang/String;)V");
+	let sig: abos_jni::signature::MethodSignature<'_, '_> = jni_sig!("(ILjava/lang/String;)V");
 	assert_eq!(sig.sig().to_bytes(), b"(ILjava/lang/String;)V");
 
 	let cstr_sig = jni_sig_cstr!("(ILjava/lang/String;)V");
 	assert_eq!(cstr_sig.to_bytes(), b"(ILjava/lang/String;)V");
 
-	let jstr_sig = jni_sig_jstr!("(ILjava/lang/String;)V");
+	let jstr_sig: &JNIStr = jni_sig_jstr!("(ILjava/lang/String;)V");
 	assert_eq!(jstr_sig.to_bytes(), b"(ILjava/lang/String;)V");
 
 	assert_eq!(STR_SIG, "(ILjava/lang/String;)V");

@@ -21,9 +21,9 @@ impl<'local> Env<'local> {
 		// returned monitor is associated with the current thread and is not a
 		// local reference.
 
-		let inner = obj.as_ref().as_raw();
+		let inner: crate::sys::jobject = obj.as_ref().as_raw();
 		// SAFETY: The object reference is non-null and live; MonitorGuard will release the acquired monitor.
-		let res = unsafe { jni_call_no_post_check_ex!(self, v1_1, MonitorEnter, inner)? };
+		let res: i32 = unsafe { jni_call_no_post_check_ex!(self, v1_1, MonitorEnter, inner)? };
 		jni_error_code_to_result(res)?;
 
 		Ok(MonitorGuard {
@@ -59,7 +59,7 @@ impl<'local> Env<'local> {
 		// - jni-rs required JNI_VERSION > 1.2
 		// - we have ensured capacity is >= 0
 		// - EnsureLocalCapacity has no documented exceptions that it throws
-		let res = unsafe { jni_call_no_post_check_ex!(self, v1_2, EnsureLocalCapacity, capacity)? };
+		let res: i32 = unsafe { jni_call_no_post_check_ex!(self, v1_2, EnsureLocalCapacity, capacity)? };
 		jni_error_code_to_result(res)?;
 		Ok(())
 	}
@@ -103,17 +103,17 @@ impl<'local> Env<'local> {
 	where
 		T: Desc<'local, JClass<'other_local>>,
 	{
-		let class = class.lookup(self)?;
+		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 		// Safety:
 		//  - NativeMethod is a #[transparent] / repr(C)] wrapper around sys::JNINativeMethod
 		//  - NativeMethod only has an `unsafe` constructor that requires the caller to ensure that
 		//    the function pointer is valid and matches the signature
-		let res = unsafe {
+		let res: i32 = unsafe {
 			jni_call_with_catch!(
 				catch |env| {
 					e: crate::exceptions::JNoSuchMethodError => {
-						let msg = e.as_throwable().get_message(env).ok();
-						let msg = msg.map_or_else(String::new, |msg| msg.to_string());
+						let msg: Option<crate::objects::JString<'_>> = e.as_throwable().get_message(env).ok();
+						let msg: String = msg.map_or_else(String::new, |msg| msg.to_string());
 						Err(Error::NoSuchMethod(msg))
 					},
 					else => Err(Error::JniCall(JniError::Unknown)),
@@ -142,9 +142,9 @@ impl<'local> Env<'local> {
 	where
 		T: Desc<'local, JClass<'other_local>>,
 	{
-		let class = class.lookup(self)?;
+		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 		// SAFETY: The class descriptor remains live during UnregisterNatives.
-		let res = unsafe { jni_call_post_check_ex!(self, v1_1, UnregisterNatives, class.as_ref().as_raw())? };
+		let res: i32 = unsafe { jni_call_post_check_ex!(self, v1_1, UnregisterNatives, class.as_ref().as_raw())? };
 
 		// Ensure that `class` isn't dropped before the JNI call returns.
 		drop(class);

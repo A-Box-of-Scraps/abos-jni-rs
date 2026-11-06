@@ -410,12 +410,12 @@ fn test_cfg_guarded_methods() {
 
 // Helper function to load the TestMethods class
 fn load_test_methods_class(env: &mut Env, out_dir: &Path) -> abos_jni::errors::Result<()> {
-	let class_path = out_dir.join("com/example/TestMethods.class");
+	let class_path: PathBuf = out_dir.join("com/example/TestMethods.class");
 	assert!(class_path.exists(), "TestMethods.class not found");
 
-	let class_bytes = fs::read(&class_path).expect("Failed to read TestMethods.class");
+	let class_bytes: Vec<u8> = fs::read(&class_path).expect("Failed to read TestMethods.class");
 
-	let class_loader =
+	let class_loader: abos_jni::objects::JClassLoader<'_> =
 		abos_jni::objects::JClassLoader::get_system_class_loader(env).expect("Failed to get system class loader");
 
 	env.define_class(Some(jni_str!("com/example/TestMethods")), &class_loader, &class_bytes)?;
@@ -425,7 +425,7 @@ fn load_test_methods_class(env: &mut Env, out_dir: &Path) -> abos_jni::errors::R
 
 // Helper function to set up test output directory
 fn setup_test_output(test_name: &str) -> PathBuf {
-	let out_dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+	let out_dir: PathBuf = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
 		.join("jni_macros_tests")
 		.join(test_name);
 

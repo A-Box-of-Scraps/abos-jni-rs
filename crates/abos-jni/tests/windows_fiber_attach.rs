@@ -18,7 +18,7 @@
 mod util;
 
 use abos_jni::{JavaVM, errors::Result};
-use std::ptr;
+use std::{ptr, sync::Arc};
 use util::jvm;
 use windows_sys::Win32::System::Threading::ConvertThreadToFiber;
 use windows_sys::Win32::System::Threading::{CreateFiber, DeleteFiber, SwitchToFiber};
@@ -38,12 +38,12 @@ static mut MAIN_FIBER: *mut std::ffi::c_void = ptr::null_mut();
 // Fiber callbacks - each attaches to JVM using FLS attachment (which persists)
 unsafe extern "system" fn fiber1_proc(param: *mut std::ffi::c_void) {
 	// SAFETY: CreateFiber receives a pointer to the shared JVM Arc, which outlives every fiber.
-	let jvm = unsafe { &*(param.cast::<std::sync::Arc<JavaVM>>()) };
+	let jvm: &Arc<JavaVM> = unsafe { &*(param.cast::<Arc<JavaVM>>()) };
 	eprintln!("Running fiber 1, part 1");
 
 	// FLS attachment - stays attached after callback returns
 	jvm.attach_current_thread(|env| -> Result<()> {
-		let _string = env.new_string("Fiber 1")?;
+		let _string: abos_jni::objects::JString<'_> = env.new_string("Fiber 1")?;
 		// SAFETY: Only this test thread accesses the flags, with cooperative fiber switching.
 		unsafe {
 			FIBER1_EXECUTED = true;
@@ -76,7 +76,7 @@ unsafe extern "system" fn fiber1_proc(param: *mut std::ffi::c_void) {
 
 	// Re-attach the thread/fiber again (without incrementing the attached count) - stays attached after callback returns
 	jvm.attach_current_thread(|env| -> Result<()> {
-		let _string = env.new_string("Fiber 1, part 2")?;
+		let _string: abos_jni::objects::JString<'_> = env.new_string("Fiber 1, part 2")?;
 		// SAFETY: Only this test thread accesses the flags, with cooperative fiber switching.
 		unsafe {
 			FIBER1_PART2_EXECUTED = true;
@@ -96,7 +96,7 @@ unsafe extern "system" fn fiber1_proc(param: *mut std::ffi::c_void) {
 
 unsafe extern "system" fn fiber2_proc(param: *mut std::ffi::c_void) {
 	// SAFETY: CreateFiber receives a pointer to the shared JVM Arc, which outlives every fiber.
-	let jvm = unsafe { &*(param.cast::<std::sync::Arc<JavaVM>>()) };
+	let jvm: &Arc<JavaVM> = unsafe { &*(param.cast::<Arc<JavaVM>>()) };
 	eprintln!("Running fiber 2");
 
 	// Ensure the thread is detached before running this fiber
@@ -104,7 +104,7 @@ unsafe extern "system" fn fiber2_proc(param: *mut std::ffi::c_void) {
 
 	// New FLS attachment (due to manual detach) - stays attached after callback returns
 	jvm.attach_current_thread(|env| -> Result<()> {
-		let _string = env.new_string("Fiber 2")?;
+		let _string: abos_jni::objects::JString<'_> = env.new_string("Fiber 2")?;
 		// SAFETY: Only this test thread accesses the flags, with cooperative fiber switching.
 		unsafe {
 			FIBER2_EXECUTED = true;
@@ -143,7 +143,7 @@ unsafe extern "system" fn fiber2_proc(param: *mut std::ffi::c_void) {
 
 unsafe extern "system" fn fiber3_proc(param: *mut std::ffi::c_void) {
 	// SAFETY: CreateFiber receives a pointer to the shared JVM Arc, which outlives every fiber.
-	let jvm = unsafe { &*(param.cast::<std::sync::Arc<JavaVM>>()) };
+	let jvm: &Arc<JavaVM> = unsafe { &*(param.cast::<Arc<JavaVM>>()) };
 	eprintln!("Running fiber 3");
 
 	// Ensure the thread is detached before running this fiber
@@ -151,7 +151,7 @@ unsafe extern "system" fn fiber3_proc(param: *mut std::ffi::c_void) {
 
 	// New FLS attachment (due to detach_current_thread()) - stays attached after callback returns
 	jvm.attach_current_thread(|env| -> Result<()> {
-		let _string = env.new_string("Fiber 3")?;
+		let _string: abos_jni::objects::JString<'_> = env.new_string("Fiber 3")?;
 		// SAFETY: Only this test thread accesses the flags, with cooperative fiber switching.
 		unsafe {
 			FIBER3_EXECUTED = true;
@@ -175,12 +175,12 @@ unsafe extern "system" fn fiber3_proc(param: *mut std::ffi::c_void) {
 
 unsafe extern "system" fn fiber4_proc(param: *mut std::ffi::c_void) {
 	// SAFETY: CreateFiber receives a pointer to the shared JVM Arc, which outlives every fiber.
-	let jvm = unsafe { &*(param.cast::<std::sync::Arc<JavaVM>>()) };
+	let jvm: &Arc<JavaVM> = unsafe { &*(param.cast::<Arc<JavaVM>>()) };
 	eprintln!("Running fiber 4");
 
 	// Use pre-existing attachment - stays attached after callback returns
 	jvm.attach_current_thread(|env| -> Result<()> {
-		let _string = env.new_string("Fiber 4")?;
+		let _string: abos_jni::objects::JString<'_> = env.new_string("Fiber 4")?;
 		// SAFETY: Only this test thread accesses the flags, with cooperative fiber switching.
 		unsafe {
 			FIBER4_EXECUTED = true;

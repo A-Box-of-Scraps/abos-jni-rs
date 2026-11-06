@@ -18,8 +18,8 @@ use syn::spanned::Spanned;
 /// Deals exclusively with `proc_macro2::TokenStream` instead of `proc_macro::TokenStream`,
 /// allowing it and all interior functionality to be unit tested.
 pub fn jni_mangle2(attr: TokenStream, item: TokenStream) -> TokenStream {
-	let attr_span = attr.span();
-	let item_span = item.span();
+	let attr_span: proc_macro2::Span = attr.span();
+	let item_span: proc_macro2::Span = item.span();
 
 	let mut function: syn::ItemFn = match syn::parse2(item) {
 		Ok(f) => f,
@@ -53,7 +53,7 @@ pub fn jni_mangle2(attr: TokenStream, item: TokenStream) -> TokenStream {
 		.to_compile_error();
 	}
 
-	let namespace = args[0].value();
+	let namespace: String = args[0].value();
 
 	if !valid_namespace(&namespace) {
 		return syn::Error::new(
@@ -63,7 +63,7 @@ pub fn jni_mangle2(attr: TokenStream, item: TokenStream) -> TokenStream {
 		.to_compile_error();
 	}
 
-	let orig_fn_name = function.sig.ident.to_string();
+	let orig_fn_name: String = function.sig.ident.to_string();
 
 	// Parse optional method name and signature
 	let (method_name, signature) = match args.len() {
@@ -73,7 +73,7 @@ pub fn jni_mangle2(attr: TokenStream, item: TokenStream) -> TokenStream {
 		}
 		2 => {
 			// Namespace + either method name or signature
-			let second_arg = args[1].value();
+			let second_arg: String = args[1].value();
 			if second_arg.contains('(') {
 				// It's a signature - derive method name from Rust function name
 				(snake_case_to_lower_camel_case(&orig_fn_name), Some(second_arg))
@@ -89,7 +89,7 @@ pub fn jni_mangle2(attr: TokenStream, item: TokenStream) -> TokenStream {
 		_ => unreachable!(),
 	};
 
-	let mangled_jni_name = create_jni_fn_name(&namespace, &method_name, signature.as_deref());
+	let mangled_jni_name: String = create_jni_fn_name(&namespace, &method_name, signature.as_deref());
 
 	// Specify the name of the exported function symbol
 	//
@@ -139,7 +139,7 @@ fn set_system_abi(function: &mut syn::ItemFn) -> syn::Result<()> {
 		}
 		return Ok(());
 	}
-	let extern_token = function
+	let extern_token: syn::token::Extern = function
 		.sig
 		.abi
 		.as_ref()
@@ -243,10 +243,10 @@ pub fn snake_case_to_lower_camel_case(s: &str) -> String {
 	}
 
 	// Find leading underscores
-	let leading_underscores = s.chars().take_while(|&c| c == '_').count();
+	let leading_underscores: usize = s.chars().take_while(|&c| c == '_').count();
 
 	// Find trailing underscores
-	let trailing_underscores = s.chars().rev().take_while(|&c| c == '_').count();
+	let trailing_underscores: usize = s.chars().rev().take_while(|&c| c == '_').count();
 
 	// If the entire string is underscores, return as-is
 	if leading_underscores + trailing_underscores >= s.len() {
@@ -254,7 +254,7 @@ pub fn snake_case_to_lower_camel_case(s: &str) -> String {
 	}
 
 	// Extract the middle part (without leading/trailing underscores)
-	let middle = &s[leading_underscores..s.len() - trailing_underscores];
+	let middle: &str = &s[leading_underscores..s.len() - trailing_underscores];
 
 	// Convert the middle part
 	let mut result = String::new();
@@ -279,13 +279,13 @@ pub fn snake_case_to_lower_camel_case(s: &str) -> String {
 
 	// Reconstruct with leading and trailing underscores
 	// Remove one leading underscore (if any exist)
-	let adjusted_leading_underscores = if leading_underscores > 0 {
+	let adjusted_leading_underscores: usize = if leading_underscores > 0 {
 		leading_underscores - 1
 	} else {
 		0
 	};
 
-	let mut final_result = String::with_capacity(s.len());
+	let mut final_result: String = String::with_capacity(s.len());
 	for _ in 0..adjusted_leading_underscores {
 		final_result.push('_');
 	}
@@ -346,17 +346,17 @@ pub fn create_jni_fn_name(namespace: &str, fn_name: &str, signature: Option<&str
 		result
 	}
 
-	let namespace_underscored = mangle_identifier(namespace);
-	let fn_name_underscored = mangle_identifier(fn_name);
+	let namespace_underscored: String = mangle_identifier(namespace);
+	let fn_name_underscored: String = mangle_identifier(fn_name);
 
-	let mut result = format!("Java_{namespace_underscored}_{fn_name_underscored}");
+	let mut result: String = format!("Java_{namespace_underscored}_{fn_name_underscored}");
 
 	if let Some(sig) = signature {
 		// Extract only the argument types (between parentheses), ignoring return type
 		if let Some(start) = sig.find('(')
 			&& let Some(end) = sig.find(')')
 		{
-			let args = &sig[start + 1..end];
+			let args: &str = &sig[start + 1..end];
 			// Always add __ when signature is provided (indicates overloaded method)
 			result.push_str("__");
 			if !args.is_empty() {

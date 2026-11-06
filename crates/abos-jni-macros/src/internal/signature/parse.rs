@@ -13,7 +13,7 @@ impl Parse for SignatureInput {
 
 		let mut signature: Option<Signature> = None;
 
-		let jni_path = crate::internal::utils::parse_jni_crate_override(input)?;
+		let jni_path: syn::Path = crate::internal::utils::parse_jni_crate_override(input)?;
 
 		// Initialize TypeMappings unconditionally now that we have jni_crate
 		let mut type_mappings = TypeMappings::new(&jni_path);
@@ -28,7 +28,7 @@ impl Parse for SignatureInput {
 		}
 
 		// Signature is required
-		let signature = signature.ok_or_else(|| {
+		let signature: Signature = signature.ok_or_else(|| {
 			syn::Error::new(
 				Span::call_site(),
 				"signature is required (either as unnamed argument or with 'sig =')",
@@ -48,8 +48,8 @@ fn parse_input_entry(
 	type_mappings: &mut TypeMappings,
 ) -> Result<()> {
 	// Check if this looks like a named property ('<ident> = <value>' or '<ident> { ... }')
-	let is_named_property = {
-		let fork = input.fork();
+	let is_named_property: bool = {
+		let fork: syn::parse::ParseBuffer<'_> = input.fork();
 		if fork.peek(Ident) {
 			fork.parse::<Ident>()
 				.is_ok_and(|_ident| fork.peek(Token![=]) || fork.peek(syn::token::Brace))
@@ -60,8 +60,8 @@ fn parse_input_entry(
 
 	if is_named_property {
 		// Parse named property
-		let prop_name = input.parse::<Ident>()?;
-		let prop_str = prop_name.to_string();
+		let prop_name: Ident = input.parse::<Ident>()?;
+		let prop_str: String = prop_name.to_string();
 
 		match prop_str.as_str() {
 			"jni" => {
@@ -113,17 +113,17 @@ pub(super) fn parse_signature(input: ParseStream, type_mappings: &TypeMappings) 
 	if input.peek(syn::LitStr) || input.peek(syn::LitCStr) {
 		// Parse the string literal
 		let raw_sig: String = if input.peek(syn::LitCStr) {
-			let lit = input.parse::<syn::LitCStr>()?;
-			let cstr = lit.value();
+			let lit: syn::LitCStr = input.parse::<syn::LitCStr>()?;
+			let cstr: std::ffi::CString = lit.value();
 			cstr.to_str()
 				.map_err(|e| syn::Error::new(lit.span(), format!("CStr literal must contain valid UTF-8: {e}")))?
 				.to_string()
 		} else {
-			let lit = input.parse::<syn::LitStr>()?;
+			let lit: syn::LitStr = input.parse::<syn::LitStr>()?;
 			lit.value()
 		};
 
-		let is_raw_jni_sig = !raw_sig.contains('.');
+		let is_raw_jni_sig: bool = !raw_sig.contains('.');
 
 		if is_raw_jni_sig {
 			// Parse as raw JNI signature
@@ -139,7 +139,7 @@ pub(super) fn parse_signature(input: ParseStream, type_mappings: &TypeMappings) 
 				));
 			}
 
-			let class = parts
+			let class: String = parts
 				.last()
 				.expect("splitting a class name yields at least one component")
 				.to_string();
@@ -158,7 +158,7 @@ pub(super) fn parse_signature(input: ParseStream, type_mappings: &TypeMappings) 
 		let args_content;
 		parenthesized!(args_content in input);
 
-		let mut parameters = Vec::new();
+		let mut parameters: Vec<Parameter> = Vec::new();
 
 		while !args_content.is_empty() {
 			parameters.push(parse_parameter_with_index(
@@ -171,7 +171,7 @@ pub(super) fn parse_signature(input: ParseStream, type_mappings: &TypeMappings) 
 			}
 		}
 
-		let return_type = if input.peek(Token![->]) {
+		let return_type: SigType = if input.peek(Token![->]) {
 			input.parse::<Token![->]>()?;
 
 			parse_type(input, type_mappings)?
@@ -186,7 +186,7 @@ pub(super) fn parse_signature(input: ParseStream, type_mappings: &TypeMappings) 
 		}))
 	} else {
 		// Field signature: just a type
-		let field_type = parse_type(input, type_mappings)?;
+		let field_type: SigType = parse_type(input, type_mappings)?;
 		Ok(Signature::Field(FieldSignature { field_type }))
 	}
 }
@@ -212,7 +212,7 @@ pub(super) fn parse_raw_jni_method_signature(sig: &str) -> Result<Signature> {
 	}
 
 	// Find the closing ')'
-	let close_paren = sig.find(')').ok_or_else(|| {
+	let close_paren: usize = sig.find(')').ok_or_else(|| {
 		syn::Error::new(
 			Span::call_site(),
 			format!("Method signature missing closing ')': '{sig}'"),
@@ -220,10 +220,10 @@ pub(super) fn parse_raw_jni_method_signature(sig: &str) -> Result<Signature> {
 	})?;
 
 	// Parse arguments
-	let args_str = &sig[1..close_paren];
-	let mut args = Vec::new();
+	let args_str: &str = &sig[1..close_paren];
+	let mut args: Vec<SigType> = Vec::new();
 	let mut i = 0;
-	let args_bytes = args_str.as_bytes();
+	let args_bytes: &[u8] = args_str.as_bytes();
 
 	while i < args_bytes.len() {
 		let (java_type, consumed) = parse_raw_jni_type(&args_str[i..])?;
@@ -232,7 +232,7 @@ pub(super) fn parse_raw_jni_method_signature(sig: &str) -> Result<Signature> {
 	}
 
 	// Parse return type
-	let ret_str = &sig[close_paren + 1..];
+	let ret_str: &str = &sig[close_paren + 1..];
 	if ret_str.is_empty() {
 		return Err(syn::Error::new(
 			Span::call_site(),
@@ -249,7 +249,7 @@ pub(super) fn parse_raw_jni_method_signature(sig: &str) -> Result<Signature> {
 	}
 
 	// Create dummy parameters with generated names
-	let parameters = args
+	let parameters: Vec<Parameter> = args
 		.into_iter()
 		.enumerate()
 		.map(|(i, ty)| Parameter {
@@ -288,7 +288,7 @@ pub(super) fn parse_raw_jni_field_signature(sig: &str) -> Result<Signature> {
 /// Parse a single JNI type descriptor from a string
 /// Returns the `JavaType` and the number of bytes consumed
 pub(super) fn parse_raw_jni_type(s: &str) -> Result<(SigType, usize)> {
-	let bytes = s.as_bytes();
+	let bytes: &[u8] = s.as_bytes();
 	if bytes.is_empty() {
 		return Err(syn::Error::new(
 			Span::call_site(),
@@ -322,11 +322,11 @@ pub(super) fn parse_raw_jni_type(s: &str) -> Result<(SigType, usize)> {
 		}
 		'L' => {
 			// Object type - find the semicolon
-			let end = s
+			let end: usize = s
 				.find(';')
 				.ok_or_else(|| syn::Error::new(Span::call_site(), format!("Object type missing closing ';': '{s}'")))?;
 
-			let class_name = &s[1..end];
+			let class_name: &str = &s[1..end];
 
 			// Validate class name - should not be empty and should not start/end with '/'
 			if class_name.is_empty() {
@@ -361,7 +361,7 @@ pub(super) fn parse_raw_jni_type(s: &str) -> Result<(SigType, usize)> {
 			let parts: Vec<&str> = class_name.split('/').collect();
 
 			// The last part is the class name (may contain '$' for inner classes)
-			let class = parts
+			let class: String = parts
 				.last()
 				.expect("splitting a class name yields at least one component")
 				.to_string();

@@ -98,7 +98,7 @@ pub struct AttachGuard<'local> {
 /// Increments the thread guard level, returning the new level.
 fn thread_guard_level_push(env: *mut abos_jni_sys::JNIEnv) -> usize {
 	THREAD_GUARD_NEST_LEVEL.with(|cell| {
-		let level = cell.get();
+		let level: usize = cell.get();
 		if level == 0 {
 			THREAD_ATTACHMENT.set(env);
 		}
@@ -109,8 +109,8 @@ fn thread_guard_level_push(env: *mut abos_jni_sys::JNIEnv) -> usize {
 
 /// Decrements the thread guard level, returning the new level.
 fn thread_guard_level_pop() -> usize {
-	let level = THREAD_GUARD_NEST_LEVEL.with(|cell| {
-		let level = cell.get();
+	let level: usize = THREAD_GUARD_NEST_LEVEL.with(|cell| {
+		let level: usize = cell.get();
 		assert_ne!(
 			level, 0,
 			"Spuriously dropped more AttachGuards than were known to exist"
@@ -145,16 +145,16 @@ impl<'local> AttachGuard<'local> {
 	/// guard must be treated as an immovable value on the stack and not be
 	/// re-ordered relative to other guards on the stack.
 	pub(super) unsafe fn from_owned(env: *mut sys::JNIEnv) -> Self {
-		let level = thread_guard_level_push(env);
+		let level: usize = thread_guard_level_push(env);
 
-		let guard = Self {
+		let guard: AttachGuard<'_> = Self {
 			// SAFETY: The caller supplies the current thread's valid JNI environment, and the newly pushed level tracks this guard.
 			env: unsafe { Env::new(env, level, true) },
 		};
 
 		// Guarantee that if you have an `AttachGuard` then
 		// `JavaVM::singleton()` will always return `Some(JavaVM)`
-		let _vm = guard.env.get_java_vm();
+		let _vm: std::result::Result<crate::JavaVM, crate::errors::Error> = guard.env.get_java_vm();
 
 		guard
 	}
@@ -182,15 +182,15 @@ impl<'local> AttachGuard<'local> {
 	/// guard must be treated as an immovable value on the stack and not be
 	/// re-ordered relative to other guards on the stack.
 	pub unsafe fn from_unowned(env: *mut sys::JNIEnv) -> Self {
-		let level = thread_guard_level_push(env);
-		let guard = Self {
+		let level: usize = thread_guard_level_push(env);
+		let guard: AttachGuard<'_> = Self {
 			// SAFETY: The caller supplies the current thread's valid JNI environment, and the newly pushed level tracks this guard.
 			env: unsafe { Env::new(env, level, false) },
 		};
 
 		// Guarantee that if you have an `AttachGuard` then
 		// `JavaVM::singleton()` will always return `Some(JavaVM)`
-		let _vm = guard.env.get_java_vm();
+		let _vm: std::result::Result<crate::JavaVM, crate::errors::Error> = guard.env.get_java_vm();
 
 		guard
 	}
@@ -230,9 +230,9 @@ impl<'local> AttachGuard<'local> {
 	/// Even though this only takes a reference, the implementation assumes that
 	/// the guard is going to be dropped.
 	unsafe fn detach_impl(&mut self, catch_exceptions: bool, throw: Option<JThrowable<'local>>) -> Result<()> {
-		let caught_exception = {
-			let env = self.borrow_env_mut();
-			let caught_exception = if catch_exceptions {
+		let caught_exception: std::result::Result<(), crate::errors::Error> = {
+			let env: &mut Env<'_> = self.borrow_env_mut();
+			let caught_exception: std::result::Result<(), crate::errors::Error> = if catch_exceptions {
 				// note: we don't want to return errors here immediately because it's more important
 				// that we do the book-keeping for the guard level and possibly detaching the thread
 				env.exception_catch()
@@ -246,14 +246,14 @@ impl<'local> AttachGuard<'local> {
 			caught_exception
 		};
 
-		let new_level = thread_guard_level_pop();
+		let new_level: usize = thread_guard_level_pop();
 		assert_eq!(
 			new_level + 1,
 			self.env.level,
 			"AttachGuard was dropped out-of-order with respect to other guards"
 		);
 
-		let detach_result = if self.owns_attachment() {
+		let detach_result: std::result::Result<(), crate::errors::Error> = if self.owns_attachment() {
 			assert_eq!(
 				new_level, 0,
 				"Spurious AttachGuard that owns its attachment but is nested under another guard"
@@ -288,7 +288,7 @@ impl<'local> AttachGuard<'local> {
 	pub fn detach(mut self) -> Result<()> {
 		// Safety: we're going to 'forget' the guard afterwards to ensure the
 		// `Drop` implementation isn't run too.
-		let res = unsafe { self.detach_impl(false, None) };
+		let res: std::result::Result<(), crate::errors::Error> = unsafe { self.detach_impl(false, None) };
 
 		// We've effectively dropped the guard manually (so we can also get a `Result`)
 		// but that means we shouldn't allow the `Drop` implementation to run too.
@@ -318,7 +318,7 @@ impl<'local> AttachGuard<'local> {
 	pub fn detach_with_catch(mut self) -> Result<()> {
 		// Safety: we're going to 'forget' the guard afterwards to ensure the
 		// `Drop` implementation isn't run too.
-		let res = unsafe { self.detach_impl(true, None) };
+		let res: std::result::Result<(), crate::errors::Error> = unsafe { self.detach_impl(true, None) };
 
 		// We've effectively dropped the guard manually (so we can also get a `Result`)
 		// but that means we shouldn't allow the `Drop` implementation to run too.
@@ -350,7 +350,7 @@ impl<'local> AttachGuard<'local> {
 	pub fn detach_with_catch_and_throw(mut self, throwable: Option<JThrowable<'local>>) -> Result<()> {
 		// Safety: we're going to 'forget' the guard afterwards to ensure the
 		// `Drop` implementation isn't run too.
-		let res = unsafe { self.detach_impl(true, throwable) };
+		let res: std::result::Result<(), crate::errors::Error> = unsafe { self.detach_impl(true, throwable) };
 
 		// We've effectively dropped the guard manually (so we can also get a `Result`)
 		// but that means we shouldn't allow the `Drop` implementation to run too.

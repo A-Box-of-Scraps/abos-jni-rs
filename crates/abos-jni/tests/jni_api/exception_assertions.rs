@@ -14,7 +14,7 @@ pub fn assert_pending_java_exception_detailed(
 	expected_message: Option<&JNIStr>,
 ) {
 	assert!(env.exception_check());
-	let exception = env.exception_occurred().expect("Unable to get exception");
+	let exception: JThrowable<'_> = env.exception_occurred().expect("Unable to get exception");
 	env.exception_clear();
 
 	if let Some(expected_type) = expected_type {
@@ -36,7 +36,7 @@ pub fn assert_exception_type(env: &mut Env, exception: &JThrowable, expected_typ
 
 // Asserts that exception's message is `expected_message`.
 pub fn assert_exception_message(env: &mut Env, exception: &JThrowable, expected_message: &JNIStr) {
-	let message = exception.get_message(env).expect("get message succeeds");
+	let message: abos_jni::objects::JString<'_> = exception.get_message(env).expect("get message succeeds");
 	let msg_rust: JNIString = message
 		.mutf8_chars(env)
 		.expect("modified UTF-8 characters are accessible")

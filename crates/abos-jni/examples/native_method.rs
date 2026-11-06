@@ -28,7 +28,7 @@ struct RustThing {
 struct ThingHandle(*const RustThing);
 impl ThingHandle {
 	pub fn new(thing: RustThing) -> Self {
-		let boxed = Box::new(thing);
+		let boxed: Box<RustThing> = Box::new(thing);
 		Self(Box::into_raw(boxed))
 	}
 
@@ -137,8 +137,8 @@ fn native_concatenate<'local>(
 	a: JString<'local>,
 	b: JString<'local>,
 ) -> Result<JString<'local>, abos_jni::errors::Error> {
-	let a_str = a.try_to_string(env)?;
-	let b_str = b.try_to_string(env)?;
+	let a_str: String = a.try_to_string(env)?;
+	let b_str: String = b.try_to_string(env)?;
 	JString::from_str(env, format!("{a_str}{b_str}"))
 }
 
@@ -148,8 +148,8 @@ fn native_process_handle<'local>(
 	handle: ThingHandle,
 ) -> Result<JString<'local>, abos_jni::errors::Error> {
 	// SAFETY: The example Java caller returns the handle allocated by Rust without freeing or changing it.
-	let thing_ref = unsafe { handle.as_ref() };
-	let response = format!("RustThing says: {}", thing_ref.message);
+	let thing_ref: &RustThing = unsafe { handle.as_ref() };
+	let response: String = format!("RustThing says: {}", thing_ref.message);
 	JString::from_str(env, response)
 }
 
@@ -202,7 +202,7 @@ fn native_greet<'local>(
 	_class: JClass<'local>,
 	name: JString<'local>,
 ) -> Result<JString<'local>, abos_jni::errors::Error> {
-	let name_str = name.try_to_string(env)?;
+	let name_str: String = name.try_to_string(env)?;
 	JString::from_str(env, format!("Hello, {name_str}!"))
 }
 
@@ -226,7 +226,7 @@ fn main() {
 
 		// Register native methods
 		println!("--- Registering Native Methods ---");
-		let class = env.find_class(jni_str!("com/example/NativeMethodOverview"))?;
+		let class: JClass<'_> = env.find_class(jni_str!("com/example/NativeMethodOverview"))?;
 		// SAFETY: The fixture class declares the names and JNI signatures supplied by these native-method descriptors.
 		unsafe {
 			env.register_native_methods(&class, NATIVE_METHODS)?;
@@ -235,18 +235,19 @@ fn main() {
 
 		// Create an instance
 		println!("\n--- Creating Instance ---");
-		let obj = env.new_object(&class, &jni_sig!(()->void), &[])?;
+		let obj: JObject<'_> = env.new_object(&class, &jni_sig!(()->void), &[])?;
 		println!("Created NativeMethodOverview instance");
 
 		// Call the test method that exercises all native methods
 		println!("\n--- Testing Native Methods ---");
-		let test_method = env.get_method_id(&class, jni_str!("testAllNativeMethods"), &jni_sig!(()->JString))?;
+		let test_method: abos_jni::ids::JMethodID =
+			env.get_method_id(&class, jni_str!("testAllNativeMethods"), &jni_sig!(()->JString))?;
 		// SAFETY: testAllNativeMethods has the looked-up no-argument signature returning String.
-		let result = unsafe {
+		let result: JObject<'_> = unsafe {
 			env.call_method_unchecked(&obj, test_method, abos_jni::signature::ReturnType::Object, &[])?
 				.l()?
 		};
-		let result = env.cast_local::<JString>(result)?;
+		let result: JString<'_> = env.cast_local::<JString>(result)?;
 		println!("Test results: {}", result.try_to_string(env)?);
 
 		// Test the handle method separately
@@ -258,9 +259,10 @@ fn main() {
 
 		// Call native_process_handle via Java
 		let handle_value = abos_jni::sys::jvalue { j: handle.into() };
-		let handle_method = env.get_method_id(&class, jni_str!("nativeProcessHandle"), &jni_sig!((jlong)->JString))?;
+		let handle_method: abos_jni::ids::JMethodID =
+			env.get_method_id(&class, jni_str!("nativeProcessHandle"), &jni_sig!((jlong)->JString))?;
 		// SAFETY: nativeProcessHandle takes the live native handle as a long and returns String.
-		let response = unsafe {
+		let response: JObject<'_> = unsafe {
 			env.call_method_unchecked(
 				&obj,
 				handle_method,
@@ -269,7 +271,7 @@ fn main() {
 			)?
 			.l()?
 		};
-		let response = env.cast_local::<JString>(response)?;
+		let response: JString<'_> = env.cast_local::<JString>(response)?;
 		println!("nativeProcessHandle response: {}", response.try_to_string(env)?);
 
 		// Safety: we are done with the handle, so convert back to Box to drop

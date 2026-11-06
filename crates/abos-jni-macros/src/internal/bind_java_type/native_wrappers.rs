@@ -20,10 +20,10 @@ pub(super) fn generate_native_wrappers(
 	default_error_policy: Option<&syn::Path>,
 	jni: &syn::Path,
 ) -> TokenStream {
-	let mut wrappers = Vec::new();
+	let mut wrappers: Vec<TokenStream> = Vec::new();
 
 	for method in native_methods {
-		let wrapper = generate_single_native_wrapper(
+		let wrapper: TokenStream = generate_single_native_wrapper(
 			type_name,
 			method,
 			trait_name,
@@ -58,13 +58,13 @@ pub(super) fn generate_single_native_wrapper(
 	default_error_policy: Option<&syn::Path>,
 	jni: &syn::Path,
 ) -> TokenStream {
-	let rust_name = &method.rust_name;
-	let wrapper_name = format_ident!("{}_native_method", rust_name);
+	let rust_name: &Ident = &method.rust_name;
+	let wrapper_name: Ident = format_ident!("{}_native_method", rust_name);
 
-	let lifetime = quote! { 'local };
+	let lifetime: TokenStream = quote! { 'local };
 
 	// Build parameter list for extern "system" fn
-	let mut params = Vec::new();
+	let mut params: Vec<TokenStream> = Vec::new();
 	params.push(quote! { mut unowned_env: #jni::EnvUnowned<#lifetime> });
 
 	if method.is_static {
@@ -76,16 +76,17 @@ pub(super) fn generate_single_native_wrapper(
 	// Add method parameters using parameter names from signature
 	// Use native trait arg type (without AsRef) to match the trait signature
 	for param in &method.signature.parameters {
-		let param_name = &param.name;
-		let rust_type = sig_type_to_rust_native_trait_arg_type(&param.ty, &lifetime, type_mappings, jni);
+		let param_name: &Ident = &param.name;
+		let rust_type: TokenStream = sig_type_to_rust_native_trait_arg_type(&param.ty, &lifetime, type_mappings, jni);
 		params.push(quote! { #param_name: #rust_type });
 	}
 
 	// Get return type
-	let return_type = sig_type_to_rust_return_type(&method.signature.return_type, &lifetime, type_mappings, jni);
+	let return_type: TokenStream =
+		sig_type_to_rust_return_type(&method.signature.return_type, &lifetime, type_mappings, jni);
 
-	let need_abi_check = method.abi_check.unwrap_or(default_abi_check);
-	let abi_check = generate_native_method_abi_check(
+	let need_abi_check: AbiCheck = method.abi_check.unwrap_or(default_abi_check);
+	let abi_check: TokenStream = generate_native_method_abi_check(
 		jni,
 		&method.java_name,
 		need_abi_check,
@@ -94,13 +95,13 @@ pub(super) fn generate_single_native_wrapper(
 		None, // type mappings are checked in the TypeAPI::get() method
 	);
 
-	let with_env_api = if method.catch_unwind.unwrap_or(default_native_methods_catch_unwind) {
+	let with_env_api: TokenStream = if method.catch_unwind.unwrap_or(default_native_methods_catch_unwind) {
 		quote! { with_env }
 	} else {
 		quote! { with_env_no_catch }
 	};
 
-	let wrapper_body = wrapper_body(
+	let wrapper_body: TokenStream = wrapper_body(
 		method,
 		api_name,
 		trait_name,
@@ -111,7 +112,7 @@ pub(super) fn generate_single_native_wrapper(
 	);
 
 	// Extract cfg attributes to apply to the wrapper function
-	let cfg_attrs = extract_cfg_attrs(&method.attrs);
+	let cfg_attrs: Vec<syn::Attribute> = extract_cfg_attrs(&method.attrs);
 
 	quote! {
 		#(#cfg_attrs)*
@@ -133,27 +134,27 @@ fn wrapper_body(
 	default_error_policy: Option<&syn::Path>,
 	jni: &syn::Path,
 ) -> TokenStream {
-	let rust_name = &method.rust_name;
-	let callable = method.native_fn.as_ref().map_or_else(
+	let rust_name: &Ident = &method.rust_name;
+	let callable: TokenStream = method.native_fn.as_ref().map_or_else(
 		|| quote! { <#api_name as #trait_name>::#rust_name },
 		|path| quote! { #path },
 	);
-	let environment = if method.is_raw {
+	let environment: TokenStream = if method.is_raw {
 		quote! { unowned_env }
 	} else {
 		quote! { env }
 	};
-	let receiver = if method.is_static {
+	let receiver: TokenStream = if method.is_static {
 		quote! { class }
 	} else {
 		quote! { this }
 	};
-	let parameters = method.signature.parameters.iter().map(|param| &param.name);
-	let call = quote! { #callable(#environment, #receiver, #(#parameters),*) };
+	let parameters: Vec<&Ident> = method.signature.parameters.iter().map(|param| &param.name).collect();
+	let call: TokenStream = quote! { #callable(#environment, #receiver, #(#parameters),*) };
 	if method.is_raw {
 		return quote! { #abi_check #call };
 	}
-	let error_policy = method.error_policy.as_ref().or(default_error_policy).map_or_else(
+	let error_policy: TokenStream = method.error_policy.as_ref().or(default_error_policy).map_or_else(
 		|| quote! { #jni::errors::ThrowRuntimeExAndDefault },
 		|policy| quote! { #policy },
 	);

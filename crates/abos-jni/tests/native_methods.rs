@@ -54,7 +54,8 @@ fn native_array_add_impl<'local>(
 ) -> Result<JPrimitiveArray<'local, jint>, abos_jni::errors::Error> {
 	// SAFETY: The fixture does not access these arrays concurrently, and element guards drop before returning to Java.
 	unsafe {
-		let mut elem = arr.get_elements(env, abos_jni::elements::ReleaseMode::CopyBack)?;
+		let mut elem: abos_jni::elements::AutoElements<'_, i32, &JPrimitiveArray<'_, i32>> =
+			arr.get_elements(env, abos_jni::elements::ReleaseMode::CopyBack)?;
 		for i in 0..elem.len() {
 			elem[i] += value;
 		}
@@ -71,8 +72,9 @@ fn native_2d_array_invert_impl<'local>(
 	// SAFETY: The fixture does not access these arrays concurrently, and element guards drop before returning to Java.
 	unsafe {
 		for i in 0..arr.len(env)? {
-			let row = arr.get_element(env, i)?.auto();
-			let mut row_elems = row.get_elements(env, abos_jni::elements::ReleaseMode::CopyBack)?;
+			let row: abos_jni::refs::Auto<'_, JPrimitiveArray<'_, bool>> = arr.get_element(env, i)?.auto();
+			let mut row_elems: abos_jni::elements::AutoElements<'_, bool, &JPrimitiveArray<'_, bool>> =
+				row.get_elements(env, abos_jni::elements::ReleaseMode::CopyBack)?;
 			for j in 0..row_elems.len() {
 				row_elems[j] = !row_elems[j];
 			}
@@ -102,9 +104,10 @@ fn native_get_message_impl<'local>(
 	this: abos_jni::objects::JObject<'local>,
 ) -> Result<JString<'local>, abos_jni::errors::Error> {
 	use abos_jni::{jni_sig, jni_str};
-	let result = env.call_method(this, jni_str!("getMessage"), jni_sig!("()Ljava/lang/String;"), &[])?;
+	let result: abos_jni::JValueOwned<'_> =
+		env.call_method(this, jni_str!("getMessage"), jni_sig!("()Ljava/lang/String;"), &[])?;
 	// Use cast_local to safely convert JObject to JString
-	let result = JString::cast_local(env, result.l()?)?;
+	let result: JString<'_> = JString::cast_local(env, result.l()?)?;
 	Ok(result)
 }
 

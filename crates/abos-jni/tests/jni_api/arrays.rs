@@ -4,7 +4,7 @@ use super::*;
 pub fn java_byte_array_from_slice() {
 	attach_current_thread(|env| {
 		let buf: &[u8] = &[1, 2, 3];
-		let java_array = env
+		let java_array: abos_jni::refs::Auto<'_, abos_jni::objects::JPrimitiveArray<'_, i8>> = env
 			.byte_array_from_slice(buf)
 			.expect("Env#byte_array_from_slice must create a java array from slice")
 			.auto();
@@ -137,7 +137,7 @@ pub fn get_long_array_elements_commit() {
 	attach_current_thread(|env| {
 		// Create original Java array
 		let buf: &[i64] = &[1, 2, 3];
-		let java_array = env
+		let java_array: abos_jni::objects::JPrimitiveArray<'_, i64> = env
 			.new_long_array(3)
 			.expect("Env#new_long_array must create a java array with given size");
 
@@ -146,7 +146,7 @@ pub fn get_long_array_elements_commit() {
 
 		// Get long array elements auto wrapper
 		// SAFETY: The test owns the array and does not allow concurrent access while its element guard is live.
-		let mut auto_ptr = unsafe {
+		let mut auto_ptr: AutoElements<'_, i64, &abos_jni::objects::JPrimitiveArray<'_, i64>> = unsafe {
 			java_array
 				.get_elements(env, ReleaseMode::CopyBack)
 				.expect("get elements succeeds")
@@ -159,7 +159,7 @@ pub fn get_long_array_elements_commit() {
 		}
 
 		// Check pointer access
-		let ptr = auto_ptr.as_ptr();
+		let ptr: *mut i64 = auto_ptr.as_ptr();
 
 		// Modify
 		// SAFETY: The guard owns three writable elements; no slice or other element access overlaps these writes.
@@ -194,7 +194,7 @@ pub fn get_array_elements_critical() {
 	attach_current_thread(|env| {
 		// Create original Java array
 		let buf: &[u8] = &[1, 2, 3];
-		let java_array = env
+		let java_array: abos_jni::objects::JPrimitiveArray<'_, i8> = env
 			.byte_array_from_slice(buf)
 			.expect("Env#byte_array_from_slice must create a java array from slice");
 
@@ -202,7 +202,11 @@ pub fn get_array_elements_critical() {
 		{
 			// Get primitive array elements auto wrapper
 			// SAFETY: The test owns the array and does not allow concurrent access while its element guard is live.
-			let mut auto_ptr = unsafe {
+			let mut auto_ptr: abos_jni::elements::AutoElementsCritical<
+				'_,
+				i8,
+				&abos_jni::objects::JPrimitiveArray<'_, i8>,
+			> = unsafe {
 				java_array
 					.get_elements_critical(env, ReleaseMode::CopyBack)
 					.expect("get elements critical succeeds")
@@ -219,7 +223,7 @@ pub fn get_array_elements_critical() {
 			// (to ensure we don't have aliased references)
 			// SAFETY: The guard retains the initialized elements, and this shared slice is dropped before mutable access.
 			unsafe {
-				let slice = std::slice::from_raw_parts(auto_ptr.as_ptr(), auto_ptr.len());
+				let slice: &[i8] = std::slice::from_raw_parts(auto_ptr.as_ptr(), auto_ptr.len());
 				assert_eq!(slice[0], 1);
 				assert_eq!(slice[1], 2);
 				assert_eq!(slice[2], 3);
@@ -253,28 +257,36 @@ pub fn new_primitive_array_ok() {
 	attach_current_thread(|env| {
 		const SIZE: usize = 16;
 
-		let result = env.new_boolean_array(SIZE);
+		let result: std::result::Result<abos_jni::objects::JPrimitiveArray<'_, bool>, abos_jni::errors::Error> =
+			env.new_boolean_array(SIZE);
 		assert!(!result.expect("test operation succeeds").is_null());
 
-		let result = env.new_byte_array(SIZE);
+		let result: std::result::Result<abos_jni::objects::JPrimitiveArray<'_, i8>, abos_jni::errors::Error> =
+			env.new_byte_array(SIZE);
 		assert!(!result.expect("test operation succeeds").is_null());
 
-		let result = env.new_char_array(SIZE);
+		let result: std::result::Result<abos_jni::objects::JPrimitiveArray<'_, u16>, abos_jni::errors::Error> =
+			env.new_char_array(SIZE);
 		assert!(!result.expect("test operation succeeds").is_null());
 
-		let result = env.new_short_array(SIZE);
+		let result: std::result::Result<abos_jni::objects::JPrimitiveArray<'_, i16>, abos_jni::errors::Error> =
+			env.new_short_array(SIZE);
 		assert!(!result.expect("test operation succeeds").is_null());
 
-		let result = env.new_int_array(SIZE);
+		let result: std::result::Result<abos_jni::objects::JPrimitiveArray<'_, i32>, abos_jni::errors::Error> =
+			env.new_int_array(SIZE);
 		assert!(!result.expect("test operation succeeds").is_null());
 
-		let result = env.new_long_array(SIZE);
+		let result: std::result::Result<abos_jni::objects::JPrimitiveArray<'_, i64>, abos_jni::errors::Error> =
+			env.new_long_array(SIZE);
 		assert!(!result.expect("test operation succeeds").is_null());
 
-		let result = env.new_float_array(SIZE);
+		let result: std::result::Result<abos_jni::objects::JPrimitiveArray<'_, f32>, abos_jni::errors::Error> =
+			env.new_float_array(SIZE);
 		assert!(!result.expect("test operation succeeds").is_null());
 
-		let result = env.new_double_array(SIZE);
+		let result: std::result::Result<abos_jni::objects::JPrimitiveArray<'_, f64>, abos_jni::errors::Error> =
+			env.new_double_array(SIZE);
 		assert!(!result.expect("test operation succeeds").is_null());
 
 		Ok(())
@@ -288,28 +300,36 @@ pub fn new_primitive_array_bad_size() {
 	attach_current_thread(|env| {
 		const BAD_SIZE: usize = usize::MAX;
 
-		let result = env.new_boolean_array(BAD_SIZE).map(|arr| arr.as_raw());
+		let result: std::result::Result<abos_jni::sys::jobject, abos_jni::errors::Error> =
+			env.new_boolean_array(BAD_SIZE).map(|arr| arr.as_raw());
 		assert!(result.is_err());
 
-		let result = env.new_byte_array(BAD_SIZE).map(|arr| arr.as_raw());
+		let result: std::result::Result<abos_jni::sys::jobject, abos_jni::errors::Error> =
+			env.new_byte_array(BAD_SIZE).map(|arr| arr.as_raw());
 		assert!(result.is_err());
 
-		let result = env.new_char_array(BAD_SIZE).map(|arr| arr.as_raw());
+		let result: std::result::Result<abos_jni::sys::jobject, abos_jni::errors::Error> =
+			env.new_char_array(BAD_SIZE).map(|arr| arr.as_raw());
 		assert!(result.is_err());
 
-		let result = env.new_short_array(BAD_SIZE).map(|arr| arr.as_raw());
+		let result: std::result::Result<abos_jni::sys::jobject, abos_jni::errors::Error> =
+			env.new_short_array(BAD_SIZE).map(|arr| arr.as_raw());
 		assert!(result.is_err());
 
-		let result = env.new_int_array(BAD_SIZE).map(|arr| arr.as_raw());
+		let result: std::result::Result<abos_jni::sys::jobject, abos_jni::errors::Error> =
+			env.new_int_array(BAD_SIZE).map(|arr| arr.as_raw());
 		assert!(result.is_err());
 
-		let result = env.new_long_array(BAD_SIZE).map(|arr| arr.as_raw());
+		let result: std::result::Result<abos_jni::sys::jobject, abos_jni::errors::Error> =
+			env.new_long_array(BAD_SIZE).map(|arr| arr.as_raw());
 		assert!(result.is_err());
 
-		let result = env.new_float_array(BAD_SIZE).map(|arr| arr.as_raw());
+		let result: std::result::Result<abos_jni::sys::jobject, abos_jni::errors::Error> =
+			env.new_float_array(BAD_SIZE).map(|arr| arr.as_raw());
 		assert!(result.is_err());
 
-		let result = env.new_double_array(BAD_SIZE).map(|arr| arr.as_raw());
+		let result: std::result::Result<abos_jni::sys::jobject, abos_jni::errors::Error> =
+			env.new_double_array(BAD_SIZE).map(|arr| arr.as_raw());
 		assert!(result.is_err());
 
 		Ok(())
@@ -321,9 +341,10 @@ pub fn new_primitive_array_bad_size() {
 fn convert_byte_array() {
 	attach_current_thread(|env| {
 		let src: Vec<u8> = vec![1, 2, 3, 4];
-		let java_byte_array = env.byte_array_from_slice(&src).expect("byte array from slice succeeds");
+		let java_byte_array: abos_jni::objects::JPrimitiveArray<'_, i8> =
+			env.byte_array_from_slice(&src).expect("byte array from slice succeeds");
 
-		let dest = env.convert_byte_array(java_byte_array);
+		let dest: std::result::Result<Vec<u8>, abos_jni::errors::Error> = env.convert_byte_array(java_byte_array);
 		assert!(dest.is_ok());
 		assert_eq!(dest.expect("test operation succeeds"), src);
 

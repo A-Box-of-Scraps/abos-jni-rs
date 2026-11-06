@@ -49,10 +49,10 @@ impl JavaVM {
 	pub(crate) unsafe fn sys_get_env_attachment<'local>(&self) -> Result<AttachGuard<'local>> {
 		// SAFETY: The caller upholds the guard scope rules; GetEnv initializes a thread-local pointer on success.
 		unsafe {
-			let mut ptr = ptr::null_mut();
-			let res = java_vm_call_unchecked!(self, v1_2, GetEnv, &raw mut ptr, JNIVersion::V1_4.into());
+			let mut ptr: *mut std::ffi::c_void = ptr::null_mut();
+			let res: i32 = java_vm_call_unchecked!(self, v1_2, GetEnv, &raw mut ptr, JNIVersion::V1_4.into());
 			jni_error_code_to_result(res)?;
-			let jni = ptr.cast::<sys::JNIEnv>();
+			let jni: *mut *const abos_jni_sys::JNINativeInterface_ = ptr.cast::<sys::JNIEnv>();
 			Ok(AttachGuard::from_unowned(jni))
 		}
 	}
@@ -101,7 +101,7 @@ impl JavaVM {
 	///
 	/// See the 'Safety' rules for [`AttachGuard`]
 	pub(crate) unsafe fn try_get_nested_env_attach_guard<'local>() -> Option<AttachGuard<'local>> {
-		let env_ptr = THREAD_ATTACHMENT.get();
+		let env_ptr: *mut *const abos_jni_sys::JNINativeInterface_ = THREAD_ATTACHMENT.get();
 		if env_ptr.is_null() {
 			None
 		} else {
@@ -179,8 +179,8 @@ impl JavaVM {
 	{
 		// SAFETY: The scope token and guard stay on this stack, and the callback cannot outlive the local frame.
 		unsafe {
-			let mut scope = ScopeToken::default();
-			let mut guard = self.get_env_attachment(&mut scope)?;
+			let mut scope: ScopeToken = ScopeToken::default();
+			let mut guard: AttachGuard<'_> = self.get_env_attachment(&mut scope)?;
 			guard.borrow_env_mut().with_local_frame(capacity, f)
 		}
 	}
@@ -217,8 +217,8 @@ impl JavaVM {
 	{
 		// SAFETY: The scope token and guard stay on this stack and outlive the callback.
 		unsafe {
-			let mut scope = ScopeToken::default();
-			let mut guard = self.get_env_attachment(&mut scope)?;
+			let mut scope: ScopeToken = ScopeToken::default();
+			let mut guard: AttachGuard<'_> = self.get_env_attachment(&mut scope)?;
 			f(guard.borrow_env_mut())
 		}
 	}
@@ -310,7 +310,7 @@ impl JavaVM {
 	pub unsafe fn destroy(&self) -> Result<()> {
 		// SAFETY: The caller guarantees VM shutdown is safe and that no JNI references will be used afterward.
 		unsafe {
-			let res = java_vm_call_unchecked!(self, v1_1, DestroyJavaVM);
+			let res: i32 = java_vm_call_unchecked!(self, v1_1, DestroyJavaVM);
 			jni_error_code_to_result(res)
 		}
 	}

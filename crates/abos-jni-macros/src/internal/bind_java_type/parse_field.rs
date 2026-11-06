@@ -40,8 +40,8 @@ struct FieldParser {
 
 /// Parse a field in either shorthand or property-block form.
 pub(super) fn parse_field(input: ParseStream, type_mappings: &TypeMappings) -> Result<Field> {
-	let attrs = input.call(syn::Attribute::parse_outer)?;
-	let visibility = parse_visibility(input)?.unwrap_or(VisibilitySpec::Public);
+	let attrs: Vec<syn::Attribute> = input.call(syn::Attribute::parse_outer)?;
+	let visibility: VisibilitySpec = parse_visibility(input)?.unwrap_or(VisibilitySpec::Public);
 	let (is_static, non_null) = parse_qualifiers(input)?;
 	let rust_name: Ident = input.parse()?;
 	let mut parser = FieldParser {
@@ -111,8 +111,8 @@ impl FieldParser {
 	}
 
 	fn parse_property(&mut self, input: ParseStream, mappings: &TypeMappings) -> Result<()> {
-		let attrs = input.call(syn::Attribute::parse_outer)?;
-		let visibility = parse_visibility(input)?;
+		let attrs: Vec<syn::Attribute> = input.call(syn::Attribute::parse_outer)?;
+		let visibility: Option<VisibilitySpec> = parse_visibility(input)?;
 		if input.peek(get) {
 			input.parse::<get>()?;
 			return self.getter.parse(input, visibility, attrs);
@@ -137,7 +137,7 @@ impl FieldParser {
 	}
 
 	fn parse_value_property(&mut self, input: ParseStream, mappings: &TypeMappings) -> Result<()> {
-		let lookahead = input.lookahead1();
+		let lookahead: syn::parse::Lookahead1<'_> = input.lookahead1();
 		if lookahead.peek(name) {
 			self.java_name = parse_name_spec(input)?.0;
 		} else if lookahead.peek(sig) {
@@ -157,7 +157,7 @@ impl FieldParser {
 	}
 
 	fn finish(mut self, mappings: &TypeMappings) -> Result<Field> {
-		let signature = self
+		let signature: FieldSignature = self
 			.signature
 			.ok_or_else(|| syn::Error::new(self.rust_name.span(), "Field must have a 'sig' property"))?;
 		if self.non_null && signature.field_type.try_as_primitive(mappings).is_some() {
@@ -169,8 +169,8 @@ impl FieldParser {
 		// An explicit getter or setter suppresses the default for the other accessor.
 		if self.getter.name.is_none() && self.setter.name.is_none() {
 			self.getter.name = Some(self.rust_name.clone());
-			let spelling = self.rust_name.to_string();
-			let underscores = spelling.chars().take_while(|c| *c == '_').count();
+			let spelling: String = self.rust_name.to_string();
+			let underscores: usize = spelling.chars().take_while(|c| *c == '_').count();
 			self.setter.name = Some(format_ident!(
 				"{}set_{}",
 				"_".repeat(underscores),
@@ -196,7 +196,7 @@ impl FieldParser {
 
 /// Parse a sequence of fields.
 pub(super) fn parse_fields(input: ParseStream, type_mappings: &TypeMappings) -> Result<Vec<Field>> {
-	let mut fields = Vec::new();
+	let mut fields: Vec<Field> = Vec::new();
 	while !input.is_empty() {
 		fields.push(parse_field(input, type_mappings)?);
 		if !input.is_empty() {

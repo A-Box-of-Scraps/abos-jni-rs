@@ -203,7 +203,7 @@ pub unsafe fn sys_attach_current_thread(
 	inc_attached_count: bool,
 ) -> Result<*mut sys::JNIEnv> {
 	assert_eq!(JavaVM::thread_attach_guard_level(), 0);
-	let mut env_ptr = ptr::null_mut();
+	let mut env_ptr: *mut std::ffi::c_void = ptr::null_mut();
 
 	let mut args = sys::JavaVMAttachArgs {
 		version: JNIVersion::V1_4.into(),
@@ -219,7 +219,7 @@ pub unsafe fn sys_attach_current_thread(
 		group: config.group.as_ref().map_or(ptr::null_mut(), Reference::as_raw),
 	};
 	// SAFETY: The live VM receives writable out-parameter storage and attachment arguments valid for the call.
-	let res = unsafe {
+	let res: i32 = unsafe {
 		java_vm_call_unchecked!(
 			vm,
 			v1_1,
@@ -286,7 +286,7 @@ pub unsafe fn sys_detach_current_thread(
 ) -> Result<()> {
 	assert_eq!(JavaVM::thread_attach_guard_level(), 0);
 
-	let vm = JavaVM::singleton()?;
+	let vm: JavaVM = JavaVM::singleton()?;
 
 	// On Windows we don't ever attempt to explicitly detach a thread from the JVM (or even query if
 	// we have a valid attachment) if we know the process is already shutting down.
@@ -304,14 +304,14 @@ pub unsafe fn sys_detach_current_thread(
 	//
 	// Ref: https://github.com/jni-rs/jni-rs/issues/701
 	#[cfg(target_os = "windows")]
-	let allow_jni = !windows_is_shutdown_in_progress();
+	let allow_jni: bool = !windows_is_shutdown_in_progress();
 	#[cfg(not(target_os = "windows"))]
 	let allow_jni = true;
 
 	if allow_jni {
 		// Check if thread is actually attached before attempting to detach
 		// SAFETY: This routine runs on the detaching thread and uses the temporary guard only within this scope.
-		let was_attached = match unsafe { vm.sys_get_env_attachment() } {
+		let was_attached: bool = match unsafe { vm.sys_get_env_attachment() } {
 			Ok(mut guard) => {
 				// Optional defensive cross-check: verify env matches current thread
 				if let Some(expected_env) = cross_check_env {

@@ -25,7 +25,8 @@ impl TypeMappings {
 		java_class: JavaClassName,
 		is_builtin: bool,
 	) -> Result<()> {
-		let java_class = if let Some((java_class, _)) = self.java_to_rust.get_key_value(&java_class) {
+		let java_class: Rc<JavaClassName> = if let Some((java_class, _)) = self.java_to_rust.get_key_value(&java_class)
+		{
 			java_class.clone()
 		} else {
 			Rc::new(java_class)
@@ -44,12 +45,12 @@ impl TypeMappings {
 			));
 		}
 
-		let rust_type = self.rust_reference_type(path, is_builtin);
+		let rust_type: Rc<RustType> = self.rust_reference_type(path, is_builtin);
 
 		// Check if this alias already has a mapping to a different Rust type
 		if let Some(existing) = self.alias_to_rust.get(alias) {
 			if existing != &rust_type {
-				let existing_java_mapping = self
+				let existing_java_mapping: &Rc<JavaClassName> = self
 					.rust_to_java
 					.get(existing)
 					.expect("registered reference types have Java mappings");
@@ -84,7 +85,7 @@ impl TypeMappings {
 		path: &str,
 		is_builtin: bool,
 	) -> Result<()> {
-		let rust_type = self.rust_prim_type(primitive, path.to_string(), is_builtin);
+		let rust_type: Rc<RustType> = self.rust_prim_type(primitive, path.to_string(), is_builtin);
 
 		if let Some(existing) = self.alias_to_rust.get(alias) {
 			if existing != &rust_type {
@@ -104,7 +105,7 @@ impl TypeMappings {
 	}
 
 	pub fn insert_alias(&mut self, from: &str, to: &str) -> Result<()> {
-		let rust_type = self.alias_to_rust.get(to).ok_or_else(|| {
+		let rust_type: &Rc<RustType> = self.alias_to_rust.get(to).ok_or_else(|| {
 			syn::Error::new(
 				Span::call_site(),
 				format!("Cannot create alias from '{from}' to '{to}': target type not found"),
@@ -213,11 +214,11 @@ impl TypeMappings {
 			let existing_type: syn::Path = input.parse()?;
 
 			// Insert alias
-			let new_alias_str = path_to_string_no_spaces(&new_alias);
-			let existing_type_str = path_to_string_no_spaces(&existing_type);
+			let new_alias_str: String = path_to_string_no_spaces(&new_alias);
+			let existing_type_str: String = path_to_string_no_spaces(&existing_type);
 			self.insert_alias(&new_alias_str, &existing_type_str)?;
 		} else {
-			let is_prim_mapping = if input.peek(Token![unsafe]) {
+			let is_prim_mapping: bool = if input.peek(Token![unsafe]) {
 				input.parse::<Token![unsafe]>()?;
 				true
 			} else {
@@ -228,7 +229,7 @@ impl TypeMappings {
 			let rust_path: syn::Path = input.parse()?;
 
 			// Convert path to string without spaces
-			let rust_path_str = path_to_string_no_spaces(&rust_path);
+			let rust_path_str: String = path_to_string_no_spaces(&rust_path);
 
 			// Parse separator
 			input.parse::<Token![=>]>()?;
@@ -249,7 +250,7 @@ impl TypeMappings {
 	fn parse_primitive_mapping(&mut self, input: ParseStream, rust_path_str: &str) -> Result<()> {
 		// Parse primitive type name
 		let prim_type_ident: Ident = input.parse()?;
-		let prim_type_name = prim_type_ident.to_string();
+		let prim_type_name: String = prim_type_ident.to_string();
 
 		// Validate type name by checking that it's a "built-in" primitive type name
 		match self.map_alias(&prim_type_name) {
@@ -283,7 +284,7 @@ impl TypeMappings {
 				is_builtin: *is_builtin,
 			},
 			RustTypeTarget::Reference { .. } => {
-				let java_class = self
+				let java_class: &Rc<JavaClassName> = self
 					.rust_to_java
 					.get(rust_type)
 					.expect("TypeMappings invariant violated: rust_type missing in rust_to_java map");

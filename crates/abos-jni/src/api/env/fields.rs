@@ -32,11 +32,11 @@ impl<'local> Env<'local> {
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 
-		let obj = obj.as_ref();
-		let obj = null_check!(obj, "get_field_typed obj argument")?;
+		let obj: &JObject<'_> = obj.as_ref();
+		let obj: &JObject<'_> = null_check!(obj, "get_field_typed obj argument")?;
 
-		let field = field.lookup(self)?.as_ref().into_raw();
-		let obj = obj.as_raw();
+		let field: crate::sys::jfieldID = field.lookup(self)?.as_ref().into_raw();
+		let obj: crate::sys::jobject = obj.as_raw();
 
 		macro_rules! field {
 			($get_field:ident) => {{
@@ -49,7 +49,7 @@ impl<'local> Env<'local> {
 		match ty {
 			Object | Array => {
 				// SAFETY: The caller guarantees the field ID and object match the supplied reference return type.
-				let obj = unsafe {
+				let obj: JObject<'_> = unsafe {
 					jni_call_post_check_ex!(self, v1_1, GetObjectField, obj, field)
 						.map(|obj| JObject::from_raw(self, obj))?
 				};
@@ -87,10 +87,10 @@ impl<'local> Env<'local> {
 			return Err(Error::WrongJValueType("void", "see java field"));
 		}
 
-		let obj = obj.as_ref();
+		let obj: &JObject<'_> = obj.as_ref();
 
-		let field = field.lookup(self)?.as_ref().into_raw();
-		let obj = obj.as_raw();
+		let field: crate::sys::jfieldID = field.lookup(self)?.as_ref().into_raw();
+		let obj: crate::sys::jobject = obj.as_raw();
 
 		macro_rules! set_field {
 			// SAFETY: The caller guarantees that the object, field ID and value have matching JNI types.
@@ -128,12 +128,12 @@ impl<'local> Env<'local> {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		let obj = obj.as_ref();
-		let obj = null_check!(obj, "get_field obj argument")?;
-		let class = self.get_object_class(obj)?.auto();
+		let obj: &JObject<'_> = obj.as_ref();
+		let obj: &JObject<'_> = null_check!(obj, "get_field obj argument")?;
+		let class: crate::refs::Auto<'_, JClass<'_>> = self.get_object_class(obj)?.auto();
 
-		let sig = sig.as_ref();
-		let field_ty = sig.ty();
+		let sig: &FieldSignature<'_> = sig.as_ref();
+		let field_ty: JavaType = sig.ty();
 		let field_id: JFieldID = Desc::<JFieldID>::lookup((&class, name, sig), self)?;
 
 		// Safety: Since we have explicitly looked up the field ID based on the given
@@ -153,15 +153,15 @@ impl<'local> Env<'local> {
 		N: AsRef<JNIStr>,
 		S: AsRef<FieldSignature<'sig>>,
 	{
-		let obj = obj.as_ref();
-		let obj = null_check!(obj, "set_field obj argument")?;
-		let sig = sig.as_ref();
+		let obj: &JObject<'_> = obj.as_ref();
+		let obj: &JObject<'_> = null_check!(obj, "set_field obj argument")?;
+		let sig: &FieldSignature<'_> = sig.as_ref();
 
 		if !sig.type_is_compatible_with(value.java_type()) {
 			return Err(Error::WrongJValueType(value.type_name(), "see java field"));
 		}
 
-		let class = self.get_object_class(obj)?.auto();
+		let class: crate::refs::Auto<'_, JClass<'_>> = self.get_object_class(obj)?.auto();
 
 		// Safety: We have explicitly checked that the field type matches
 		// the value type and the field ID is going to be looked up dynamically
@@ -198,8 +198,8 @@ impl<'local> Env<'local> {
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 
-		let class = class.lookup(self)?;
-		let field = field.lookup(self)?;
+		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
+		let field: <F as Desc<'_, JStaticFieldID>>::Output = field.lookup(self)?;
 
 		macro_rules! field {
 			($get_field:ident) => {{
@@ -216,12 +216,12 @@ impl<'local> Env<'local> {
 			}};
 		}
 
-		let ret = match ty {
+		let ret: std::result::Result<JValueOwned<'_>, crate::errors::Error> = match ty {
 			Primitive(Void) => Err(Error::WrongJValueType("void", "see java field")),
 			Object | Array => {
-				let obj = field!(GetStaticObjectField);
+				let obj: crate::sys::jobject = field!(GetStaticObjectField);
 				// SAFETY: The JNI field access returned an object reference in the current local frame.
-				let obj = unsafe { JObject::from_raw(self, obj) };
+				let obj: JObject<'_> = unsafe { JObject::from_raw(self, obj) };
 				Ok(JValueOwned::from(obj))
 			}
 			Primitive(Boolean) => Ok(field!(GetStaticBooleanField).into()),
@@ -261,8 +261,8 @@ impl<'local> Env<'local> {
 		C: Desc<'local, JClass<'other_local>>,
 		F: Desc<'local, JStaticFieldID>,
 	{
-		let class = class.lookup(self)?;
-		let field = field.lookup(self)?;
+		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
+		let field: <F as Desc<'_, JStaticFieldID>>::Output = field.lookup(self)?;
 
 		macro_rules! set_field {
 			($set_field:ident($val:expr)) => {{
@@ -319,11 +319,11 @@ impl<'local> Env<'local> {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		let sig = sig.as_ref();
-		let field_ty = sig.ty();
+		let sig: &FieldSignature<'_> = sig.as_ref();
+		let field_ty: JavaType = sig.ty();
 
 		// go ahead and look up the class since we'll need that for the next call.
-		let class = class.lookup(self)?;
+		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 
 		// SAFETY: We have verified that `class`, `field`, `sig` and `ty` are valid
 		unsafe { self.get_static_field_unchecked(class.as_ref(), (class.as_ref(), name, sig), field_ty) }
@@ -346,13 +346,13 @@ impl<'local> Env<'local> {
 		N: AsRef<JNIStr>,
 		S: AsRef<FieldSignature<'sig>>,
 	{
-		let sig = sig.as_ref();
+		let sig: &FieldSignature<'_> = sig.as_ref();
 
 		if !sig.type_is_compatible_with(value.java_type()) {
 			return Err(Error::WrongJValueType(value.type_name(), "see java field"));
 		}
 
-		let class = class.lookup(self)?;
+		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 
 		// Safety: We have explicitly checked that the field type matches the value type.
 		unsafe { self.set_static_field_unchecked(class.as_ref(), (class.as_ref(), name, sig), value) }

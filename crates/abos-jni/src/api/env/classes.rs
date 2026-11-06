@@ -23,7 +23,7 @@ impl<'local> Env<'local> {
 		buf: *const jbyte,
 		buf_len: usize,
 	) -> Result<JClass<'local>> {
-		let buf_len = jsize::try_from(buf_len).map_err(|_| Error::JniCall(JniError::InvalidArguments))?;
+		let buf_len: i32 = jsize::try_from(buf_len).map_err(|_| Error::JniCall(JniError::InvalidArguments))?;
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
@@ -111,7 +111,7 @@ impl<'local> Env<'local> {
 		L: AsRef<JClassLoader<'any_loader>>,
 	{
 		let name: Option<&JNIStr> = name.as_ref().map(std::convert::AsRef::as_ref);
-		let name = name.map_or(ptr::null(), JNIStr::as_ptr);
+		let name: *const c_char = name.map_or(ptr::null(), JNIStr::as_ptr);
 		// Safety: we know the pointer for the u8 slice is valid for buf.len() bytes
 		unsafe { self.define_class_impl(name, loader.as_ref(), buf.as_ptr().cast::<jbyte>(), buf.len()) }
 	}
@@ -166,7 +166,7 @@ impl<'local> Env<'local> {
 		L: AsRef<JClassLoader<'any_loader>>,
 	{
 		let name: Option<&JNIStr> = name.as_ref().map(std::convert::AsRef::as_ref);
-		let name = name.as_ref().map_or(ptr::null(), |n| n.as_ptr());
+		let name: *const c_char = name.as_ref().map_or(ptr::null(), |n| n.as_ptr());
 		// Safety: we know the pointer for the u8 slice is valid for buf.len() bytes
 		unsafe { self.define_class_impl(name, loader.as_ref(), buf.as_ptr().cast::<jbyte>(), buf.len()) }
 	}
@@ -231,7 +231,7 @@ impl<'local> Env<'local> {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		let name = name.as_ref();
+		let name: &JNIStr = name.as_ref();
 		// Safety:
 		// FindClass is 1.1 API that must be valid
 		// name is non-null
@@ -240,7 +240,7 @@ impl<'local> Env<'local> {
                 catch |env| {
                     e: crate::exceptions::JNoClassDefFoundError => {
                         let cause: &JThrowable = &e.as_throwable();
-                        let cause = env.new_global_ref(cause).ok();
+                        let cause: Option<crate::refs::Global<JThrowable<'_>>> = env.new_global_ref(cause).ok();
                         Err(Error::NoClassDefFound {
                             requested: name.to_string(),
                             cause
@@ -251,7 +251,7 @@ impl<'local> Env<'local> {
                     // Error:NoClassDefFound, consistent with `LoaderContext::load_class`
                     e: crate::exceptions::JClassNotFoundException => {
                         let cause: &JThrowable = &e.as_throwable();
-                        let cause = env.new_global_ref(cause).ok();
+                        let cause: Option<crate::refs::Global<JThrowable<'_>>> = env.new_global_ref(cause).ok();
                         Err(Error::NoClassDefFound {
                             requested: name.to_string(),
                             cause
@@ -267,7 +267,7 @@ impl<'local> Env<'local> {
                     // with `LoaderContext::load_class`
                     e: crate::exceptions::JLinkageError => {
                         let cause: &JThrowable = &e.as_throwable();
-                        let cause = env.new_global_ref(cause).ok();
+                        let cause: Option<crate::refs::Global<JThrowable<'_>>> = env.new_global_ref(cause).ok();
                         Err(Error::LinkageError {
                             requested: name.to_string(),
                             cause
@@ -353,7 +353,7 @@ impl<'local> Env<'local> {
 	where
 		S: AsRef<JNIStr>,
 	{
-		let name = name.as_ref();
+		let name: &JNIStr = name.as_ref();
 		LoaderContext::None.load_class(self, name, false)
 	}
 
@@ -370,9 +370,9 @@ impl<'local> Env<'local> {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		let class = class.lookup(self)?;
+		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 		// SAFETY: The class descriptor is valid and the returned local class reference is tied to the current frame.
-		let superclass = unsafe {
+		let superclass: JClass<'_> = unsafe {
 			JClass::from_raw(
 				self,
 				jni_call_no_post_check_ex!(self, v1_1, GetSuperclass, class.as_ref().as_raw())?,
@@ -385,8 +385,8 @@ impl<'local> Env<'local> {
 	// Like is_assignable_from but it doesn't need a mutable Env reference because it doesn't do any
 	// descriptor lookups.
 	pub(super) fn is_assignable_from_class(&self, class1: &JClass, class2: &JClass) -> Result<bool> {
-		let class1 = null_check!(class1, "is_assignable_from class1")?;
-		let class2 = null_check!(class2, "is_assignable_from class2")?;
+		let class1: &JClass<'_> = null_check!(class1, "is_assignable_from class1")?;
+		let class2: &JClass<'_> = null_check!(class2, "is_assignable_from class2")?;
 
 		// Safety:
 		// - IsAssignableFrom is 1.1 API that must be valid
@@ -415,23 +415,24 @@ impl<'local> Env<'local> {
 		T: Desc<'local, JClass<'other_local_1>>,
 		U: Desc<'local, JClass<'other_local_2>>,
 	{
-		let class1 = class1.lookup(self)?;
-		let class1 = null_check!(class1.as_ref(), "is_assignable_from class1")?;
-		let class2 = class2.lookup(self)?;
-		let class2 = null_check!(class2.as_ref(), "is_assignable_from class2")?;
+		let class1: <T as Desc<'_, JClass<'_>>>::Output = class1.lookup(self)?;
+		let class1: &JClass<'_> = null_check!(class1.as_ref(), "is_assignable_from class1")?;
+		let class2: <U as Desc<'_, JClass<'_>>>::Output = class2.lookup(self)?;
+		let class2: &JClass<'_> = null_check!(class2.as_ref(), "is_assignable_from class2")?;
 
 		self.is_assignable_from_class(class1, class2)
 	}
 
 	/// Checks if an object can be cast to a specific reference type.
 	pub(crate) fn is_instance_of_cast_type<To: Reference>(&self, obj: &JObject) -> Result<bool> {
-		let class = match To::lookup_class(self, &LoaderContext::FromObject(obj)) {
-			Ok(class) => class,
-			Err(Error::ClassNotFound { name: _ }) => return Ok(false),
-			Err(e) => return Err(e),
-		};
+		let class: &crate::refs::Global<JClass<'static>> =
+			&*match To::lookup_class(self, &LoaderContext::FromObject(obj)) {
+				Ok(class) => class,
+				Err(Error::ClassNotFound { name: _ }) => return Ok(false),
+				Err(e) => return Err(e),
+			};
 
-		let class: &JClass = &class;
+		let class: &JClass = class;
 		self.is_instance_of_class(obj, class)
 	}
 
@@ -444,7 +445,7 @@ impl<'local> Env<'local> {
 		O: AsRef<JObject<'other_local_1>>,
 		C: AsRef<JClass<'other_local_2>>,
 	{
-		let class = null_check!(class.as_ref(), "is_instance_of class")?;
+		let class: &JClass<'_> = null_check!(class.as_ref(), "is_instance_of class")?;
 
 		// Safety:
 		// - IsInstanceOf is 1.1 API that must be valid
@@ -479,7 +480,7 @@ impl<'local> Env<'local> {
 		O: AsRef<JObject<'other_local_1>>,
 		T: Desc<'local, JClass<'other_local_2>>,
 	{
-		let class = class.lookup(self)?;
+		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 		self.is_instance_of_class(object, class)
 	}
 

@@ -78,7 +78,7 @@ pub const fn char_to_java(char: char) -> std::result::Result<jchar, CharToJavaEr
 		return Err(CharToJavaError { char });
 	}
 
-	let mut buf = [0u16; 1];
+	let mut buf: [u16; 1] = [0u16; 1];
 	let buf: &mut [u16] = char.encode_utf16(&mut buf);
 	Ok(buf[0])
 }

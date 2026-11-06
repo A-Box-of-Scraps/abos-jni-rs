@@ -42,7 +42,7 @@ fn test_jni_cstr_basic_ascii() {
 fn test_jni_str_basic_ascii() {
 	const CLASS: &JNIStr = jni_str!("java.lang.String");
 
-	let bytes = CLASS.to_bytes();
+	let bytes: &[u8] = CLASS.to_bytes();
 	assert_eq!(bytes, b"java.lang.String");
 	verify_roundtrip("java.lang.String", bytes);
 }
@@ -141,14 +141,14 @@ fn test_unicode_emoji_surrogate_pairs() {
 	const EMOJI: &CStr = jni_cstr!("😀");
 	const JEMOJI: &JNIStr = jni_str!("😀");
 
-	let bytes = EMOJI.to_bytes();
-	let jbytes = JEMOJI.to_bytes();
+	let bytes: &[u8] = EMOJI.to_bytes();
+	let jbytes: &[u8] = JEMOJI.to_bytes();
 
 	// Both should produce same bytes
 	assert_eq!(bytes, jbytes);
 
 	// MUTF-8 should be longer than UTF-8 for emoji
-	let utf8_bytes = "😀".as_bytes();
+	let utf8_bytes: &[u8] = "😀".as_bytes();
 	assert_eq!(utf8_bytes.len(), 4); // UTF-8: 4 bytes
 	assert_eq!(bytes.len(), 6); // MUTF-8: 6 bytes (surrogate pair)
 
@@ -161,8 +161,8 @@ fn test_unicode_japanese_no_surrogate_pairs() {
 	// Japanese characters below U+FFFF don't need surrogate pairs
 	const JP: &CStr = jni_cstr!("こんにちは");
 
-	let bytes = JP.to_bytes();
-	let utf8_bytes = "こんにちは".as_bytes();
+	let bytes: &[u8] = JP.to_bytes();
+	let utf8_bytes: &[u8] = "こんにちは".as_bytes();
 
 	// UTF-8 and MUTF-8 should be identical for these characters
 	assert_eq!(bytes, utf8_bytes);
@@ -284,7 +284,7 @@ fn test_long_package_name() {
 fn test_jnistr_to_bytes_method() {
 	const JSTR: &JNIStr = jni_str!("test.Class");
 
-	let bytes = JSTR.to_bytes();
+	let bytes: &[u8] = JSTR.to_bytes();
 	assert_eq!(bytes, b"test.Class");
 }
 
@@ -292,7 +292,7 @@ fn test_jnistr_to_bytes_method() {
 fn test_roundtrip_multiple_emoji() {
 	const MULTI_EMOJI: &CStr = jni_cstr!("😀🚀👍");
 
-	let bytes = MULTI_EMOJI.to_bytes();
+	let bytes: &[u8] = MULTI_EMOJI.to_bytes();
 
 	// Each emoji should be 6 bytes in MUTF-8
 	assert_eq!(bytes.len(), 18); // 3 emoji * 6 bytes each

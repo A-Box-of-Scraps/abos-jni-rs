@@ -18,7 +18,7 @@ pub fn parse_jni_crate_override(input: syn::parse::ParseStream) -> Result<syn::P
 	if !input.peek(Ident) {
 		return Ok(jni_crate_default());
 	}
-	let fork = input.fork();
+	let fork: syn::parse::ParseBuffer<'_> = input.fork();
 	let property: Ident = fork.parse()?;
 	if property != "jni" || !fork.peek(Token![=]) {
 		return Ok(jni_crate_default());

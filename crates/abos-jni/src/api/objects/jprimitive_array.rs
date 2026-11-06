@@ -90,13 +90,13 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 	///
 	/// Returns an error if the length does not fit JNI, allocation fails, or a Java exception is pending.
 	pub fn new<'env_local>(env: &mut Env<'env_local>, length: usize) -> Result<JPrimitiveArray<'env_local, T>> {
-		let length = crate::sys::jsize::try_from(length)
+		let length: i32 = crate::sys::jsize::try_from(length)
 			.map_err(|_| crate::errors::Error::JniCall(crate::errors::JniError::InvalidArguments))?;
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		env.assert_top();
 		// SAFETY: TypeArray selects the matching JNI primitive allocator, and the checked length fits jsize.
-		let raw_array = unsafe { T::new_array(env, length)? };
+		let raw_array: crate::sys::jobject = unsafe { T::new_array(env, length)? };
 		// SAFETY: The allocator returned a local array of T in the current frame.
 		unsafe { Ok(JPrimitiveArray::from_raw(env, raw_array)) }
 	}
@@ -142,9 +142,9 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 	///
 	/// Returns an error if the array is null or a Java exception is pending.
 	pub fn len(&self, env: &Env) -> Result<usize> {
-		let array = null_check!(self.as_raw(), "JPrimitiveArray::len self argument")?;
+		let array: crate::sys::jobject = null_check!(self.as_raw(), "JPrimitiveArray::len self argument")?;
 		// SAFETY: The typed array reference is non-null and valid for this Env.
-		let len = unsafe { jni_call_no_post_check_ex!(env, v1_1, GetArrayLength, array)? };
+		let len: i32 = unsafe { jni_call_no_post_check_ex!(env, v1_1, GetArrayLength, array)? };
 		usize::try_from(len).map_err(|_| crate::errors::Error::JniCall(crate::errors::JniError::Unknown))
 	}
 

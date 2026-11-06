@@ -123,7 +123,8 @@ impl<'local> Env<'local> {
 		// - we can assume that `obj.raw()` is a valid reference, or null
 		// - we know there's no other wrapper for the reference passed to from_local_raw
 		//   since we have just created it.
-		let local = unsafe { O::kind_from_raw(jni_call_no_post_check_ex!(self, v1_2, NewLocalRef, obj.as_raw())?) };
+		let local: O::Kind<'_> =
+			unsafe { O::kind_from_raw(jni_call_no_post_check_ex!(self, v1_2, NewLocalRef, obj.as_raw())?) };
 
 		// Per JNI spec, `NewLocalRef` will return a null pointer if the object was GC'd
 		// (which could happen if `obj` is a `Weak`):
@@ -187,7 +188,7 @@ impl<'local> Env<'local> {
 		}
 
 		if self.is_instance_of_cast_type::<To>(obj.as_ref())? {
-			let new = self.new_local_ref(obj.as_ref())?;
+			let new: JObject<'_> = self.new_local_ref(obj.as_ref())?;
 			// Safety:
 			// - we have just checked that `new` is an instance of `To`
 			// - as it's a new reference, it's assigned the `'local` Env lifetime
@@ -401,8 +402,8 @@ impl<'local> Env<'local> {
 	where
 		O: Into<JObject<'other_local>>,
 	{
-		let obj = obj.into();
-		let raw = obj.into_raw();
+		let obj: JObject<'_> = obj.into();
+		let raw: crate::sys::jobject = obj.into_raw();
 
 		// Safety:
 		// `raw` may be `null`

@@ -59,7 +59,7 @@ pub(super) fn str_to_cstr_win32(s: Cow<str>, needed_codepage: WCodepage) -> Resu
 		.expect("UTF-16 form of input string is too long");
 
 	// Decide which flags we're going to use.
-	let conversion_flags = match needed_codepage {
+	let conversion_flags: u32 = match needed_codepage {
 		// No flags may be given for the following code pages.
 		// https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-widechartomultibyte
 		42 | 50220 | 50221 | 50222 | 50225 | 50227 | 50229 | 54936 | 57002..=57011 | 65000 | 65001 => 0,
@@ -69,7 +69,7 @@ pub(super) fn str_to_cstr_win32(s: Cow<str>, needed_codepage: WCodepage) -> Resu
 
 	// Find out how much buffer space will be needed for the output and whether the string is
 	// fully representable.
-	let mut is_non_representable: Option<MaybeUninit<_>> = match needed_codepage {
+	let mut is_non_representable: Option<MaybeUninit<i32>> = match needed_codepage {
 		// All characters are representable in UTF-7 and UTF-8, and moreover
 		// `WideCharToMultiByte` will fail if the target encoding is UTF-7 or UTF-8 and this is not
 		// `None`.
@@ -80,7 +80,7 @@ pub(super) fn str_to_cstr_win32(s: Cow<str>, needed_codepage: WCodepage) -> Resu
 	// Safety: `s_utf16.as_ptr()` is a valid pointer to a UTF-16 string, and `s_utf16_len` is its
 	// length. `lpDefaultChar` is null. `lpUsedDefaultChar` is either null or valid. `cbMultiByte`
 	// is zero.
-	let required_buffer_space = unsafe {
+	let required_buffer_space: i32 = unsafe {
 		windows_sys::WideCharToMultiByte(
 			needed_codepage,
 			conversion_flags,
@@ -105,7 +105,7 @@ pub(super) fn str_to_cstr_win32(s: Cow<str>, needed_codepage: WCodepage) -> Resu
 	// Check if the string is not fully representable.
 	if let Some(is_non_representable) = is_non_representable {
 		// Safety: `is_non_representable` has been initialized by `WideCharToMultiByte`.
-		let is_non_representable = unsafe { is_non_representable.assume_init() };
+		let is_non_representable: i32 = unsafe { is_non_representable.assume_init() };
 
 		if is_non_representable != 0 {
 			drop(s_utf16);
@@ -126,14 +126,14 @@ pub(super) fn str_to_cstr_win32(s: Cow<str>, needed_codepage: WCodepage) -> Resu
 	let required_buffer_space_usize_with_nul: usize = required_buffer_space_usize + 1;
 
 	// Allocate enough buffer space, including one byte for the null terminator.
-	let mut output = Vec::<u8>::with_capacity(required_buffer_space_usize_with_nul);
+	let mut output: Vec<u8> = Vec::<u8>::with_capacity(required_buffer_space_usize_with_nul);
 
 	// Perform the actual conversion.
 	//
 	// Safety: `s_utf16` holds `s_utf16_len` initialized UTF-16 units.
 	// `output` has capacity for at least `required_buffer_space` bytes.
 	// All other raw pointers are null.
-	let used_buffer_space = unsafe {
+	let used_buffer_space: i32 = unsafe {
 		windows_sys::WideCharToMultiByte(
 			needed_codepage,
 			conversion_flags,
@@ -181,7 +181,7 @@ pub(super) fn str_to_cstr_win32_default_codepage(s: Cow<str>) -> Result<Cow<CStr
 	// Windows convert the string to the expected code page first.
 
 	// Safety: This function isn't actually unsafe.
-	let needed_codepage = unsafe { windows_sys::GetACP() };
+	let needed_codepage: u32 = unsafe { windows_sys::GetACP() };
 
 	if needed_codepage == windows_sys::CP_UTF8 {
 		// The code page is UTF-8! Lucky us.
@@ -204,21 +204,21 @@ mod tests {
 		codepage: WCodepage,
 		max_expected_utf16_len: WSize,
 	) -> io::Result<String> {
-		let codepage_string_slice = codepage_string.as_ref();
+		let codepage_string_slice: &[u8] = codepage_string.as_ref();
 
 		let codepage_string_slice_len: WSize = codepage_string_slice
 			.len()
 			.try_into()
 			.expect("`codepage_string`'s length is too large to transcode with Win32");
 
-		let mut buf = Vec::<u16>::with_capacity(
+		let mut buf: Vec<u16> = Vec::<u16>::with_capacity(
 			max_expected_utf16_len
 				.try_into()
 				.expect("expected_utf16_len is negative or exceeds address space"),
 		);
 
 		// Safety: All of these pointers and lengths are valid and checked for overflow.
-		let utf16_units_transcoded = unsafe {
+		let utf16_units_transcoded: i32 = unsafe {
 			windows_sys::MultiByteToWideChar(
 				codepage,
 				0,
@@ -240,7 +240,8 @@ mod tests {
 
 		drop(codepage_string);
 
-		let string = String::from_utf16(buf.as_slice()).expect("`MultiByteToWideChar` generated invalid UTF-16");
+		let string: String =
+			String::from_utf16(buf.as_slice()).expect("`MultiByteToWideChar` generated invalid UTF-16");
 
 		Ok(string)
 	}
@@ -248,28 +249,28 @@ mod tests {
 	#[test]
 	fn test() {
 		{
-			let result =
+			let result: Cow<'_, CStr> =
 				str_to_cstr_win32("Hello, world 😎".into(), windows_sys::CP_UTF8).expect("UTF-8 conversion succeeds");
 			assert_eq!(result.to_bytes_with_nul(), b"Hello, world \xf0\x9f\x98\x8e\0");
 			assert_matches!(result, Cow::Owned(_));
 		}
 
 		{
-			let result =
+			let result: Cow<'_, CStr> =
 				str_to_cstr_win32("Hello, world 😎\0".into(), windows_sys::CP_UTF8).expect("UTF-8 conversion succeeds");
 			assert_eq!(result.to_bytes_with_nul(), b"Hello, world \xf0\x9f\x98\x8e\0");
 		}
 
 		{
-			let result =
+			let result: JvmError =
 				str_to_cstr_win32("Hello, world 😎".into(), 1252).expect_err("Windows-1252 cannot represent the emoji");
-			let error_string =
+			let error_string: String =
 				assert_matches!(result, JvmError::OptStringNotRepresentable { opt_string } => opt_string);
 			assert_eq!(error_string, "Hello, world 😎");
 		}
 
 		{
-			let result =
+			let result: Cow<'_, CStr> =
 				str_to_cstr_win32("Hello, world™".into(), 1252).expect("Windows-1252 represents the trademark symbol");
 			assert_eq!(result.to_bytes_with_nul(), b"Hello, world\x99\0");
 			assert_matches!(result, Cow::Owned(_));
@@ -308,7 +309,7 @@ mod tests {
 		expected_opt_string: &str,
 		result: Result<Cow<'static, CStr>, JvmError>,
 	) -> Cow<'static, CStr> {
-		let string = expect_success(expected_opt_string, result);
+		let string: Cow<'_, CStr> = expect_success(expected_opt_string, result);
 		assert!(
 			expected_opt_string.as_bytes() == string.to_bytes(),
 			"opt_string was transcoded successfully but mangled"
@@ -318,7 +319,7 @@ mod tests {
 
 	#[track_caller]
 	fn expect_opt_string_too_long(expected_opt_string: &str, result: Result<Cow<'static, CStr>, JvmError>) {
-		let mut error = match result {
+		let mut error: JvmError = match result {
 			Err(err) => err,
 			Ok(ok) => {
 				assert!(
@@ -342,10 +343,10 @@ mod tests {
 			// First, allocate enough space to completely fill the maximum allowed length, plus one
 			// more.
 			//eprintln!("Allocating & filling ASCII");
-			let string = vec![b'H'; MAX_INPUT_LEN + 1];
+			let string: Vec<u8> = vec![b'H'; MAX_INPUT_LEN + 1];
 
 			//eprintln!("Checking UTF-8 correctness");
-			let mut string = String::from_utf8(string).expect("ASCII fixture is valid UTF-8");
+			let mut string: String = String::from_utf8(string).expect("ASCII fixture is valid UTF-8");
 
 			// This string is currently one character too long to transcode, so there should be an
 			// overflow error.
@@ -368,7 +369,7 @@ mod tests {
 			// faster than the naïve character-by-character approach (at least unless some future Rust
 			// compiler performs this optimization on its own, but 1.66 doesn't).
 			//eprintln!("Allocating & filling non-ASCII for UTF-8 and UTF-7");
-			let string_byte_pairs = vec![u16::from_be(0xdfbf); MAX_INPUT_LEN / 2];
+			let string_byte_pairs: Vec<u16> = vec![u16::from_be(0xdfbf); MAX_INPUT_LEN / 2];
 
 			//eprintln!("Checking UTF-8 correctness");
 			let string: &str = std::str::from_utf8(bytemuck::cast_slice(string_byte_pairs.as_slice()))
@@ -383,7 +384,8 @@ mod tests {
 			// with the worst-case code page.
 			{
 				//eprintln!("Transcoding non-ASCII to UTF-7");
-				let result = expect_success(string, str_to_cstr_win32(string.into(), windows_sys::CP_UTF7));
+				let result: Cow<'_, CStr> =
+					expect_success(string, str_to_cstr_win32(string.into(), windows_sys::CP_UTF7));
 
 				// *And* it should roundtrip back to UTF-8.
 				//eprintln!("Transcoding UTF-7 back to UTF-8");
@@ -404,14 +406,14 @@ mod tests {
 			// Try transcoding to Windows-1252. This is the slowest part of the test
 			// (`WideCharToMultiByte` is very slow at this, for some reason), so it's done last.
 			//eprintln!("Allocating & filling non-ASCII for Windows-1252");
-			let string_byte_pairs = vec![u16::from_be(0xc2ae); MAX_INPUT_LEN / 2];
+			let string_byte_pairs: Vec<u16> = vec![u16::from_be(0xc2ae); MAX_INPUT_LEN / 2];
 
 			//eprintln!("Checking UTF-8 correctness");
 			let string: &str = std::str::from_utf8(bytemuck::cast_slice(string_byte_pairs.as_slice()))
 				.expect("fixture contains valid UTF-8 pairs");
 
 			//eprintln!("Transcoding non-ASCII to Windows-1252");
-			let result = expect_success(string, str_to_cstr_win32(string.into(), 1252));
+			let result: Cow<'_, CStr> = expect_success(string, str_to_cstr_win32(string.into(), 1252));
 
 			//eprintln!("Checking Windows-1252 for correctness");
 			assert!(

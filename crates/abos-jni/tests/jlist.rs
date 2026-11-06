@@ -2,6 +2,7 @@
 #![allow(missing_docs, reason = "Executable examples and test fixtures are not library API.")]
 #![cfg(feature = "invocation")]
 
+use abos_jni::refs::Auto;
 use abos_jni::{
 	jni_sig, jni_str,
 	objects::{IntoAuto, JList, JString},
@@ -14,7 +15,7 @@ use util::{attach_current_thread, unwrap};
 #[test]
 fn jlist_push_and_iterate() {
 	attach_current_thread(|env| {
-		let data = &[
+		let data: &[&abos_jni::strings::JNIStr; 5] = &[
 			jni_str!("hello"),
 			jni_str!("world"),
 			jni_str!("from"),
@@ -23,17 +24,17 @@ fn jlist_push_and_iterate() {
 		];
 
 		// Create a new ArrayList
-		let list_object = unwrap(
+		let list_object: abos_jni::objects::JObject<'_> = unwrap(
 			env.new_object(jni_str!("java/util/ArrayList"), jni_sig!("()V"), &[]),
 			env,
 		);
-		let list = unwrap(JList::cast_local(env, list_object), env);
+		let list: JList<'_> = unwrap(JList::cast_local(env, list_object), env);
 
 		// Add all strings to the list
 		unwrap(
 			data.iter().try_for_each(|s| {
-				let string = JString::from_jni_str(env, s)?;
-				let added = list.add(env, &string)?;
+				let string: JString<'_> = JString::from_jni_str(env, s)?;
+				let added: bool = list.add(env, &string)?;
 				assert!(added);
 				Ok(())
 			}),
@@ -41,16 +42,16 @@ fn jlist_push_and_iterate() {
 		);
 
 		// Verify the list size
-		let size = unwrap(list.size(env), env);
+		let size: i32 = unwrap(list.size(env), env);
 		assert_eq!(size, jint::try_from(data.len()).expect("test list length fits jint"));
 
 		// Collect the values using the JList iterator
-		let mut collected = Vec::new();
+		let mut collected: Vec<abos_jni::strings::JNIString> = Vec::new();
 		unwrap(
 			list.iter(env).and_then(|iter| {
 				while let Some(obj) = iter.next(env)? {
-					let s = env.cast_local::<JString>(obj)?;
-					let s = s.mutf8_chars(env)?;
+					let s: JString<'_> = env.cast_local::<JString>(obj)?;
+					let s: abos_jni::strings::MUTF8Chars<'_, &JString<'_>> = s.mutf8_chars(env)?;
 					collected.push(s.to_owned());
 				}
 				Ok(())
@@ -58,7 +59,7 @@ fn jlist_push_and_iterate() {
 			env,
 		);
 
-		let orig = data.to_vec();
+		let orig: Vec<&abos_jni::strings::JNIStr> = data.to_vec();
 		assert_eq!(orig, collected);
 		Ok(())
 	})
@@ -69,34 +70,34 @@ fn jlist_push_and_iterate() {
 fn jlist_get_and_set() {
 	attach_current_thread(|env| {
 		// Create a new ArrayList
-		let list_object = unwrap(
+		let list_object: abos_jni::objects::JObject<'_> = unwrap(
 			env.new_object(jni_str!("java/util/ArrayList"), jni_sig!("()V"), &[]),
 			env,
 		);
-		let list = unwrap(JList::cast_local(env, list_object), env);
+		let list: JList<'_> = unwrap(JList::cast_local(env, list_object), env);
 
 		// Add some initial elements
-		let hello_str = unwrap(env.new_string("hello"), env);
-		let world_str = unwrap(env.new_string("world"), env);
+		let hello_str: JString<'_> = unwrap(env.new_string("hello"), env);
+		let world_str: JString<'_> = unwrap(env.new_string("world"), env);
 
 		unwrap(list.add(env, &hello_str.into()), env);
 		unwrap(list.add(env, &world_str.into()), env);
 
 		// Test get method
-		let first_obj = unwrap(list.get(env, 0), env);
+		let first_obj: abos_jni::objects::JObject<'_> = unwrap(list.get(env, 0), env);
 		assert!(!first_obj.is_null());
-		let first_jstring = unwrap(env.cast_local::<JString>(first_obj), env);
-		let first_str = unwrap(first_jstring.mutf8_chars(env), env);
+		let first_jstring: JString<'_> = unwrap(env.cast_local::<JString>(first_obj), env);
+		let first_str: abos_jni::strings::MUTF8Chars<'_, &JString<'_>> = unwrap(first_jstring.mutf8_chars(env), env);
 		assert_eq!(first_str.to_str().as_ref(), "hello");
 
-		let second_obj = unwrap(list.get(env, 1), env);
+		let second_obj: abos_jni::objects::JObject<'_> = unwrap(list.get(env, 1), env);
 		assert!(!second_obj.is_null());
-		let second_jstring = unwrap(env.cast_local::<JString>(second_obj), env);
-		let second_str = unwrap(second_jstring.mutf8_chars(env), env);
+		let second_jstring: JString<'_> = unwrap(env.cast_local::<JString>(second_obj), env);
+		let second_str: abos_jni::strings::MUTF8Chars<'_, &JString<'_>> = unwrap(second_jstring.mutf8_chars(env), env);
 		assert_eq!(second_str.to_str().as_ref(), "world");
 
 		// Test get with invalid index (should throw IndexOutOfBoundsException)
-		let invalid = list.get(env, 10);
+		let invalid: std::result::Result<abos_jni::objects::JObject<'_>, abos_jni::errors::Error> = list.get(env, 10);
 		assert!(invalid.is_err());
 
 		assert!(matches!(
@@ -115,32 +116,32 @@ fn jlist_get_and_set() {
 fn jlist_insert_and_remove() {
 	attach_current_thread(|env| {
 		// Create a new ArrayList
-		let list_object = unwrap(
+		let list_object: abos_jni::objects::JObject<'_> = unwrap(
 			env.new_object(jni_str!("java/util/ArrayList"), jni_sig!("()V"), &[]),
 			env,
 		);
-		let list = unwrap(JList::cast_local(env, list_object), env);
+		let list: JList<'_> = unwrap(JList::cast_local(env, list_object), env);
 
 		// Add initial elements
-		let first_str = unwrap(env.new_string("first"), env);
-		let third_str = unwrap(env.new_string("third"), env);
+		let first_str: JString<'_> = unwrap(env.new_string("first"), env);
+		let third_str: JString<'_> = unwrap(env.new_string("third"), env);
 
 		unwrap(list.add(env, &first_str.into()), env);
 		unwrap(list.add(env, &third_str.into()), env);
 
 		// Insert in the middle
-		let second_str = unwrap(env.new_string("second"), env);
+		let second_str: JString<'_> = unwrap(env.new_string("second"), env);
 		unwrap(list.insert(env, 1, &second_str), env);
 
 		// Verify the size is now 3
-		let size = unwrap(list.size(env), env);
+		let size: i32 = unwrap(list.size(env), env);
 		assert_eq!(size, 3);
 
 		// Verify the order
 		let items: Vec<String> = (0..3)
 			.map(|i| {
-				let obj = unwrap(list.get(env, i), env);
-				let jstring = unwrap(env.cast_local::<JString>(obj), env);
+				let obj: abos_jni::objects::JObject<'_> = unwrap(list.get(env, i), env);
+				let jstring: JString<'_> = unwrap(env.cast_local::<JString>(obj), env);
 				String::from(unwrap(jstring.mutf8_chars(env), env))
 			})
 			.collect();
@@ -148,24 +149,25 @@ fn jlist_insert_and_remove() {
 		assert_eq!(items, vec!["first", "second", "third"]);
 
 		// Remove the middle element
-		let removed_obj = unwrap(list.remove(env, 1), env);
-		let removed_jstring = unwrap(env.cast_local::<JString>(removed_obj), env);
-		let removed_str = unwrap(removed_jstring.mutf8_chars(env), env);
+		let removed_obj: abos_jni::objects::JObject<'_> = unwrap(list.remove(env, 1), env);
+		let removed_jstring: JString<'_> = unwrap(env.cast_local::<JString>(removed_obj), env);
+		let removed_str: abos_jni::strings::MUTF8Chars<'_, &JString<'_>> =
+			unwrap(removed_jstring.mutf8_chars(env), env);
 		assert_eq!(removed_str.to_str().as_ref(), "second");
 
 		// Verify size is now 2
-		let size = unwrap(list.size(env), env);
+		let size: i32 = unwrap(list.size(env), env);
 		assert_eq!(size, 2);
 
 		// Verify remaining elements
-		let first_remaining = unwrap(list.get(env, 0), env);
-		let first_jstring = unwrap(env.cast_local::<JString>(first_remaining), env);
-		let first_str = unwrap(first_jstring.mutf8_chars(env), env);
+		let first_remaining: abos_jni::objects::JObject<'_> = unwrap(list.get(env, 0), env);
+		let first_jstring: JString<'_> = unwrap(env.cast_local::<JString>(first_remaining), env);
+		let first_str: abos_jni::strings::MUTF8Chars<'_, &JString<'_>> = unwrap(first_jstring.mutf8_chars(env), env);
 		assert_eq!(first_str.to_str().as_ref(), "first");
 
-		let second_remaining = unwrap(list.get(env, 1), env);
-		let second_jstring = unwrap(env.cast_local::<JString>(second_remaining), env);
-		let second_str = unwrap(second_jstring.mutf8_chars(env), env);
+		let second_remaining: abos_jni::objects::JObject<'_> = unwrap(list.get(env, 1), env);
+		let second_jstring: JString<'_> = unwrap(env.cast_local::<JString>(second_remaining), env);
+		let second_str: abos_jni::strings::MUTF8Chars<'_, &JString<'_>> = unwrap(second_jstring.mutf8_chars(env), env);
 		assert_eq!(second_str.to_str().as_ref(), "third");
 
 		Ok(())
@@ -177,57 +179,60 @@ fn jlist_insert_and_remove() {
 fn jlist_size_and_remove() {
 	attach_current_thread(|env| {
 		// Create a new ArrayList
-		let list_object = unwrap(
+		let list_object: abos_jni::objects::JObject<'_> = unwrap(
 			env.new_object(jni_str!("java/util/ArrayList"), jni_sig!("()V"), &[]),
 			env,
 		);
-		let list = unwrap(JList::cast_local(env, list_object), env);
+		let list: JList<'_> = unwrap(JList::cast_local(env, list_object), env);
 
 		// Test size on empty list
-		let size = unwrap(list.size(env), env);
+		let size: i32 = unwrap(list.size(env), env);
 		assert_eq!(size, 0);
 
 		// Add some elements
-		let first_str = unwrap(env.new_string("first"), env);
-		let second_str = unwrap(env.new_string("second"), env);
-		let third_str = unwrap(env.new_string("third"), env);
+		let first_str: JString<'_> = unwrap(env.new_string("first"), env);
+		let second_str: JString<'_> = unwrap(env.new_string("second"), env);
+		let third_str: JString<'_> = unwrap(env.new_string("third"), env);
 
 		unwrap(list.add(env, &first_str), env);
 		unwrap(list.add(env, &second_str), env);
 		unwrap(list.add(env, &third_str), env);
 
 		// Verify size is now 3
-		let size = unwrap(list.size(env), env);
+		let size: i32 = unwrap(list.size(env), env);
 		assert_eq!(size, 3);
 
 		// Remove the last element
-		let removed_obj = unwrap(list.remove(env, 2), env);
-		let removed_jstring = unwrap(env.cast_local::<JString>(removed_obj), env);
-		let removed_str = unwrap(removed_jstring.mutf8_chars(env), env);
+		let removed_obj: abos_jni::objects::JObject<'_> = unwrap(list.remove(env, 2), env);
+		let removed_jstring: JString<'_> = unwrap(env.cast_local::<JString>(removed_obj), env);
+		let removed_str: abos_jni::strings::MUTF8Chars<'_, &JString<'_>> =
+			unwrap(removed_jstring.mutf8_chars(env), env);
 		assert_eq!(removed_str.to_str().as_ref(), "third");
 
 		// Verify size is now 2
-		let size = unwrap(list.size(env), env);
+		let size: i32 = unwrap(list.size(env), env);
 		assert_eq!(size, 2);
 
 		// Remove another element
-		let removed_obj = unwrap(list.remove(env, 1), env);
-		let removed_jstring = unwrap(env.cast_local::<JString>(removed_obj), env);
-		let removed_str = unwrap(removed_jstring.mutf8_chars(env), env);
+		let removed_obj: abos_jni::objects::JObject<'_> = unwrap(list.remove(env, 1), env);
+		let removed_jstring: JString<'_> = unwrap(env.cast_local::<JString>(removed_obj), env);
+		let removed_str: abos_jni::strings::MUTF8Chars<'_, &JString<'_>> =
+			unwrap(removed_jstring.mutf8_chars(env), env);
 		assert_eq!(removed_str.to_str().as_ref(), "second");
 
 		// Verify size is now 1
-		let size = unwrap(list.size(env), env);
+		let size: i32 = unwrap(list.size(env), env);
 		assert_eq!(size, 1);
 
 		// Remove the last element
-		let removed_obj = unwrap(list.remove(env, 0), env);
-		let removed_jstring = unwrap(env.cast_local::<JString>(removed_obj), env);
-		let removed_str = unwrap(removed_jstring.mutf8_chars(env), env);
+		let removed_obj: abos_jni::objects::JObject<'_> = unwrap(list.remove(env, 0), env);
+		let removed_jstring: JString<'_> = unwrap(env.cast_local::<JString>(removed_obj), env);
+		let removed_str: abos_jni::strings::MUTF8Chars<'_, &JString<'_>> =
+			unwrap(removed_jstring.mutf8_chars(env), env);
 		assert_eq!(removed_str.to_str().as_ref(), "first");
 
 		// Verify list is now empty
-		let size = unwrap(list.size(env), env);
+		let size: i32 = unwrap(list.size(env), env);
 		assert_eq!(size, 0);
 
 		Ok(())
@@ -239,19 +244,19 @@ fn jlist_size_and_remove() {
 fn jlist_iterator_empty() {
 	attach_current_thread(|env| {
 		// Create an empty ArrayList
-		let list_object = unwrap(
+		let list_object: abos_jni::objects::JObject<'_> = unwrap(
 			env.new_object(jni_str!("java/util/ArrayList"), jni_sig!("()V"), &[]),
 			env,
 		);
-		let list = unwrap(JList::cast_local(env, list_object), env);
+		let list: JList<'_> = unwrap(JList::cast_local(env, list_object), env);
 
 		// Test iterator on empty list
-		let mut collected = Vec::new();
+		let mut collected: Vec<abos_jni::strings::JNIString> = Vec::new();
 		unwrap(
 			list.iter(env).and_then(|iter| {
 				while let Some(obj) = iter.next(env)? {
-					let s = env.cast_local::<JString>(obj)?;
-					let s = s.mutf8_chars(env)?;
+					let s: JString<'_> = env.cast_local::<JString>(obj)?;
+					let s: abos_jni::strings::MUTF8Chars<'_, &JString<'_>> = s.mutf8_chars(env)?;
 					collected.push(s.to_owned());
 				}
 				Ok(())
@@ -268,20 +273,20 @@ fn jlist_iterator_empty() {
 #[test]
 fn jlist_iterator_with_auto() {
 	attach_current_thread(|env| {
-		let data = &[jni_str!("item1"), jni_str!("item2"), jni_str!("item3")];
+		let data: &[&abos_jni::strings::JNIStr; 3] = &[jni_str!("item1"), jni_str!("item2"), jni_str!("item3")];
 
 		// Create a new ArrayList
-		let list_object = unwrap(
+		let list_object: abos_jni::objects::JObject<'_> = unwrap(
 			env.new_object(jni_str!("java/util/ArrayList"), jni_sig!("()V"), &[]),
 			env,
 		);
-		let list = unwrap(JList::cast_local(env, list_object), env);
+		let list: JList<'_> = unwrap(JList::cast_local(env, list_object), env);
 
 		// Add all strings to the list
 		unwrap(
 			data.iter().try_for_each(|s| {
-				let string = JString::from_jni_str(env, s)?;
-				let added = list.add(env, &string)?;
+				let string: JString<'_> = JString::from_jni_str(env, s)?;
+				let added: bool = list.add(env, &string)?;
 				assert!(added);
 				Ok(())
 			}),
@@ -289,13 +294,13 @@ fn jlist_iterator_with_auto() {
 		);
 
 		// Test iterator with Auto<T> to prevent memory leaks
-		let mut collected = Vec::new();
+		let mut collected: Vec<abos_jni::strings::JNIString> = Vec::new();
 		unwrap(
 			list.iter(env).and_then(|iter| {
 				while let Some(obj) = iter.next(env)? {
-					let obj = obj.auto(); // Wrap as Auto<T> to avoid leaking while iterating
-					let s = env.as_cast::<JString>(&obj)?;
-					let s = s.mutf8_chars(env)?;
+					let obj: Auto<'_, abos_jni::objects::JObject<'_>> = obj.auto(); // Wrap as Auto<T> to avoid leaking while iterating
+					let s: abos_jni::refs::Cast<'_, '_, JString<'_>> = env.as_cast::<JString>(&obj)?;
+					let s: abos_jni::strings::MUTF8Chars<'_, &JString<'_>> = s.mutf8_chars(env)?;
 					collected.push(s.to_owned());
 				}
 				Ok(())
@@ -303,7 +308,7 @@ fn jlist_iterator_with_auto() {
 			env,
 		);
 
-		let orig = data.to_vec();
+		let orig: Vec<&abos_jni::strings::JNIStr> = data.to_vec();
 		assert_eq!(orig, collected);
 		Ok(())
 	})

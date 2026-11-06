@@ -55,7 +55,7 @@ where
 		// OutOfMemoryError. If it returns NULL, no critical section has been
 		// created, so it's safe to make JNI calls to check/clear exceptions.
 		// SAFETY: The typed array is valid, the copy flag is writable, and the guard will delimit the critical section.
-		let ptr = unsafe {
+		let ptr: *mut T = unsafe {
 			jni_call_no_post_check_ex!(
 				env,
 				v1_2,
@@ -86,7 +86,7 @@ where
 	}
 
 	pub(crate) fn new(env: &Env<'_>, array: TArrayRef, mode: ReleaseMode) -> Result<Self> {
-		let len = array.as_ref().len(env)?;
+		let len: usize = array.as_ref().len(env)?;
 		// SAFETY: The length was obtained from the same typed array retained by the returned guard.
 		unsafe { Self::new_with_len(env, array, len, mode) }
 	}
@@ -167,7 +167,8 @@ where
 {
 	fn drop(&mut self) {
 		// Safety: `self.mode` is valid and the array has not yet been released.
-		let res = unsafe { self.release_primitive_array_critical(self.mode as i32) };
+		let res: std::result::Result<(), crate::errors::Error> =
+			unsafe { self.release_primitive_array_critical(self.mode as i32) };
 
 		match res {
 			Ok(()) => {}

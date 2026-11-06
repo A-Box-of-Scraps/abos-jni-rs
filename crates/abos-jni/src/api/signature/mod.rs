@@ -257,7 +257,7 @@ where
 	M: AsRef<MethodSignature<'sig, 'args>>,
 {
 	fn from(sig: M) -> Self {
-		let sig = sig.as_ref();
+		let sig: &MethodSignature<'_, '_> = sig.as_ref();
 		Self {
 			sig: sig.sig().into(),
 			args: sig.args().to_vec(),
@@ -277,7 +277,7 @@ impl RuntimeMethodSignature {
 	///
 	/// Returns a parse error if the input is not a complete, valid JNI signature.
 	pub fn from_str<S: AsRef<str>>(s: S) -> Result<Self> {
-		let input = s.as_ref();
+		let input: &str = s.as_ref();
 		match parse_method_sig(input)? {
 			// Note: the parser initially returns a placeholder, empty signature string,
 			(Self { sig: _, args, ret }, "") => Ok(Self {
@@ -360,7 +360,7 @@ where
 	F: AsRef<FieldSignature<'sig>>,
 {
 	fn from(sig: F) -> Self {
-		let sig = sig.as_ref();
+		let sig: &FieldSignature<'_> = sig.as_ref();
 		Self {
 			sig: sig.sig().into(),
 			ty: sig.ty(),
@@ -379,7 +379,7 @@ impl RuntimeFieldSignature {
 	///
 	/// Returns a parse error if the input is not a complete, valid JNI signature.
 	pub fn from_str<S: AsRef<str>>(s: S) -> Result<Self> {
-		let input = s.as_ref();
+		let input: &str = s.as_ref();
 		match parse_field_sig(input)? {
 			// Note: the parser initially returns a placeholder, empty signature string,
 			(Self { sig: _, ty }, "") => Ok(Self {

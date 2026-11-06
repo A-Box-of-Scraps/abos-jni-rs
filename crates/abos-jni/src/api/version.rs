@@ -86,7 +86,7 @@ impl From<JNIVersion> for abos_jni_sys::jint {
 
 #[test]
 fn jni_version_major_minor() {
-	let cases = [
+	let cases: [(u16, u16, JNIVersion, i32); 10] = [
 		(1, 1, JNIVersion::V1_1, abos_jni_sys::JNI_VERSION_1_1),
 		(1, 2, JNIVersion::V1_2, abos_jni_sys::JNI_VERSION_1_2),
 		(1, 4, JNIVersion::V1_4, abos_jni_sys::JNI_VERSION_1_4),

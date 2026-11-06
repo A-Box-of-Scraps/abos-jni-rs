@@ -46,22 +46,23 @@ impl<'local> Env<'local> {
 		clippy::wrong_self_convention,
 		reason = "JNI reflection allocates a local reference and therefore requires a mutable Env."
 	)]
-	pub(super) unsafe fn to_reflected_method_base<'other_local, M>(
+	pub(super) unsafe fn to_reflected_method_base<'other_local, M, C>(
 		&mut self,
-		class: impl Desc<'local, JClass<'other_local>>,
+		class: C,
 		method_id: impl Desc<'local, M>,
 		to_jmethodid: impl FnOnce(M) -> crate::sys::jmethodID,
 		is_static: bool,
 	) -> Result<JObject<'local>>
 	where
 		M: Copy,
+		C: Desc<'local, JClass<'other_local>>,
 	{
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		let class = class.lookup(self)?;
+		let class: C::Output = class.lookup(self)?;
 
-		let method_id = to_jmethodid(*method_id.lookup(self)?.as_ref());
+		let method_id: crate::sys::jmethodID = to_jmethodid(*method_id.lookup(self)?.as_ref());
 
 		// SAFETY: The caller guarantees is_static matches the resolved method ID; the class remains live during reflection.
 		unsafe {

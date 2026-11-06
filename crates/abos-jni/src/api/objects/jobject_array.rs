@@ -96,8 +96,9 @@ static API_REGISTRY: OnceLock<RwLock<HashMap<TypeId, &'static (dyn Any + Send + 
 
 impl<E: Reference + Send + Sync> JObjectArrayAPI<E> {
 	pub(crate) fn get(env: &Env<'_>, loader_context: &LoaderContext<'_, '_>) -> Result<&'static Self> {
-		let map = API_REGISTRY.get_or_init(|| RwLock::new(HashMap::new()));
-		let tid = TypeId::of::<Self>();
+		let map: &RwLock<HashMap<TypeId, &(dyn Any + Send + Sync)>> =
+			API_REGISTRY.get_or_init(|| RwLock::new(HashMap::new()));
+		let tid: TypeId = TypeId::of::<Self>();
 
 		// Fast path (read-lock)
 		if let Some(any_ref) = map.read().expect("array binding cache is not poisoned").get(&tid) {
@@ -115,8 +116,8 @@ impl<E: Reference + Send + Sync> JObjectArrayAPI<E> {
 
 		let created: Self = {
 			env.with_local_frame(DEFAULT_LOCAL_FRAME_CAPACITY, |env| -> Result<_> {
-				let class = loader_context.load_class_for_type::<JObjectArray<E>>(env, false)?;
-				let class = env.new_global_ref(&class)?;
+				let class: JClass<'_> = loader_context.load_class_for_type::<JObjectArray<E>>(env, false)?;
+				let class: Global<JClass<'_>> = env.new_global_ref(&class)?;
 				Ok(Self {
 					class,
 					_marker: std::marker::PhantomData,
@@ -124,11 +125,12 @@ impl<E: Reference + Send + Sync> JObjectArrayAPI<E> {
 			})?
 		};
 
-		let mut write = map.write().expect("array binding cache is not poisoned");
+		let mut write: std::sync::RwLockWriteGuard<'_, HashMap<TypeId, &(dyn Any + Send + Sync)>> =
+			map.write().expect("array binding cache is not poisoned");
 
 		// Another thread might have inserted while we acquired the write lock:
 		if let Some(any_ref) = write.get(&tid) {
-			let api = any_ref
+			let api: &Self = any_ref
 				.downcast_ref::<Self>()
 				.expect("TypeId matched but downcast failed");
 			return Ok(api);
@@ -166,11 +168,13 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 		length: usize,
 		initial_element: impl AsRef<E::Kind<'any_local>>,
 	) -> Result<JObjectArray<'env_local, E::Kind<'env_local>>> {
-		let length = crate::sys::jsize::try_from(length).map_err(|_| Error::JniCall(JniError::InvalidArguments))?;
+		let length: i32 =
+			crate::sys::jsize::try_from(length).map_err(|_| Error::JniCall(JniError::InvalidArguments))?;
 		env.assert_top();
-		let element_class = E::lookup_class(env, &LoaderContext::default())?;
+		// Borrowing the lookup result keeps its guard alive through the JNI call.
+		let element_class: &Global<JClass<'static>> = &*E::lookup_class(env, &LoaderContext::default())?;
 		// SAFETY: The element class is resolved through Reference, and the initial value has the matching element type.
-		let array = unsafe {
+		let array: JObjectArray<'_, E::Kind<'_>> = unsafe {
 			jni_call_with_catch_and_null_check!(
 				catch |env| {
 					crate::exceptions::JOutOfMemoryError =>
@@ -186,9 +190,6 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 			)
 			.map(|array| JObjectArray::<E>::from_raw(env, array))?
 		};
-
-		// Ensure that `element_class` isn't dropped before the JNI call returns.
-		drop(element_class);
 
 		Ok(array)
 	}
@@ -261,9 +262,9 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 	///
 	/// Returns an error if the array is null or a Java exception is pending.
 	pub fn len(&self, env: &Env) -> Result<usize> {
-		let array = null_check!(self.as_raw() as jobjectArray, "JObjectArray::len self argument")?;
+		let array: crate::sys::jobject = null_check!(self.as_raw() as jobjectArray, "JObjectArray::len self argument")?;
 		// SAFETY: The typed array reference is non-null and valid for this Env.
-		let len = unsafe { jni_call_no_post_check_ex!(env, v1_1, GetArrayLength, array)? };
+		let len: i32 = unsafe { jni_call_no_post_check_ex!(env, v1_1, GetArrayLength, array)? };
 		usize::try_from(len).map_err(|_| Error::JniCall(JniError::Unknown))
 	}
 
@@ -285,8 +286,9 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		assert_eq!(env.level, JavaVM::thread_attach_guard_level());
-		let array = null_check!(self.as_raw() as jobjectArray, "get_object_array_element array argument")?;
-		let index = crate::sys::jsize::try_from(index).map_err(|_| Error::JniCall(JniError::InvalidArguments))?;
+		let array: crate::sys::jobject =
+			null_check!(self.as_raw() as jobjectArray, "get_object_array_element array argument")?;
+		let index: i32 = crate::sys::jsize::try_from(index).map_err(|_| Error::JniCall(JniError::InvalidArguments))?;
 		// SAFETY: The typed array is non-null, index fits jint, and JNI checks array bounds.
 		unsafe {
 			jni_call_with_catch!(
@@ -318,8 +320,9 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 		index: usize,
 		value: impl AsRef<E::Kind<'any_local>>,
 	) -> Result<()> {
-		let array = null_check!(self.as_raw() as jobjectArray, "set_object_array_element array argument")?;
-		let index = crate::sys::jsize::try_from(index).map_err(|_| Error::JniCall(JniError::InvalidArguments))?;
+		let array: crate::sys::jobject =
+			null_check!(self.as_raw() as jobjectArray, "set_object_array_element array argument")?;
+		let index: i32 = crate::sys::jsize::try_from(index).map_err(|_| Error::JniCall(JniError::InvalidArguments))?;
 		// SAFETY: The typed array and element references are valid, index fits jint, and JNI checks bounds and element compatibility.
 		unsafe {
 			jni_call_with_catch!(
@@ -347,7 +350,7 @@ unsafe impl<'local, E: Reference + 'local> Reference for JObjectArray<'local, E>
 	type Kind<'env>
 		= JObjectArray<'env, E::Kind<'env>>
 	where
-		<E as Reference>::Kind<'env>: 'env;
+		E::Kind<'env>: 'env;
 	type GlobalKind = JObjectArray<'static, E::GlobalKind>;
 
 	fn as_raw(&self) -> jobject {
@@ -355,9 +358,9 @@ unsafe impl<'local, E: Reference + 'local> Reference for JObjectArray<'local, E>
 	}
 
 	fn class_name() -> Cow<'static, JNIStr> {
-		let inner = E::class_name();
-		let inner = inner.to_str();
-		let name = if inner.len() == 1 || inner.starts_with('[') {
+		let inner: Cow<'_, JNIStr> = E::class_name();
+		let inner: Cow<'_, str> = inner.to_str();
+		let name: String = if inner.len() == 1 || inner.starts_with('[') {
 			// inner = primitive OR array
 			format!("[{inner}")
 		} else {
@@ -372,7 +375,7 @@ unsafe impl<'local, E: Reference + 'local> Reference for JObjectArray<'local, E>
 		env: &Env<'_>,
 		loader_context: &LoaderContext,
 	) -> crate::errors::Result<impl Deref<Target = Global<JClass<'static>>> + 'caller> {
-		let api = JObjectArrayAPI::<E::GlobalKind>::get(env, loader_context)?;
+		let api: &JObjectArrayAPI<E::GlobalKind> = JObjectArrayAPI::<E::GlobalKind>::get(env, loader_context)?;
 		Ok(&api.class)
 	}
 

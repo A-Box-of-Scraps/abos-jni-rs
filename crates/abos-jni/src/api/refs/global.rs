@@ -187,7 +187,7 @@ where
 	/// you do not own, you should instead use [`Env::as_cast_raw`] to create a
 	/// temporary wrapper.
 	pub fn into_raw(mut self) -> sys::jobject {
-		let obj = std::mem::take(&mut self.obj); // Leave a `Default/null`` reference in self.obj that doesn't need to be deleted
+		let obj: T = std::mem::take(&mut self.obj); // Leave a `Default/null`` reference in self.obj that doesn't need to be deleted
 		std::mem::forget(self); // Skip redundant Drop for `Default/null` reference
 		let obj: JObject = obj.into();
 		obj.into_raw()
@@ -216,7 +216,7 @@ where
 	T: Into<JObject<'static>> + AsRef<JObject<'static>> + Default + Reference + Send + Sync + 'static,
 {
 	fn drop(&mut self) {
-		let obj = std::mem::take(&mut self.obj);
+		let obj: T = std::mem::take(&mut self.obj);
 
 		// It's redundant to explicitly call DeleteGlobalRef with a null pointer and we don't
 		// assume that a JavaVM has been initialized if we only wrap a 'static null pointer
@@ -225,17 +225,17 @@ where
 		}
 		// Panic: If we have a non-null reference, we know JavaVM::singleton() must have been
 		// initialized (and can't return an error) because ::new() takes a Env reference.
-		let vm = JavaVM::singleton().expect("JavaVM singleton uninitialized");
+		let vm: JavaVM = JavaVM::singleton().expect("JavaVM singleton uninitialized");
 
 		// Note: we use `attach_current_thread_guard` and avoid using
 		// `AttachGuard::detach_with_catch` because we need to be exception safe and must
 		// not interfere with any currently-pending exception
 		let exception_safe_delete = || -> abos_jni::errors::Result<()> {
-			let mut scope = abos_jni::ScopeToken::default();
-			let mut guard =
+			let mut scope: crate::ScopeToken = abos_jni::ScopeToken::default();
+			let mut guard: crate::AttachGuard<'_> =
 				// SAFETY: The scope token and guard remain on this stack until the reference has been released.
 				unsafe { vm.attach_current_thread_guard(|| AttachConfig::new().scoped(true), &mut scope)? };
-			let env = guard.borrow_env_mut();
+			let env: &mut Env<'_> = guard.borrow_env_mut();
 			// If the Env is borrowing from an AttachGuard that owns the current thread
 			// attachment that means the thread was not already attached
 			if env.owns_attachment() {

@@ -36,12 +36,12 @@ impl<'local> Env<'local> {
 		N: AsRef<JNIStr>,
 		S: AsRef<FieldSignature<'sig>>,
 	{
-		let class = class.lookup(self)?;
-		let ffi_name = name.as_ref();
-		let ffi_sig = sig.as_ref();
+		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
+		let ffi_name: &JNIStr = name.as_ref();
+		let ffi_sig: &FieldSignature<'_> = sig.as_ref();
 
 		// SAFETY: The resolved class, field name and signature remain valid during the JNI lookup.
-		let field_id = unsafe {
+		let field_id: crate::sys::jfieldID = unsafe {
 			jni_call_with_catch!(
 				catch |env| {
 					crate::exceptions::JNoSuchFieldError =>
@@ -50,8 +50,8 @@ impl<'local> Env<'local> {
 							sig: ffi_sig.sig().to_string(),
 						}),
 					e: crate::exceptions::JExceptionInInitializerError => {
-						let exception = e.get_exception(env);
-						let exception = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
+						let exception: std::result::Result<crate::objects::JThrowable<'_>, crate::errors::Error> = e.get_exception(env);
+						let exception: Option<crate::refs::Global<crate::objects::JThrowable<'_>>> = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
 						Err(Error::ExceptionInInitializer { exception })
 					},
 					crate::exceptions::JOutOfMemoryError =>
@@ -117,12 +117,12 @@ impl<'local> Env<'local> {
 		U: AsRef<JNIStr>,
 		V: AsRef<FieldSignature<'sig>>,
 	{
-		let class = class.lookup(self)?;
-		let ffi_name = name.as_ref();
-		let ffi_sig = sig.as_ref();
+		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
+		let ffi_name: &JNIStr = name.as_ref();
+		let ffi_sig: &FieldSignature<'_> = sig.as_ref();
 
 		// SAFETY: The resolved class, field name and signature remain valid during the JNI lookup.
-		let field_id = unsafe {
+		let field_id: crate::sys::jfieldID = unsafe {
 			jni_call_with_catch!(
 				catch |env| {
 					crate::exceptions::JNoSuchFieldError =>
@@ -131,8 +131,8 @@ impl<'local> Env<'local> {
 							sig: ffi_sig.sig().to_string(),
 						}),
 					e: crate::exceptions::JExceptionInInitializerError => {
-						let exception = e.get_exception(env);
-						let exception = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
+						let exception: std::result::Result<crate::objects::JThrowable<'_>, crate::errors::Error> = e.get_exception(env);
+						let exception: Option<crate::refs::Global<crate::objects::JThrowable<'_>>> = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
 						Err(Error::ExceptionInInitializer { exception })
 					},
 					crate::exceptions::JOutOfMemoryError =>
@@ -169,8 +169,8 @@ impl<'local> Env<'local> {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		let obj = obj.as_ref();
-		let obj = null_check!(obj, "get_object_class")?;
+		let obj: &JObject<'_> = obj.as_ref();
+		let obj: &JObject<'_> = null_check!(obj, "get_object_class")?;
 		// SAFETY: The object is non-null and valid; GetObjectClass returns a local reference in this frame.
 		unsafe {
 			Ok(JClass::from_raw(

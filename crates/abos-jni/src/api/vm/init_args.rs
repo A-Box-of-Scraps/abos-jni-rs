@@ -204,7 +204,7 @@ impl<'a> InitArgsBuilder<'a> {
 	///
 	/// [jni-options]: https://docs.oracle.com/en/java/javase/11/docs/specs/jni/invocation.html#jni_createjavavm
 	pub fn try_option(&mut self, opt_string: impl Into<Cow<'a, str>>) -> Result<(), JvmError> {
-		let opt_string = opt_string.into();
+		let opt_string: Cow<'_, str> = opt_string.into();
 
 		// If there is already a deferred error, do nothing.
 		let Ok(opts) = &mut self.opts else { return Ok(()) };
@@ -259,7 +259,7 @@ impl<'a> InitArgsBuilder<'a> {
 	/// [jni-options]: https://docs.oracle.com/en/java/javase/11/docs/specs/jni/invocation.html#jni_createjavavm
 	#[must_use]
 	pub fn option_encoded(mut self, opt_string: impl Into<Cow<'a, CStr>>) -> Self {
-		let opt_string = opt_string.into();
+		let opt_string: Cow<'_, CStr> = opt_string.into();
 
 		// If there is already a deferred error, do nothing.
 		let Ok(opts) = &mut self.opts else { return self };
@@ -280,7 +280,7 @@ impl<'a> InitArgsBuilder<'a> {
 	/// Default: V8
 	#[must_use]
 	pub const fn version(self, version: JNIVersion) -> Self {
-		let mut s = self;
+		let mut s: InitArgsBuilder<'_> = self;
 		s.version = version;
 		s
 	}
@@ -294,7 +294,7 @@ impl<'a> InitArgsBuilder<'a> {
 	/// Default: `false`
 	#[must_use]
 	pub const fn ignore_unrecognized(self, ignore: bool) -> Self {
-		let mut s = self;
+		let mut s: InitArgsBuilder<'_> = self;
 		s.ignore_unrecognized = ignore;
 		s
 	}
@@ -306,8 +306,8 @@ impl<'a> InitArgsBuilder<'a> {
 	/// If a call to [`InitArgsBuilder::option`] caused a deferred error, it is returned from this
 	/// method. Also returns [`JvmError::TooManyOptions`] if the option count does not fit JNI.
 	pub fn build(self) -> Result<InitArgs<'a>, JvmError> {
-		let opt_strings = self.opts?;
-		let option_count = checked_option_count(opt_strings.len())?;
+		let opt_strings: Vec<Cow<'_, CStr>> = self.opts?;
+		let option_count: i32 = checked_option_count(opt_strings.len())?;
 
 		let opts: Vec<JavaVMOption> = opt_strings
 			.iter()
@@ -379,14 +379,14 @@ mod tests {
 
 	#[test]
 	fn option_count_respects_jni_integer_range() {
-		let limit = usize::try_from(i32::MAX).expect("JNI integer limit fits usize");
+		let limit: usize = usize::try_from(i32::MAX).expect("JNI integer limit fits usize");
 		assert_eq!(checked_option_count(0).expect("zero options fit"), 0);
 		assert_eq!(
 			checked_option_count(limit).expect("maximum option count fits"),
 			i32::MAX
 		);
 		for count in [limit + 1, usize::MAX] {
-			let error = checked_option_count(count).expect_err("oversized option count is rejected");
+			let error: JvmError = checked_option_count(count).expect_err("oversized option count is rejected");
 			assert!(matches!(error, JvmError::TooManyOptions(actual) if actual == count));
 			assert!(error.opt_string().is_none());
 		}

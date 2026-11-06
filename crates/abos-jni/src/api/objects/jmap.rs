@@ -6,7 +6,6 @@ use crate::{
 
 use std::ops::Deref;
 
-#[cfg(doc)]
 use crate::objects::JSet;
 
 crate::bind_java_type! {
@@ -146,7 +145,7 @@ impl JMap<'_> {
 	///
 	/// Returns an error if resolving or calling the Java map or iterator methods fails, including pending Java exceptions.
 	pub fn get<'env_local>(&self, env: &mut Env<'env_local>, key: &JObject) -> Result<Option<JObject<'env_local>>> {
-		let value = self._get(env, key)?;
+		let value: JObject<'_> = self._get(env, key)?;
 		if value.is_null() { Ok(None) } else { Ok(Some(value)) }
 	}
 
@@ -174,7 +173,7 @@ impl JMap<'_> {
 		key: &JObject,
 		value: &JObject,
 	) -> Result<Option<JObject<'env_local>>> {
-		let old = self._put(env, key, value)?;
+		let old: JObject<'_> = self._put(env, key, value)?;
 		if old.is_null() { Ok(None) } else { Ok(Some(old)) }
 	}
 
@@ -196,7 +195,7 @@ impl JMap<'_> {
 	///
 	/// Returns an error if resolving or calling the Java map or iterator methods fails, including pending Java exceptions.
 	pub fn remove<'env_local>(&self, env: &mut Env<'env_local>, key: &JObject) -> Result<Option<JObject<'env_local>>> {
-		let old = self._remove(env, key)?;
+		let old: JObject<'_> = self._remove(env, key)?;
 		if old.is_null() { Ok(None) } else { Ok(Some(old)) }
 	}
 
@@ -241,8 +240,8 @@ impl JMap<'_> {
 	///
 	/// Returns an error if resolving or calling the Java map or iterator methods fails, including pending Java exceptions.
 	pub fn iter<'env_local>(&self, env: &mut Env<'env_local>) -> Result<JMapIter<'env_local>> {
-		let set = self.entry_set(env)?;
-		let iterator = set.iterator(env)?;
+		let set: JSet<'_> = self.entry_set(env)?;
+		let iterator: JIterator<'_> = set.iterator(env)?;
 
 		Ok(JMapIter { iterator })
 	}
@@ -335,7 +334,7 @@ impl JMapIter<'_> {
 		self.iterator.next(env)?.map_or(Ok(None), |entry| {
 			// SAFETY: we know that the entrySet iterator will yield Map.Entry values
 			// so we can safely downcast without needing a runtime type check
-			let entry = unsafe { JMapEntry::from_raw(env, entry.into_raw()) };
+			let entry: JMapEntry<'_> = unsafe { JMapEntry::from_raw(env, entry.into_raw()) };
 			Ok(Some(entry))
 		})
 	}

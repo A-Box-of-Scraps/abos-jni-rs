@@ -27,8 +27,8 @@ impl Env<'_> {
 		// - we can assume that `obj.raw()` is a valid reference
 		// - we know there's no other wrapper for the reference passed to from_global_raw
 		//   since we have just created it.
-		let global_ref = unsafe {
-			let global_ref =
+		let global_ref: Global<O::GlobalKind> = unsafe {
+			let global_ref: O::GlobalKind =
 				O::global_kind_from_raw(jni_call_no_post_check_ex!(self, v1_1, NewGlobalRef, obj.as_raw())?);
 			Global::new(self, global_ref)
 		};
@@ -99,11 +99,11 @@ impl Env<'_> {
 		}
 
 		if self.is_instance_of_cast_type::<To>(obj.as_ref())? {
-			let new = self.new_global_ref(obj)?;
+			let raw: crate::sys::jobject = self.new_global_ref(obj)?.into_raw();
 			// Safety:
-			// - we have just checked that `new` is an instance of `To`
+			// - we have just checked that the global reference is an instance of `To`
 			unsafe {
-				let cast = To::global_kind_from_raw(new.into_raw());
+				let cast: To::GlobalKind = To::global_kind_from_raw(raw);
 				Ok(Global::new(self, cast))
 			}
 		} else {
@@ -173,7 +173,7 @@ impl Env<'_> {
 			// - we have just checked that `obj` is an instance of `T`
 			// - there won't be multiple wrappers since we are creating one from the other
 			unsafe {
-				let cast = To::global_kind_from_raw(obj.into_raw());
+				let cast: To::GlobalKind = To::global_kind_from_raw(obj.into_raw());
 				Ok(Global::new(self, cast))
 			}
 		} else {
@@ -216,8 +216,8 @@ impl Env<'_> {
 		// - we can assume that `obj.raw()` is a valid reference
 		// - we know there's no other wrapper for the reference passed to from_global_raw
 		//   since we have just created it.
-		let weak_ref = unsafe {
-			let weak = O::global_kind_from_raw(jni_call_with_catch!(
+		let weak_ref: Weak<O::GlobalKind> = unsafe {
+			let weak: O::GlobalKind = O::global_kind_from_raw(jni_call_with_catch!(
 				catch |env| {
 					crate::exceptions::JOutOfMemoryError =>
 						Err(Error::JniCall(JniError::NoMemory)),

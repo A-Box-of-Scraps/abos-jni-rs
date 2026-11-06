@@ -11,10 +11,10 @@ pub(super) fn generate_is_instance_of_assignable_checks(
 	type_mappings: &TypeMappings,
 	jni: &syn::Path,
 ) -> Result<TokenStream> {
-	let checks: Vec<_> = is_instance_of
+	let checks: Vec<TokenStream> = is_instance_of
 		.iter()
 		.map(|entry| {
-			let to_rust_type_alias = &entry.type_alias;
+			let to_rust_type_alias: &String = &entry.type_alias;
 
 			match type_mappings.map_alias(to_rust_type_alias) {
 				Some(ConcreteType::Primitive { .. }) => Err(syn::Error::new(
@@ -25,9 +25,9 @@ pub(super) fn generate_is_instance_of_assignable_checks(
 					name: to_java_class,
 					reference_type: to_rust_type,
 				}) => {
-					let to_type_path_str = &to_rust_type.path();
+					let to_type_path_str: &&str = &to_rust_type.path();
 
-					let to_java_class_str = to_java_class.to_java_dotted();
+					let to_java_class_str: String = to_java_class.to_java_dotted();
 
 					let to_type_path: syn::Path = syn::parse_str(to_type_path_str).map_err(|_| {
 						syn::Error::new(Span::call_site(), format!("Invalid Rust type path: {to_type_path_str}"))
@@ -92,7 +92,7 @@ pub(super) fn generate_reference_impl(
 	jni: &syn::Path,
 ) -> TokenStream {
 	// Create a CStr literal for the Java class name
-	let java_class_cstr = lit_cstr_mutf8(java_class);
+	let java_class_cstr: syn::LitCStr = lit_cstr_mutf8(java_class);
 
 	quote! {
 		unsafe impl<'local> #jni::refs::Reference for #type_name<'local> {
@@ -140,12 +140,12 @@ pub(super) fn generate_reference_impl(
 /// Generate base methods (`from_raw`, null, `into_raw`)
 pub(super) fn generate_base_methods(type_name: &Ident, sys_type: Option<&Ident>, jni: &syn::Path) -> TokenStream {
 	// Use the provided sys_type or default to jobject
-	let sys_type_ident = sys_type.map_or_else(|| quote! { jobject }, |ident| quote! { #ident });
+	let sys_type_ident: TokenStream = sys_type.map_or_else(|| quote! { jobject }, |ident| quote! { #ident });
 
 	// Generate the full path to the sys type
-	let sys_type_path = quote! { #jni::sys::#sys_type_ident };
+	let sys_type_path: TokenStream = quote! { #jni::sys::#sys_type_ident };
 
-	let jni_path_str = path_to_string_no_spaces(jni);
+	let jni_path_str: String = path_to_string_no_spaces(jni);
 
 	quote! {
 		impl<'local> #type_name<'local> {
@@ -229,11 +229,11 @@ pub(super) fn generate_is_instance_of_code(
 	type_mappings: &TypeMappings,
 	jni: &syn::Path,
 ) -> Result<TokenStream> {
-	let mut is_instance_of_methods = Vec::new();
-	let mut trait_impls = Vec::new();
+	let mut is_instance_of_methods: Vec<TokenStream> = Vec::new();
+	let mut trait_impls: Vec<TokenStream> = Vec::new();
 
 	for entry in is_instance_of {
-		let type_alias = &entry.type_alias;
+		let type_alias: &String = &entry.type_alias;
 
 		match type_mappings.map_alias(type_alias) {
 			Some(ConcreteType::Primitive { .. }) => {
@@ -246,14 +246,14 @@ pub(super) fn generate_is_instance_of_code(
 				reference_type: rust_type,
 				..
 			}) => {
-				let type_path_str = rust_type.path();
+				let type_path_str: &str = rust_type.path();
 
 				let type_path: syn::Path = syn::parse_str(type_path_str).map_err(|_| {
 					syn::Error::new(Span::call_site(), format!("Invalid Rust type path: {type_path_str}"))
 				})?;
 
 				if let Some(stem) = &entry.stem {
-					let method_name = format_ident!("as_{}", stem);
+					let method_name: Ident = format_ident!("as_{}", stem);
 
 					is_instance_of_methods.push(quote! {
                         #[doc = concat!(

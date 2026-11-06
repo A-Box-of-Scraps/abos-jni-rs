@@ -29,7 +29,7 @@ impl<'local> Env<'local> {
 		// Safety:
 		// This method is safe to call in case of pending exceptions (see chapter 2 of the spec)
 		// We check for JNI > 1.2 in `from_raw`
-		let res = unsafe { ex_safe_jni_call_no_post_check_ex!(self, v1_2, PushLocalFrame, capacity) };
+		let res: i32 = unsafe { ex_safe_jni_call_no_post_check_ex!(self, v1_2, PushLocalFrame, capacity) };
 		jni_error_code_to_result(res)
 	}
 
@@ -60,7 +60,8 @@ impl<'local> Env<'local> {
 		// This method is safe to call in case of pending exceptions (see chapter 2 of the spec)
 		// We check for JNI > 1.2 in `from_raw`
 		unsafe {
-			let raw = ex_safe_jni_call_no_post_check_ex!(self, v1_2, PopLocalFrame, result.into_raw());
+			let raw: crate::sys::jobject =
+				ex_safe_jni_call_no_post_check_ex!(self, v1_2, PopLocalFrame, result.into_raw());
 			T::kind_from_raw(raw)
 		}
 	}
@@ -101,10 +102,11 @@ impl<'local> Env<'local> {
 		unsafe {
 			// Safety: by creating a new AttachGuard we ensure that the attach guard level
 			// will be incremented in sync with the creation of a new JNI stack frame
-			let mut guard = AttachGuard::from_unowned(self.get_raw());
-			let env = guard.borrow_env_mut();
+			let mut guard: AttachGuard<'_> = AttachGuard::from_unowned(self.get_raw());
+			let env: &mut Env<'_> = guard.borrow_env_mut();
 			self.push_local_frame(capacity)?;
-			let ret = catch_unwind(AssertUnwindSafe(|| f(env)));
+			let ret: std::result::Result<std::result::Result<T, E>, Box<dyn std::any::Any + std::marker::Send>> =
+				catch_unwind(AssertUnwindSafe(|| f(env)));
 			self.pop_local_frame::<JObject>(JObject::null());
 			drop(guard);
 
@@ -159,17 +161,17 @@ impl<'local> Env<'local> {
 		// SAFETY: The nested guard tracks the pushed JNI frame, which is popped before the guard drops on every callback outcome.
 		unsafe {
 			// Inner scope to ensure drop order: `Result` -> `env` -> `guard`, before we potentially call `resume_unwind`.
-			let panic_payload = {
+			let panic_payload: Box<dyn std::any::Any + std::marker::Send> = {
 				// Safety: by creating a new AttachGuard we ensure that the attach guard level
 				// will be incremented in sync with the creation of a new JNI stack frame
-				let mut guard = AttachGuard::from_unowned(self.get_raw());
-				let env = guard.borrow_env_mut();
+				let mut guard: AttachGuard<'_> = AttachGuard::from_unowned(self.get_raw());
+				let env: &mut Env<'_> = guard.borrow_env_mut();
 
 				self.push_local_frame(capacity)?;
 
 				match catch_unwind(AssertUnwindSafe(|| f(env))) {
 					Ok(Ok(obj)) => {
-						let obj = self.pop_local_frame::<T>(obj);
+						let obj: T::Kind<'_> = self.pop_local_frame::<T>(obj);
 						return Ok(obj);
 					}
 					Ok(Err(err)) => {
@@ -224,7 +226,7 @@ impl<'local> Env<'local> {
 	{
 		// SAFETY: The nested guard borrows the current attached thread's environment and drops after the callback.
 		unsafe {
-			let mut guard = AttachGuard::from_unowned(self.get_raw());
+			let mut guard: AttachGuard<'_> = AttachGuard::from_unowned(self.get_raw());
 			f(guard.borrow_env_mut())
 		}
 	}

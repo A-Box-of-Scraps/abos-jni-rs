@@ -3,7 +3,7 @@ use assert_matches::assert_matches;
 
 #[test]
 fn test_parser_types() {
-	let cases = [
+	let cases: [(&str, JavaType); 18] = [
 		("Z", JavaType::Primitive(Primitive::Boolean)),
 		("B", JavaType::Primitive(Primitive::Byte)),
 		("C", JavaType::Primitive(Primitive::Char)),

@@ -98,7 +98,7 @@ fn test_catch_unwind_false_causes_abort() {
 		.arg("test_catch_unwind_false_causes_abort_impl")
 		.arg("--nocapture");
 
-	let output = cmd.output().expect("Failed to execute fixture test");
+	let output: std::process::Output = cmd.output().expect("Failed to execute fixture test");
 
 	if output.status.success() {
 		eprintln!("Expected the test to abort/fail, but it succeeded:");
@@ -112,9 +112,9 @@ fn test_catch_unwind_false_causes_abort() {
 	assert!(!output.status.success(), "Expected process to abort/fail");
 
 	// Check the combined output (stderr and stdout) for the panic message
-	let stderr = String::from_utf8_lossy(&output.stderr);
-	let stdout = String::from_utf8_lossy(&output.stdout);
-	let combined = format!("{stdout}{stderr}");
+	let stderr: std::borrow::Cow<'_, str> = String::from_utf8_lossy(&output.stderr);
+	let stdout: std::borrow::Cow<'_, str> = String::from_utf8_lossy(&output.stdout);
+	let combined: String = format!("{stdout}{stderr}");
 
 	assert!(
 		combined.contains("This panic should cause abort because catch_unwind = false"),

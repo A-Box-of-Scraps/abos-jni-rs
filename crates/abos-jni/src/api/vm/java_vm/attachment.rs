@@ -158,15 +158,15 @@ impl JavaVM {
 		E: From<Error>,
 		C: FnOnce() -> AttachConfig<'config>,
 	{
-		let config = config();
-		let exceptions_policy = config.exceptions_policy;
-		let mut scope = ScopeToken::default();
+		let config: AttachConfig<'_> = config();
+		let exceptions_policy: AttachmentExceptionPolicy = config.exceptions_policy;
+		let mut scope: ScopeToken = ScopeToken::default();
 		// Safety: The ScopeToken and guard will remain fixed on the stack by keeping the guard
 		// private to this function.
-		let mut guard = unsafe { self.attach_current_thread_guard(|| config, &mut scope)? };
-		let env = guard.borrow_env_mut();
+		let mut guard: AttachGuard<'_> = unsafe { self.attach_current_thread_guard(|| config, &mut scope)? };
+		let env: &mut Env<'_> = guard.borrow_env_mut();
 
-		let pre_pending_exception = match exceptions_policy {
+		let pre_pending_exception: Option<crate::objects::JThrowable<'_>> = match exceptions_policy {
 			AttachmentExceptionPolicy::Ignore => None,
 			AttachmentExceptionPolicy::PreCheckPostCatch => {
 				// In case the thread was already attached we must not go any further if there is a pending exception,
@@ -183,7 +183,7 @@ impl JavaVM {
 			}),
 		};
 
-		let ret = if let Some(capacity) = capacity {
+		let ret: std::result::Result<T, E> = if let Some(capacity) = capacity {
 			env.with_local_frame(capacity, callback)
 		} else {
 			callback(env)
@@ -288,7 +288,7 @@ impl JavaVM {
 		// Safety:
 		// - The minimum supported JNI version is >= 1.4
 		// - The caller is responsible for managing the returned guard safely
-		let guard = unsafe {
+		let guard: AttachGuard<'_> = unsafe {
 			// Note: Even Windows (where we track permanent attachments via FLS) we use TLS to track
 			// active AttachGuards for the current thread because we assume that fibers using JNI must
 			// not be switched out or freed while they have active AttachGuards.
@@ -302,9 +302,10 @@ impl JavaVM {
 				match self.sys_get_env_attachment() {
 					Ok(guard) => guard,
 					Err(Error::JniCall(JniError::ThreadDetached)) => {
-						let config = config();
+						let config: AttachConfig<'_> = config();
 						if config.scoped {
-							let jni = sys_attach_current_thread(self, &config, &current(), true)?;
+							let jni: *mut *const abos_jni_sys::JNINativeInterface_ =
+								sys_attach_current_thread(self, &config, &current(), true)?;
 							AttachGuard::from_owned(jni)
 						} else {
 							#[cfg(use_tls_attach_guard)]

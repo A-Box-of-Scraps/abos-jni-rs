@@ -133,11 +133,11 @@ impl MethodParser {
 	}
 
 	fn finish(mut self, span: Span) -> Result<NativeMethodStructInput> {
-		let java_method_name = self.method_name.take().ok_or_else(|| syn::Error::new(span,
+		let java_method_name: String = self.method_name.take().ok_or_else(|| syn::Error::new(span,
 			"Missing method name (use 'name = \"javaCamelCaseName\"' or inline signature like 'fn RustType::snake_case_method_name()')"))?;
-		let signature = self.signature.take().ok_or_else(|| syn::Error::new(span,
+		let signature: MethodSignature = self.signature.take().ok_or_else(|| syn::Error::new(span,
 			"Missing method signature (use 'sig = (args...) -> ret' or inline signature like 'fn RustType::method_name(args...) -> ret')"))?;
-		let fn_path = self.fn_path.take().ok_or_else(|| syn::Error::new(span,
+		let fn_path: syn::Path = self.fn_path.take().ok_or_else(|| syn::Error::new(span,
 			"Missing 'fn' and can't infer a default function path without an inline signature like 'fn RustType::method_name(args..) -> ret'."))?;
 		self.validate_modes(span)?;
 		Ok(NativeMethodStructInput {
@@ -159,7 +159,7 @@ impl MethodParser {
 }
 
 fn is_property(input: ParseStream) -> bool {
-	let fork = input.fork();
+	let fork: syn::parse::ParseBuffer<'_> = input.fork();
 	fork.call(Ident::parse_any).is_ok() && (fork.peek(Token![=]) || fork.peek(syn::token::Brace))
 }
 
@@ -181,12 +181,12 @@ fn parse_export(input: ParseStream) -> Result<NativeMethodExport> {
 }
 
 fn split_method_path(path: &syn::Path) -> Result<(Option<syn::Path>, String)> {
-	let mut owner = path.clone();
-	let method = owner
+	let mut owner: syn::Path = path.clone();
+	let method: syn::PathSegment = owner
 		.segments
 		.pop()
 		.ok_or_else(|| syn::Error::new_spanned(path, "Expected method path"))?;
-	let method_name = method.ident.to_string();
+	let method_name: String = method.ident.to_string();
 	// Popping the last segment leaves the preceding separator in Punctuated.
 	owner.segments.pop_punct();
 	Ok(((!owner.segments.is_empty()).then_some(owner), method_name))
@@ -195,14 +195,14 @@ fn split_method_path(path: &syn::Path) -> Result<(Option<syn::Path>, String)> {
 fn parse_inline_signature(input: ParseStream, mappings: &TypeMappings) -> Result<MethodSignature> {
 	let args;
 	syn::parenthesized!(args in input);
-	let mut parameters = Vec::new();
+	let mut parameters: Vec<crate::internal::signature::Parameter> = Vec::new();
 	while !args.is_empty() {
 		parameters.push(parse_parameter_with_index(&args, parameters.len(), mappings)?);
 		if !args.is_empty() {
 			args.parse::<Token![,]>()?;
 		}
 	}
-	let return_type = if input.peek(Token![->]) {
+	let return_type: SigType = if input.peek(Token![->]) {
 		input.parse::<Token![->]>()?;
 		parse_type(input, mappings)?
 	} else {
@@ -216,7 +216,7 @@ fn parse_inline_signature(input: ParseStream, mappings: &TypeMappings) -> Result
 
 impl Parse for NativeMethodStructInput {
 	fn parse(input: ParseStream) -> Result<Self> {
-		let jni_crate = crate::internal::utils::parse_jni_crate_override(input)?;
+		let jni_crate: syn::Path = crate::internal::utils::parse_jni_crate_override(input)?;
 		let mut parser = MethodParser::new(jni_crate);
 		while !input.is_empty() {
 			if is_property(input) {

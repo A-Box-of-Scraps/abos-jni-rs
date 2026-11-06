@@ -17,22 +17,22 @@ pub const fn native_abs(x: i32) -> i32 {
 }
 
 pub fn jni_abs_safe(env: &mut Env, x: jint) -> jint {
-	let x = JValue::from(x);
-	let v = env
+	let x: JValue<'_> = JValue::from(x);
+	let v: abos_jni::JValueOwned<'_> = env
 		.call_static_method(CLASS_MATH, METHOD_MATH_ABS, &SIG_MATH_ABS, &[x])
 		.expect("static method call succeeds");
 	v.i().expect("JNI result contains an int")
 }
 
 pub fn jni_hash_safe(env: &mut Env, obj: &JObject) -> jint {
-	let v = env
+	let v: abos_jni::JValueOwned<'_> = env
 		.call_method(obj, METHOD_OBJECT_HASH_CODE, &SIG_OBJECT_HASH_CODE, &[])
 		.expect("instance method call succeeds");
 	v.i().expect("JNI result contains an int")
 }
 
 pub fn jni_local_date_time_of_safe<'local>(env: &mut Env<'local>, components: [jint; 7]) -> JObject<'local> {
-	let args = components.map(JValue::Int);
+	let args: [JValue<'_>; 7] = components.map(JValue::Int);
 	env.call_static_method(
 		CLASS_LOCAL_DATE_TIME,
 		METHOD_LOCAL_DATE_TIME_OF,
@@ -53,11 +53,12 @@ pub fn jni_int_call_static_unchecked<'local, C>(
 where
 	C: Desc<'local, JClass<'local>>,
 {
-	let x = JValue::from(x);
-	let ret = ReturnType::Primitive(Primitive::Int);
+	let x: JValue<'_> = JValue::from(x);
+	let ret: abos_jni::signature::JavaType = ReturnType::Primitive(Primitive::Int);
 	// SAFETY: The benchmarks resolve this ID from Math.abs(I)I and pass an int argument.
-	let v = unsafe { env.call_static_method_unchecked(class, method_id, ret, &[x.as_jni()]) }
-		.expect("call static method unchecked succeeds");
+	let v: abos_jni::JValueOwned<'_> =
+		unsafe { env.call_static_method_unchecked(class, method_id, ret, &[x.as_jni()]) }
+			.expect("call static method unchecked succeeds");
 	v.i().expect("JNI result contains an int")
 }
 
@@ -65,9 +66,10 @@ pub fn jni_int_call_unchecked<'local, M>(env: &mut Env<'local>, obj: &JObject<'l
 where
 	M: Desc<'local, JMethodID>,
 {
-	let ret = ReturnType::Primitive(Primitive::Int);
+	let ret: abos_jni::signature::JavaType = ReturnType::Primitive(Primitive::Int);
 	// SAFETY: Caller retrieved method ID + class specifically for this use: Object.hashCode()I
-	let v = unsafe { env.call_method_unchecked(obj, method_id, ret, &[]) }.expect("call method unchecked succeeds");
+	let v: abos_jni::JValueOwned<'_> =
+		unsafe { env.call_method_unchecked(obj, method_id, ret, &[]) }.expect("call method unchecked succeeds");
 	v.i().expect("JNI result contains an int")
 }
 
@@ -81,7 +83,8 @@ where
 	C: Desc<'local, JClass<'local>>,
 {
 	// SAFETY: Caller retrieved method ID and constructed arguments
-	let v = unsafe { env.call_static_method_unchecked(class, method_id, ReturnType::Object, args) }
-		.expect("call static method unchecked succeeds");
+	let v: abos_jni::JValueOwned<'_> =
+		unsafe { env.call_static_method_unchecked(class, method_id, ReturnType::Object, args) }
+			.expect("call static method unchecked succeeds");
 	v.l().expect("JNI result contains an object")
 }

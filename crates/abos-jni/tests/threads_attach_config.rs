@@ -12,16 +12,16 @@ use util::jvm;
 // Tests that an `AttachConfig` can be used to configure the name of the JVM `Thread`
 #[test]
 fn attach_config() {
-	let jvm = jvm();
+	let jvm: &std::sync::Arc<abos_jni::JavaVM> = jvm();
 
-	let thread = spawn({
+	let thread: std::thread::JoinHandle<std::result::Result<(), abos_jni::errors::Error>> = spawn({
 		move || {
 			jvm.attach_current_thread_with_config(
 				|| AttachConfig::new().thread_name(jni_str!("test-thread")),
 				None,
 				|env| -> abos_jni::errors::Result<_> {
 					// Get the current Thread and query the name
-					let thread = env
+					let thread: abos_jni::objects::JObject<'_> = env
 						.call_static_method(
 							jni_str!("java/lang/Thread"),
 							jni_str!("currentThread"),
@@ -31,11 +31,11 @@ fn attach_config() {
 						.expect("static method call succeeds")
 						.l()
 						.expect("JNI result contains an object");
-					let name = env
+					let name: abos_jni::objects::JObject<'_> = env
 						.call_method(thread, jni_str!("getName"), jni_sig!("()Ljava/lang/String;"), &[])?
 						.l()?;
-					let name = env.cast_local::<JString>(name).expect("test operation succeeds");
-					let name = name.mutf8_chars(env)?;
+					let name: JString<'_> = env.cast_local::<JString>(name).expect("test operation succeeds");
+					let name: abos_jni::strings::MUTF8Chars<'_, &JString<'_>> = name.mutf8_chars(env)?;
 					assert_eq!(name.as_cstr(), c"test-thread");
 					Ok(())
 				},

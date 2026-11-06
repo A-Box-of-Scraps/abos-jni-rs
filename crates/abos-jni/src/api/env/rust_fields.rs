@@ -29,10 +29,10 @@ impl<'local> Env<'local> {
 		// reference for.
 
 		self.with_local_frame(DEFAULT_LOCAL_FRAME_CAPACITY, |env| {
-			let obj = obj.as_ref();
-			let class = env.get_object_class(obj)?;
+			let obj: &JObject<'_> = obj.as_ref();
+			let class: crate::objects::JClass<'_> = env.get_object_class(obj)?;
 			let field_id: JFieldID = Desc::<JFieldID>::lookup((&class, &field, jni_sig!("J")), env)?;
-			let guard = self.lock_obj(obj)?;
+			let guard: MonitorGuard<'_> = self.lock_obj(obj)?;
 			Ok((guard, field_id))
 		})
 	}
@@ -105,7 +105,7 @@ impl<'local> Env<'local> {
 				}
 			}
 
-			let mbox = Box::new(::std::sync::Mutex::new(rust_object));
+			let mbox: Box<Mutex<T>> = Box::new(::std::sync::Mutex::new(rust_object));
 			let ptr: *mut Mutex<T> = Box::into_raw(mbox);
 
 			// Safety: the requirement that the given field must be a `long` is
@@ -207,7 +207,7 @@ impl<'local> Env<'local> {
 		self.with_top_local_frame(|env| {
 			// Safety: the requirement that the given field must be a `long` is
 			// documented in the 'Safety' section of this function
-			let mbox = unsafe {
+			let mbox: Box<Mutex<T>> = unsafe {
 				let ptr = env
 					.get_field_unchecked(&obj, field_id, ReturnType::Primitive(Primitive::Long))?
 					.j()? as *mut Mutex<T>;

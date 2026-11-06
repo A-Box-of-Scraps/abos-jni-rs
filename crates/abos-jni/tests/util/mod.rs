@@ -16,7 +16,7 @@ pub use example_proxy::AtomicIntegerProxy;
 pub fn jvm() -> &'static Arc<JavaVM> {
 	static JVM: OnceLock<Arc<JavaVM>> = OnceLock::new();
 	JVM.get_or_init(|| {
-		let jvm_args = InitArgsBuilder::new()
+		let jvm_args: abos_jni::InitArgs<'_> = InitArgsBuilder::new()
 			.version(JNIVersion::V1_8)
 			.option("-Xcheck:jni")
 			.build()
@@ -94,14 +94,14 @@ pub fn detach_current_thread() -> Result<()> {
 	reason = "Shared test and example helpers are used by different subsets of binaries."
 )]
 pub unsafe fn sys_detach_current_thread() {
-	let vm = jvm();
+	let vm: &Arc<JavaVM> = jvm();
 	let jvm: *mut abos_jni_sys::JavaVM = vm.get_raw();
 	// SAFETY: The caller guarantees that this thread has no remaining JNI guards or references in use.
 	unsafe { ((*(*jvm)).v1_4.DetachCurrentThread)(jvm) };
 }
 
 pub fn print_exception(env: &Env) {
-	let exception_occurred = env.exception_check();
+	let exception_occurred: bool = env.exception_check();
 	if exception_occurred {
 		env.exception_describe();
 	}
@@ -124,19 +124,20 @@ pub fn unwrap<T>(res: Result<T>, env: &Env) -> T {
 	reason = "Shared test and example helpers are used by different subsets of binaries."
 )]
 pub fn load_test_class(env: &mut Env, out_dir: &std::path::Path, class_name: &str) -> abos_jni::errors::Result<()> {
-	let class_path = out_dir.join(format!("com/example/{class_name}.class"));
+	let class_path: std::path::PathBuf = out_dir.join(format!("com/example/{class_name}.class"));
 	assert!(
 		class_path.exists(),
 		"{class_name}.class not found at {}",
 		class_path.display()
 	);
 
-	let class_bytes = std::fs::read(&class_path).unwrap_or_else(|_| panic!("Failed to read {class_name}.class"));
+	let class_bytes: Vec<u8> =
+		std::fs::read(&class_path).unwrap_or_else(|_| panic!("Failed to read {class_name}.class"));
 
-	let class_loader =
+	let class_loader: abos_jni::objects::JClassLoader<'_> =
 		abos_jni::objects::JClassLoader::get_system_class_loader(env).expect("Failed to get system class loader");
 
-	let class_internal_name = format!("com/example/{class_name}");
+	let class_internal_name: String = format!("com/example/{class_name}");
 	let class_jni = abos_jni::strings::JNIString::new(class_internal_name.as_str());
 
 	env.define_class(Some(&class_jni), &class_loader, &class_bytes)?;
@@ -156,7 +157,7 @@ pub fn setup_test_output(test_name: &str) -> std::path::PathBuf {
 		clippy::option_env_unwrap,
 		reason = "Trybuild fixtures lack CARGO_TARGET_TMPDIR; only runtime tests call this helper."
 	)]
-	let out_dir = std::path::PathBuf::from(
+	let out_dir: std::path::PathBuf = std::path::PathBuf::from(
 		option_env!("CARGO_TARGET_TMPDIR").expect("CARGO_TARGET_TMPDIR environment variable not set"),
 	)
 	.join("jni_macros_tests")

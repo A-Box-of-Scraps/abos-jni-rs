@@ -22,9 +22,9 @@ abos_jni::bind_java_type! {
 #[test]
 #[should_panic = "jni runtime check failure"]
 fn test_bind_java_type_constructor_emits_assert_top() {
-	let jvm = util::jvm();
+	let jvm: &std::sync::Arc<abos_jni::JavaVM> = util::jvm();
 	jvm.attach_current_thread(|env| {
-		let _bad_obj = env.get_java_vm()?.with_local_frame(16, |_| {
+		let _bad_obj: JBoolean<'_> = env.get_java_vm()?.with_local_frame(16, |_| {
 			//let s = env.new_string("s")?; // triggers the runtime error
 			JBoolean::new(env, true)
 		})?;

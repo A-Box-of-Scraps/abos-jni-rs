@@ -20,7 +20,7 @@ impl<'local> Env<'local> {
 		&self,
 		array: &'array impl AsJArrayRaw<'other_local>,
 	) -> Result<jsize> {
-		let array = null_check!(array.as_jarray_raw(), "get_array_length array argument")?;
+		let array: crate::sys::jobject = null_check!(array.as_jarray_raw(), "get_array_length array argument")?;
 		// SAFETY: AsJArrayRaw guarantees an array reference, which was checked for null.
 		let len: jsize = unsafe { jni_call_no_post_check_ex!(self, v1_1, GetArrayLength, array)? };
 		Ok(len)
@@ -51,10 +51,10 @@ impl<'local> Env<'local> {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		let class = element_class.lookup(self)?;
+		let class: <T as Desc<'_, JClass<'_>>>::Output = element_class.lookup(self)?;
 
 		// SAFETY: The class descriptor resolves to a valid class and initial_element remains live during the JNI call.
-		let array = unsafe {
+		let array: JObjectArray<'_> = unsafe {
 			jni_call_post_check_ex_and_null_ret!(
 				self,
 				v1_1,
@@ -133,7 +133,7 @@ impl<'local> Env<'local> {
 	///
 	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
 	pub fn byte_array_from_slice(&mut self, buf: &[u8]) -> Result<JByteArray<'local>> {
-		let bytes = JByteArray::new(self, buf.len())?;
+		let bytes: JByteArray<'_> = JByteArray::new(self, buf.len())?;
 		// SAFETY: i8 and u8 are both plain, single-byte, data types with the same size and
 		// alignment.
 		//
@@ -155,14 +155,14 @@ impl<'local> Env<'local> {
 	///
 	/// Returns an error if the array is null, copying its contents fails, or a Java exception is pending.
 	pub fn convert_byte_array<'other_local>(&self, array: impl AsRef<JByteArray<'other_local>>) -> Result<Vec<u8>> {
-		let array = array.as_ref().as_raw();
-		let array = null_check!(array, "convert_byte_array array argument")?;
+		let array: crate::sys::jobject = array.as_ref().as_raw();
+		let array: crate::sys::jobject = null_check!(array, "convert_byte_array array argument")?;
 
 		// GetArrayLength is not documented to throw any exceptions
 		// SAFETY: The byte-array reference was checked for null and is valid for this environment.
-		let length = unsafe { jni_call_no_post_check_ex!(self, v1_1, GetArrayLength, array)? };
-		let buffer_len = usize::try_from(length).map_err(|_| Error::JniCall(JniError::Unknown))?;
-		let mut vec = vec![0u8; buffer_len];
+		let length: i32 = unsafe { jni_call_no_post_check_ex!(self, v1_1, GetArrayLength, array)? };
+		let buffer_len: usize = usize::try_from(length).map_err(|_| Error::JniCall(JniError::Unknown))?;
+		let mut vec: Vec<u8> = vec![0u8; buffer_len];
 		// SAFETY: The destination is allocated for the array length, and the byte-array reference remains live.
 		unsafe {
 			jni_call_with_catch!(

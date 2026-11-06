@@ -38,7 +38,7 @@ fn concurrent_threads() {
 }
 
 fn test_single_thread(vm: &JavaVM) {
-	let atomic = AtomicIntegerProxy::new(vm, 0).expect("test value can be constructed");
+	let atomic: AtomicIntegerProxy = AtomicIntegerProxy::new(vm, 0).expect("test value can be constructed");
 	assert_eq!(0, atomic.get().expect("test bindings initialize"));
 	assert_eq!(1, atomic.increment_and_get().expect("increment and get succeeds"));
 	assert_eq!(3, atomic.add_and_get(2).expect("add and get succeeds"));
@@ -46,28 +46,28 @@ fn test_single_thread(vm: &JavaVM) {
 }
 
 fn test_serialized_threads(vm: &JavaVM) {
-	let atomic = AtomicIntegerProxy::new(vm, 0).expect("test value can be constructed");
+	let atomic: AtomicIntegerProxy = AtomicIntegerProxy::new(vm, 0).expect("test value can be constructed");
 	assert_eq!(0, atomic.get().expect("test bindings initialize"));
-	let jh = spawn(move || {
+	let jh: std::thread::JoinHandle<AtomicIntegerProxy> = spawn(move || {
 		assert_eq!(1, atomic.increment_and_get().expect("increment and get succeeds"));
 		assert_eq!(3, atomic.add_and_get(2).expect("add and get succeeds"));
 		atomic
 	});
-	let atomic = jh.join().expect("test worker completes without panicking");
+	let atomic: AtomicIntegerProxy = jh.join().expect("test worker completes without panicking");
 	assert_eq!(3, atomic.get().expect("test bindings initialize"));
 }
 
 fn test_concurrent_threads(vm: &JavaVM, thread_num: usize) {
 	const ITERS_PER_THREAD: usize = 10_000;
 
-	let atomic = AtomicIntegerProxy::new(vm, 0).expect("test value can be constructed");
-	let barrier = Arc::new(Barrier::new(thread_num));
-	let mut threads = Vec::new();
+	let atomic: AtomicIntegerProxy = AtomicIntegerProxy::new(vm, 0).expect("test value can be constructed");
+	let barrier: Arc<Barrier> = Arc::new(Barrier::new(thread_num));
+	let mut threads: Vec<std::thread::JoinHandle<()>> = Vec::new();
 
 	for _ in 0..thread_num {
-		let barrier = Arc::clone(&barrier);
-		let atomic = atomic.clone();
-		let jh = spawn(move || {
+		let barrier: Arc<Barrier> = Arc::clone(&barrier);
+		let atomic: AtomicIntegerProxy = atomic.clone();
+		let jh: std::thread::JoinHandle<()> = spawn(move || {
 			barrier.wait();
 			for _ in 0..ITERS_PER_THREAD {
 				atomic.increment_and_get().expect("increment and get succeeds");
@@ -78,7 +78,7 @@ fn test_concurrent_threads(vm: &JavaVM, thread_num: usize) {
 	for jh in threads {
 		jh.join().expect("test worker completes without panicking");
 	}
-	let expected = jint::try_from(ITERS_PER_THREAD * thread_num).expect("test iteration count fits jint");
+	let expected: i32 = jint::try_from(ITERS_PER_THREAD * thread_num).expect("test iteration count fits jint");
 	assert_eq!(expected, atomic.get().expect("test bindings initialize"));
 }
 
@@ -88,10 +88,10 @@ rusty_fork_test! {
 #[test]
 fn test_destroy() {
 	unsafe fn attach_current_thread_as_daemon<'local>(vm: &abos_jni::JavaVM) -> abos_jni::errors::Result<AttachGuard<'local>> {
-		let mut env_ptr = std::ptr::null_mut();
+		let mut env_ptr: *mut std::ffi::c_void = std::ptr::null_mut();
 		let jvm: *mut abos_jni_sys::JavaVM = vm.get_raw();
 		// SAFETY: The live VM receives writable environment storage; null selects default attachment options.
-		let res = unsafe {
+		let res: i32 = unsafe {
 			((*(*jvm)).v1_4.AttachCurrentThreadAsDaemon)(
 				jvm,
 				&raw mut env_ptr,

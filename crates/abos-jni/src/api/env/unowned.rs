@@ -132,12 +132,12 @@ impl<'local, T, E> EnvOutcome<'local, T, E> {
 		// SAFETY: EnvOutcome retains the native call's environment and lifetime, and the nested guard drops before returning.
 		unsafe {
 			let mut guard: AttachGuard<'local> = AttachGuard::from_unowned(self.raw_env);
-			let env = guard.borrow_env_mut();
+			let env: &mut Env<'_> = guard.borrow_env_mut();
 
 			match self.outcome {
 				Outcome::Ok(t) => t,
 				Outcome::Err(e) => {
-					let mut cap = capture();
+					let mut cap: <P as ErrorPolicy<T, E>>::Captures<'_, '_> = capture();
 					std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match P::on_error(env, &mut cap, e) {
 						Ok(t) => t,
 						Err(err) => P::on_internal_jni_error(&mut cap, err),
@@ -145,7 +145,7 @@ impl<'local, T, E> EnvOutcome<'local, T, E> {
 					.unwrap_or_else(|payload| P::on_internal_panic(&mut cap, payload))
 				}
 				Outcome::Panic(p) => {
-					let mut cap = capture();
+					let mut cap: <P as ErrorPolicy<T, E>>::Captures<'_, '_> = capture();
 					std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match P::on_panic(env, &mut cap, p) {
 						Ok(t) => t,
 						Err(err) => P::on_internal_jni_error(&mut cap, err),
@@ -219,9 +219,10 @@ impl<'local> EnvUnowned<'local> {
 	{
 		// Safety: we trust that self.ptr a valid, non-null pointer
 		let mut guard: AttachGuard<'local> = unsafe { AttachGuard::from_unowned(self.ptr) };
-		let env = guard.borrow_env_mut();
-		let result = catch_unwind(AssertUnwindSafe(|| f(env)));
-		let outcome = match result {
+		let env: &mut Env<'_> = guard.borrow_env_mut();
+		let result: std::result::Result<std::result::Result<T, E>, Box<dyn std::any::Any + Send>> =
+			catch_unwind(AssertUnwindSafe(|| f(env)));
+		let outcome: Outcome<T, E> = match result {
 			Ok(ret) => match ret {
 				Ok(t) => Outcome::Ok(t),
 				Err(e) => Outcome::Err(e),
@@ -253,7 +254,7 @@ impl<'local> EnvUnowned<'local> {
 	{
 		// Safety: we trust that self.ptr a valid, non-null pointer
 		let mut guard: AttachGuard<'local> = unsafe { AttachGuard::from_unowned(self.ptr) };
-		let result = f(guard.borrow_env_mut());
+		let result: std::result::Result<T, E> = f(guard.borrow_env_mut());
 		match result {
 			Ok(t) => EnvOutcome::new(self.ptr, Outcome::Ok(t)),
 			Err(e) => EnvOutcome::new(self.ptr, Outcome::Err(e)),

@@ -44,7 +44,7 @@ impl<'local> Env<'local> {
 	where
 		E: Desc<'local, JThrowable<'other_local>>,
 	{
-		let throwable = obj.lookup(self)?;
+		let throwable: <E as Desc<'_, JThrowable<'_>>>::Output = obj.lookup(self)?;
 
 		// Safety:
 		// Throw is 1.1 API that must be valid
@@ -72,7 +72,7 @@ impl<'local> Env<'local> {
 		if !self.is_assignable_from_class(class.as_ref(), throwable_class)? {
 			return Err(Error::WrongObjectType);
 		}
-		let msg = msg.as_ref().map(std::convert::AsRef::as_ref);
+		let msg: Option<&JNIStr> = msg.as_ref().map(std::convert::AsRef::as_ref);
 
 		// Safety:
 		// ThrowNew is 1.1 API that must be valid
@@ -129,7 +129,7 @@ impl<'local> Env<'local> {
 		S: AsRef<JNIStr>,
 		T: Desc<'local, JClass<'other_local>>,
 	{
-		let class = class.lookup(self)?;
+		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 		let msg: &JNIStr = msg.as_ref();
 		self.throw_new_optional(class.as_ref(), Some(msg))
 	}
@@ -164,7 +164,7 @@ impl<'local> Env<'local> {
 	where
 		T: Desc<'local, JClass<'other_local>>,
 	{
-		let class = class.lookup(self)?;
+		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 		self.throw_new_optional(class.as_ref(), None)
 	}
 
@@ -188,7 +188,8 @@ impl<'local> Env<'local> {
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		// SAFETY: ExceptionOccurred is valid with a pending exception and returns a local throwable reference.
-		let throwable = unsafe { ex_safe_jni_call_no_post_check_ex!(self, v1_1, ExceptionOccurred) };
+		let throwable: crate::sys::jobject =
+			unsafe { ex_safe_jni_call_no_post_check_ex!(self, v1_1, ExceptionOccurred) };
 		if throwable.is_null() {
 			None
 		} else {
@@ -229,12 +230,13 @@ impl<'local> Env<'local> {
 			env: &mut abos_jni::Env<'_>,
 			throwable: &abos_jni::objects::JThrowable,
 		) -> abos_jni::errors::Result<String> {
-			let stack_trace = throwable.get_stack_trace(env)?;
-			let len = stack_trace.len(env)?;
+			let stack_trace: crate::objects::JObjectArray<'_, crate::objects::JStackTraceElement<'_>> =
+				throwable.get_stack_trace(env)?;
+			let len: usize = stack_trace.len(env)?;
 			let mut trace = String::new();
 			for i in 0..len {
-				let element = stack_trace.get_element(env, i)?;
-				let element_jstr = element.try_to_string(env)?;
+				let element: crate::objects::JStackTraceElement<'_> = stack_trace.get_element(env, i)?;
+				let element_jstr: crate::objects::JString<'_> = element.try_to_string(env)?;
 				writeln!(trace, "{i}: {element_jstr}").expect("writing to String cannot fail");
 			}
 			Ok(trace)
@@ -243,7 +245,7 @@ impl<'local> Env<'local> {
 		if !self.exception_check() {
 			return Ok(());
 		}
-		let result = self.with_local_frame(
+		let result: std::result::Result<crate::errors::Error, crate::errors::Error> = self.with_local_frame(
 			DEFAULT_LOCAL_FRAME_CAPACITY,
 			|env| -> abos_jni::errors::Result<abos_jni::errors::Error> {
 				let Some(e) = env.exception_occurred() else {
@@ -254,13 +256,13 @@ impl<'local> Env<'local> {
 
 				assert!(!e.is_null(), "ExceptionOccurred returned a null throwable");
 
-				let e = env.new_global_ref(e)?;
+				let e: crate::refs::Global<JThrowable<'_>> = env.new_global_ref(e)?;
 				// besides null pointer checks, there are no documented errors or exceptions
 				// for GetObjectClass or getName, so this should be infallible
-				let name = env.get_object_class(&e)?.get_name(env)?.to_string();
-				let msg = e.get_message(env)?.to_string();
+				let name: String = env.get_object_class(&e)?.get_name(env)?.to_string();
+				let msg: String = e.get_message(env)?.to_string();
 
-				let stack = match try_get_stack_trace(env, &e) {
+				let stack: String = match try_get_stack_trace(env, &e) {
 					Ok(stack_trace) => stack_trace,
 					Err(err) => format!("none: {err:?}"),
 				};

@@ -20,7 +20,7 @@ fn qualified_shorthand_preserves_owner_path() {
 		fn ::module::Example::java_method() -> void,
 	})
 	.expect("valid qualified method");
-	let owner = parsed.rust_type.expect("qualified method has an owner");
+	let owner: syn::Path = parsed.rust_type.expect("qualified method has an owner");
 	assert!(owner.leading_colon.is_some());
 	assert_eq!(owner.segments.len(), 2);
 	assert!(!owner.segments.trailing_punct());
@@ -30,7 +30,7 @@ fn qualified_shorthand_preserves_owner_path() {
 
 #[test]
 fn named_export_does_not_require_java_type() {
-	let tokens = native_method_impl(quote! {
+	let tokens: proc_macro2::TokenStream = native_method_impl(quote! {
 		name = "method",
 		sig = () -> void,
 		fn = implementation,
@@ -46,7 +46,7 @@ fn automatic_export_requires_java_type() {
 		quote! { name = "method", sig = () -> void, fn = implementation, export = true },
 		quote! { extern fn Example::method() -> void },
 	] {
-		let error = syn::parse2::<NativeMethodStructInput>(tokens)
+		let error: syn::Error = syn::parse2::<NativeMethodStructInput>(tokens)
 			.err()
 			.expect("missing Java type is rejected");
 		assert!(error.to_string().contains("java_type"));
@@ -75,7 +75,7 @@ fn raw_methods_reject_wrapper_options() {
 			"catch_unwind",
 		),
 	] {
-		let error = syn::parse2::<NativeMethodStructInput>(tokens)
+		let error: syn::Error = syn::parse2::<NativeMethodStructInput>(tokens)
 			.err()
 			.expect("raw method cannot use wrapper options");
 		assert!(error.to_string().contains(property));
@@ -84,7 +84,7 @@ fn raw_methods_reject_wrapper_options() {
 
 #[test]
 fn missing_function_reports_a_parse_error() {
-	let error = syn::parse2::<NativeMethodStructInput>(quote! {
+	let error: syn::Error = syn::parse2::<NativeMethodStructInput>(quote! {
 		name = "method", sig = () -> void,
 	})
 	.err()

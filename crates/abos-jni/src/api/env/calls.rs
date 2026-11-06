@@ -55,16 +55,16 @@ impl<'local> Env<'local> {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		let obj = obj.as_ref();
-		let obj = null_check!(obj, "call_method obj argument")?;
-		let sig = sig.as_ref();
+		let obj: &JObject<'_> = obj.as_ref();
+		let obj: &JObject<'_> = null_check!(obj, "call_method obj argument")?;
+		let sig: &MethodSignature<'_, '_> = sig.as_ref();
 
 		if sig.args().len() != args.len() {
 			return Err(Error::InvalidArgList(sig.into()));
 		}
 
 		// check arguments types
-		let base_types_match = sig.args().iter().zip(args.iter()).all(|(exp, act)| match exp {
+		let base_types_match: bool = sig.args().iter().zip(args.iter()).all(|(exp, act)| match exp {
 			JavaType::Primitive(p) => act.primitive_type() == Some(*p),
 			JavaType::Object | JavaType::Array => act.primitive_type().is_none(),
 		});
@@ -72,7 +72,7 @@ impl<'local> Env<'local> {
 			return Err(Error::InvalidArgList(sig.into()));
 		}
 
-		let class = self.get_object_class(obj)?.auto();
+		let class: crate::refs::Auto<'_, JClass<'_>> = self.get_object_class(obj)?.auto();
 
 		let args: Vec<jvalue> = args.iter().map(super::super::jvalue::JValue::as_jni).collect();
 
@@ -112,13 +112,13 @@ impl<'local> Env<'local> {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		let sig = sig.as_ref();
+		let sig: &MethodSignature<'_, '_> = sig.as_ref();
 		if sig.args().len() != args.len() {
 			return Err(Error::InvalidArgList(sig.into()));
 		}
 
 		// check arguments types
-		let base_types_match = sig.args().iter().zip(args.iter()).all(|(exp, act)| match exp {
+		let base_types_match: bool = sig.args().iter().zip(args.iter()).all(|(exp, act)| match exp {
 			JavaType::Primitive(p) => act.primitive_type() == Some(*p),
 			JavaType::Object | JavaType::Array => act.primitive_type().is_none(),
 		});
@@ -127,8 +127,8 @@ impl<'local> Env<'local> {
 		}
 
 		// go ahead and look up the class since we'll need that for the next call.
-		let class = class.lookup(self)?;
-		let class = class.as_ref();
+		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
+		let class: &JClass<'_> = class.as_ref();
 
 		let args: Vec<jvalue> = args.iter().map(super::super::jvalue::JValue::as_jni).collect();
 
@@ -169,15 +169,15 @@ impl<'local> Env<'local> {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		let obj = obj.as_ref();
-		let obj = null_check!(obj, "call_method obj argument")?;
-		let sig = sig.as_ref();
+		let obj: &JObject<'_> = obj.as_ref();
+		let obj: &JObject<'_> = null_check!(obj, "call_method obj argument")?;
+		let sig: &MethodSignature<'_, '_> = sig.as_ref();
 		if sig.args().len() != args.len() {
 			return Err(Error::InvalidArgList(sig.into()));
 		}
 
 		// check arguments types
-		let base_types_match = sig.args().iter().zip(args.iter()).all(|(exp, act)| match exp {
+		let base_types_match: bool = sig.args().iter().zip(args.iter()).all(|(exp, act)| match exp {
 			JavaType::Primitive(p) => act.primitive_type() == Some(*p),
 			JavaType::Object | JavaType::Array => act.primitive_type().is_none(),
 		});
@@ -186,8 +186,8 @@ impl<'local> Env<'local> {
 		}
 
 		// go ahead and look up the class since we'll need that for the next call.
-		let class = class.lookup(self)?;
-		let class = class.as_ref();
+		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
+		let class: &JClass<'_> = class.as_ref();
 
 		let args: Vec<jvalue> = args.iter().map(super::super::jvalue::JValue::as_jni).collect();
 
@@ -216,7 +216,7 @@ impl<'local> Env<'local> {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		let ctor_sig = ctor_sig.as_ref();
+		let ctor_sig: &MethodSignature<'_, '_> = ctor_sig.as_ref();
 
 		// check arguments length
 		if ctor_sig.args().len() != ctor_args.len() {
@@ -224,7 +224,7 @@ impl<'local> Env<'local> {
 		}
 
 		// check arguments types
-		let base_types_match = ctor_sig
+		let base_types_match: bool = ctor_sig
 			.args()
 			.iter()
 			.zip(ctor_args.iter())
@@ -242,8 +242,8 @@ impl<'local> Env<'local> {
 		}
 
 		// build strings
-		let class = class.lookup(self)?;
-		let class = class.as_ref();
+		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
+		let class: &JClass<'_> = class.as_ref();
 
 		let method_id: JMethodID = Desc::<JMethodID>::lookup((class, ctor_sig), self)?;
 
@@ -279,14 +279,14 @@ impl<'local> Env<'local> {
 		// Runtime check that the 'local reference lifetime will be tied to
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
-		let class = class.lookup(self)?;
+		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 
 		let ctor_id: JMethodID = *ctor_id.lookup(self)?.as_ref();
 
-		let jni_args = ctor_args.as_ptr();
+		let jni_args: *const abos_jni_sys::jvalue = ctor_args.as_ptr();
 
 		// SAFETY: The caller guarantees that ctor_id and ctor_args match this class's constructor signature.
-		let obj = unsafe {
+		let obj: JObject<'_> = unsafe {
 			jni_call_post_check_ex_and_null_ret!(
 				self,
 				v1_1,

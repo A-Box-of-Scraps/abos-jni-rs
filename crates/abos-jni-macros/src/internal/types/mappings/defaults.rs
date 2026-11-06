@@ -6,7 +6,7 @@ impl TypeMappings {
 	/// # Arguments
 	/// * `jni_crate` - The path to the jni crate (e.g., `jni` or `::jni` or `crate::jni`)
 	pub fn new(jni_crate: &syn::Path) -> Self {
-		let mut type_mappings = Self {
+		let mut type_mappings: Self = Self {
 			alias_to_rust: std::collections::HashMap::new(),
 			rust_types: std::collections::HashSet::new(),
 			rust_to_java: std::collections::HashMap::new(),
@@ -16,7 +16,7 @@ impl TypeMappings {
 		};
 
 		// Convert the jni crate path to a string
-		let jni_crate_str = path_to_string_no_spaces(jni_crate);
+		let jni_crate_str: String = path_to_string_no_spaces(jni_crate);
 
 		type_mappings.add_reference_defaults(&jni_crate_str);
 
@@ -25,7 +25,7 @@ impl TypeMappings {
 			.insert_prim_type("void", PrimitiveType::Void, "()", true)
 			.expect("Failed to insert 'void' primitive type mapping");
 
-		let jni_sys_prim_types = [
+		let jni_sys_prim_types: [(&str, &str, PrimitiveType); 8] = [
 			("jboolean", "sys::jboolean", PrimitiveType::Boolean),
 			("jbyte", "sys::jbyte", PrimitiveType::Byte),
 			("jchar", "sys::jchar", PrimitiveType::Char),
@@ -37,13 +37,13 @@ impl TypeMappings {
 		];
 
 		for (rust_name, path, prim_type) in jni_sys_prim_types {
-			let full_path = format!("{jni_crate_str}::{path}");
+			let full_path: String = format!("{jni_crate_str}::{path}");
 			type_mappings
 				.insert_prim_type(rust_name, prim_type, &full_path, true)
 				.expect("Failed to insert abos_jni::sys primitive type mapping");
 		}
 
-		let rust_prim_types = [
+		let rust_prim_types: [(&str, PrimitiveType); 7] = [
 			("bool", PrimitiveType::Boolean),
 			("i8", PrimitiveType::Byte),
 			("i16", PrimitiveType::Short),
@@ -85,11 +85,11 @@ impl TypeMappings {
 			let parts: Vec<&str> = class_str.split('.').collect();
 			assert!(!parts.is_empty(), "Invalid Java class name: {class_str}");
 
-			let class = parts
+			let class: String = parts
 				.last()
 				.expect("built-in class names have at least one component")
 				.to_string();
-			let package = parts[..parts.len() - 1]
+			let package: Vec<String> = parts[..parts.len() - 1]
 				.iter()
 				.map(std::string::ToString::to_string)
 				.collect();
@@ -126,10 +126,10 @@ impl TypeMappings {
 		];
 
 		for (simple_name, java_class_str, module_path, is_core) in builtins {
-			let java_class = Rc::new(parse_java_class_dotted(java_class_str));
+			let java_class: Rc<JavaClassName> = Rc::new(parse_java_class_dotted(java_class_str));
 
-			let jni_full_path = format!("abos_jni::{module_path}");
-			let real_full_path = format!("{jni_crate_str}::{module_path}");
+			let jni_full_path: String = format!("abos_jni::{module_path}");
+			let real_full_path: String = format!("{jni_crate_str}::{module_path}");
 
 			self.insert_ref_type(&jni_full_path, &real_full_path, (*java_class).clone(), true)
 				.expect("Failed to insert built-in jni crate type mapping");
@@ -159,7 +159,7 @@ impl TypeMappings {
 			}
 			return existing.clone();
 		}
-		let rust_type = Rc::new(candidate);
+		let rust_type: Rc<RustType> = Rc::new(candidate);
 		self.rust_types.insert(rust_type.clone());
 		rust_type
 	}
@@ -184,7 +184,7 @@ impl TypeMappings {
 			}
 			return existing.clone();
 		}
-		let rust_type = Rc::new(candidate);
+		let rust_type: Rc<RustType> = Rc::new(candidate);
 		self.rust_types.insert(rust_type.clone());
 		rust_type
 	}

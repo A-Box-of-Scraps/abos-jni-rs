@@ -45,7 +45,7 @@ pub fn sig_type_to_rust_type_core(
 				reference_type: rust_type,
 				..
 			}) => {
-				let path_str = rust_type.path();
+				let path_str: &str = rust_type.path();
 
 				let path: syn::Path =
 					syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
@@ -63,7 +63,7 @@ pub fn sig_type_to_rust_type_core(
 				|| quote! { #jni::objects::JObject<#lifetime> },
 				|rust_type| {
 					// Parse the rust path and generate the type
-					let path_str = rust_type.path();
+					let path_str: &str = rust_type.path();
 					let path: syn::Path =
 						syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
 					quote! { #path<#lifetime> }
@@ -76,10 +76,10 @@ pub fn sig_type_to_rust_type_core(
 			// - JPrimitiveArray<prim_type> for primitive arrays
 			// - JObjectArray<RustType> for arrays of mapped types
 			// - JObjectArray (defaulting to JObjectArray<JObject>) for unmapped object arrays
-			let innermost_array = array_element_type(element_type, lifetime, type_mappings, jni);
+			let innermost_array: TokenStream = array_element_type(element_type, lifetime, type_mappings, jni);
 
 			// Now wrap with JObjectArray for each additional dimension beyond the first
-			let mut result = innermost_array;
+			let mut result: TokenStream = innermost_array;
 			for _ in 0..(*dimensions - 1) {
 				result = quote! { #jni::objects::JObjectArray<#lifetime, #result> };
 			}
@@ -101,14 +101,15 @@ fn array_element_type(
 					if primitive == PrimitiveType::Void {
 						unreachable!("void cannot be used as an array element type");
 					}
-					let prim_ident = quote::format_ident!("j{}", primitive.jni_name().to_lowercase());
+					let prim_ident: proc_macro2::Ident =
+						quote::format_ident!("j{}", primitive.jni_name().to_lowercase());
 					quote! { #jni::objects::JPrimitiveArray<#lifetime, #jni::sys::#prim_ident> }
 				}
 				Some(ConcreteType::Object {
 					reference_type: rust_type,
 					..
 				}) => {
-					let path_str = rust_type.path();
+					let path_str: &str = rust_type.path();
 					let path: syn::Path =
 						syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
 					quote! { #jni::objects::JObjectArray<#lifetime, #path<#lifetime>> }
@@ -124,7 +125,7 @@ fn array_element_type(
 			type_mappings.map_java_class_to_rust_type(class_name).map_or_else(
 				|| quote! { #jni::objects::JObjectArray<#lifetime> },
 				|rust_type| {
-					let path_str = rust_type.path();
+					let path_str: &str = rust_type.path();
 					let path: syn::Path =
 						syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
 					quote! { #jni::objects::JObjectArray<#lifetime, #path<#lifetime>> }
@@ -148,7 +149,7 @@ fn array_element_type(
 /// (note that we will still generate a compile-time error if attempting to map
 /// a built-in Rust type to a different Java type)
 pub fn generate_type_mapping_checks(type_mappings: &TypeMappings, jni: &syn::Path) -> TokenStream {
-	let mut type_checks = Vec::new();
+	let mut type_checks: Vec<TokenStream> = Vec::new();
 
 	// Generate runtime checks for all type mappings
 	for (rust_type, java_class) in type_mappings
@@ -158,8 +159,8 @@ pub fn generate_type_mapping_checks(type_mappings: &TypeMappings, jni: &syn::Pat
 		let rust_path: syn::Path =
 			syn::parse_str(rust_type.path()).unwrap_or_else(|_| panic!("Invalid Rust type path: {}", rust_type.path()));
 
-		let java_class_dotted = java_class.to_java_dotted();
-		let java_class_cstr = lit_cstr_mutf8(&java_class_dotted);
+		let java_class_dotted: String = java_class.to_java_dotted();
+		let java_class_cstr: syn::LitCStr = lit_cstr_mutf8(&java_class_dotted);
 
 		type_checks.push(quote! {
 			{
@@ -189,7 +190,7 @@ pub fn generate_type_mapping_checks(type_mappings: &TypeMappings, jni: &syn::Pat
 		let rust_path: syn::Path =
 			syn::parse_str(rust_type.path()).unwrap_or_else(|_| panic!("Invalid Rust type path: {}", rust_type.path()));
 
-		let jni_sys_prim = match rust_type
+		let jni_sys_prim: TokenStream = match rust_type
 			.primitive()
 			.expect("primitive mappings have a JNI primitive kind")
 		{

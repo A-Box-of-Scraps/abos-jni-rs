@@ -31,12 +31,12 @@ pub(super) fn generate_native_methods_code(
 	}
 
 	// Generate default names if not provided
-	let default_trait_name = format_ident!("{}NativeInterface", type_name);
+	let default_trait_name: Ident = format_ident!("{}NativeInterface", type_name);
 
-	let trait_name = native_trait_name.unwrap_or(&default_trait_name);
+	let trait_name: &Ident = native_trait_name.unwrap_or(&default_trait_name);
 
 	// Generate the native trait
-	let native_trait = generate_native_trait(
+	let native_trait: TokenStream = generate_native_trait(
 		trait_name,
 		type_name,
 		type_visibility,
@@ -46,7 +46,7 @@ pub(super) fn generate_native_methods_code(
 	);
 
 	// Generate wrapper methods (to be added to impl API block)
-	let wrapper_methods = generate_native_wrappers(
+	let wrapper_methods: TokenStream = generate_native_wrappers(
 		type_name,
 		api_name,
 		java_class_internal,
@@ -60,17 +60,18 @@ pub(super) fn generate_native_methods_code(
 	);
 
 	// Wrap the wrappers in an impl block for the API struct
-	let wrapper_impl = quote! {
+	let wrapper_impl: TokenStream = quote! {
 		impl #api_name {
 			#wrapper_methods
 		}
 	};
 
 	// Generate registration code (to be added to API::get())
-	let registration_code = generate_native_registration_code(api_name, native_methods, type_mappings, jni)?;
+	let registration_code: TokenStream =
+		generate_native_registration_code(api_name, native_methods, type_mappings, jni)?;
 
 	// Generate exported native method functions for methods marked with export = true
-	let native_exports = generate_native_exports(
+	let native_exports: TokenStream = generate_native_exports(
 		type_name,
 		api_name,
 		java_class_dotted,
@@ -81,7 +82,7 @@ pub(super) fn generate_native_methods_code(
 	)?;
 
 	// Combine trait, impl struct, wrapper impl, and exports for top-level output
-	let trait_and_impl = quote! {
+	let trait_and_impl: TokenStream = quote! {
 		#native_trait
 		#wrapper_impl
 		#native_exports
@@ -99,7 +100,7 @@ pub(super) fn generate_native_trait(
 	type_mappings: &TypeMappings,
 	jni: &syn::Path,
 ) -> TokenStream {
-	let mut method_sigs = Vec::new();
+	let mut method_sigs: Vec<TokenStream> = Vec::new();
 
 	for method in native_methods.iter().filter(|method| method.native_fn.is_none()) {
 		method_sigs.push(generate_trait_signature(type_name, method, type_mappings, jni));
@@ -110,7 +111,7 @@ pub(super) fn generate_native_trait(
 		return quote! {};
 	}
 
-	let trait_visibility = VisibilitySpec::PubCrate.clamp_to(type_visibility).to_tokens();
+	let trait_visibility: TokenStream = VisibilitySpec::PubCrate.clamp_to(type_visibility).to_tokens();
 	quote! {
 		/// Native methods trait for user implementation
 		#trait_visibility trait #trait_name {
@@ -126,10 +127,10 @@ fn generate_trait_signature(
 	type_mappings: &TypeMappings,
 	jni: &syn::Path,
 ) -> TokenStream {
-	let rust_name = &method.rust_name;
-	let lifetime = quote! { 'local };
+	let rust_name: &Ident = &method.rust_name;
+	let lifetime: TokenStream = quote! { 'local };
 
-	let mut params = Vec::new();
+	let mut params: Vec<TokenStream> = Vec::new();
 
 	// Raw methods take EnvUnowned directly, regular methods take &mut Env
 	if method.is_raw {
@@ -145,16 +146,17 @@ fn generate_trait_signature(
 	}
 
 	for param in &method.signature.parameters {
-		let param_name = &param.name;
+		let param_name: &Ident = &param.name;
 		// Use the native trait arg type (without AsRef)
-		let rust_type = sig_type_to_rust_native_trait_arg_type(&param.ty, &lifetime, type_mappings, jni);
+		let rust_type: TokenStream = sig_type_to_rust_native_trait_arg_type(&param.ty, &lifetime, type_mappings, jni);
 		params.push(quote! { #param_name: #rust_type });
 	}
 
-	let return_type = sig_type_to_rust_return_type(&method.signature.return_type, &lifetime, type_mappings, jni);
+	let return_type: TokenStream =
+		sig_type_to_rust_return_type(&method.signature.return_type, &lifetime, type_mappings, jni);
 
 	// Only emit cfg attributes on trait methods (not doc or other attributes)
-	let cfg_attrs = extract_cfg_attrs(&method.attrs);
+	let cfg_attrs: Vec<syn::Attribute> = extract_cfg_attrs(&method.attrs);
 
 	// Raw methods return the value directly, regular methods return Result
 	if method.is_raw {
