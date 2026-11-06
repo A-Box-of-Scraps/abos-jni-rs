@@ -1,4 +1,4 @@
-//! Procedural macros for generating compile-time type-checked NativeMethod
+//! Procedural macros for generating compile-time type-checked `NativeMethod`
 //! structs
 //!
 //! This module implements the `native_method!` macro that create `NativeMethod`
@@ -42,7 +42,6 @@ custom_keyword!(catch_unwind);
 #[derive(Clone)]
 pub enum NativeMethodExport {
 	/// Use the default behavior
-	#[allow(unused)]
 	Default,
 	/// Don't export this method (override global setting)
 	No,
@@ -52,9 +51,8 @@ pub enum NativeMethodExport {
 	WithName(String),
 }
 
-/// Input structure for native_method!
+/// Input structure for `native_method`!
 struct NativeMethodStructInput {
-	#[allow(dead_code)]
 	is_static: bool,
 	jni_crate: syn::Path,
 	rust_type: Option<syn::Path>,
@@ -66,7 +64,7 @@ struct NativeMethodStructInput {
 	type_mappings: TypeMappings,
 	/// true if `raw = true` or `raw` qualifier with inline signature
 	is_raw_fn: bool,
-	/// Only used when is_raw_fn is false
+	/// Only used when `is_raw_fn` is false
 	error_policy: Option<Ident>,
 	/// `WithAutoMangle` if `export = true` or `extern` qualifier with inline signature
 	export: NativeMethodExport,
@@ -166,7 +164,7 @@ pub fn generate_native_method_abi_check(
 	}
 }
 
-/// Generate the NativeMethod struct creation
+/// Generate the `NativeMethod` struct creation
 pub fn native_method_impl(input: TokenStream) -> Result<TokenStream> {
 	let input: NativeMethodStructInput = syn::parse2(input)?;
 
@@ -180,7 +178,7 @@ pub fn native_method_impl(input: TokenStream) -> Result<TokenStream> {
 	let jni_signature = input.method_signature.to_jni_signature(type_mappings).map_err(|e| {
 		syn::Error::new(
 			proc_macro2::Span::call_site(),
-			format!("Failed to generate JNI signature: {}", e),
+			format!("Failed to generate JNI signature: {e}"),
 		)
 	})?;
 
@@ -300,8 +298,7 @@ pub fn native_method_impl(input: TokenStream) -> Result<TokenStream> {
 		let error_policy = input
 			.error_policy
 			.as_ref()
-			.map(|p| quote! { #p })
-			.unwrap_or_else(|| quote! { #jni::errors::ThrowRuntimeExAndDefault });
+			.map_or_else(|| quote! { #jni::errors::ThrowRuntimeExAndDefault }, |p| quote! { #p });
 
 		let wrapper_ident = syn::Ident::new("__native_method_wrapper", proc_macro2::Span::call_site());
 		let wrapper_path: syn::Path = syn::parse_quote! { #wrapper_ident };
@@ -336,15 +333,24 @@ pub fn native_method_impl(input: TokenStream) -> Result<TokenStream> {
 	};
 
 	// Generate export wrapper if requested
-	if !matches!(input.export, NativeMethodExport::No) {
-		let java_class = input.java_type.as_ref().unwrap(); // Validated earlier
-		let java_class_dotted = java_class.to_java_dotted();
-
+	if matches!(input.export, NativeMethodExport::No) {
+		Ok(quote! {
+			const {
+				#native_method_block
+			}
+		})
+	} else {
 		// Generate the mangled JNI function name
 		let mangled_name = if let NativeMethodExport::WithName(export_name) = input.export {
-			export_name.clone()
+			export_name
 		} else {
-			create_jni_fn_name(&java_class_dotted, java_method_name, Some(&jni_signature))
+			let java_class = input.java_type.as_ref().ok_or_else(|| {
+				syn::Error::new_spanned(
+					&input.fn_path,
+					"java_type is required for an automatically mangled export",
+				)
+			})?;
+			create_jni_fn_name(&java_class.to_java_dotted(), java_method_name, Some(&jni_signature))
 		};
 
 		// Use export_name attribute - check if has_unsafe_attr is set
@@ -380,13 +386,10 @@ pub fn native_method_impl(input: TokenStream) -> Result<TokenStream> {
 				#native_method_block
 			}
 		})
-	} else {
-		Ok(quote! {
-			const {
-				#native_method_block
-			}
-		})
 	}
 }
 
 mod parse;
+
+#[cfg(test)]
+mod tests;
