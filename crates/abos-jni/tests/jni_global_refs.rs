@@ -32,10 +32,10 @@ pub fn global_ref_works_in_other_threads() {
 		.auto();
 		env.new_global_ref(&local_ref)
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 
 	static ATOMIC_INT: OnceLock<Global<JObject<'static>>> = OnceLock::new();
-	ATOMIC_INT.set(atomic_integer).unwrap();
+	ATOMIC_INT.set(atomic_integer).expect("set succeeds");
 
 	let mut join_handlers = Vec::new();
 
@@ -45,7 +45,7 @@ pub fn global_ref_works_in_other_threads() {
 
 		for _ in 0..thread_num {
 			let barrier = barrier.clone();
-			let atomic_integer = ATOMIC_INT.get().unwrap();
+			let atomic_integer = ATOMIC_INT.get().expect("test bindings initialize");
 
 			let jh = spawn(move || {
 				attach_current_thread(|env| {
@@ -62,17 +62,17 @@ pub fn global_ref_works_in_other_threads() {
 					}
 					Ok(())
 				})
-				.unwrap();
+				.expect("attached JNI callback succeeds");
 			});
 			join_handlers.push(jh);
 		}
 
 		for jh in join_handlers.drain(..) {
-			jh.join().unwrap();
+			jh.join().expect("test worker completes without panicking");
 		}
 
 		attach_current_thread(|env| {
-			let atomic_integer = ATOMIC_INT.get().unwrap();
+			let atomic_integer = ATOMIC_INT.get().expect("test bindings initialize");
 			let expected = (ITERS_PER_THREAD * thread_num) as jint;
 			assert_eq!(
 				expected,
@@ -92,6 +92,6 @@ pub fn global_ref_works_in_other_threads() {
 			);
 			Ok(())
 		})
-		.unwrap();
+		.expect("attached JNI callback succeeds");
 	}
 }

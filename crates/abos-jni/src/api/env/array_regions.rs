@@ -1,6 +1,9 @@
-use super::*;
+use super::{
+	Env, JBooleanArray, JByteArray, JCharArray, JDoubleArray, JFloatArray, JIntArray, JLongArray, JShortArray,
+	Reference, Result, TypeArraySealed, jboolean, jbyte, jchar, jdouble, jfloat, jint, jlong, jshort, jsize,
+};
 
-impl<'local> Env<'local> {
+impl Env<'_> {
 	/// Copy elements of the java boolean array from the `start` index to the
 	/// `buf` slice. The number of copied elements is equal to the `buf` length.
 	///

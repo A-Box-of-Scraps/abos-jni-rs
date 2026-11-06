@@ -1,6 +1,10 @@
-use super::*;
+use super::{
+	Field, FieldSignature, Ident, LitBool, ParseStream, Result, Token, TypeMappings, VisibilitySpec, braced,
+	format_ident, get, name, non_null, parse_field_sig, parse_name_spec, parse_type, parse_visibility, set, sig,
+	snake_case_to_lower_camel_case,
+};
 
-/// Parse fields or static_fields block
+/// Parse fields or `static_fields` block
 pub(super) fn parse_field(input: ParseStream, type_mappings: &TypeMappings) -> Result<Field> {
 	// Parse attributes first (for the field itself)
 	let field_attrs = input.call(syn::Attribute::parse_outer)?;
@@ -202,7 +206,7 @@ pub(super) fn parse_field(input: ParseStream, type_mappings: &TypeMappings) -> R
 	}
 }
 
-/// Parse methods or static_methods block
+/// Parse methods or `static_methods` block
 pub(super) fn parse_fields(input: ParseStream, type_mappings: &TypeMappings) -> Result<Vec<Field>> {
 	let mut fields = Vec::new();
 

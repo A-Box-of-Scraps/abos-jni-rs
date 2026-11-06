@@ -29,22 +29,22 @@ struct ThingHandle(*const RustThing);
 impl ThingHandle {
 	pub fn new(thing: RustThing) -> Self {
 		let boxed = Box::new(thing);
-		ThingHandle(Box::into_raw(boxed))
+		Self(Box::into_raw(boxed))
 	}
 
-	unsafe fn as_ref(&self) -> &RustThing {
+	const unsafe fn as_ref(&self) -> &RustThing {
 		unsafe { &*self.0 }
 	}
 
 	// Safety: only convert back to Box (to drop) when sure handle is no longer shared.
 	pub unsafe fn into_box(self) -> Box<RustThing> {
-		unsafe { Box::from_raw(self.0 as *mut RustThing) }
+		unsafe { Box::from_raw(self.0.cast_mut()) }
 	}
 }
 // In order to pass ThingHandle values to/from Java as jlong, we need From<ThingHandle> for jlong
 impl From<ThingHandle> for abos_jni::sys::jlong {
 	fn from(handle: ThingHandle) -> Self {
-		handle.0 as abos_jni::sys::jlong
+		handle.0 as Self
 	}
 }
 
@@ -112,7 +112,7 @@ const NATIVE_METHODS: &[NativeMethod] = &[
 
 // Implementation functions for native methods
 
-fn native_add<'local>(
+const fn native_add<'local>(
 	_env: &mut Env<'local>,
 	_this: JObject<'local>,
 	a: jint,
@@ -129,7 +129,7 @@ fn native_concatenate<'local>(
 ) -> Result<JString<'local>, abos_jni::errors::Error> {
 	let a_str = a.try_to_string(env)?;
 	let b_str = b.try_to_string(env)?;
-	JString::from_str(env, format!("{}{}", a_str, b_str))
+	JString::from_str(env, format!("{a_str}{b_str}"))
 }
 
 fn native_process_handle<'local>(
@@ -142,11 +142,11 @@ fn native_process_handle<'local>(
 	JString::from_str(env, response)
 }
 
-fn native_raw<'local>(_unowned_env: EnvUnowned<'local>, _this: JObject<'local>, value: jint) -> jint {
+const fn native_raw<'local>(_unowned_env: EnvUnowned<'local>, _this: JObject<'local>, value: jint) -> jint {
 	value * 2
 }
 
-fn native_with_function_impl<'local>(
+const fn native_with_function_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: JObject<'local>,
 	value: jint,
@@ -154,7 +154,7 @@ fn native_with_function_impl<'local>(
 	Ok(value * 3)
 }
 
-fn native_no_unwind<'local>(
+const fn native_no_unwind<'local>(
 	_env: &mut Env<'local>,
 	_this: JObject<'local>,
 	value: jint,
@@ -162,7 +162,7 @@ fn native_no_unwind<'local>(
 	Ok(value - 1)
 }
 
-fn native_custom_error_policy<'local>(
+const fn native_custom_error_policy<'local>(
 	_env: &mut Env<'local>,
 	_this: JObject<'local>,
 	value: jint,
@@ -180,10 +180,10 @@ fn native_greet<'local>(
 	name: JString<'local>,
 ) -> Result<JString<'local>, abos_jni::errors::Error> {
 	let name_str = name.try_to_string(env)?;
-	JString::from_str(env, format!("Hello, {}!", name_str))
+	JString::from_str(env, format!("Hello, {name_str}!"))
 }
 
-fn native_echo_int_array<'local>(
+const fn native_echo_int_array<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
 	arr: JIntArray<'local>,

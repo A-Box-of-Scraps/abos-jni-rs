@@ -1,6 +1,9 @@
-use super::*;
+use super::{
+	ConcreteType, Constructor, IdLookup, Ident, Result, SigType, TokenStream, TypeMappings, extract_cfg_attrs,
+	format_ident, generate_jni_call_args, lit_cstr_mutf8, quote, sig_type_to_rust_type_core,
+};
 
-/// Generate field and initialization code from IdLookup descriptors
+/// Generate field and initialization code from `IdLookup` descriptors
 pub(super) fn generate_id_fields_and_inits(
 	lookups: Vec<IdLookup>,
 	jni: &syn::Path,
@@ -54,7 +57,7 @@ pub(super) fn generate_constructor_method_ids(
 			.map_err(|e| {
 				syn::Error::new(
 					name.span(),
-					format!("Failed to generate JNI signature for constructor '{}': {}", name, e),
+					format!("Failed to generate JNI signature for constructor '{name}': {e}"),
 				)
 			})?;
 
@@ -73,8 +76,8 @@ pub(super) fn generate_constructor_method_ids(
 	Ok(generate_id_fields_and_inits(lookups, jni))
 }
 
-/// Convert a JavaType to a Rust native method trait argument type with lifetime
-/// This variant does NOT use AsRef - it takes reference types by value
+/// Convert a `JavaType` to a Rust native method trait argument type with lifetime
+/// This variant does NOT use `AsRef` - it takes reference types by value
 pub(super) fn sig_type_to_rust_native_trait_arg_type(
 	sig_type: &SigType,
 	lifetime: &TokenStream,
@@ -85,8 +88,8 @@ pub(super) fn sig_type_to_rust_native_trait_arg_type(
 	sig_type_to_rust_type_core(sig_type, lifetime, type_mappings, jni)
 }
 
-/// Convert a JavaType to a Rust method argument type with lifetime
-/// This variant uses impl AsRef for object and array types
+/// Convert a `JavaType` to a Rust method argument type with lifetime
+/// This variant uses impl `AsRef` for object and array types
 pub(super) fn sig_type_to_rust_arg_type(
 	sig_type: &SigType,
 	lifetime: &TokenStream,
@@ -106,7 +109,7 @@ pub(super) fn sig_type_to_rust_arg_type(
 	quote! { impl AsRef<#concrete_type> }
 }
 
-/// Convert a JavaType to a Rust method return type with lifetime
+/// Convert a `JavaType` to a Rust method return type with lifetime
 pub(super) fn sig_type_to_rust_return_type(
 	sig_type: &SigType,
 	lifetime: &TokenStream,

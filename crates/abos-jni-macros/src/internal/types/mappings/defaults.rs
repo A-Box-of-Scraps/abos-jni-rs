@@ -1,7 +1,7 @@
-use super::*;
+use super::{JavaClassName, PrimitiveType, Rc, RustType, RustTypeTarget, TypeMappings, path_to_string_no_spaces};
 
 impl TypeMappings {
-	/// Create a new TypeMappings with default JNI type mappings
+	/// Create a new `TypeMappings` with default JNI type mappings
 	///
 	/// # Arguments
 	/// * `jni_crate` - The path to the jni crate (e.g., `jni` or `::jni` or `crate::jni`)
@@ -18,12 +18,16 @@ impl TypeMappings {
 		// Helper function to parse a Java class name from a dotted string
 		let parse_java_class_dotted = |class_str: &str| -> JavaClassName {
 			let parts: Vec<&str> = class_str.split('.').collect();
-			if parts.is_empty() {
-				panic!("Invalid Java class name: {}", class_str);
-			}
+			assert!(!parts.is_empty(), "Invalid Java class name: {class_str}");
 
-			let class = parts.last().unwrap().to_string();
-			let package = parts[..parts.len() - 1].iter().map(|s| s.to_string()).collect();
+			let class = parts
+				.last()
+				.expect("built-in class names have at least one component")
+				.to_string();
+			let package = parts[..parts.len() - 1]
+				.iter()
+				.map(std::string::ToString::to_string)
+				.collect();
 
 			JavaClassName { package, class }
 		};
@@ -63,8 +67,8 @@ impl TypeMappings {
 		for (simple_name, java_class_str, module_path, is_core) in builtins {
 			let java_class = Rc::new(parse_java_class_dotted(java_class_str));
 
-			let jni_full_path = format!("abos_jni::{}", module_path);
-			let real_full_path = format!("{}::{}", jni_crate_str, module_path);
+			let jni_full_path = format!("abos_jni::{module_path}");
+			let real_full_path = format!("{jni_crate_str}::{module_path}");
 
 			type_mappings
 				.insert_ref_type(&jni_full_path, &real_full_path, (*java_class).clone(), true)
@@ -94,7 +98,7 @@ impl TypeMappings {
 		];
 
 		for (rust_name, path, prim_type) in jni_sys_prim_types {
-			let full_path = format!("{}::{}", jni_crate_str, path);
+			let full_path = format!("{jni_crate_str}::{path}");
 			type_mappings
 				.insert_prim_type(rust_name, prim_type, &full_path, true)
 				.expect("Failed to insert abos_jni::sys primitive type mapping");
@@ -149,8 +153,7 @@ impl TypeMappings {
 			if is_builtin {
 				assert!(
 					existing.is_builtin(),
-					"Inconsistent is_builtin flag for existing Rust reference type '{}'",
-					path
+					"Inconsistent is_builtin flag for existing Rust reference type '{path}'"
 				);
 			}
 			return existing.clone();

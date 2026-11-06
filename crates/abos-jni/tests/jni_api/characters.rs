@@ -29,7 +29,7 @@ fn test_java_char_conversion() {
 				&sb,
 				jni_str!("append"),
 				jni_sig!("(C)Ljava/lang/StringBuilder;"),
-				&[JValue::try_from('☃').unwrap()],
+				&[JValue::try_from('☃').expect("try from succeeds")],
 			),
 			env,
 		);
@@ -40,7 +40,7 @@ fn test_java_char_conversion() {
 			env,
 		)
 		.l()
-		.unwrap();
+		.expect("JNI result has the expected value");
 
 		env.delete_local_ref(sb);
 
@@ -75,7 +75,7 @@ fn test_java_char_conversion() {
 				env,
 			)
 			.i_char()
-			.unwrap();
+			.expect("JNI result has the expected value");
 
 			// It should be correct.
 			assert_eq!(c, '🤓');
@@ -97,7 +97,7 @@ fn test_java_char_conversion() {
 				env,
 			)
 			.c_char()
-			.unwrap();
+			.expect("JNI result has the expected value");
 
 			// It should be correct.
 			assert_eq!(c, '☃');
@@ -105,5 +105,5 @@ fn test_java_char_conversion() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }

@@ -4,13 +4,13 @@
 //!
 //! This test verifies that the FLS-based attachment mechanism works correctly
 //! on Windows, including proper tracking when:
-//! - There are multiple redundant attach_current_thread() calls across multiple
+//! - There are multiple redundant `attach_current_thread()` calls across multiple
 //!   fibers on the same OS thread.
-//! - detach_current_thread() is used in fibers with no FLS attachment.
-//! - detach_current_thread() is used in fibers with an FLS attachment.
+//! - `detach_current_thread()` is used in fibers with no FLS attachment.
+//! - `detach_current_thread()` is used in fibers with an FLS attachment.
 //!
 //! No attempt is made to test misuse of fibers that would violate safety
-//! invariants (e.g., switching or deleting fibers while AttachGuards are
+//! invariants (e.g., switching or deleting fibers while `AttachGuards` are
 //! active).
 
 #![cfg(all(use_fls_attach_guard, feature = "invocation"))]

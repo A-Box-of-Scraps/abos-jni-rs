@@ -72,11 +72,11 @@ enum VisibilitySpec {
 impl std::fmt::Debug for VisibilitySpec {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			VisibilitySpec::Public => write!(f, "Public"),
-			VisibilitySpec::PubSelf => write!(f, "PubSelf"),
-			VisibilitySpec::PubCrate => write!(f, "PubCrate"),
-			VisibilitySpec::PubSuper => write!(f, "PubSuper"),
-			VisibilitySpec::PubInPath(_) => write!(f, "PubInPath(..)"),
+			Self::Public => write!(f, "Public"),
+			Self::PubSelf => write!(f, "PubSelf"),
+			Self::PubCrate => write!(f, "PubCrate"),
+			Self::PubSuper => write!(f, "PubSuper"),
+			Self::PubInPath(_) => write!(f, "PubInPath(..)"),
 		}
 	}
 }
@@ -84,35 +84,33 @@ impl std::fmt::Debug for VisibilitySpec {
 impl VisibilitySpec {
 	fn to_tokens(&self) -> TokenStream {
 		match self {
-			VisibilitySpec::Public => quote! { pub },
-			VisibilitySpec::PubSelf => quote! { pub(self) },
-			VisibilitySpec::PubCrate => quote! { pub(crate) },
-			VisibilitySpec::PubSuper => quote! { pub(super) },
-			VisibilitySpec::PubInPath(path) => quote! { pub(in #path) },
+			Self::Public => quote! { pub },
+			Self::PubSelf => quote! { pub(self) },
+			Self::PubCrate => quote! { pub(crate) },
+			Self::PubSuper => quote! { pub(super) },
+			Self::PubInPath(path) => quote! { pub(in #path) },
 		}
 	}
 	// Get back a visibility that is at most as permissive as `other`
 	//
 	// This is used to clamp the visibility of the `*API` struct to the visibility of the binding
 	// type itself.
-	fn clamp_to(&self, other: &VisibilitySpec) -> VisibilitySpec {
+	fn clamp_to(&self, other: &Self) -> Self {
 		match (self, other) {
-			(VisibilitySpec::Public, _) => other.clone(),
-			(VisibilitySpec::PubCrate, VisibilitySpec::Public) => VisibilitySpec::PubCrate,
-			(VisibilitySpec::PubCrate, _) => other.clone(),
-			(VisibilitySpec::PubSuper, VisibilitySpec::Public | VisibilitySpec::PubCrate) => VisibilitySpec::PubSuper,
-			(VisibilitySpec::PubSuper, _) => other.clone(),
-			(VisibilitySpec::PubSelf, VisibilitySpec::Public | VisibilitySpec::PubCrate | VisibilitySpec::PubSuper) => {
-				VisibilitySpec::PubSelf
-			}
-			(VisibilitySpec::PubSelf, _) => other.clone(),
+			(Self::Public, _) => other.clone(),
+			(Self::PubCrate, Self::Public) => Self::PubCrate,
+			(Self::PubCrate, _) => other.clone(),
+			(Self::PubSuper, Self::Public | Self::PubCrate) => Self::PubSuper,
+			(Self::PubSuper, _) => other.clone(),
+			(Self::PubSelf, Self::Public | Self::PubCrate | Self::PubSuper) => Self::PubSelf,
+			(Self::PubSelf, _) => other.clone(),
 			// XXX: it's a bit hand-wavey deciding how we should clamp `pub(in
 			// path)`, but essentially we'll assume that if someone want's their
 			// binding to only be visible for a specific module path then their
 			// API type should also only be visible for the same path, unless
 			// `other` is restricted to `pub(self)`
-			(VisibilitySpec::PubInPath(_), VisibilitySpec::PubSelf) => VisibilitySpec::PubSelf,
-			(VisibilitySpec::PubInPath(_), _) => self.clone(),
+			(Self::PubInPath(_), Self::PubSelf) => Self::PubSelf,
+			(Self::PubInPath(_), _) => self.clone(),
 		}
 	}
 }
@@ -155,10 +153,10 @@ struct Field {
 	non_null: bool,
 }
 
-/// Represents an entry in the is_instance_of list
+/// Represents an entry in the `is_instance_of` list
 #[derive(Clone)]
 struct IsInstanceOfEntry {
-	/// The Rust type alias (e.g., "JObject" or "abos_jni::objects::JObject")
+	/// The Rust type alias (e.g., "`JObject`" or "`abos_jni::objects::JObject`")
 	type_alias: String,
 	/// Optional stem name for the generated as_<stem>() method
 	stem: Option<String>,
@@ -175,7 +173,7 @@ struct NativeMethod {
 	attrs: Vec<syn::Attribute>,
 	/// Optional direct function binding (bypasses trait implementation)
 	native_fn: Option<syn::Path>,
-	/// Whether this is a raw JNI function (takes EnvUnowned directly, no with_env wrapper)
+	/// Whether this is a raw JNI function (takes `EnvUnowned` directly, no `with_env` wrapper)
 	is_raw: bool,
 	/// Whether this is a static method
 	is_static: bool,
@@ -208,7 +206,7 @@ struct ParsedMethod {
 	non_null: bool,               // Set for Method and NativeMethod (not Constructor)
 }
 
-/// The main input structure for bind_java_type!
+/// The main input structure for `bind_java_type`!
 struct BindClassInput {
 	type_name: Ident,
 	type_visibility: Option<VisibilitySpec>,
@@ -236,15 +234,15 @@ struct BindClassInput {
 
 /// Intermediate representation for ID lookups (method IDs or field IDs)
 struct IdLookup {
-	/// The field name in the API struct (e.g., "new_method_id", "get_value_field_id")
+	/// The field name in the API struct (e.g., "`new_method_id`", "`get_value_field_id`")
 	field_name: Ident,
-	/// The field type (JMethodID or JFieldID)
+	/// The field type (`JMethodID` or `JFieldID`)
 	field_type: TokenStream,
 	/// The Java name to look up (e.g., "<init>", "getValue", "myField")
 	java_name: String,
 	/// The JNI signature string
 	signature: String,
-	/// The function to call for lookup (e.g., "get_method_id", "get_static_field_id")
+	/// The function to call for lookup (e.g., "`get_method_id`", "`get_static_field_id`")
 	lookup_fn: Ident,
 	/// The cfg attributes to apply to this ID (e.g., #[cfg(feature = "foo")])
 	cfg_attrs: Vec<syn::Attribute>,
@@ -258,10 +256,10 @@ struct JniCallArgs {
 }
 
 mod parse_method;
-use parse_method::*;
+use parse_method::{parse_constructors, parse_methods, parse_name_spec, parse_native_methods, parse_visibility};
 
 mod parse_field;
-use parse_field::*;
+use parse_field::parse_fields;
 
 mod parse_class;
 
@@ -269,31 +267,37 @@ mod expand;
 pub use expand::*;
 
 mod generate_api;
-use generate_api::*;
+use generate_api::{generate_api_get_method, generate_api_struct, generate_type_struct};
 
 mod references;
-use references::*;
+use references::{
+	extract_cfg_attrs, generate_base_methods, generate_is_instance_of_assignable_checks, generate_is_instance_of_code,
+	generate_reference_impl,
+};
 
 mod generate_constructors;
-use generate_constructors::*;
+use generate_constructors::{
+	generate_constructor_method_ids, generate_constructors, generate_id_fields_and_inits, sig_type_to_rust_arg_type,
+	sig_type_to_rust_native_trait_arg_type, sig_type_to_rust_return_type,
+};
 
 mod ids;
-use ids::*;
+use ids::{generate_field_ids, generate_method_ids};
 
 mod calls;
-use calls::*;
+use calls::{generate_jni_call_args, generate_methods};
 
 mod field_access;
-use field_access::*;
+use field_access::{generate_jni_get_field_call, generate_jni_set_field_call};
 
 mod generate_fields;
-use generate_fields::*;
+use generate_fields::generate_fields;
 
 mod generate_native_trait;
-use generate_native_trait::*;
+use generate_native_trait::generate_native_methods_code;
 
 mod native_wrappers;
-use native_wrappers::*;
+use native_wrappers::generate_native_wrappers;
 
 mod native_exports;
-use native_exports::*;
+use native_exports::{generate_native_exports, generate_native_registration_code};

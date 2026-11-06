@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+	Field, IdLookup, Method, Result, TokenStream, TypeMappings, extract_cfg_attrs, format_ident,
+	generate_id_fields_and_inits, quote,
+};
 
 /// Generate method ID fields and initialization code for methods
 pub(super) fn generate_method_ids(
@@ -18,7 +21,7 @@ pub(super) fn generate_method_ids(
 		let jni_sig_str = method.method_signature.to_jni_signature(type_mappings).map_err(|e| {
 			syn::Error::new(
 				rust_name.span(),
-				format!("Failed to generate JNI signature for method '{}': {}", rust_name, e),
+				format!("Failed to generate JNI signature for method '{rust_name}': {e}"),
 			)
 		})?;
 
@@ -66,7 +69,7 @@ pub(super) fn generate_field_ids(
 		let field_sig = field.field_signature.to_jni_signature(type_mappings).map_err(|e| {
 			syn::Error::new(
 				rust_name.span(),
-				format!("Failed to generate JNI signature for field '{}': {}", rust_name, e),
+				format!("Failed to generate JNI signature for field '{rust_name}': {e}"),
 			)
 		})?;
 

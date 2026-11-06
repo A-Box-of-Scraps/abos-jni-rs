@@ -1,4 +1,4 @@
-use super::*;
+use super::{PrimitiveType, SigType, TokenStream, TypeMappings, format_ident, quote, sig_type_to_rust_return_type};
 
 /// Generate JNI get field call code for a given field type
 pub(super) fn generate_jni_get_field_call(
@@ -65,15 +65,15 @@ pub(super) fn generate_jni_get_field_call(
 
 	// The JNI spec asserts that `Get<Type>Field` _must_ not be called with a `null` object reference
 	// Note: we assume that the class will never be null when getting static fields
-	let null_check = if !is_static {
-		let error_msg = format!("Attempted to set '{}' field with a null object", debug_name);
+	let null_check = if is_static {
+		quote! {}
+	} else {
+		let error_msg = format!("Attempted to set '{debug_name}' field with a null object");
 		quote! {
 			if #this_or_class.is_null() {
 				return Err(#jni::errors::Error::NullPtr(#error_msg));
 			}
 		}
-	} else {
-		quote! {}
 	};
 
 	quote! {
@@ -170,15 +170,15 @@ pub(super) fn generate_jni_set_field_call(
 
 	// The JNI spec asserts that `Set<Type>Field` _must_ not be called with a `null` object reference
 	// Note: we assume that the class will never be null when setting static fields
-	let null_check = if !is_static {
-		let error_msg = format!("Attempted to set '{}' field with a null object", debug_name);
+	let null_check = if is_static {
+		quote! {}
+	} else {
+		let error_msg = format!("Attempted to set '{debug_name}' field with a null object");
 		quote! {
 			if #this_or_class.is_null() {
 				return Err(#jni::errors::Error::NullPtr(#error_msg));
 			}
 		}
-	} else {
-		quote! {}
 	};
 
 	// Generate the JNI field setter call

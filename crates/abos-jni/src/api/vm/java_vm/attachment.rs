@@ -1,4 +1,11 @@
-use super::*;
+use super::{
+	AttachConfig, AttachGuard, AttachmentExceptionPolicy, DEFAULT_LOCAL_FRAME_CAPACITY, Env, Error, JavaVM, JniError,
+	Result, ScopeToken, THREAD_GUARD_NEST_LEVEL, current, sys_attach_current_thread,
+};
+#[cfg(use_fls_attach_guard)]
+use crate::internal::fls_attach_guard;
+#[cfg(use_tls_attach_guard)]
+use crate::internal::tls_attach_guard;
 
 impl JavaVM {
 	/// Attaches the current thread to the Java VM and calls the provided callback with a mutable
@@ -156,9 +163,8 @@ impl JavaVM {
 				// indicate there is a pending exception that must be handled.
 				if env.exception_check() {
 					return Err(Error::JavaException.into());
-				} else {
-					None
 				}
+				None
 			}
 			AttachmentExceptionPolicy::PreReThrowPostCatch => {
 				if let Some(e) = env.exception_occurred() {

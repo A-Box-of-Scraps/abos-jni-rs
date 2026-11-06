@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+	AbiCheck, Ident, IsInstanceOfEntry, Result, TokenStream, TypeMappings, VisibilitySpec, format_ident,
+	generate_is_instance_of_assignable_checks, generate_type_mapping_checks, path_to_string_no_spaces, quote,
+};
 
 /// Generate the type struct definition
 pub(super) fn generate_type_struct(
@@ -99,7 +102,7 @@ pub(super) fn generate_api_struct(
 	}
 }
 
-/// Generate the API::get() method
+/// Generate the `API::get()` method
 #[allow(clippy::too_many_arguments)]
 pub(super) fn generate_api_get_method(
 	api_name: &Ident,

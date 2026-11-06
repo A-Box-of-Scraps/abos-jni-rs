@@ -15,7 +15,7 @@ pub fn call_method_returning_null() {
 		assert!(message_ref.is_null());
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -26,7 +26,7 @@ pub fn is_instance_of_same_class() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -37,7 +37,7 @@ pub fn is_instance_of_superclass() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -48,7 +48,7 @@ pub fn is_instance_of_subclass() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -59,7 +59,7 @@ pub fn is_instance_of_not_superclass() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -72,51 +72,60 @@ pub fn is_instance_of_null() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
 pub fn is_same_object_diff_references() {
 	attach_current_thread(|env| {
-		let string = JString::from_jni_str(env, TESTING_OBJECT_STR).unwrap();
+		let string = JString::from_jni_str(env, TESTING_OBJECT_STR).expect("test JNI string can be allocated");
 		let ref_from_string = unwrap(env.new_local_ref(&string), env);
-		assert!(env.is_same_object(&string, &ref_from_string).unwrap());
+		assert!(
+			env.is_same_object(&string, &ref_from_string)
+				.expect("is same object succeeds")
+		);
 		env.delete_local_ref(ref_from_string);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
 pub fn is_same_object_same_reference() {
 	attach_current_thread(|env| {
-		let string = JString::from_jni_str(env, TESTING_OBJECT_STR).unwrap();
-		assert!(env.is_same_object(&string, &string).unwrap());
+		let string = JString::from_jni_str(env, TESTING_OBJECT_STR).expect("test JNI string can be allocated");
+		assert!(env.is_same_object(&string, &string).expect("is same object succeeds"));
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
 pub fn is_not_same_object() {
 	attach_current_thread(|env| {
-		let string = JString::from_jni_str(env, TESTING_OBJECT_STR).unwrap();
-		let same_src_str = JString::from_jni_str(env, TESTING_OBJECT_STR).unwrap();
-		assert!(!env.is_same_object(&string, &same_src_str).unwrap());
+		let string = JString::from_jni_str(env, TESTING_OBJECT_STR).expect("test JNI string can be allocated");
+		let same_src_str = JString::from_jni_str(env, TESTING_OBJECT_STR).expect("test JNI string can be allocated");
+		assert!(
+			!env.is_same_object(&string, &same_src_str)
+				.expect("is same object succeeds")
+		);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
 pub fn is_not_same_object_null() {
 	attach_current_thread(|env| {
-		assert!(env.is_same_object(JObject::null(), JObject::null()).unwrap());
+		assert!(
+			env.is_same_object(JObject::null(), JObject::null())
+				.expect("is same object succeeds")
+		);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }

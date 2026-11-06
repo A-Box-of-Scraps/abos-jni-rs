@@ -41,7 +41,11 @@ use rusty_fork::rusty_fork_test;
 // Test 1: fn= + Raw (property syntax) + Export (property syntax)
 // ====================================================================================
 
-fn method1_impl<'local>(_env: EnvUnowned<'local>, _this: abos_jni::objects::JObject<'local>, value: jint) -> jint {
+const fn method1_impl<'local>(
+	_env: EnvUnowned<'local>,
+	_this: abos_jni::objects::JObject<'local>,
+	value: jint,
+) -> jint {
 	value * 2
 }
 
@@ -67,7 +71,11 @@ native_method_test! {
 // Test 2: fn= + Raw (qualifier syntax) + Export (qualifier syntax)
 // ====================================================================================
 
-fn method2_impl<'local>(_env: EnvUnowned<'local>, _this: abos_jni::objects::JObject<'local>, value: jint) -> jint {
+const fn method2_impl<'local>(
+	_env: EnvUnowned<'local>,
+	_this: abos_jni::objects::JObject<'local>,
+	value: jint,
+) -> jint {
 	value * 3
 }
 
@@ -93,7 +101,11 @@ native_method_test! {
 // Test 3: fn= + Raw (property syntax) + Export (property syntax)
 // ====================================================================================
 
-fn method3_impl<'local>(_env: EnvUnowned<'local>, _this: abos_jni::objects::JObject<'local>, value: jint) -> jint {
+const fn method3_impl<'local>(
+	_env: EnvUnowned<'local>,
+	_this: abos_jni::objects::JObject<'local>,
+	value: jint,
+) -> jint {
 	value * 4
 }
 
@@ -119,7 +131,7 @@ native_method_test! {
 // Test 4: fn= + Not Raw + Export (property syntax)
 // ====================================================================================
 
-fn method4_impl<'local>(
+const fn method4_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: abos_jni::objects::JObject<'local>,
 	value: jint,
@@ -150,7 +162,7 @@ native_method_test! {
 // Test 5: Static fn= + Raw + Export (mixed syntax)
 // ====================================================================================
 
-fn static_method1_impl<'local>(_env: EnvUnowned<'local>, _class: JClass<'local>, value: jint) -> jint {
+const fn static_method1_impl<'local>(_env: EnvUnowned<'local>, _class: JClass<'local>, value: jint) -> jint {
 	value * 10
 }
 
@@ -175,7 +187,7 @@ native_method_test! {
 // Test 6: Static fn= + Raw (qualifier) + Export (qualifier)
 // ====================================================================================
 
-fn static_method2_impl<'local>(_env: EnvUnowned<'local>, _class: JClass<'local>, value: jint) -> jint {
+const fn static_method2_impl<'local>(_env: EnvUnowned<'local>, _class: JClass<'local>, value: jint) -> jint {
 	value * 20
 }
 
@@ -200,7 +212,11 @@ native_method_test! {
 // Test 7: fn= + Not Raw + Export (qualifier syntax)
 // ====================================================================================
 
-fn static_method3_impl<'local>(_env: &mut Env<'local>, _class: JClass<'local>, value: jint) -> Result<jint, Error> {
+const fn static_method3_impl<'local>(
+	_env: &mut Env<'local>,
+	_class: JClass<'local>,
+	value: jint,
+) -> Result<jint, Error> {
 	Ok(value * 30)
 }
 
@@ -225,7 +241,7 @@ native_method_test! {
 // Test 8: fn= + Not Raw + Not Exported
 // ====================================================================================
 
-fn static_method_non_exported_impl<'local>(
+const fn static_method_non_exported_impl<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
 	value: jint,
@@ -254,7 +270,7 @@ native_method_test! {
 // Test 9: Instance fn= + Not Raw + Not Exported
 // ====================================================================================
 
-fn method_non_exported_impl<'local>(
+const fn method_non_exported_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: abos_jni::objects::JObject<'local>,
 	value: jint,
@@ -283,7 +299,7 @@ native_method_test! {
 // Test 10: Static fn= + Not Raw + Not Exported
 // ====================================================================================
 
-fn static_method_non_exported2_impl<'local>(
+const fn static_method_non_exported2_impl<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
 	value: jint,
@@ -311,7 +327,7 @@ native_method_test! {
 // Test 11: Mixed - fn= (not raw) + fn= (not raw) in one test
 // ====================================================================================
 
-fn method_non_exported_fn_impl<'local>(
+const fn method_non_exported_fn_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: abos_jni::objects::JObject<'local>,
 	value: jint,
@@ -319,7 +335,7 @@ fn method_non_exported_fn_impl<'local>(
 	Ok(value * 70)
 }
 
-fn method_non_exported2_impl<'local>(
+const fn method_non_exported2_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: abos_jni::objects::JObject<'local>,
 	value: jint,
@@ -361,11 +377,19 @@ native_method_test! {
 // Test 12: Mixed - fn= (raw) + fn= (raw) in one test
 // ====================================================================================
 
-fn static_method_non_exported_fn_impl<'local>(_env: EnvUnowned<'local>, _class: JClass<'local>, value: jint) -> jint {
+const fn static_method_non_exported_fn_impl<'local>(
+	_env: EnvUnowned<'local>,
+	_class: JClass<'local>,
+	value: jint,
+) -> jint {
 	value * 90
 }
 
-fn static_method_non_exported2_fn_impl<'local>(_env: EnvUnowned<'local>, _class: JClass<'local>, value: jint) -> jint {
+const fn static_method_non_exported2_fn_impl<'local>(
+	_env: EnvUnowned<'local>,
+	_class: JClass<'local>,
+	value: jint,
+) -> jint {
 	value * 100
 }
 

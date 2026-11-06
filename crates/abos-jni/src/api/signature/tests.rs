@@ -4,20 +4,57 @@ use assert_matches::assert_matches;
 #[test]
 fn test_parser_types() {
 	assert_eq!(
-		"Z".parse::<JavaType>().unwrap(),
+		"Z".parse::<JavaType>().expect("test operation succeeds"),
 		JavaType::Primitive(Primitive::Boolean)
 	);
-	assert_eq!("B".parse::<JavaType>().unwrap(), JavaType::Primitive(Primitive::Byte));
-	assert_eq!("C".parse::<JavaType>().unwrap(), JavaType::Primitive(Primitive::Char));
-	assert_eq!("S".parse::<JavaType>().unwrap(), JavaType::Primitive(Primitive::Short));
-	assert_eq!("I".parse::<JavaType>().unwrap(), JavaType::Primitive(Primitive::Int));
-	assert_eq!("J".parse::<JavaType>().unwrap(), JavaType::Primitive(Primitive::Long));
-	assert_eq!("F".parse::<JavaType>().unwrap(), JavaType::Primitive(Primitive::Float));
-	assert_eq!("D".parse::<JavaType>().unwrap(), JavaType::Primitive(Primitive::Double));
-	assert_eq!("V".parse::<JavaType>().unwrap(), JavaType::Primitive(Primitive::Void));
-	assert_eq!("Ljava/lang/String;".parse::<JavaType>().unwrap(), JavaType::Object);
-	assert_eq!("[I".parse::<JavaType>().unwrap(), JavaType::Array);
-	assert_eq!("[Ljava/lang/String;".parse::<JavaType>().unwrap(), JavaType::Array);
+	assert_eq!(
+		"B".parse::<JavaType>().expect("test operation succeeds"),
+		JavaType::Primitive(Primitive::Byte)
+	);
+	assert_eq!(
+		"C".parse::<JavaType>().expect("test operation succeeds"),
+		JavaType::Primitive(Primitive::Char)
+	);
+	assert_eq!(
+		"S".parse::<JavaType>().expect("test operation succeeds"),
+		JavaType::Primitive(Primitive::Short)
+	);
+	assert_eq!(
+		"I".parse::<JavaType>().expect("test operation succeeds"),
+		JavaType::Primitive(Primitive::Int)
+	);
+	assert_eq!(
+		"J".parse::<JavaType>().expect("test operation succeeds"),
+		JavaType::Primitive(Primitive::Long)
+	);
+	assert_eq!(
+		"F".parse::<JavaType>().expect("test operation succeeds"),
+		JavaType::Primitive(Primitive::Float)
+	);
+	assert_eq!(
+		"D".parse::<JavaType>().expect("test operation succeeds"),
+		JavaType::Primitive(Primitive::Double)
+	);
+	assert_eq!(
+		"V".parse::<JavaType>().expect("test operation succeeds"),
+		JavaType::Primitive(Primitive::Void)
+	);
+	assert_eq!(
+		"Ljava/lang/String;"
+			.parse::<JavaType>()
+			.expect("test operation succeeds"),
+		JavaType::Object
+	);
+	assert_eq!(
+		"[I".parse::<JavaType>().expect("test operation succeeds"),
+		JavaType::Array
+	);
+	assert_eq!(
+		"[Ljava/lang/String;"
+			.parse::<JavaType>()
+			.expect("test operation succeeds"),
+		JavaType::Array
+	);
 
 	assert_matches!("".parse::<JavaType>(), Err(_));
 	assert_matches!("A".parse::<JavaType>(), Err(_));
@@ -40,20 +77,40 @@ fn test_parser_types() {
 	assert_matches!("[V".parse::<RuntimeFieldSignature>(), Err(_));
 
 	// Multi-dimensional arrays
-	assert_eq!("[[I".parse::<JavaType>().unwrap(), JavaType::Array);
-	assert_eq!("[[[I".parse::<JavaType>().unwrap(), JavaType::Array);
-	assert_eq!("[[Ljava/lang/String;".parse::<JavaType>().unwrap(), JavaType::Array);
+	assert_eq!(
+		"[[I".parse::<JavaType>().expect("test operation succeeds"),
+		JavaType::Array
+	);
+	assert_eq!(
+		"[[[I".parse::<JavaType>().expect("test operation succeeds"),
+		JavaType::Array
+	);
+	assert_eq!(
+		"[[Ljava/lang/String;"
+			.parse::<JavaType>()
+			.expect("test operation succeeds"),
+		JavaType::Array
+	);
 
 	// Array with no element type
 	assert_matches!("[".parse::<JavaType>(), Err(_));
 	assert_matches!("[[".parse::<JavaType>(), Err(_));
 
 	// Single-segment class name (no slashes)
-	assert_eq!("LString;".parse::<JavaType>().unwrap(), JavaType::Object);
-	assert_eq!("LA;".parse::<JavaType>().unwrap(), JavaType::Object);
+	assert_eq!(
+		"LString;".parse::<JavaType>().expect("test operation succeeds"),
+		JavaType::Object
+	);
+	assert_eq!(
+		"LA;".parse::<JavaType>().expect("test operation succeeds"),
+		JavaType::Object
+	);
 
 	// Deeply nested class path
-	assert_eq!("La/b/c/d/e;".parse::<JavaType>().unwrap(), JavaType::Object);
+	assert_eq!(
+		"La/b/c/d/e;".parse::<JavaType>().expect("test operation succeeds"),
+		JavaType::Object
+	);
 
 	// Trailing slash in class name
 	assert_matches!("Ljava/lang/String/;".parse::<JavaType>(), Err(_));
@@ -73,14 +130,14 @@ fn test_parser_types() {
 fn test_parser_field_signatures() {
 	// Primitive field signatures
 	assert_eq!(
-		"I".parse::<RuntimeFieldSignature>().unwrap(),
+		"I".parse::<RuntimeFieldSignature>().expect("test operation succeeds"),
 		RuntimeFieldSignature {
 			sig: JNIString::new("I"),
 			ty: JavaType::Primitive(Primitive::Int),
 		}
 	);
 	assert_eq!(
-		"Z".parse::<RuntimeFieldSignature>().unwrap(),
+		"Z".parse::<RuntimeFieldSignature>().expect("test operation succeeds"),
 		RuntimeFieldSignature {
 			sig: JNIString::new("Z"),
 			ty: JavaType::Primitive(Primitive::Boolean),
@@ -89,7 +146,9 @@ fn test_parser_field_signatures() {
 
 	// Object field signature
 	assert_eq!(
-		"Ljava/lang/String;".parse::<RuntimeFieldSignature>().unwrap(),
+		"Ljava/lang/String;"
+			.parse::<RuntimeFieldSignature>()
+			.expect("test operation succeeds"),
 		RuntimeFieldSignature {
 			sig: JNIString::new("Ljava/lang/String;"),
 			ty: JavaType::Object,
@@ -98,21 +157,23 @@ fn test_parser_field_signatures() {
 
 	// Array field signatures
 	assert_eq!(
-		"[I".parse::<RuntimeFieldSignature>().unwrap(),
+		"[I".parse::<RuntimeFieldSignature>().expect("test operation succeeds"),
 		RuntimeFieldSignature {
 			sig: JNIString::new("[I"),
 			ty: JavaType::Array,
 		}
 	);
 	assert_eq!(
-		"[Ljava/lang/String;".parse::<RuntimeFieldSignature>().unwrap(),
+		"[Ljava/lang/String;"
+			.parse::<RuntimeFieldSignature>()
+			.expect("test operation succeeds"),
 		RuntimeFieldSignature {
 			sig: JNIString::new("[Ljava/lang/String;"),
 			ty: JavaType::Array,
 		}
 	);
 	assert_eq!(
-		"[[I".parse::<RuntimeFieldSignature>().unwrap(),
+		"[[I".parse::<RuntimeFieldSignature>().expect("test operation succeeds"),
 		RuntimeFieldSignature {
 			sig: JNIString::new("[[I"),
 			ty: JavaType::Array,
@@ -131,7 +192,9 @@ fn test_parser_field_signatures() {
 #[test]
 fn test_parser_signatures() {
 	assert_eq!(
-		"()V".parse::<RuntimeMethodSignature>().unwrap(),
+		"()V"
+			.parse::<RuntimeMethodSignature>()
+			.expect("test operation succeeds"),
 		RuntimeMethodSignature {
 			sig: JNIString::new("()V"),
 			args: vec![],
@@ -139,7 +202,9 @@ fn test_parser_signatures() {
 		}
 	);
 	assert_eq!(
-		"(I)V".parse::<RuntimeMethodSignature>().unwrap(),
+		"(I)V"
+			.parse::<RuntimeMethodSignature>()
+			.expect("test operation succeeds"),
 		RuntimeMethodSignature {
 			sig: JNIString::new("(I)V"),
 			args: vec![JavaType::Primitive(Primitive::Int)],
@@ -147,7 +212,9 @@ fn test_parser_signatures() {
 		}
 	);
 	assert_eq!(
-		"(Ljava/lang/String;)I".parse::<RuntimeMethodSignature>().unwrap(),
+		"(Ljava/lang/String;)I"
+			.parse::<RuntimeMethodSignature>()
+			.expect("test operation succeeds"),
 		RuntimeMethodSignature {
 			sig: JNIString::new("(Ljava/lang/String;)I"),
 			args: vec![JavaType::Object],
@@ -155,7 +222,9 @@ fn test_parser_signatures() {
 		}
 	);
 	assert_eq!(
-		"([I)I".parse::<RuntimeMethodSignature>().unwrap(),
+		"([I)I"
+			.parse::<RuntimeMethodSignature>()
+			.expect("test operation succeeds"),
 		RuntimeMethodSignature {
 			sig: JNIString::new("([I)I"),
 			args: vec![JavaType::Array],
@@ -163,7 +232,9 @@ fn test_parser_signatures() {
 		}
 	);
 	assert_eq!(
-		"([Ljava/lang/String;)I".parse::<RuntimeMethodSignature>().unwrap(),
+		"([Ljava/lang/String;)I"
+			.parse::<RuntimeMethodSignature>()
+			.expect("test operation succeeds"),
 		RuntimeMethodSignature {
 			sig: JNIString::new("([Ljava/lang/String;)I"),
 			args: vec![JavaType::Array],
@@ -171,7 +242,9 @@ fn test_parser_signatures() {
 		}
 	);
 	assert_eq!(
-		"(I[Ljava/lang/String;Z)I".parse::<RuntimeMethodSignature>().unwrap(),
+		"(I[Ljava/lang/String;Z)I"
+			.parse::<RuntimeMethodSignature>()
+			.expect("test operation succeeds"),
 		RuntimeMethodSignature {
 			sig: JNIString::new("(I[Ljava/lang/String;Z)I"),
 			args: vec![
@@ -212,7 +285,9 @@ fn test_parser_signatures() {
 
 	// Object return type
 	assert_eq!(
-		"()Ljava/lang/String;".parse::<RuntimeMethodSignature>().unwrap(),
+		"()Ljava/lang/String;"
+			.parse::<RuntimeMethodSignature>()
+			.expect("test operation succeeds"),
 		RuntimeMethodSignature {
 			sig: JNIString::new("()Ljava/lang/String;"),
 			args: vec![],
@@ -222,7 +297,9 @@ fn test_parser_signatures() {
 
 	// Array return type
 	assert_eq!(
-		"()[I".parse::<RuntimeMethodSignature>().unwrap(),
+		"()[I"
+			.parse::<RuntimeMethodSignature>()
+			.expect("test operation succeeds"),
 		RuntimeMethodSignature {
 			sig: JNIString::new("()[I"),
 			args: vec![],
@@ -230,7 +307,9 @@ fn test_parser_signatures() {
 		}
 	);
 	assert_eq!(
-		"()[Ljava/lang/String;".parse::<RuntimeMethodSignature>().unwrap(),
+		"()[Ljava/lang/String;"
+			.parse::<RuntimeMethodSignature>()
+			.expect("test operation succeeds"),
 		RuntimeMethodSignature {
 			sig: JNIString::new("()[Ljava/lang/String;"),
 			args: vec![],
@@ -242,7 +321,7 @@ fn test_parser_signatures() {
 	assert_eq!(
 		"(Ljava/lang/String;Ljava/lang/Object;)V"
 			.parse::<RuntimeMethodSignature>()
-			.unwrap(),
+			.expect("test operation succeeds"),
 		RuntimeMethodSignature {
 			sig: JNIString::new("(Ljava/lang/String;Ljava/lang/Object;)V"),
 			args: vec![JavaType::Object, JavaType::Object],
@@ -252,7 +331,9 @@ fn test_parser_signatures() {
 
 	// Array arguments
 	assert_eq!(
-		"([[I[Ljava/lang/String;)V".parse::<RuntimeMethodSignature>().unwrap(),
+		"([[I[Ljava/lang/String;)V"
+			.parse::<RuntimeMethodSignature>()
+			.expect("test operation succeeds"),
 		RuntimeMethodSignature {
 			sig: JNIString::new("([[I[Ljava/lang/String;)V"),
 			args: vec![JavaType::Array, JavaType::Array],

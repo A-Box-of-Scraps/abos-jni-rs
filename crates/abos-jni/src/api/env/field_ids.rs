@@ -1,4 +1,6 @@
-use super::*;
+use super::{
+	Desc, Env, Error, FieldSignature, JClass, JFieldID, JNIStr, JObject, JStaticFieldID, JniError, Reference, Result,
+};
 
 impl<'local> Env<'local> {
 	/// Look up the field ID for a class/name/type combination.

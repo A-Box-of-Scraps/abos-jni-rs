@@ -12,5 +12,5 @@ fn test_builtin_bindings() {
 		abos_jni::__test_bindings_init(env, &Default::default());
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }

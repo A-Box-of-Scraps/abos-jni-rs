@@ -1,4 +1,10 @@
-use super::*;
+#[cfg(doc)]
+use crate::objects::JPrimitiveArray;
+
+use super::{
+	AsJArrayRaw, Desc, Env, Error, JBooleanArray, JByteArray, JCharArray, JClass, JDoubleArray, JFloatArray, JIntArray,
+	JLongArray, JObject, JObjectArray, JShortArray, JniError, Reference, Result, jsize,
+};
 
 impl<'local> Env<'local> {
 	/// Get the length of a [`JPrimitiveArray`] or [`JObjectArray`].
@@ -19,7 +25,7 @@ impl<'local> Env<'local> {
 	///
 	/// All elements are initially set to `initial_element`.
 	///
-	/// It's recommended to use [JObjectArray::new] or [`Self::new_object_type_array`]
+	/// It's recommended to use [`JObjectArray::new`] or [`Self::new_object_type_array`]
 	/// instead, which both support element type parameterization.
 	///
 	/// This API may be deprecated and removed in a future version.
@@ -60,7 +66,7 @@ impl<'local> Env<'local> {
 	///
 	/// All elements are initially set to `initial_element`.
 	///
-	/// It's recommended to use [JObjectArray::new] instead.
+	/// It's recommended to use [`JObjectArray::new`] instead.
 	pub fn new_object_type_array<'any_local, E>(
 		&mut self,
 		length: usize,
@@ -114,7 +120,7 @@ impl<'local> Env<'local> {
 
 	/// Converts a java byte array to a rust vector of bytes.
 	///
-	/// Returns [Error::IndexOutOfBounds] if one of the calculated indexes in the region is not
+	/// Returns [`Error::IndexOutOfBounds`] if one of the calculated indexes in the region is not
 	/// valid (in case the array length is changed concurrently).
 	///
 	/// This API catches exceptions internally and is not expected to return [`Error::JavaException`]
@@ -138,78 +144,78 @@ impl<'local> Env<'local> {
 				array,
 				0,
 				length,
-				vec.as_mut_ptr() as *mut i8
+				vec.as_mut_ptr().cast::<i8>()
 			)?;
 		}
 		Ok(vec)
 	}
 
-	/// Create a new [JBooleanArray] of supplied length.
+	/// Create a new [`JBooleanArray`] of supplied length.
 	///
-	/// It is recommended to use [JBooleanArray::new] instead.
+	/// It is recommended to use [`JBooleanArray::new`] instead.
 	///
 	/// This API may be deprecated and removed in a future version.
 	pub fn new_boolean_array(&mut self, length: usize) -> Result<JBooleanArray<'local>> {
 		JBooleanArray::new(self, length)
 	}
 
-	/// Create a new [JByteArray] of supplied length.
+	/// Create a new [`JByteArray`] of supplied length.
 	///
-	/// It is recommended to use [JByteArray::new] instead.
+	/// It is recommended to use [`JByteArray::new`] instead.
 	///
 	/// This API may be deprecated and removed in a future version.
 	pub fn new_byte_array(&mut self, length: usize) -> Result<JByteArray<'local>> {
 		JByteArray::new(self, length)
 	}
 
-	/// Create a new [JCharArray] of supplied length.
+	/// Create a new [`JCharArray`] of supplied length.
 	///
-	/// It is recommended to use [JCharArray::new] instead.
+	/// It is recommended to use [`JCharArray::new`] instead.
 	///
 	/// This API may be deprecated and removed in a future version.
 	pub fn new_char_array(&mut self, length: usize) -> Result<JCharArray<'local>> {
 		JCharArray::new(self, length)
 	}
 
-	/// Create a new [JShortArray] of supplied length.
+	/// Create a new [`JShortArray`] of supplied length.
 	///
-	/// It is recommended to use [JShortArray::new] instead.
+	/// It is recommended to use [`JShortArray::new`] instead.
 	///
 	/// This API may be deprecated and removed in a future version.
 	pub fn new_short_array(&mut self, length: usize) -> Result<JShortArray<'local>> {
 		JShortArray::new(self, length)
 	}
 
-	/// Create a new [JIntArray] of supplied length.
+	/// Create a new [`JIntArray`] of supplied length.
 	///
-	/// It is recommended to use [JIntArray::new] instead.
+	/// It is recommended to use [`JIntArray::new`] instead.
 	///
 	/// This API may be deprecated and removed in a future version.
 	pub fn new_int_array(&mut self, length: usize) -> Result<JIntArray<'local>> {
 		JIntArray::new(self, length)
 	}
 
-	/// Create a new [JLongArray] of supplied length.
+	/// Create a new [`JLongArray`] of supplied length.
 	///
-	/// It is recommended to use [JLongArray::new] instead.
+	/// It is recommended to use [`JLongArray::new`] instead.
 	///
 	/// This API may be deprecated and removed in a future version.
 	pub fn new_long_array(&mut self, length: usize) -> Result<JLongArray<'local>> {
 		JLongArray::new(self, length)
 	}
 
-	/// Create a new [JFloatArray] of supplied length.
+	/// Create a new [`JFloatArray`] of supplied length.
 	///
-	/// It is recommended to use [JFloatArray::new] instead.
+	/// It is recommended to use [`JFloatArray::new`] instead.
 	///
 	/// This API may be deprecated and removed in a future version.
 	pub fn new_float_array(&mut self, length: usize) -> Result<JFloatArray<'local>> {
 		JFloatArray::new(self, length)
 	}
 
-	/// Create a new [JDoubleArray] of supplied length.
+	/// Create a new [`JDoubleArray`] of supplied length.
 	///
-	/// It is recommended to use [JDoubleArray::new] instead.
+	/// It is recommended to use [`JDoubleArray::new`] instead.
 	///
 	/// This API may be deprecated and removed in a future version.
 	pub fn new_double_array(&mut self, length: usize) -> Result<JDoubleArray<'local>> {

@@ -29,11 +29,11 @@ use crate::{objects::JString, refs::Weak};
 ///
 /// For downcasting (i.e converting to a more specific type), with runtime
 /// checks, use one of these APIs:
-/// - [Env::as_cast]
-/// - [Env::new_cast_local_ref]
-/// - [Env::cast_local]
-/// - [Env::new_cast_global_ref]
-/// - [Env::cast_global]
+/// - [`Env::as_cast`]
+/// - [`Env::new_cast_local_ref`]
+/// - [`Env::cast_local`]
+/// - [`Env::new_cast_global_ref`]
+/// - [`Env::cast_global`]
 ///
 /// or look for a `cast_local` API like [`JString::cast_local`].
 ///
@@ -65,14 +65,14 @@ pub struct JObject<'local> {
 unsafe impl Send for JObject<'static> {}
 unsafe impl Sync for JObject<'static> {}
 
-impl<'local> AsRef<JObject<'local>> for JObject<'local> {
-	fn as_ref(&self) -> &JObject<'local> {
+impl AsRef<Self> for JObject<'_> {
+	fn as_ref(&self) -> &Self {
 		self
 	}
 }
 
-impl<'local> AsMut<JObject<'local>> for JObject<'local> {
-	fn as_mut(&mut self) -> &mut JObject<'local> {
+impl AsMut<Self> for JObject<'_> {
+	fn as_mut(&mut self) -> &mut Self {
 		self
 	}
 }
@@ -85,7 +85,7 @@ impl ::std::ops::Deref for JObject<'_> {
 	}
 }
 
-pub(crate) struct JObjectAPI {
+pub struct JObjectAPI {
 	class: Global<JClass<'static>>,
 	// no methods cached for now
 }
@@ -119,10 +119,10 @@ impl JObjectAPI {
 		let api = env.with_local_frame(8, |env| -> crate::errors::Result<_> {
 			let class = env.find_class(jni_str!("java/lang/Object"))?;
 			let class = env.new_global_ref(class)?;
-			Ok(JObjectAPI { class })
+			Ok(Self { class })
 		})?;
 		let _ = API.set(api);
-		Ok(API.get().unwrap())
+		Ok(API.get().expect("Object bindings have just been initialized"))
 	}
 }
 
@@ -143,6 +143,7 @@ impl JObject<'_> {
 	///
 	/// Null references are always valid and do not belong to a local reference frame. Therefore,
 	/// the returned `JObject` always has the `'static` lifetime.
+	#[must_use]
 	pub const fn null() -> JObject<'static> {
 		JObject {
 			internal: std::ptr::null_mut(),
@@ -151,11 +152,13 @@ impl JObject<'_> {
 	}
 
 	/// Returns the raw JNI pointer.
+	#[must_use]
 	pub const fn as_raw(&self) -> jobject {
 		self.internal
 	}
 
 	/// Unwrap to the internal jni type.
+	#[must_use]
 	pub const fn into_raw(self) -> jobject {
 		self.internal
 	}

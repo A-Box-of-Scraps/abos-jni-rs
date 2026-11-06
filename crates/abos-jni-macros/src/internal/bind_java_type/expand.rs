@@ -1,6 +1,11 @@
-use super::*;
+use super::{
+	BindClassInput, Result, Span, TokenStream, VisibilitySpec, format_ident, generate_api_get_method,
+	generate_api_struct, generate_base_methods, generate_constructor_method_ids, generate_constructors,
+	generate_field_ids, generate_fields, generate_is_instance_of_code, generate_method_ids, generate_methods,
+	generate_native_methods_code, generate_reference_impl, generate_type_struct, quote,
+};
 
-/// Generate code for the bind_java_type macro
+/// Generate code for the `bind_java_type` macro
 pub fn bind_java_type_impl(input: TokenStream) -> Result<TokenStream> {
 	let input: BindClassInput = syn::parse2(input)?;
 
@@ -15,8 +20,7 @@ pub fn bind_java_type_impl(input: TokenStream) -> Result<TokenStream> {
 		return Err(syn::Error::new(
 			Span::call_site(),
 			format!(
-				"Cannot create binding for core Java type '{}'. Core types (java.lang.Object, java.lang.Class, java.lang.Throwable, and java.lang.String) are already provided by the jni crate and cannot be re-bound.",
-				java_class_dotted
+				"Cannot create binding for core Java type '{java_class_dotted}'. Core types (java.lang.Object, java.lang.Class, java.lang.Throwable, and java.lang.String) are already provided by the jni crate and cannot be re-bound."
 			),
 		));
 	}

@@ -1,4 +1,4 @@
-use super::*;
+use super::{Error, JNIString, JavaType, Primitive, Result, RuntimeFieldSignature, RuntimeMethodSignature};
 
 /// Parse a primitive type descriptor from the start of `input`.
 /// Returns the parsed `Primitive` and the remaining input.
@@ -55,7 +55,7 @@ pub(super) fn parse_object(input: &str) -> Result<(JavaType, &str)> {
 		.ok_or_else(|| Error::ParseFailed("expected 'L' for object type".into()))?;
 
 	// JVMS §4.2.2: unqualified names must not contain '.', ';', '[', or '/'
-	pub(super) fn is_unqualified(c: char) -> bool {
+	pub(super) const fn is_unqualified(c: char) -> bool {
 		!matches!(c, '.' | ';' | '[' | '/')
 	}
 

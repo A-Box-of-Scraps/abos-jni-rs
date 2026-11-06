@@ -37,7 +37,7 @@ native_method_test! {
 	}
 }
 
-fn native_method_registered_as_static<'local>(
+const fn native_method_registered_as_static<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>, // Static registration expects JClass
 	value: jint,
@@ -66,7 +66,7 @@ native_method_test! {
 	}
 }
 
-fn native_static_method_registered_as_instance<'local>(
+const fn native_static_method_registered_as_instance<'local>(
 	_env: &mut Env<'local>,
 	_this: abos_jni::objects::JObject<'local>, // Instance registration expects JObject
 	value: jint,
@@ -107,7 +107,7 @@ native_method_test! {
 	}
 }
 
-fn native_method_correct<'local>(
+const fn native_method_correct<'local>(
 	_env: &mut Env<'local>,
 	_this: abos_jni::objects::JObject<'local>,
 	value: jint,
@@ -115,7 +115,7 @@ fn native_method_correct<'local>(
 	Ok(value * 2)
 }
 
-fn native_static_method_correct<'local>(
+const fn native_static_method_correct<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
 	value: jint,
@@ -252,22 +252,19 @@ fn test_abi_debug_only_in_debug_mode_raw() {
 	// Check the combined output (stderr and stdout) for the ABI check message
 	let stderr = String::from_utf8_lossy(&output.stderr);
 	let stdout = String::from_utf8_lossy(&output.stdout);
-	let combined = format!("{}{}", stdout, stderr);
+	let combined = format!("{stdout}{stderr}");
 
 	// The ABI check assertion message should appear in the output
 	assert!(
 		combined.contains("was registered as static but called as instance method")
 			|| combined.contains("nativeMethod"),
-		"Expected ABI check error message in output, got stdout: {}\nstderr: {}",
-		stdout,
-		stderr
+		"Expected ABI check error message in output, got stdout: {stdout}\nstderr: {stderr}"
 	);
 
 	// The test should have failed
 	assert!(
 		combined.contains("test test_abi_debug_only_in_debug_mode_raw_impl ... FAILED"),
-		"Expected test failure in output, got: {}",
-		combined
+		"Expected test failure in output, got: {combined}"
 	);
 }
 
@@ -294,7 +291,7 @@ native_method_test! {
 	}
 }
 
-fn raw_native_method_registered_as_static<'local>(
+const fn raw_native_method_registered_as_static<'local>(
 	_env: abos_jni::EnvUnowned<'local>,
 	_class: JClass<'local>,
 	value: jint,

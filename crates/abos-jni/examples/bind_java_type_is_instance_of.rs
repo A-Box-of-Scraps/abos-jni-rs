@@ -4,10 +4,10 @@
 //! Example demonstrating `is_instance_of` functionality
 //!
 //! This example shows how to:
-//! - Bind a Java class that extends ArrayList (java.util.List)
-//! - Use `is_instance_of` to declare that instances can be cast to JList + JCollection
+//! - Bind a Java class that extends `ArrayList` (java.util.List)
+//! - Use `is_instance_of` to declare that instances can be cast to `JList` + `JCollection`
 //! - Use stem name to generate convenient `as_<stem>()` methods
-//! - Cast from the bound reference type to the is_instance_of type using From + AsRef traits
+//! - Cast from the bound reference type to the `is_instance_of` type using From + `AsRef` traits
 //!
 //! Note: The bindings will include a runtime self-check within `<Type>API::get()` to do
 //! a one-time verification that the Java object is indeed an instance of the declared
@@ -60,33 +60,30 @@ fn main() {
 		println!("\nUsing as_list() method (generated from stem name):");
 		let as_list = instance.as_list();
 		let size = as_list.size(env)?;
-		println!("  List size: {}", size);
+		println!("  List size: {size}");
 
 		// Add an item to the list
 		let item = env.new_string("World")?;
 		as_list.add(env, &item)?;
 
 		let new_size = as_list.size(env)?;
-		println!("  List size after adding another item: {}", new_size);
+		println!("  List size after adding another item: {new_size}");
 
 		// Demonstrate AsRef trait conversion to &JList
 		println!("\nUsing AsRef trait to convert to &JList:");
 		let as_list_from: &JList = instance.as_ref();
 		let size_from = as_list_from.size(env)?;
-		println!("  List size (via AsRef): {}", size_from);
+		println!("  List size (via AsRef): {size_from}");
 
 		println!("\nUsing AsRef trait to convert &JList to &JCollection:");
 		let as_collection_via_list: &JCollection = as_list_from.as_ref();
 		let size_collection_via_list = as_collection_via_list.size(env)?;
-		println!(
-			"  Collection size (via AsRef from &JList): {}",
-			size_collection_via_list
-		);
+		println!("  Collection size (via AsRef from &JList): {size_collection_via_list}");
 
 		println!("\nUsing Into trait to convert JInstanceOf to JCollection:");
 		let as_collection_from: JCollection = instance.into();
 		let size_collection_from = as_collection_from.size(env)?;
-		println!("  Collection size (via Into): {}", size_collection_from);
+		println!("  Collection size (via Into): {size_collection_from}");
 
 		Ok(())
 	})

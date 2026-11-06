@@ -12,7 +12,7 @@ use abos_jni_sys::jobject;
 use crate::{
 	DEFAULT_LOCAL_FRAME_CAPACITY, JNIVersion, JavaVM,
 	descriptors::Desc,
-	errors::*,
+	errors::{Error, JniError, Result, jni_error_code_to_result},
 	jni_sig,
 	objects::{
 		Auto, AutoElements, AutoElementsCritical, Global, IntoAuto, JByteBuffer, JClass, JClassLoader, JFieldID, JList,
@@ -27,7 +27,7 @@ use crate::{
 	errors::ErrorPolicy,
 	objects::{
 		Cast, JBooleanArray, JByteArray, JCharArray, JDoubleArray, JFloatArray, JIntArray, JLongArray, JObjectArray,
-		JPrimitiveArray, JShortArray, LoaderContext, type_array_sealed::TypeArraySealed,
+		JPrimitiveArray, JShortArray, LoaderContext, TypeArraySealed,
 	},
 };
 use crate::{objects::AsJArrayRaw, signature::ReturnType};
@@ -150,7 +150,7 @@ use crate::{jni_str, objects::JThread, strings::JNIString};
 ///
 /// ## `null` Java references
 /// `null` Java references are handled by the following rules:
-///   - Methods that require non-null references will return [Error::NullPtr] if
+///   - Methods that require non-null references will return [`Error::NullPtr`] if
 ///     passed a `null` reference.
 ///   - If a JNI function returns `null` to indicate an error (e.g.
 ///     [`Env::new_int_array`]), it is converted to `Err`/[`Error::NullPtr`], or
@@ -331,14 +331,14 @@ use crate::{jni_str, objects::JThread, strings::JNIString};
 /// literal like `jni_str!("java/lang/String")` which will be encoded as MUTF-8
 /// at compile time.
 ///
-/// See [jni_str!] for more details.
+/// See [`jni_str`!] for more details.
 ///
-/// For non-literal, dynamic strings then you can use [JNIString::new] to encode
+/// For non-literal, dynamic strings then you can use [`JNIString::new`] to encode
 /// strings as MUTF-8 at runtime (derefs as [`JNIStr`]).
 ///
 #[derive(Debug)]
 pub struct Env<'local> {
-	/// A non-null JNIEnv pointer
+	/// A non-null `JNIEnv` pointer
 	pub(crate) raw: *mut sys::JNIEnv,
 	/// The current [`abos_jni::AttachGuard`] nesting level, which we assert matches
 	/// the top/current nesting level whenever some API will return a new local
@@ -395,16 +395,12 @@ impl<'desc> NativeMethod<'desc> {
 	/// or some specific `this` type like:
 	///
 	/// `fn<'local>(unowned_env: EnvUnowned<'local>, this: MyType<'local>, arg0: jint) -> JString<'local>`.
-	pub const unsafe fn from_raw_parts(
-		name: &'desc JNIStr,
-		sig: &'desc JNIStr,
-		fn_ptr: *mut c_void,
-	) -> NativeMethod<'desc> {
+	pub const unsafe fn from_raw_parts(name: &'desc JNIStr, sig: &'desc JNIStr, fn_ptr: *mut c_void) -> Self {
 		NativeMethod {
 			desc: JNINativeMethod {
-				name: name.as_ptr() as *mut c_char,
-				signature: sig.as_ptr() as *mut c_char,
-				fnPtr: fn_ptr as *mut c_void,
+				name: name.as_ptr().cast_mut(),
+				signature: sig.as_ptr().cast_mut(),
+				fnPtr: fn_ptr.cast::<c_void>(),
 			},
 			_phantom: PhantomData,
 		}

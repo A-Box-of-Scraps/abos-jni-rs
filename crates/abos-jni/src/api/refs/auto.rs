@@ -31,7 +31,7 @@ use super::Reference;
 ///
 /// These JNI references are normally automatically deleted once the their JNI
 /// stack frame unwinds, such as when a foreign method implementation returns
-/// back to the JavaVM.
+/// back to the `JavaVM`.
 ///
 /// In some situations you don't want to wait until the current JNI stack frame
 /// unwinds before you delete a local reference and you can wrap then with
@@ -82,7 +82,7 @@ use super::Reference;
 /// references in bulk, without needing to use [`Auto`].
 ///
 /// You can also explicitly delete a local reference with
-/// [crate::Env::delete_local_ref].
+/// [`crate::Env::delete_local_ref`].
 ///
 /// [spec-references]:
 ///     https://docs.oracle.com/en/java/javase/12/docs/specs/jni/design.html#referencing-java-objects
@@ -113,7 +113,7 @@ where
 	/// Once this wrapper goes out of scope, the `delete_local_ref` will be
 	/// called on the object. While wrapped, the object can be accessed via
 	/// the `Deref` impl.
-	pub fn new(obj: T) -> Self {
+	pub const fn new(obj: T) -> Self {
 		Auto {
 			obj: ManuallyDrop::new(obj),
 			_lifetime: PhantomData,
@@ -161,7 +161,7 @@ where
 			// Safety: The `&mut` proves that `self_md.obj` is valid and not aliased. It is not
 			// accessed again after this point. It is wrapped inside `ManuallyDrop`, and will
 			// therefore not be dropped after it is moved.
-			ptr::read(&*self_md.obj)
+			ptr::read(&raw const *self_md.obj)
 		}
 	}
 

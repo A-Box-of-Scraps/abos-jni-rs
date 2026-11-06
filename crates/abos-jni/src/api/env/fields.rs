@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+	Desc, Env, Error, FieldSignature, IntoAuto, JClass, JFieldID, JNIStr, JObject, JStaticFieldID, JValue, JValueOwned,
+	JavaType, Reference, Result,
+};
 
 impl<'local> Env<'local> {
 	/// Get a field without checking the provided type against the actual field.
@@ -6,7 +9,7 @@ impl<'local> Env<'local> {
 	/// # Safety
 	///
 	/// - The `obj` must not be `null`
-	/// - The `field` must be associated with the given `obj` (got from passing the `obj` to [Env::get_field_id])
+	/// - The `field` must be associated with the given `obj` (got from passing the `obj` to [`Env::get_field_id`])
 	/// - The field must have the specified `ty` type.
 	pub unsafe fn get_field_unchecked<'other_local, O, F>(
 		&mut self,
@@ -63,14 +66,14 @@ impl<'local> Env<'local> {
 	/// # Safety
 	///
 	/// - The `obj` must not be `null`
-	/// - The `field` must be associated with the given `obj` (got from passing the `obj` to [Env::get_field_id])
+	/// - The `field` must be associated with the given `obj` (got from passing the `obj` to [`Env::get_field_id`])
 	/// - The field type must match the given `value` type.
 	pub unsafe fn set_field_unchecked<'other_local, O, F>(&mut self, obj: O, field: F, value: JValue) -> Result<()>
 	where
 		O: AsRef<JObject<'other_local>>,
 		F: Desc<'local, JFieldID>,
 	{
-		if let JValue::Void = value {
+		if matches!(value, JValue::Void) {
 			return Err(Error::WrongJValueType("void", "see java field"));
 		}
 
@@ -94,7 +97,7 @@ impl<'local> Env<'local> {
 			JValue::Double(d) => set_field!(SetDoubleField(d))?,
 			JValue::Byte(b) => set_field!(SetByteField(b))?,
 			_ => (),
-		};
+		}
 
 		Ok(())
 	}
@@ -153,7 +156,7 @@ impl<'local> Env<'local> {
 	/// # Safety
 	///
 	/// - The `class` must not be null
-	/// - The `field` must be associated with the given `class` (got from passing the `class` to [Env::get_static_field_id])
+	/// - The `field` must be associated with the given `class` (got from passing the `class` to [`Env::get_static_field_id`])
 	/// - The field must have the specified `ty` type.
 	pub unsafe fn get_static_field_unchecked<'other_local, C, F>(
 		&mut self,
@@ -216,7 +219,7 @@ impl<'local> Env<'local> {
 	/// # Safety
 	///
 	/// - The `class` must not be null
-	/// - The `field` must be associated with the given `class` (got from passing the `class` to [Env::get_static_field_id])
+	/// - The `field` must be associated with the given `class` (got from passing the `class` to [`Env::get_static_field_id`])
 	/// - The field type must match the given `value` type.
 	pub unsafe fn set_static_field_unchecked<'other_local, C, F>(
 		&mut self,

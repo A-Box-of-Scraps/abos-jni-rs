@@ -13,38 +13,38 @@ pub enum LoaderContext<'any_local, 'a> {
 	/// There's no extra context that influences how the class should be loaded, and a default
 	/// strategy will be used:
 	///
-	/// 1. The Thread context will be used to find a ClassLoader to check via Class.forName
-	/// 2. FindClass will be called
+	/// 1. The Thread context will be used to find a `ClassLoader` to check via Class.forName
+	/// 2. `FindClass` will be called
 	#[default]
 	None,
-	/// A direct reference to the class loader that should be used (with no fallback to FindClass)
+	/// A direct reference to the class loader that should be used (with no fallback to `FindClass`)
 	Loader(&'a JClassLoader<'any_local>),
-	/// In case we don't have a direct reference, to a `ClassLoader`, the ClassLoader associated
+	/// In case we don't have a direct reference, to a `ClassLoader`, the `ClassLoader` associated
 	/// with this object's Class may be checked
 	///
 	/// This is used when downcasting, where we can speculate that the object being
 	/// downcast _should_ be associated with the correct `ClassLoader`.
 	///
 	/// The search strategy will be:
-	/// 1. The Thread context will be used to find a ClassLoader to check via Class.forName
-	/// 2. The ClassLoader associated with the object being downcast will be used
-	/// 3. FindClass will be called
+	/// 1. The Thread context will be used to find a `ClassLoader` to check via Class.forName
+	/// 2. The `ClassLoader` associated with the object being downcast will be used
+	/// 3. `FindClass` will be called
 	FromObject(&'a JObject<'any_local>),
 }
 
-impl<'a, 'any_local> LoaderContext<'a, 'any_local> {
+impl LoaderContext<'_, '_> {
 	/// Loads the class with the given name using the loader context.
 	///
 	/// `name` should be a binary name like `"java.lang.String"` or an array descriptor like
 	/// `"[Ljava.lang.String;"`.
 	///
-	/// **Note:** that unlike [crate::api::env::Env::find_class], the name uses **dots instead of
+	/// **Note:** that unlike [`crate::api::env::Env::find_class`], the name uses **dots instead of
 	/// slashes** and should conform to the format that `Class.getName()` returns and that
 	/// `Class.forName()` expects.
 	///
-	/// **Note**: see [Self::find_class] if you need to load a class by its internal name, with
-	/// slashes, instead of dots (compatible with [crate::api::env::Env::find_class]). If you have a
-	/// choice, then prefer using [Self::load_class] because in the common case `Class.forName` will
+	/// **Note**: see [`Self::find_class`] if you need to load a class by its internal name, with
+	/// slashes, instead of dots (compatible with [`crate::api::env::Env::find_class`]). If you have a
+	/// choice, then prefer using [`Self::load_class`] because in the common case `Class.forName` will
 	/// be called first, and that requires a **binary** name (so you can avoid a format conversion).
 	///
 	/// `initialize` indicates whether a newly loaded class should be initialized (has no effect on
@@ -84,16 +84,17 @@ impl<'a, 'any_local> LoaderContext<'a, 'any_local> {
 		/// Convert a binary name or array descriptor (like `"java.lang.String"` or
 		/// `"[Ljava.lang.String;"`) into an internal name like `"java/lang/String"` or
 		/// `"[Ljava/lang/String;"` that can be passed to `FindClass`.
-		fn internal_find_class_name<'name>(binary_name: &'name JNIStr) -> Cow<'name, JNIStr> {
+		fn internal_find_class_name(binary_name: &JNIStr) -> Cow<'_, JNIStr> {
 			let bytes = binary_name.to_bytes();
-			if !bytes.contains(&b'.') {
-				Cow::Borrowed(binary_name)
-			} else {
+			if bytes.contains(&b'.') {
 				// Convert from dot-notation to slash-notation
 				let owned: Vec<u8> = bytes.iter().map(|&b| if b == b'.' { b'/' } else { b }).collect();
-				let cstring = CString::new(owned).unwrap();
+				let cstring =
+					CString::new(owned).expect("replacing class-name separators preserves NUL-free modified UTF-8");
 				let jni_string = unsafe { JNIString::from_cstring(cstring) };
 				Cow::Owned(jni_string)
+			} else {
+				Cow::Borrowed(binary_name)
 			}
 		}
 
@@ -226,11 +227,11 @@ impl<'a, 'any_local> LoaderContext<'a, 'any_local> {
 
 	/// Loads the class with the given "internal" name using the loader context.
 	///
-	/// This behaves the same as [Self::load_class] except that it uses the so-called "internal"
+	/// This behaves the same as [`Self::load_class`] except that it uses the so-called "internal"
 	/// name format that `FindClass` or [`crate::Env::find_class`] accepts, with slashes instead of
 	/// dots.
 	///
-	/// If possible, prefer to use [Self::load_class] to avoid a redundant name format conversion.
+	/// If possible, prefer to use [`Self::load_class`] to avoid a redundant name format conversion.
 	pub fn find_class<'env_local>(
 		&self,
 		env: &mut crate::api::env::Env<'env_local>,
@@ -239,17 +240,18 @@ impl<'a, 'any_local> LoaderContext<'a, 'any_local> {
 	) -> crate::errors::Result<JClass<'env_local>> {
 		/// Convert an internal name or array descriptor (like `"java/lang/String"` or
 		/// `"[Ljava/lang/String;"`) into a binary name like `"java.lang.String"` or
-		/// `"[Ljava.lang.String;"` that can be passed to [LoaderContext::load_class].
-		fn internal_to_binary_class_name<'name>(internal: &'name JNIStr) -> Cow<'name, JNIStr> {
+		/// `"[Ljava.lang.String;"` that can be passed to [`LoaderContext::load_class`].
+		fn internal_to_binary_class_name(internal: &JNIStr) -> Cow<'_, JNIStr> {
 			let bytes = internal.to_bytes();
-			if !bytes.contains(&b'/') {
-				Cow::Borrowed(internal)
-			} else {
+			if bytes.contains(&b'/') {
 				// Convert from slash-notation to dot-notation
 				let owned: Vec<u8> = bytes.iter().map(|&b| if b == b'/' { b'.' } else { b }).collect();
-				let cstring = CString::new(owned).unwrap();
+				let cstring =
+					CString::new(owned).expect("replacing class-name separators preserves NUL-free modified UTF-8");
 				let jni_string = unsafe { JNIString::from_cstring(cstring) };
 				Cow::Owned(jni_string)
+			} else {
+				Cow::Borrowed(internal)
 			}
 		}
 		let internal_name = internal_to_binary_class_name(name.as_ref());

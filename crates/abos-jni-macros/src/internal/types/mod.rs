@@ -16,9 +16,9 @@ custom_keyword!(Always);
 custom_keyword!(UnsafeDebugOnly);
 custom_keyword!(UnsafeNever);
 
-/// Format a syn::Path as a string without spaces (for rustdoc links)
+/// Format a `syn::Path` as a string without spaces (for rustdoc links)
 pub fn path_to_string_no_spaces(path: &syn::Path) -> String {
-	quote!(#path).to_string().replace(" ", "")
+	quote!(#path).to_string().replace(' ', "")
 }
 
 /// Represents a primitive Java type
@@ -37,17 +37,17 @@ pub enum PrimitiveType {
 
 impl PrimitiveType {
 	/// Convert primitive type to JNI descriptor character
-	pub fn to_jni_descriptor(&self) -> &'static str {
+	pub const fn to_jni_descriptor(&self) -> &'static str {
 		match self {
-			PrimitiveType::Void => "V",
-			PrimitiveType::Boolean => "Z",
-			PrimitiveType::Byte => "B",
-			PrimitiveType::Char => "C",
-			PrimitiveType::Short => "S",
-			PrimitiveType::Int => "I",
-			PrimitiveType::Long => "J",
-			PrimitiveType::Float => "F",
-			PrimitiveType::Double => "D",
+			Self::Void => "V",
+			Self::Boolean => "Z",
+			Self::Byte => "B",
+			Self::Char => "C",
+			Self::Short => "S",
+			Self::Int => "I",
+			Self::Long => "J",
+			Self::Float => "F",
+			Self::Double => "D",
 		}
 	}
 }
@@ -111,7 +111,7 @@ impl JavaClassName {
 }
 
 impl Parse for JavaClassName {
-	/// Parse a Java class name from a ParseStream or string literal
+	/// Parse a Java class name from a `ParseStream` or string literal
 	/// Supports:
 	/// - Dotted package.Class syntax (e.g., `java.lang.String`)
 	/// - Inner classes with :: separator (e.g., `java.lang.Outer::Inner`)
@@ -135,15 +135,21 @@ impl Parse for JavaClassName {
 				));
 			}
 
-			let class = parts.last().unwrap().to_string();
+			let class = parts
+				.last()
+				.expect("splitting a class name yields at least one component")
+				.to_string();
 			let package: Vec<String> = if class_str.starts_with('.') {
 				// Default package case
 				Vec::new()
 			} else {
-				parts[..parts.len() - 1].iter().map(|s| s.to_string()).collect()
+				parts[..parts.len() - 1]
+					.iter()
+					.map(std::string::ToString::to_string)
+					.collect()
 			};
 
-			return Ok(JavaClassName { package, class });
+			return Ok(Self { package, class });
 		}
 
 		// Check for dot-prefixed default package class (e.g., .NoPackage)
@@ -159,7 +165,7 @@ impl Parse for JavaClassName {
 				class_name.push_str(&inner.to_string());
 			}
 
-			return Ok(JavaClassName {
+			return Ok(Self {
 				package: Vec::new(),
 				class: class_name,
 			});
@@ -189,13 +195,13 @@ impl Parse for JavaClassName {
 			}
 
 			// Build the class name: last segment + any inner classes joined with $
-			let mut class = segments.pop().unwrap();
+			let mut class = segments.pop().expect("the class path contains a name");
 			if !inner_class_parts.is_empty() {
 				class.push('$');
 				class.push_str(&inner_class_parts.join("$"));
 			}
 
-			return Ok(JavaClassName {
+			return Ok(Self {
 				package: segments,
 				class,
 			});
@@ -211,26 +217,26 @@ impl Parse for JavaClassName {
 /// Represents a type in the signature
 #[derive(Debug, Clone, PartialEq)]
 pub enum SigType {
-	/// A type alias that must be mapped via TypeMappings
+	/// A type alias that must be mapped via `TypeMappings`
 	/// into a Java class name or a primitive type
 	Alias(String),
 	/// Object type (Java class)
 	Object(JavaClassName),
 	/// Array type with element type and dimensions
-	Array(Box<SigType>, usize),
+	Array(Box<Self>, usize),
 }
 
 impl SigType {
 	/// Convert to JNI descriptor
 	pub fn to_jni_descriptor(&self, type_mappings: &TypeMappings) -> Result<String> {
 		match self {
-			SigType::Alias(name) => match type_mappings.map_alias(name) {
+			Self::Alias(name) => match type_mappings.map_alias(name) {
 				Some(ConcreteType::Primitive { primitive, .. }) => Ok(primitive.to_jni_descriptor().to_string()),
 				Some(ConcreteType::Object { name: java_class, .. }) => Ok(java_class.to_jni_descriptor()),
-				None => Err(syn::Error::new(Span::call_site(), format!("Unknown type '{}'", name))),
+				None => Err(syn::Error::new(Span::call_site(), format!("Unknown type '{name}'"))),
 			},
-			SigType::Object(class) => Ok(class.to_jni_descriptor()),
-			SigType::Array(elem, dims) => {
+			Self::Object(class) => Ok(class.to_jni_descriptor()),
+			Self::Array(elem, dims) => {
 				let elem_desc = elem.to_jni_descriptor(type_mappings)?;
 				let mut result = String::new();
 				for _ in 0..*dims {
@@ -244,7 +250,7 @@ impl SigType {
 
 	pub fn try_as_primitive(&self, type_mappings: &TypeMappings) -> Option<PrimitiveType> {
 		match self {
-			SigType::Alias(name) => match type_mappings.map_alias(name) {
+			Self::Alias(name) => match type_mappings.map_alias(name) {
 				Some(ConcreteType::Primitive { primitive, .. }) => Some(primitive),
 				_ => None,
 			},
@@ -288,12 +294,11 @@ pub fn parse_type(input: ParseStream, type_mappings: &TypeMappings) -> Result<Si
 		parenthesized!(content in input);
 		if content.is_empty() {
 			return Ok(SigType::Alias("void".to_string()));
-		} else {
-			return Err(syn::Error::new(
-				content.span(),
-				"Expected empty parentheses for void type",
-			));
 		}
+		return Err(syn::Error::new(
+			content.span(),
+			"Expected empty parentheses for void type",
+		));
 	}
 
 	// Try to parse as Java class name first (handles string literals, .NoPackage, and package.Class)
@@ -332,7 +337,11 @@ pub fn parse_type(input: ParseStream, type_mappings: &TypeMappings) -> Result<Si
 	// If we have array dimensions, validate and wrap in Array type
 	if dims > 0 {
 		// Validate that the element type can be used in an array (void cannot)
-		validate_array_element_type(&base_type, type_mappings, first_bracket_span.unwrap())?;
+		validate_array_element_type(
+			&base_type,
+			type_mappings,
+			first_bracket_span.expect("an array dimension has an opening bracket"),
+		)?;
 		Ok(SigType::Array(Box::new(base_type), dims))
 	} else {
 		Ok(base_type)
@@ -347,7 +356,7 @@ enum RustTypeTarget {
 		is_builtin: bool,
 		/// The primitive type
 		primitive: PrimitiveType,
-		/// The name or full path for the primitive type (e.g., "i32" or "abos_jni::sys::jint")
+		/// The name or full path for the primitive type (e.g., "i32" or "`abos_jni::sys::jint`")
 		///
 		/// If the jni crate is renamed, this path will reflect the renamed crate path.
 		///
@@ -358,7 +367,7 @@ enum RustTypeTarget {
 	Reference {
 		/// Is this a built-in `jni` crate Reference type?
 		is_builtin: bool,
-		/// The full path for a `jni` `Reference` type (e.g., "abos_jni::objects::JString")
+		/// The full path for a `jni` `Reference` type (e.g., "`abos_jni::objects::JString`")
 		///
 		/// If the jni crate is renamed, this path will reflect the renamed crate path.
 		path: String,
@@ -371,20 +380,18 @@ impl PartialEq for RustTypeTarget {
 	fn eq(&self, other: &Self) -> bool {
 		match (self, other) {
 			(
-				RustTypeTarget::Primitive {
+				Self::Primitive {
 					primitive: p1,
 					path: path1,
 					..
 				},
-				RustTypeTarget::Primitive {
+				Self::Primitive {
 					primitive: p2,
 					path: path2,
 					..
 				},
 			) => p1 == p2 && path1 == path2,
-			(RustTypeTarget::Reference { path: path1, .. }, RustTypeTarget::Reference { path: path2, .. }) => {
-				path1 == path2
-			}
+			(Self::Reference { path: path1, .. }, Self::Reference { path: path2, .. }) => path1 == path2,
 			_ => false,
 		}
 	}
@@ -392,11 +399,11 @@ impl PartialEq for RustTypeTarget {
 impl std::hash::Hash for RustTypeTarget {
 	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
 		match &self {
-			RustTypeTarget::Primitive { primitive, path, .. } => {
+			Self::Primitive { primitive, path, .. } => {
 				primitive.hash(state);
 				path.hash(state);
 			}
-			RustTypeTarget::Reference { path, .. } => {
+			Self::Reference { path, .. } => {
 				path.hash(state);
 			}
 		}
@@ -416,13 +423,13 @@ impl RustType {
 			None
 		}
 	}
-	pub fn is_builtin(&self) -> bool {
+	pub const fn is_builtin(&self) -> bool {
 		match self.target {
 			RustTypeTarget::Primitive { is_builtin, .. } => is_builtin,
 			RustTypeTarget::Reference { is_builtin, .. } => is_builtin,
 		}
 	}
-	pub fn path(&self) -> &str {
+	pub const fn path(&self) -> &str {
 		match &self.target {
 			RustTypeTarget::Primitive { path, .. } => path.as_str(),
 			RustTypeTarget::Reference { path, .. } => path.as_str(),
@@ -433,7 +440,7 @@ impl RustType {
 pub enum ConcreteType {
 	Primitive {
 		primitive: PrimitiveType,
-		/// The full path for the primitive type (e.g., "abos_jni::sys::jint")
+		/// The full path for the primitive type (e.g., "`abos_jni::sys::jint`")
 		///
 		/// If the jni crate is renamed, this path will reflect the renamed
 		/// crate path.
@@ -462,11 +469,11 @@ pub enum AbiCheck {
 }
 
 impl AbiCheck {
-	pub fn requires_abi_check(&self) -> bool {
+	pub const fn requires_abi_check(&self) -> bool {
 		match self {
-			AbiCheck::Always => true,
-			AbiCheck::UnsafeDebugOnly => cfg!(debug_assertions),
-			AbiCheck::UnsafeNever => false,
+			Self::Always => true,
+			Self::UnsafeDebugOnly => cfg!(debug_assertions),
+			Self::UnsafeNever => false,
 		}
 	}
 }
@@ -476,13 +483,13 @@ impl Parse for AbiCheck {
 		let lookahead = input.lookahead1();
 		if lookahead.peek(Always) {
 			input.parse::<Always>()?;
-			Ok(AbiCheck::Always)
+			Ok(Self::Always)
 		} else if lookahead.peek(UnsafeDebugOnly) {
 			input.parse::<UnsafeDebugOnly>()?;
-			Ok(AbiCheck::UnsafeDebugOnly)
+			Ok(Self::UnsafeDebugOnly)
 		} else if lookahead.peek(UnsafeNever) {
 			input.parse::<UnsafeNever>()?;
-			Ok(AbiCheck::UnsafeNever)
+			Ok(Self::UnsafeNever)
 		} else {
 			Err(lookahead.error())
 		}

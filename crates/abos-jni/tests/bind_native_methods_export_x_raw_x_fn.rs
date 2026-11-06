@@ -113,7 +113,11 @@ native_method_test! {
 // Test 3: fn= + Raw (property syntax) + Export (property syntax)
 // ====================================================================================
 
-extern "system" fn method3_impl<'local>(_env: EnvUnowned<'local>, _this: TestCombo3<'local>, value: jint) -> jint {
+const extern "system" fn method3_impl<'local>(
+	_env: EnvUnowned<'local>,
+	_this: TestCombo3<'local>,
+	value: jint,
+) -> jint {
 	value * 4
 }
 
@@ -148,7 +152,7 @@ native_method_test! {
 // Test 4: fn= + Not Raw + Export (property syntax)
 // ====================================================================================
 
-fn method4_impl<'local>(
+const fn method4_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: TestCombo4<'local>,
 	value: jint,
@@ -223,7 +227,11 @@ native_method_test! {
 // Test 6: Static fn= + Raw (qualifier) + Export (qualifier)
 // ====================================================================================
 
-extern "system" fn static_method2_impl<'local>(_env: EnvUnowned<'local>, _class: JClass<'local>, value: jint) -> jint {
+const extern "system" fn static_method2_impl<'local>(
+	_env: EnvUnowned<'local>,
+	_class: JClass<'local>,
+	value: jint,
+) -> jint {
 	value * 20
 }
 
@@ -290,7 +298,7 @@ native_method_test! {
 // Test 8: fn= + Not Raw + Not Exported
 // ====================================================================================
 
-fn static_method_non_exported_impl<'local>(
+const fn static_method_non_exported_impl<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
 	value: jint,
@@ -400,7 +408,7 @@ native_method_test! {
 // Test 11: Mixed - fn= (not raw) + Trait (not raw) in one binding
 // ====================================================================================
 
-fn method_non_exported_fn_impl<'local>(
+const fn method_non_exported_fn_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: TestCombo12<'local>,
 	value: jint,
@@ -460,7 +468,11 @@ native_method_test! {
 // Test 12: Mixed - fn= (raw) + Trait (raw) in one binding
 // ====================================================================================
 
-fn static_method_non_exported_fn_impl<'local>(_env: EnvUnowned<'local>, _class: JClass<'local>, value: jint) -> jint {
+const fn static_method_non_exported_fn_impl<'local>(
+	_env: EnvUnowned<'local>,
+	_class: JClass<'local>,
+	value: jint,
+) -> jint {
 	value * 90
 }
 

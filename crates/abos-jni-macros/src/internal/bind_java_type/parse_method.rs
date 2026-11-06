@@ -1,4 +1,9 @@
-use super::*;
+use super::{
+	AbiCheck, Constructor, Ident, LitBool, LitStr, Method, MethodKind, MethodSignature, NativeMethod,
+	NativeMethodExport, ParseStream, ParsedMethod, Result, SigType, Token, TypeMappings, VisibilitySpec, abi_check,
+	braced, catch_unwind, error_policy, export, format_ident, name, non_null, parenthesized, parse_method_sig,
+	parse_parameter_with_index, parse_type, raw, sig, snake_case_to_lower_camel_case,
+};
 
 /// Parse an optional visibility specifier
 /// Supports: pub, pub(self), pub(crate), pub(super), pub(in path), or priv (which maps to pub(self))
@@ -42,7 +47,7 @@ pub(super) fn parse_visibility(input: ParseStream) -> Result<Option<VisibilitySp
 	}
 }
 
-/// Parse a name = "value" or name = rust_name pair
+/// Parse a name = "value" or name = `rust_name` pair
 pub(super) fn parse_name_spec(input: ParseStream) -> Result<(String, Ident)> {
 	input.parse::<name>()?;
 	input.parse::<Token![=]>()?;
@@ -62,7 +67,7 @@ pub(super) fn parse_name_spec(input: ParseStream) -> Result<(String, Ident)> {
 /// Unified parser for method blocks (constructors, methods, and native methods)
 /// Parses both shorthand syntax: `[vis] [static] [raw] [extern] fn name(params) -> ret`
 /// and block syntax: `[vis] [static] [raw] [extern] fn name [=] { ... }`
-/// Ensures signature is always present and java_name is derived from rust_name if not explicit
+/// Ensures signature is always present and `java_name` is derived from `rust_name` if not explicit
 /// Validates based on the method kind
 pub(super) fn parse_method(input: ParseStream, type_mappings: &TypeMappings, kind: MethodKind) -> Result<ParsedMethod> {
 	// Parse attributes first
@@ -446,7 +451,7 @@ pub(super) fn parse_methods(input: ParseStream, type_mappings: &TypeMappings) ->
 	Ok(methods)
 }
 
-/// Parse native_methods block
+/// Parse `native_methods` block
 pub(super) fn parse_native_methods(
 	input: ParseStream,
 	type_mappings: &TypeMappings,

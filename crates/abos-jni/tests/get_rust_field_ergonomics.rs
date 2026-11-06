@@ -10,7 +10,7 @@ pub struct Renderer {
 	// fields
 }
 impl Renderer {
-	pub fn render(&mut self, _surface: &Surface) {
+	pub const fn render(&mut self, _surface: &Surface) {
 		// rendering logic
 	}
 }
@@ -37,5 +37,5 @@ pub extern "system" fn Java_Renderer_render<'local>(
 
 			Ok(())
 		})
-		.resolve::<abos_jni::errors::LogErrorAndDefault>()
+		.resolve::<abos_jni::errors::LogErrorAndDefault>();
 }

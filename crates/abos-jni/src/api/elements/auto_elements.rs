@@ -4,7 +4,11 @@ use std::ptr::NonNull;
 
 use crate::objects::{JPrimitiveArray, Reference, ReleaseMode, TypeArray};
 use crate::sys::jboolean;
-use crate::{Env, JavaVM, errors::*, sys};
+use crate::{
+	Env, JavaVM,
+	errors::{Error, Result},
+	sys,
+};
 
 #[cfg(doc)]
 use crate::objects::JByteArray;
@@ -62,7 +66,7 @@ where
 	}
 
 	/// Get a reference to the wrapped pointer
-	pub fn as_ptr(&self) -> *mut T {
+	pub const fn as_ptr(&self) -> *mut T {
 		self.ptr.as_ptr()
 	}
 
@@ -102,28 +106,27 @@ where
 	}
 
 	/// Indicates if the array is a copy or not
-	pub fn is_copy(&self) -> bool {
+	pub const fn is_copy(&self) -> bool {
 		self.is_copy
 	}
 
 	/// Returns the array length (number of elements)
-	pub fn len(&self) -> usize {
+	pub const fn len(&self) -> usize {
 		self.len
 	}
 
 	/// Returns true if the vector contains no elements.
-	pub fn is_empty(&self) -> bool {
+	pub const fn is_empty(&self) -> bool {
 		self.len == 0
 	}
 }
 
-impl<'array_local, T, TArrayRef> AsRef<AutoElements<'array_local, T, TArrayRef>>
-	for AutoElements<'array_local, T, TArrayRef>
+impl<'array_local, T, TArrayRef> AsRef<Self> for AutoElements<'array_local, T, TArrayRef>
 where
 	T: TypeArray + 'array_local,
 	TArrayRef: AsRef<JPrimitiveArray<'array_local, T>> + Reference,
 {
-	fn as_ref(&self) -> &AutoElements<'array_local, T, TArrayRef> {
+	fn as_ref(&self) -> &Self {
 		self
 	}
 }
@@ -139,7 +142,7 @@ where
 
 		match res {
 			Ok(()) => {}
-			Err(e) => error!("error releasing array: {:#?}", e),
+			Err(e) => error!("error releasing array: {e:#?}"),
 		}
 	}
 }

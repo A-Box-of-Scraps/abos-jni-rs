@@ -126,7 +126,7 @@ fn primitive_args_impl<'local>(
 	b: jlong,
 	c: jboolean,
 ) -> Result<jint, abos_jni::errors::Error> {
-	Ok(a + b as jint + c as jint)
+	Ok(a + jint::try_from(b).expect("test long argument fits in jint") + jint::from(c))
 }
 
 // ====================================================================================

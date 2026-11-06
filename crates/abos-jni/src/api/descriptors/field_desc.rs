@@ -1,7 +1,7 @@
 use crate::{
 	Env,
 	descriptors::Desc,
-	errors::*,
+	errors::Result,
 	objects::{JClass, JFieldID, JStaticFieldID},
 	signature::FieldSignature,
 	strings::JNIStr,

@@ -354,7 +354,7 @@ macro_rules! jni_try {
     });
 }
 
-/// Maps a pointer to either Ok(ptr) or Err(Error::NullPtr)
+/// Maps a pointer to either Ok(ptr) or `Err(Error::NullPtr)`
 ///
 /// This makes it reasonably ergonomic to use `?` to early-exit with an `Err` in
 /// case of `null` pointer arguments.
@@ -372,7 +372,7 @@ macro_rules! null_check {
 	};
 }
 
-/// Directly calls a JavaVM function, nothing else
+/// Directly calls a `JavaVM` function, nothing else
 ///
 /// # Safety
 ///

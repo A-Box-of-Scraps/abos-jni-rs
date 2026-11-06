@@ -1,4 +1,7 @@
-use super::*;
+#[cfg(doc)]
+use crate::refs::{Global, IntoAuto};
+
+use super::{Auto, Cast, Env, Error, JObject, JniError, Reference, Result, jobject};
 
 impl<'local> Env<'local> {
 	/// Create a new local reference to an object.
@@ -363,7 +366,7 @@ impl<'local> Env<'local> {
 	/// but cannot rely on automatic de-allocation (e.g., in case of recursion, deep call stacks,
 	/// [permanently-attached](struct.JavaVM.html#attaching-native-threads) native threads, etc.).
 	#[deprecated = "Use '.auto()' from IntoAuto trait"]
-	pub fn auto_local<O>(&self, obj: O) -> Auto<'local, O>
+	pub const fn auto_local<O>(&self, obj: O) -> Auto<'local, O>
 	where
 		O: Into<JObject<'local>>,
 	{

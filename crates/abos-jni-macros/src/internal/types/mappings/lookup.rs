@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+	ConcreteType, Ident, JavaClassName, ParseStream, PrimitiveType, Rc, Result, RustType, RustTypeTarget, Span, Token,
+	TypeMappings, braced, path_to_string_no_spaces, typealias,
+};
 
 impl TypeMappings {
 	/// Insert a mapping from a Rust `Reference` type path to a Java class
@@ -46,7 +49,10 @@ impl TypeMappings {
 		// Check if this alias already has a mapping to a different Rust type
 		if let Some(existing) = self.alias_to_rust.get(alias) {
 			if existing != &rust_type {
-				let existing_java_mapping = self.rust_to_java.get(existing).unwrap();
+				let existing_java_mapping = self
+					.rust_to_java
+					.get(existing)
+					.expect("registered reference types have Java mappings");
 				return Err(syn::Error::new(
 					Span::call_site(),
 					format!(
@@ -85,15 +91,14 @@ impl TypeMappings {
 				return Err(syn::Error::new(
 					Span::call_site(),
 					format!(
-						"Cannot change existing Rust type mapping for Rust type name '{}': already mapped to a different primitive type. Only one mapping per Rust type name is allowed.",
-						alias
+						"Cannot change existing Rust type mapping for Rust type name '{alias}': already mapped to a different primitive type. Only one mapping per Rust type name is allowed."
 					),
 				));
 			}
 			return Ok(());
 		}
 
-		self.alias_to_rust.insert(alias.to_string(), rust_type.clone());
+		self.alias_to_rust.insert(alias.to_string(), rust_type);
 
 		Ok(())
 	}
@@ -120,19 +125,19 @@ impl TypeMappings {
 		} else {
 			Err(syn::Error::new(
 				Span::call_site(),
-				format!("Cannot create alias from '{}' to '{}': target type not found", from, to),
+				format!("Cannot create alias from '{from}' to '{to}': target type not found"),
 			))
 		}
 	}
 
 	/// Parse `type_map` block with Reference + primitive mappings and aliases
 	///
-	/// This is a shared parser used by both bind_java_type! and jni_sig! macros. Parses a
+	/// This is a shared parser used by both `bind_java_type`! and `jni_sig`! macros. Parses a
 	/// braced block containing type mappings from Rust type paths to Java class names.
 	///
 	/// # Syntax
 	///
-	/// A type_map block can be comprised of:
+	/// A `type_map` block can be comprised of:
 	/// - Reference type mappings
 	/// - Primitive type mappings (unsafe)
 	/// - Type aliases
@@ -145,7 +150,7 @@ impl TypeMappings {
 	/// ## Reference Type Mappings
 	///
 	/// Each Reference type mapping has the form: `RustPath => java.lang.Class`
-	/// - RustPath can be a simple identifier (e.g., `JString`) or a path (e.g.,
+	/// - `RustPath` can be a simple identifier (e.g., `JString`) or a path (e.g.,
 	///   `abos_jni::objects::JString`)
 	///
 	/// ## Primitive Type Mappings
@@ -240,8 +245,7 @@ impl TypeMappings {
 							return Err(syn::Error::new(
 								prim_type_ident.span(),
 								format!(
-									"Invalid primitive type name '{}' for unsafe primitive mapping. Must be one of the built-in primitive type names (e.g., 'int', 'long', 'boolean', etc.)",
-									prim_type_name
+									"Invalid primitive type name '{prim_type_name}' for unsafe primitive mapping. Must be one of the built-in primitive type names (e.g., 'int', 'long', 'boolean', etc.)"
 								),
 							));
 						}
@@ -295,7 +299,7 @@ impl TypeMappings {
 
 	/// Get the canonical Rust type path for a Java class name
 	pub fn map_java_class_to_rust_type(&self, java_class: &JavaClassName) -> Option<&RustType> {
-		self.java_to_rust.get(java_class).map(|s| s.as_ref())
+		self.java_to_rust.get(java_class).map(std::convert::AsRef::as_ref)
 	}
 
 	/// Get an iterator over all Java class names
@@ -309,13 +313,13 @@ impl TypeMappings {
 		self.rust_types.iter()
 	}
 
-	/// Get an iterator over rust_path -> java_class mappings
+	/// Get an iterator over `rust_path` -> `java_class` mappings
 	pub fn rust_to_java_iter(&self) -> impl Iterator<Item = (&Rc<RustType>, &Rc<JavaClassName>)> {
 		self.rust_to_java.iter()
 	}
 
 	/// Get the jni crate path
-	pub fn jni_crate(&self) -> &syn::Path {
+	pub const fn jni_crate(&self) -> &syn::Path {
 		&self.jni_crate
 	}
 

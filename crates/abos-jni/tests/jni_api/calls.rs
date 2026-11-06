@@ -6,12 +6,15 @@ pub fn attach_current_thread_guard_scope() {
 	let (_vm, _guard) = {
 		let vm = jvm();
 		let vm = vm.as_ref().clone();
-		let guard = unsafe { vm.attach_current_thread_guard(Default::default, &mut scope).unwrap() };
+		let guard = unsafe {
+			vm.attach_current_thread_guard(Default::default, &mut scope)
+				.expect("thread attaches to the test JVM")
+		};
 		vm.with_local_frame(10, |env| -> abos_jni::errors::Result<_> {
-			let _s = env.new_string("hello").unwrap();
+			let _s = env.new_string("hello").expect("test string can be allocated");
 			Ok(())
 		})
-		.unwrap();
+		.expect("local-frame callback succeeds");
 		(vm, guard)
 	};
 }
@@ -24,8 +27,8 @@ pub fn with_local_frame() {
 				let res = env.new_string("Test")?;
 				Ok(res.into())
 			})
-			.unwrap();
-		let s = env.cast_local::<JString>(s).unwrap();
+			.expect("test string can be allocated");
+		let s = env.cast_local::<JString>(s).expect("test operation succeeds");
 
 		let s = s
 			.mutf8_chars(env)
@@ -34,7 +37,7 @@ pub fn with_local_frame() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -52,14 +55,14 @@ pub fn with_local_frame_misuse_panic() {
 
 				Ok(())
 			})
-			.unwrap();
+			.expect("test string can be allocated");
 			Ok(())
 		})
-		.unwrap();
+		.expect("test string can be allocated");
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -78,31 +81,31 @@ pub fn with_local_frame_pending_exception() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
 pub fn call_method_ok() {
 	attach_current_thread(|env| {
-		let s = JString::from_jni_str(env, TESTING_OBJECT_STR).unwrap();
+		let s = JString::from_jni_str(env, TESTING_OBJECT_STR).expect("test JNI string can be allocated");
 
 		let v: jint = env
 			.call_method(s, jni_str!("indexOf"), jni_sig!("(I)I"), &[JValue::Int('S' as i32)])
 			.expect("Env#call_method should return JValue")
 			.i()
-			.unwrap();
+			.expect("instance method call succeeds");
 
 		assert_eq!(v, 2);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
 pub fn call_method_with_bad_args_errs() {
 	attach_current_thread(|env| {
-		let s = JString::from_jni_str(env, TESTING_OBJECT_STR).unwrap();
+		let s = JString::from_jni_str(env, TESTING_OBJECT_STR).expect("test JNI string can be allocated");
 
 		let is_bad_typ = env
 			.call_method(
@@ -136,7 +139,7 @@ pub fn call_method_with_bad_args_errs() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -147,23 +150,23 @@ pub fn call_static_method_ok() {
 			.call_static_method(MATH_CLASS, MATH_ABS_METHOD_NAME, MATH_ABS_SIGNATURE, &[x])
 			.expect("Env#call_static_method should return JValue")
 			.i()
-			.unwrap();
+			.expect("static method call succeeds");
 
 		assert_eq!(val, 10);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
 pub fn call_static_method_unchecked_ok() {
 	attach_current_thread(|env| {
 		let x = JValue::from(-10);
-		let math_class = env.find_class(MATH_CLASS).unwrap();
+		let math_class = env.find_class(MATH_CLASS).expect("test class can be resolved");
 		let abs_method_id = env
 			.get_static_method_id(&math_class, MATH_ABS_METHOD_NAME, MATH_ABS_SIGNATURE)
-			.unwrap();
+			.expect("test static method can be resolved");
 		let val: jint = unsafe {
 			env.call_static_method_unchecked(
 				&math_class,
@@ -174,42 +177,42 @@ pub fn call_static_method_unchecked_ok() {
 		}
 		.expect("Env#call_static_method_unchecked should return JValue")
 		.i()
-		.unwrap();
+		.expect("call static method unchecked succeeds");
 
 		assert_eq!(val, 10);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
 pub fn call_new_object_unchecked_ok() {
 	attach_current_thread(|env| {
-		let test_str = JString::from_jni_str(env, TESTING_OBJECT_STR).unwrap();
-		let string_class = env.find_class(STRING_CLASS).unwrap();
+		let test_str = JString::from_jni_str(env, TESTING_OBJECT_STR).expect("test JNI string can be allocated");
+		let string_class = env.find_class(STRING_CLASS).expect("test class can be resolved");
 
 		let ctor_method_id = env
 			.get_method_id(&string_class, jni_str!("<init>"), jni_sig!("(Ljava/lang/String;)V"))
-			.unwrap();
+			.expect("test method can be resolved");
 		let val: JObject =
 			unsafe { env.new_object_unchecked(&string_class, ctor_method_id, &[JValue::from(&test_str).as_jni()]) }
 				.expect("Env#new_object_unchecked should return JValue");
 
-		let jstr = env.cast_local::<JString>(val).unwrap();
-		let javastr = jstr.mutf8_chars(env).unwrap();
+		let jstr = env.cast_local::<JString>(val).expect("test operation succeeds");
+		let javastr = jstr.mutf8_chars(env).expect("modified UTF-8 characters are accessible");
 		let jnistr: &JNIStr = javastr.as_ref();
 		assert_eq!(jnistr, TESTING_OBJECT_STR);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
 pub fn call_new_object_with_bad_args_errs() {
 	attach_current_thread(|env| {
-		let string_class = env.find_class(STRING_CLASS).unwrap();
+		let string_class = env.find_class(STRING_CLASS).expect("test class can be resolved");
 
 		let is_bad_typ = env
 			.new_object(&string_class, jni_sig!("(Ljava/lang/String;)V"), &[JValue::Int(2)])
@@ -221,7 +224,7 @@ pub fn call_new_object_with_bad_args_errs() {
 			"ErrorKind::InvalidArgList expected when passing bad value type"
 		);
 
-		let s = JString::from_jni_str(env, TESTING_OBJECT_STR).unwrap();
+		let s = JString::from_jni_str(env, TESTING_OBJECT_STR).expect("test JNI string can be allocated");
 
 		let is_bad_len = env
 			.new_object(
@@ -239,7 +242,7 @@ pub fn call_new_object_with_bad_args_errs() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 /// Check that we get a runtime error if trying to instantiate with an array class.
@@ -253,8 +256,8 @@ pub fn call_new_object_with_bad_args_errs() {
 #[test]
 pub fn call_new_object_with_array_class() {
 	attach_current_thread(|env| {
-		let byte_array = env.new_byte_array(16).unwrap();
-		let array_class = env.get_object_class(byte_array).unwrap();
+		let byte_array = env.new_byte_array(16).expect("new byte array succeeds");
+		let array_class = env.get_object_class(byte_array).expect("get object class succeeds");
 		// We just make up a plausible constructor signature
 		let result = env.new_object(&array_class, jni_sig!("(I)[B"), &[JValue::Int(16)]);
 
@@ -262,7 +265,7 @@ pub fn call_new_object_with_array_class() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -280,7 +283,7 @@ pub fn call_static_method_throws() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -314,7 +317,7 @@ pub fn call_static_method_with_bad_args_errs() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -323,10 +326,12 @@ pub fn get_reflected_method_from_id() {
 		let ctor_method_id = env
 			.get_method_id(INTEGER_CLASS, jni_str!("<init>"), jni_sig!("(Ljava/lang/String;)V"))
 			.expect("constructor from string exists");
-		let ctor = env.to_reflected_method(INTEGER_CLASS, ctor_method_id).unwrap();
+		let ctor = env
+			.to_reflected_method(INTEGER_CLASS, ctor_method_id)
+			.expect("to reflected method succeeds");
 
 		let value = {
-			let jstr = env.new_string("55").unwrap();
+			let jstr = env.new_string("55").expect("test string can be allocated");
 			let vargs = env
 				.new_object_array(1, jni_str!("java/lang/Object"), jstr)
 				.expect("can create array");
@@ -344,29 +349,35 @@ pub fn get_reflected_method_from_id() {
 
 		let int_value = env
 			.call_method(value, jni_str!("intValue"), jni_sig!("()I"), &[])
-			.unwrap()
+			.expect("instance method call succeeds")
 			.i()
-			.unwrap();
+			.expect("JNI result contains an int");
 		assert_eq!(int_value, 55);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
 pub fn get_reflected_static_method_from_id() {
 	attach_current_thread(|env| {
 		let x = JValue::from(-10);
-		let math_class = env.find_class(MATH_CLASS).unwrap();
+		let math_class = env.find_class(MATH_CLASS).expect("test class can be resolved");
 		let abs_method_id = env
 			.get_static_method_id(&math_class, MATH_ABS_METHOD_NAME, MATH_ABS_SIGNATURE)
-			.unwrap();
+			.expect("test static method can be resolved");
 
-		let abs_method = env.to_reflected_static_method(&math_class, abs_method_id).unwrap();
+		let abs_method = env
+			.to_reflected_static_method(&math_class, abs_method_id)
+			.expect("to reflected static method succeeds");
 
-		let arg = env.new_object(INTEGER_CLASS, jni_sig!("(I)V"), &[x]).unwrap();
-		let vargs = env.new_object_array(1, jni_str!("java/lang/Object"), arg).unwrap();
+		let arg = env
+			.new_object(INTEGER_CLASS, jni_sig!("(I)V"), &[x])
+			.expect("test object can be allocated");
+		let vargs = env
+			.new_object_array(1, jni_str!("java/lang/Object"), arg)
+			.expect("new object array succeeds");
 		let val = env
 			.call_method(
 				abs_method,
@@ -379,12 +390,12 @@ pub fn get_reflected_static_method_from_id() {
 			.expect("return value is an int");
 		let val = env
 			.call_method(val, jni_str!("intValue"), jni_sig!("()I"), &[])
-			.unwrap()
+			.expect("instance method call succeeds")
 			.i()
-			.unwrap();
+			.expect("JNI result contains an int");
 
 		assert_eq!(val, 10);
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }

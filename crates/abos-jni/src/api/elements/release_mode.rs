@@ -3,7 +3,7 @@ use crate::sys::JNI_ABORT;
 #[cfg(doc)]
 use super::{AutoElements, AutoElementsCritical};
 
-/// ReleaseMode
+/// `ReleaseMode`
 ///
 /// This defines the release mode of [`AutoElements`] (and [`AutoElementsCritical`]) resources, and
 /// related release array functions.

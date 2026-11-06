@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+	Desc, Env, JClass, JMethodID, JObject, JStaticMethodID, JValueOwned, JavaType, Reference, Result, ReturnType,
+	jobject, jvalue,
+};
 
 impl<'local> Env<'local> {
 	/// Call a static method in an unsafe manner. This does nothing to check
@@ -10,8 +13,8 @@ impl<'local> Env<'local> {
 	///
 	/// # Safety
 	///
-	/// The provided JMethodID must be valid, and match the types and number of arguments, and return type.
-	/// If these are incorrect, the JVM may crash. The JMethodID must also match the passed type.
+	/// The provided `JMethodID` must be valid, and match the types and number of arguments, and return type.
+	/// If these are incorrect, the JVM may crash. The `JMethodID` must also match the passed type.
 	pub unsafe fn call_static_method_unchecked<'other_local, T, U>(
 		&mut self,
 		class: T,
@@ -81,8 +84,8 @@ impl<'local> Env<'local> {
 	///
 	/// # Safety
 	///
-	/// The provided JMethodID must be valid, and match the types and number of arguments, and return type.
-	/// If these are incorrect, the JVM may crash. The JMethodID must also match the passed type.
+	/// The provided `JMethodID` must be valid, and match the types and number of arguments, and return type.
+	/// If these are incorrect, the JVM may crash. The `JMethodID` must also match the passed type.
 	pub unsafe fn call_method_unchecked<'other_local, O, T>(
 		&mut self,
 		obj: O,
@@ -148,8 +151,8 @@ impl<'local> Env<'local> {
 	///
 	/// # Safety
 	///
-	/// The provided JClass, JMethodID must be valid, and match the types and number of arguments, and return type.
-	/// If these are incorrect, the JVM may crash. The JMethodID must also match the passed type.
+	/// The provided `JClass`, `JMethodID` must be valid, and match the types and number of arguments, and return type.
+	/// If these are incorrect, the JVM may crash. The `JMethodID` must also match the passed type.
 	pub unsafe fn call_nonvirtual_method_unchecked<'other_local, O, T, U>(
 		&mut self,
 		obj: O,

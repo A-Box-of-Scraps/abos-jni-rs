@@ -24,17 +24,17 @@ crate::bind_java_type! {
 #[allow(rustdoc::invalid_html_tags)]
 /// Display the contents of a `JString`
 ///
-/// This implementation relies on JNI (GetStringUTFChars) to retrieve the string contents for
+/// This implementation relies on JNI (`GetStringUTFChars`) to retrieve the string contents for
 /// display.
 ///
 /// If you try and format a null reference this will output "<NULL>"
 ///
-/// In case you attempt to format a JString before [`JavaVM::singleton`] has been initialized then
+/// In case you attempt to format a `JString` before [`JavaVM::singleton`] has been initialized then
 /// this will simply output "<JNI Not Initialized>" and log an error.
 ///
 /// In case of any other unexpected JNI error, this will output "<JNI Error>" and log the error
 /// details.
-impl<'local> std::fmt::Display for JString<'local> {
+impl std::fmt::Display for JString<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		#[derive(Error, Debug)]
 		#[error(transparent)]
@@ -72,7 +72,7 @@ impl<'local> std::fmt::Display for JString<'local> {
 					// is handled below as a general JNI error.
 					let mutf8_chars = self.mutf8_chars(env)?;
 					let s = mutf8_chars.to_str();
-					write!(f, "{}", s)?;
+					write!(f, "{s}")?;
 					Ok(())
 				})
 			})
@@ -80,12 +80,12 @@ impl<'local> std::fmt::Display for JString<'local> {
 				match err {
 					FmtOrJniError::Fmt(err) => Err(err),
 					FmtOrJniError::Jni(crate::errors::Error::UninitializedJavaVM) => {
-						log::error!("error getting JavaVM singleton to format JString: {:#?}", err);
+						log::error!("error getting JavaVM singleton to format JString: {err:#?}");
 						write!(f, "<JNI Not Initialized>")
 					}
 					FmtOrJniError::Jni(err) => {
 						// If we failed to get the string contents, just print the error
-						log::error!("error getting JString contents: {:#?}", err);
+						log::error!("error getting JString contents: {err:#?}");
 						write!(f, "<JNI Error>")
 					}
 				}
@@ -107,7 +107,7 @@ impl JString<'_> {
 	/// encode, before calling into JNI to create the `JString`.
 	///
 	/// To avoid the overhead of encoding and copying, use [`Self::from_jni_str`] and the
-	/// [crate::jni_str!] macro to encode strings to MUTF-8 at compile time.
+	/// [`crate::jni_str`!] macro to encode strings to MUTF-8 at compile time.
 	pub fn new<'env_local>(env: &mut Env<'env_local>, from: impl AsRef<str>) -> Result<JString<'env_local>> {
 		Self::from_str(env, from)
 	}
@@ -123,15 +123,15 @@ impl JString<'_> {
 	/// encode, before calling into JNI to create the `JString`.
 	///
 	/// To avoid the overhead of encoding and copying, use [`Self::from_jni_str`] and the
-	/// [crate::jni_str!] macro to encode strings to MUTF-8 at compile time.
+	/// [`crate::jni_str`!] macro to encode strings to MUTF-8 at compile time.
 	pub fn from_str<'env_local>(env: &mut Env<'env_local>, from: impl AsRef<str>) -> Result<JString<'env_local>> {
 		Self::from_jni_str(env, JNIString::new(from))
 	}
 
-	/// Creates a `JString` (`java.lang.String` object) from a [JNIStr] (modified UTF-8).
+	/// Creates a `JString` (`java.lang.String` object) from a [`JNIStr`] (modified UTF-8).
 	///
-	/// For simple string literals, consider using the [crate::jni_str!] macro to create / encode
-	/// [JNIStr] literals at compile time.
+	/// For simple string literals, consider using the [`crate::jni_str`!] macro to create / encode
+	/// [`JNIStr`] literals at compile time.
 	///
 	/// This API catches exceptions internally and is not expected to return
 	/// [`Error::JavaException`] (unless called while there is a pending exception).
@@ -157,7 +157,7 @@ impl JString<'_> {
 
 	/// Gets the contents of this string, in [modified UTF-8] encoding (via `GetStringUTFChars`).
 	///
-	/// The returned [MUTF8Chars] guard can be used to access the modified UTF-8 bytes, or to
+	/// The returned [`MUTF8Chars`] guard can be used to access the modified UTF-8 bytes, or to
 	/// convert to a Rust string (UTF-8).
 	///
 	/// For example:
@@ -174,18 +174,18 @@ impl JString<'_> {
 	/// # }
 	/// ```
 	///
-	/// When the [MUTF8Chars] guard is dropped, the reference to the contents gets released.
+	/// When the [`MUTF8Chars`] guard is dropped, the reference to the contents gets released.
 	///
-	/// The [MUTF8Chars] guard dereferences to a [JNIStr].
+	/// The [`MUTF8Chars`] guard dereferences to a [`JNIStr`].
 	///
-	/// Also note that [MUTF8Chars] (and also [`JString`] itself) implements `Display` and
-	/// `ToString` so it's also possible to use `.to_string()` to get a Rust String from a [JString]
+	/// Also note that [`MUTF8Chars`] (and also [`JString`] itself) implements `Display` and
+	/// `ToString` so it's also possible to use `.to_string()` to get a Rust String from a [`JString`]
 	///
 	/// [modified UTF-8]: https://en.wikipedia.org/wiki/UTF-8#Modified_UTF-8
 	///
 	/// # Errors
 	///
-	/// Returns an [Error::NullPtr] if this [`JString`] is null.
+	/// Returns an [`Error::NullPtr`] if this [`JString`] is null.
 	pub fn mutf8_chars(&self, env: &Env<'_>) -> Result<MUTF8Chars<'_, &JString<'_>>> {
 		MUTF8Chars::from_get_string_utf_chars(env, self)
 	}
@@ -220,7 +220,7 @@ impl JString<'_> {
 	///
 	/// # Errors
 	///
-	/// Returns an [Error::NullPtr] if this [`JString`] is null.
+	/// Returns an [`Error::NullPtr`] if this [`JString`] is null.
 	pub fn try_to_string(&self, env: &Env<'_>) -> Result<String> {
 		let mutf8_chars = self.mutf8_chars(env)?;
 		Ok(mutf8_chars.to_string())

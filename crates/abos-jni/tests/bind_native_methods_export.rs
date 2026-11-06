@@ -80,7 +80,7 @@ impl TestPrimitiveArgsNativeInterface for TestPrimitiveArgsAPI {
 		b: jlong,
 		c: jboolean,
 	) -> Result<jint, Self::Error> {
-		Ok(a + b as jint + c as jint)
+		Ok(a + b as jint + jint::from(c))
 	}
 }
 

@@ -21,10 +21,10 @@ fn thread_detaches_for_tls_attachment_when_finished() {
 			assert_eq!(jvm().threads_attached(), 1);
 
 			Ok(())
-		}).unwrap();
+		}).expect("attached JNI callback succeeds");
 	});
 
-	thread.join().unwrap();
+	thread.join().expect("test worker completes without panicking");
 	assert_eq!(jvm().threads_attached(), 0);
 	assert!(!util::is_thread_attached());
 }
@@ -54,7 +54,7 @@ fn threads_external_detach() {
 			assert_eq!(jvm().threads_attached(), 2);
 
 			Ok(())
-		}).unwrap();
+		}).expect("attached JNI callback succeeds");
 
 		assert!(util::is_thread_attached());
 		assert_eq!(jvm().threads_attached(), 2);
@@ -65,7 +65,7 @@ fn threads_external_detach() {
 		assert_eq!(jvm().threads_attached(), 2);
 	});
 
-	thread.join().unwrap();
+	thread.join().expect("test worker completes without panicking");
 
 	// Since the main thread was detached manually the counter should still be 1
 	// while the main thread is detached
@@ -79,12 +79,12 @@ fn threads_external_detach() {
 		assert_eq!(val, 3);
 		assert_eq!(jvm().threads_attached(), 1);
 		Ok(())
-	}).unwrap();
+	}).expect("attached JNI callback succeeds");
 
 	assert!(util::is_thread_attached());
 	assert_eq!(jvm().threads_attached(), 1);
 
-	util::detach_current_thread().unwrap();
+	util::detach_current_thread().expect("test thread detaches");
 	assert_eq!(jvm().threads_attached(), 0);
 	assert!(!util::is_thread_attached());
 }
@@ -95,7 +95,7 @@ rusty_fork_test! {
 fn thread_detaches_for_scoped_attachment() {
 	// A newly created VM will be attached
 	assert_eq!(jvm().threads_attached(), 1);
-	jvm().detach_current_thread().unwrap();
+	jvm().detach_current_thread().expect("test JVM is available");
 	assert_eq!(jvm().threads_attached(), 0);
 
 	attach_current_thread_for_scope(|env| {
@@ -103,7 +103,7 @@ fn thread_detaches_for_scoped_attachment() {
 		let val = call_java_abs(env, -1);
 		assert_eq!(val, 1);
 		Ok(())
-	}).unwrap();
+	}).expect("scoped JNI callback succeeds");
 	assert_eq!(jvm().threads_attached(), 0);
 	assert!(!util::is_thread_attached());
 }
@@ -122,7 +122,7 @@ rusty_fork_test! {
 fn threads_explicit_detach_error_for_scoped_attachment() {
 	// A newly created VM will be attached
 	assert_eq!(jvm().threads_attached(), 1);
-	jvm().detach_current_thread().unwrap();
+	jvm().detach_current_thread().expect("test JVM is available");
 	assert_eq!(jvm().threads_attached(), 0);
 
 	attach_current_thread_for_scope(|env| {
@@ -137,7 +137,7 @@ fn threads_explicit_detach_error_for_scoped_attachment() {
 		assert!(util::is_thread_attached());
 
 		Ok(())
-	}).unwrap();
+	}).expect("scoped JNI callback succeeds");
 
 	// Double check something didn't go wrong after dropping the guard
 	assert_eq!(jvm().threads_attached(), 0);
@@ -153,7 +153,7 @@ rusty_fork_test! {
 fn threads_explicit_detach_tls_attachment() {
 	// A newly created VM will be attached
 	assert_eq!(jvm().threads_attached(), 1);
-	jvm().detach_current_thread().unwrap();
+	jvm().detach_current_thread().expect("test JVM is available");
 	assert_eq!(jvm().threads_attached(), 0);
 
 	attach_current_thread(|env| {
@@ -168,7 +168,7 @@ fn threads_explicit_detach_tls_attachment() {
 		assert!(JavaVM::thread_attach_guard_level() > 0);
 
 		Ok(())
-	}).unwrap();
+	}).expect("attached JNI callback succeeds");
 	assert_eq!(jvm().threads_attached(), 1);
 	assert!(util::is_thread_attached());
 
@@ -190,7 +190,7 @@ rusty_fork_test! {
 fn threads_scoped_attachments_nest() {
 	// A newly created VM will be attached
 	assert_eq!(jvm().threads_attached(), 1);
-	jvm().detach_current_thread().unwrap();
+	jvm().detach_current_thread().expect("test JVM is available");
 	assert_eq!(jvm().threads_attached(), 0);
 	assert!(!util::is_thread_attached());
 
@@ -207,7 +207,7 @@ fn threads_scoped_attachments_nest() {
 			assert_eq!(jvm().threads_attached(), 1);
 
 			Ok(())
-		}).unwrap();
+		}).expect("scoped JNI callback succeeds");
 
 		assert_eq!(jvm().threads_attached(), 1);
 		assert!(util::is_thread_attached());
@@ -219,7 +219,7 @@ fn threads_scoped_attachments_nest() {
 
 		Ok(())
 		// Outer attachment should detach the thread here
-	}).unwrap();
+	}).expect("scoped JNI callback succeeds");
 
 	assert_eq!(jvm().threads_attached(), 0);
 	assert!(!util::is_thread_attached());
@@ -231,7 +231,7 @@ rusty_fork_test! {
 fn threads_scope_attachments_block_tls_attachments() {
 	// A newly created VM will be attached
 	assert_eq!(jvm().threads_attached(), 1);
-	jvm().detach_current_thread().unwrap();
+	jvm().detach_current_thread().expect("test JVM is available");
 	assert_eq!(jvm().threads_attached(), 0);
 
 	attach_current_thread_for_scope(|_| {
@@ -241,7 +241,7 @@ fn threads_scope_attachments_block_tls_attachments() {
 			assert_eq!(val, 1);
 			assert_eq!(jvm().threads_attached(), 1);
 			Ok(())
-		}).unwrap();
+		}).expect("scoped JNI callback succeeds");
 
 		// Request a permanent AttachGuard, which should re-use the existing
 		// attachment and should therefore not register a permanent TLS
@@ -251,12 +251,12 @@ fn threads_scope_attachments_block_tls_attachments() {
 			assert_eq!(val, 4);
 			assert_eq!(jvm().threads_attached(), 1);
 			Ok(())
-		}).unwrap();
+		}).expect("attached JNI callback succeeds");
 
 		assert_eq!(jvm().threads_attached(), 1);
 
 		Ok(())
-	}).unwrap();
+	}).expect("scoped JNI callback succeeds");
 
 	// Check that after guard is dropped the thread is properly detached
 	// despite the request to create a nested permanent attachment.
@@ -272,7 +272,7 @@ fn threads_guard_nesting_blocks_explicit_detachment() {
 	assert_eq!(jvm().threads_attached(), 1);
 	// There are initially no AttachGuards in place
 	assert_eq!(JavaVM::thread_attach_guard_level(), 0);
-	jvm().detach_current_thread().unwrap();
+	jvm().detach_current_thread().expect("test JVM is available");
 	assert_eq!(jvm().threads_attached(), 0);
 
 	// While there are no guards and no attachment then `detach_current_thread`
@@ -297,7 +297,7 @@ fn threads_guard_nesting_blocks_explicit_detachment() {
 			let guard_level_2 = JavaVM::thread_attach_guard_level();
 			assert!(guard_level_2 > guard_level_1);
 			Ok(())
-		}).unwrap();
+		}).expect("attached JNI callback succeeds");
 
 		assert_eq!(jvm().threads_attached(), 1);
 		assert_eq!(JavaVM::thread_attach_guard_level(), guard_level_1);
@@ -317,7 +317,7 @@ fn threads_guard_nesting_blocks_explicit_detachment() {
 			let guard_level_2 = JavaVM::thread_attach_guard_level();
 			assert!(guard_level_2 > guard_level_1);
 			Ok(())
-		}).unwrap();
+		}).expect("scoped JNI callback succeeds");
 
 		assert_eq!(jvm().threads_attached(), 1);
 		assert_eq!(JavaVM::thread_attach_guard_level(), guard_level_1);
@@ -333,7 +333,7 @@ fn threads_guard_nesting_blocks_explicit_detachment() {
 		assert!(jvm().detach_current_thread().is_err());
 
 		Ok(())
-	}).unwrap();
+	}).expect("attached JNI callback succeeds");
 
 	// Since we requested a permanent attachment then dropping the guard
 	// shouldn't detach the thread
@@ -345,7 +345,7 @@ fn threads_guard_nesting_blocks_explicit_detachment() {
 
 	// Should be OK to detach a thread before it terminates so long as there are
 	// no active AttachGuards...
-	jvm().detach_current_thread().unwrap();
+	jvm().detach_current_thread().expect("test JVM is available");
 
 	assert_eq!(jvm().threads_attached(), 0);
 	assert!(!util::is_thread_attached());

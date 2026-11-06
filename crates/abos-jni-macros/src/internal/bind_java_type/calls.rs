@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+	Ident, JniCallArgs, Method, PrimitiveType, Result, SigType, Span, TokenStream, TypeMappings, format_ident, quote,
+	sig_type_to_rust_arg_type, sig_type_to_rust_return_type,
+};
 
 /// Generate JNI call arguments processing data for a method/constructor
 /// This consolidates the common logic for processing parameters into jvalue arrays
@@ -10,8 +13,8 @@ pub(super) fn generate_jni_call_args(
 	// Generate unique lifetime for each argument
 	let lifetimes: Vec<_> = (0..parameters.len())
 		.map(|i| {
-			let lt_name = format!("local_{}", i);
-			let lt = syn::Lifetime::new(&format!("'{}", lt_name), Span::call_site());
+			let lt_name = format!("local_{i}");
+			let lt = syn::Lifetime::new(&format!("'{lt_name}"), Span::call_site());
 			quote! { #lt }
 		})
 		.collect();
@@ -131,15 +134,15 @@ pub(super) fn generate_jni_call_for_return_type(
 
 	// The JNI spec asserts that `Call<Type>MethodA` _must_ not be called with a `null` object reference
 	// Note: we assume that the class will never be null when calling static methods
-	let null_check = if !is_static {
-		let error_msg = format!("Attempted to call '{}' with a null object", debug_name);
+	let null_check = if is_static {
+		quote! {}
+	} else {
+		let error_msg = format!("Attempted to call '{debug_name}' with a null object");
 		quote! {
 			if #this_or_class.is_null() {
 				return Err(#jni::errors::Error::NullPtr(#error_msg));
 			}
 		}
-	} else {
-		quote! {}
 	};
 
 	// Generate the JNI call

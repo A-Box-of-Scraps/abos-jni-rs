@@ -3,14 +3,14 @@ use super::*;
 #[test]
 pub fn get_object_class() {
 	attach_current_thread(|env| {
-		let string = env.new_string("test").unwrap();
+		let string = env.new_string("test").expect("test string can be allocated");
 		let result = env.get_object_class(string);
 		assert!(result.is_ok());
-		assert!(!result.unwrap().is_null());
+		assert!(!result.expect("test operation succeeds").is_null());
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -25,7 +25,7 @@ pub fn get_object_class_null_arg() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -39,10 +39,10 @@ pub fn new_direct_byte_buffer() {
 		};
 		let result = unsafe { env.new_direct_byte_buffer(addr, len) };
 		assert!(result.is_ok());
-		assert!(!result.unwrap().is_null());
+		assert!(!result.expect("test operation succeeds").is_null());
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -53,7 +53,7 @@ pub fn new_direct_byte_buffer_invalid_addr() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -65,28 +65,30 @@ pub fn get_direct_buffer_capacity_ok() {
 			let buf = vec.leak();
 			(buf.as_mut_ptr(), buf.len())
 		};
-		let result = unsafe { env.new_direct_byte_buffer(addr, len) }.unwrap();
+		let result = unsafe { env.new_direct_byte_buffer(addr, len) }.expect("new direct byte buffer succeeds");
 		assert!(!result.is_null());
 
-		let capacity = env.get_direct_buffer_capacity(&result).unwrap();
+		let capacity = env
+			.get_direct_buffer_capacity(&result)
+			.expect("get direct buffer capacity succeeds");
 		assert_eq!(capacity, 4);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
 pub fn get_direct_buffer_capacity_wrong_arg() {
 	attach_current_thread(|env| {
-		let wrong_type = env.new_string("wrong").unwrap();
+		let wrong_type = env.new_string("wrong").expect("test string can be allocated");
 		let wrong_obj = unsafe { JByteBuffer::from_raw(env, wrong_type.into_raw()) };
 		let capacity = env.get_direct_buffer_capacity(&wrong_obj);
 		assert!(capacity.is_err());
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -97,7 +99,7 @@ pub fn get_direct_buffer_capacity_null_arg() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -109,21 +111,23 @@ pub fn get_direct_buffer_address_ok() {
 			let buf = vec.leak();
 			(buf.as_mut_ptr(), buf.len())
 		};
-		let result = unsafe { env.new_direct_byte_buffer(addr, len) }.unwrap();
+		let result = unsafe { env.new_direct_byte_buffer(addr, len) }.expect("new direct byte buffer succeeds");
 		assert!(!result.is_null());
 
-		let dest_buffer = env.get_direct_buffer_address(&result).unwrap();
+		let dest_buffer = env
+			.get_direct_buffer_address(&result)
+			.expect("get direct buffer address succeeds");
 		assert_eq!(addr, dest_buffer);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
 pub fn get_direct_buffer_address_wrong_arg() {
 	attach_current_thread(|env| {
-		let wrong_obj: JObject = env.new_string("wrong").unwrap().into();
+		let wrong_obj: JObject = env.new_string("wrong").expect("test string can be allocated").into();
 
 		// SAFETY: This is not a valid cast and not generally safe but `GetDirectBufferAddress` is
 		// documented to return a null pointer in case the "given object is not a direct java.nio.Buffer".
@@ -133,7 +137,7 @@ pub fn get_direct_buffer_address_wrong_arg() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -144,7 +148,7 @@ pub fn get_direct_buffer_address_null_arg() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 // Group test for testing the family of new_PRIMITIVE_array functions with correct arguments

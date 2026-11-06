@@ -2,10 +2,10 @@
 #![allow(missing_docs, reason = "Executable examples and test fixtures are not library API.")]
 #![cfg(feature = "invocation")]
 //! Example demonstrating a wrapper macro that can inject the jni crate path and
-//! a type_map into native_method! invocations.
+//! a `type_map` into `native_method`! invocations.
 //!
 //! Notably the wrapper doesn't need to know anything about the syntax of
-//! native_method! and it doesn't stop you from adding additional type_map
+//! `native_method`! and it doesn't stop you from adding additional `type_map`
 //! entries.
 //!
 //! This could be useful in a workspace with:
@@ -47,7 +47,7 @@ define_stub_type!(JCustomType, "com.example.CustomType");
 struct CommonHandle(*const c_char);
 impl From<CommonHandle> for abos_jni::sys::jlong {
 	fn from(handle: CommonHandle) -> Self {
-		handle.0 as *const u8 as abos_jni::sys::jlong
+		handle.0.cast::<u8>() as Self
 	}
 }
 
@@ -118,7 +118,7 @@ impl JNativeMethodWrapper<'_> {
 		// Safely: we assume the handle is a valid CStr pointer for this example
 		let c_str = unsafe { CStr::from_ptr(handle.0) };
 		let str_slice = c_str.to_str().map_err(MyError::InvalidUtf8)?;
-		let response = format!("Processed resource: {}", str_slice);
+		let response = format!("Processed resource: {str_slice}");
 		Ok(JString::from_str(env, response)?)
 	}
 

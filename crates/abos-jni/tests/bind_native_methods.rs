@@ -66,7 +66,7 @@ impl TestNativeMethodsNativeInterface for TestNativeMethodsAPI {
 		_this: TestNativeMethods<'local>,
 		message: JString<'local>,
 	) -> Result<(), Self::Error> {
-		println!("Native log: {}", message);
+		println!("Native log: {message}");
 		Ok(())
 	}
 

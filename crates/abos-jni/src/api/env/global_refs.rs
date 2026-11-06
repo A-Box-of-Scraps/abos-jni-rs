@@ -1,6 +1,6 @@
-use super::*;
+use super::{Env, Error, Global, JObject, JniError, Reference, Result, Weak, sys};
 
-impl<'local> Env<'local> {
+impl Env<'_> {
 	/// Creates a new global reference to the Java object `obj`.
 	///
 	/// Global references take more time to create or delete than ordinary

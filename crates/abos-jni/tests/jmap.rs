@@ -52,5 +52,5 @@ pub fn jmap_push_and_iterate() {
 		assert_eq!(orig, collected);
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }

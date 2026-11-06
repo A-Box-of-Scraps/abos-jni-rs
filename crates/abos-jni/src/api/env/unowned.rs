@@ -1,4 +1,7 @@
-use super::*;
+#[cfg(doc)]
+use crate::errors::{LogContextErrorAndDefault, LogErrorAndDefault, ThrowRuntimeExAndDefault};
+
+use super::{AssertUnwindSafe, AttachGuard, Env, Error, ErrorPolicy, catch_unwind};
 
 /// The outcome of an operation that may succeed, fail with an error, or panic.
 ///
@@ -294,12 +297,14 @@ impl<'local> EnvUnowned<'local> {
 	}
 
 	/// Returns the raw pointer to the underlying [`crate::sys::JNIEnv`].
-	pub fn as_raw(&self) -> *mut abos_jni_sys::JNIEnv {
+	#[must_use]
+	pub const fn as_raw(&self) -> *mut abos_jni_sys::JNIEnv {
 		self.ptr
 	}
 
 	/// Consumes the [`EnvUnowned`] and returns the raw pointer to the underlying [`crate::sys::JNIEnv`].
-	pub fn into_raw(self) -> *mut abos_jni_sys::JNIEnv {
+	#[must_use]
+	pub const fn into_raw(self) -> *mut abos_jni_sys::JNIEnv {
 		self.ptr
 	}
 }

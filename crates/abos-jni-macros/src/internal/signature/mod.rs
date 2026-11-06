@@ -127,8 +127,8 @@ impl Signature {
 	/// Convert to JNI signature string
 	pub fn to_jni_signature(&self, type_mappings: &TypeMappings) -> Result<String> {
 		match self {
-			Signature::Method(sig) => sig.to_jni_signature(type_mappings),
-			Signature::Field(sig) => sig.to_jni_signature(type_mappings),
+			Self::Method(sig) => sig.to_jni_signature(type_mappings),
+			Self::Field(sig) => sig.to_jni_signature(type_mappings),
 		}
 	}
 }
@@ -145,7 +145,7 @@ pub fn parse_parameter_with_index(input: ParseStream, index: usize, type_mapping
 	} else {
 		// Unnamed parameter - generate fallback name
 		let ty = parse_type(input, type_mappings)?;
-		let name = Ident::new(&format!("arg{}", index), Span::call_site());
+		let name = Ident::new(&format!("arg{index}"), Span::call_site());
 		Ok(Parameter { name, ty })
 	}
 }

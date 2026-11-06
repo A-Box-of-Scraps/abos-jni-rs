@@ -1,10 +1,16 @@
-use super::*;
+#[cfg(doc)]
+use crate::jni_sig;
+
+use super::{
+	Desc, Env, Error, IntoAuto, JClass, JMethodID, JNIStr, JObject, JValue, JValueOwned, JavaType, MethodSignature,
+	Primitive, Reference, Result, ReturnType, jvalue,
+};
 
 impl<'local> Env<'local> {
 	/// Calls an object method safely. This comes with a number of lookups/checks. It
 	///
-	/// * Looks up the [JClass] for the given object.
-	/// * Looks up the [JMethodID] for the object's class/name/signature combination
+	/// * Looks up the [`JClass`] for the given object.
+	/// * Looks up the [`JMethodID`] for the object's class/name/signature combination
 	/// * Ensures that the number/types of args matches the signature
 	/// * Calls [`Self::call_method_unchecked`] with the verified safe arguments.
 	///
@@ -64,7 +70,7 @@ impl<'local> Env<'local> {
 
 		let class = self.get_object_class(obj)?.auto();
 
-		let args: Vec<jvalue> = args.iter().map(|v| v.as_jni()).collect();
+		let args: Vec<jvalue> = args.iter().map(super::super::jvalue::JValue::as_jni).collect();
 
 		// SAFETY: We've ensured that the Desc trait will be used to dynamically look up a valid
 		// method ID for the object's class, method name, and signature (or else it will return an
@@ -76,7 +82,7 @@ impl<'local> Env<'local> {
 	/// Calls a static method safely. This comes with a number of
 	/// lookups/checks. It
 	///
-	/// * Looks up the [JMethodID] for the class/name/signature combination
+	/// * Looks up the [`JMethodID`] for the class/name/signature combination
 	/// * Ensures that the number/types of args matches the signature
 	///   * Cannot check an object's type - but primitive types are matched against each other (including Object)
 	/// * Calls [`Self::call_static_method_unchecked`] with the verified safe arguments.
@@ -116,7 +122,7 @@ impl<'local> Env<'local> {
 		let class = class.lookup(self)?;
 		let class = class.as_ref();
 
-		let args: Vec<jvalue> = args.iter().map(|v| v.as_jni()).collect();
+		let args: Vec<jvalue> = args.iter().map(super::super::jvalue::JValue::as_jni).collect();
 
 		// SAFETY: We've obtained the method_id above, so it is valid for this class.
 		// We've also validated the argument counts and types using the same type signature
@@ -127,7 +133,7 @@ impl<'local> Env<'local> {
 	/// Calls a non-virtual method safely. This comes with a number of
 	/// lookups/checks. It
 	///
-	/// * Looks up the [JMethodID] for the class/name/signature combination
+	/// * Looks up the [`JMethodID`] for the class/name/signature combination
 	/// * Ensures that the number/types of args matches the signature
 	///   * Cannot check an object's type - but primitive types are matched against each other (including Object)
 	/// * Calls [`Self::call_nonvirtual_method_unchecked`] with the verified safe arguments.
@@ -171,7 +177,7 @@ impl<'local> Env<'local> {
 		let class = class.lookup(self)?;
 		let class = class.as_ref();
 
-		let args: Vec<jvalue> = args.iter().map(|v| v.as_jni()).collect();
+		let args: Vec<jvalue> = args.iter().map(super::super::jvalue::JValue::as_jni).collect();
 
 		// SAFETY: We've obtained the method_id above, so it is valid for this class.
 		// We've also validated the argument counts and types using the same type signature
@@ -225,7 +231,7 @@ impl<'local> Env<'local> {
 
 		let method_id: JMethodID = Desc::<JMethodID>::lookup((class, ctor_sig), self)?;
 
-		let ctor_args: Vec<jvalue> = ctor_args.iter().map(|v| v.as_jni()).collect();
+		let ctor_args: Vec<jvalue> = ctor_args.iter().map(super::super::jvalue::JValue::as_jni).collect();
 		// SAFETY: We've obtained the method_id above, so it is valid for this class.
 		// We've also validated the argument counts and types using the same type signature
 		// we fetched the original method ID from.
@@ -237,8 +243,8 @@ impl<'local> Env<'local> {
 	///
 	/// # Safety
 	///
-	/// The provided JMethodID must be valid, and match the types and number of arguments, as well as return type
-	/// (always an Object for a constructor). If these are incorrect, the JVM may crash.  The JMethodID must also match
+	/// The provided `JMethodID` must be valid, and match the types and number of arguments, as well as return type
+	/// (always an Object for a constructor). If these are incorrect, the JVM may crash.  The `JMethodID` must also match
 	/// the passed type.
 	pub unsafe fn new_object_unchecked<'other_local, C, M>(
 		&mut self,

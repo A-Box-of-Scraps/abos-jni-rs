@@ -30,9 +30,9 @@ pub fn call_java_abs(env: &mut Env, value: i32) -> i32 {
 		jni_sig!("(I)I"),
 		&[JValue::from(value as jint)],
 	)
-	.unwrap()
+	.expect("static method call succeeds")
 	.i()
-	.unwrap()
+	.expect("JNI result contains an int")
 }
 
 #[allow(dead_code)]
@@ -65,11 +65,11 @@ pub fn detach_current_thread() -> Result<()> {
 /// tracking.
 ///
 /// This simulates external code detaching the thread. (The jni crate handles
-/// this so long as there are no active AttachGuards.)
+/// this so long as there are no active `AttachGuards`.)
 ///
 /// # Safety
 ///
-/// There must be no active AttachGuards for the thread when this is called,
+/// There must be no active `AttachGuards` for the thread when this is called,
 /// otherwise we're breaking jni crate safety invariants.
 #[allow(dead_code)]
 pub unsafe fn sys_detach_current_thread() {
@@ -89,31 +89,26 @@ pub fn print_exception(env: &Env) {
 pub fn unwrap<T>(res: Result<T>, env: &Env) -> T {
 	res.unwrap_or_else(|e| {
 		print_exception(env);
-		panic!("{:#?}", e);
+		panic!("{e:#?}");
 	})
 }
 
 // Generic helper function to load any test class
 #[allow(dead_code)]
 pub fn load_test_class(env: &mut Env, out_dir: &std::path::Path, class_name: &str) -> abos_jni::errors::Result<()> {
-	let class_path = out_dir.join(format!("com/example/{}.class", class_name));
-	assert!(
-		class_path.exists(),
-		"{}.class not found at {:?}",
-		class_name,
-		class_path
-	);
+	let class_path = out_dir.join(format!("com/example/{class_name}.class"));
+	assert!(class_path.exists(), "{class_name}.class not found at {class_path:?}");
 
-	let class_bytes = std::fs::read(&class_path).unwrap_or_else(|_| panic!("Failed to read {}.class", class_name));
+	let class_bytes = std::fs::read(&class_path).unwrap_or_else(|_| panic!("Failed to read {class_name}.class"));
 
 	let class_loader =
 		abos_jni::objects::JClassLoader::get_system_class_loader(env).expect("Failed to get system class loader");
 
-	let class_internal_name = format!("com/example/{}", class_name);
+	let class_internal_name = format!("com/example/{class_name}");
 	let class_jni = abos_jni::strings::JNIString::new(class_internal_name.as_str());
 
 	env.define_class(Some(&class_jni), &class_loader, &class_bytes)
-		.unwrap_or_else(|_| panic!("Failed to define {} class", class_name));
+		.unwrap_or_else(|_| panic!("Failed to define {class_name} class"));
 
 	Ok(())
 }

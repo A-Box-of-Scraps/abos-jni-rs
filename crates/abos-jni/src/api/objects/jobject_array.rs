@@ -56,8 +56,8 @@ pub struct JObjectArray<'local, E: Reference + 'local = JObject<'local>> {
 	_marker: std::marker::PhantomData<E>,
 }
 
-impl<'local, E: Reference> AsRef<JObjectArray<'local, E>> for JObjectArray<'local, E> {
-	fn as_ref(&self) -> &JObjectArray<'local, E> {
+impl<E: Reference> AsRef<Self> for JObjectArray<'_, E> {
+	fn as_ref(&self) -> &Self {
 		self
 	}
 }
@@ -77,14 +77,14 @@ impl<'local, E: Reference> ::std::ops::Deref for JObjectArray<'local, E> {
 }
 
 impl<'local, E: Reference> From<JObjectArray<'local, E>> for JObject<'local> {
-	fn from(other: JObjectArray<'local, E>) -> JObject<'local> {
+	fn from(other: JObjectArray<'local, E>) -> Self {
 		other.array
 	}
 }
 
 unsafe impl<'local, E: Reference> AsJArrayRaw<'local> for JObjectArray<'local, E> {}
 
-pub(crate) struct JObjectArrayAPI<E: Reference> {
+pub struct JObjectArrayAPI<E: Reference> {
 	class: Global<JClass<'static>>,
 	_marker: std::marker::PhantomData<E>,
 }
@@ -94,15 +94,12 @@ pub(crate) struct JObjectArrayAPI<E: Reference> {
 static API_REGISTRY: OnceLock<RwLock<HashMap<TypeId, &'static (dyn Any + Send + Sync)>>> = OnceLock::new();
 
 impl<E: Reference + Send + Sync> JObjectArrayAPI<E> {
-	pub(crate) fn get<'any_local>(
-		env: &Env<'_>,
-		loader_context: &LoaderContext<'any_local, '_>,
-	) -> Result<&'static Self> {
+	pub(crate) fn get(env: &Env<'_>, loader_context: &LoaderContext<'_, '_>) -> Result<&'static Self> {
 		let map = API_REGISTRY.get_or_init(|| RwLock::new(HashMap::new()));
 		let tid = TypeId::of::<Self>();
 
 		// Fast path (read-lock)
-		if let Some(any_ref) = map.read().unwrap().get(&tid) {
+		if let Some(any_ref) = map.read().expect("array binding cache is not poisoned").get(&tid) {
 			// Stored as &'static dyn Any; downcast back to &'static JObjectArrayAPI<E>
 			return Ok(any_ref
 				.downcast_ref::<Self>()
@@ -115,18 +112,18 @@ impl<E: Reference + Send + Sync> JObjectArrayAPI<E> {
 		// in the unlikely case that another thread is also trying to look up
 		// the same state then we let them race and keep the first one to finish.
 
-		let created: JObjectArrayAPI<E> = {
+		let created: Self = {
 			env.with_local_frame(DEFAULT_LOCAL_FRAME_CAPACITY, |env| -> Result<_> {
 				let class = loader_context.load_class_for_type::<JObjectArray<E>>(env, false)?;
 				let class = env.new_global_ref(&class)?;
-				Ok(JObjectArrayAPI {
+				Ok(Self {
 					class,
 					_marker: std::marker::PhantomData,
 				})
 			})?
 		};
 
-		let mut write = map.write().unwrap();
+		let mut write = map.write().expect("array binding cache is not poisoned");
 
 		// Another thread might have inserted while we acquired the write lock:
 		if let Some(any_ref) = write.get(&tid) {
@@ -137,7 +134,7 @@ impl<E: Reference + Send + Sync> JObjectArrayAPI<E> {
 		}
 
 		// Leak it to get a true 'static reference and erase the type for storage
-		let leaked: &'static JObjectArrayAPI<E> = Box::leak(Box::new(created));
+		let leaked: &'static Self = Box::leak(Box::new(created));
 		write.insert(tid, leaked as &'static (dyn Any + Send + Sync));
 
 		Ok(leaked)
@@ -214,6 +211,7 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 	///
 	/// Null references are always valid and do not belong to a local reference frame. Therefore,
 	/// the returned `JObjectArray` always has the `'static` lifetime.
+	#[must_use]
 	pub const fn null() -> JObjectArray<'static, E::GlobalKind> {
 		JObjectArray {
 			array: JObject::null(),
@@ -222,6 +220,7 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 	}
 
 	/// Unwrap to the raw jni type.
+	#[must_use]
 	pub const fn into_raw(self) -> jobjectArray {
 		self.array.into_raw() as jobjectArray
 	}
@@ -231,15 +230,15 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 	/// This will do a runtime (`IsInstanceOf`) check that the object is an instance of `T[]`.
 	///
 	/// Also see these other options for casting local or global references to a [`JObjectArray<T>`]:
-	/// - [Env::as_cast]
-	/// - [Env::new_cast_local_ref]
-	/// - [Env::cast_local]
-	/// - [Env::new_cast_global_ref]
-	/// - [Env::cast_global]
+	/// - [`Env::as_cast`]
+	/// - [`Env::new_cast_local_ref`]
+	/// - [`Env::cast_local`]
+	/// - [`Env::new_cast_global_ref`]
+	/// - [`Env::cast_global`]
 	///
 	/// # Errors
 	///
-	/// Returns [Error::WrongObjectType] if the `IsInstanceOf` check fails.
+	/// Returns [`Error::WrongObjectType`] if the `IsInstanceOf` check fails.
 	pub fn cast_local<'any_local>(
 		env: &mut Env<'_>,
 		obj: impl Reference + Into<JObject<'any_local>> + AsRef<JObject<'any_local>>,
@@ -259,7 +258,7 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 
 	/// Returns a local reference to an element of the [`JObjectArray`] `array`.
 	///
-	/// Returns [Error::IndexOutOfBounds] if the `index` is out of bounds.
+	/// Returns [`Error::IndexOutOfBounds`] if the `index` is out of bounds.
 	///
 	/// This API catches exceptions internally and is not expected to return
 	/// [`Error::JavaException`] (unless called while there is a pending exception).
@@ -286,8 +285,8 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 	/// Sets an element of the [`JObjectArray`] `array`.
 	///
 	/// Returns:
-	/// - [Error::IndexOutOfBounds] if the `index` is out of bounds.
-	/// - [Error::WrongObjectType] if the `value` is not of the correct type.
+	/// - [`Error::IndexOutOfBounds`] if the `index` is out of bounds.
+	/// - [`Error::WrongObjectType`] if the `value` is not of the correct type.
 	///
 	/// This API catches exceptions internally and is not expected to return
 	/// [`Error::JavaException`] (unless called while there is a pending exception).
@@ -337,7 +336,7 @@ unsafe impl<'local, E: Reference + 'local> Reference for JObjectArray<'local, E>
 	fn class_name() -> Cow<'static, JNIStr> {
 		let inner = E::class_name();
 		let inner = inner.to_str();
-		let name = if inner.len() == 1 || inner.starts_with("[") {
+		let name = if inner.len() == 1 || inner.starts_with('[') {
 			// inner = primitive OR array
 			format!("[{inner}")
 		} else {

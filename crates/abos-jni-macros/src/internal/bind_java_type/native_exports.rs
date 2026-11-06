@@ -1,6 +1,9 @@
-use super::*;
+use super::{
+	Ident, NativeMethod, NativeMethodExport, Result, TokenStream, TypeMappings, create_jni_fn_name, extract_cfg_attrs,
+	format_ident, lit_cstr_mutf8, quote, sig_type_to_rust_native_trait_arg_type, sig_type_to_rust_return_type,
+};
 
-/// Generate the native methods registration code for API::get()
+/// Generate the native methods registration code for `API::get()`
 pub(super) fn generate_native_registration_code(
 	_api_name: &Ident,
 	native_methods: &[NativeMethod],
@@ -22,10 +25,7 @@ pub(super) fn generate_native_registration_code(
 		let jni_signature = method.method_signature.to_jni_signature(type_mappings).map_err(|e| {
 			syn::Error::new(
 				rust_name.span(),
-				format!(
-					"Failed to generate JNI signature for native method '{}': {}",
-					rust_name, e
-				),
+				format!("Failed to generate JNI signature for native method '{rust_name}': {e}"),
 			)
 		})?;
 
@@ -135,16 +135,13 @@ pub(super) fn generate_single_native_export(
 	let jni_signature = method.method_signature.to_jni_signature(type_mappings).map_err(|e| {
 		syn::Error::new(
 			rust_name.span(),
-			format!(
-				"Failed to generate JNI signature for exported native method '{}': {}",
-				rust_name, e
-			),
+			format!("Failed to generate JNI signature for exported native method '{rust_name}': {e}"),
 		)
 	})?;
 
 	// Generate the mangled JNI function name
 	let mangled_name = if let Some(export_name) = export_name {
-		export_name.clone()
+		export_name
 	} else {
 		create_jni_fn_name(java_class_dotted, java_method_name, Some(&jni_signature))
 	};
@@ -171,10 +168,10 @@ pub(super) fn generate_single_native_export(
 
 	// Build forwarding call arguments
 	let mut call_args = vec![quote! { unowned_env }];
-	if !method.is_static {
-		call_args.push(quote! { this });
-	} else {
+	if method.is_static {
 		call_args.push(quote! { class });
+	} else {
+		call_args.push(quote! { this });
 	}
 	for param in &method.method_signature.parameters {
 		let param_name = &param.name;

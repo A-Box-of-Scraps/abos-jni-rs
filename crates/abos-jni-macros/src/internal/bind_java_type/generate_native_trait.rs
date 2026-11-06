@@ -1,7 +1,11 @@
-use super::*;
+use super::{
+	AbiCheck, Ident, NativeMethod, Result, TokenStream, TypeMappings, VisibilitySpec, extract_cfg_attrs, format_ident,
+	generate_native_exports, generate_native_registration_code, generate_native_wrappers, quote,
+	sig_type_to_rust_native_trait_arg_type, sig_type_to_rust_return_type,
+};
 
 /// Generate all native method related code (trait, wrappers, registration)
-/// Returns: (trait_and_impl_struct, registration_code)
+/// Returns: (`trait_and_impl_struct`, `registration_code`)
 #[allow(clippy::too_many_arguments)]
 pub(super) fn generate_native_methods_code(
 	type_name: &Ident,

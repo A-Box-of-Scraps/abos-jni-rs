@@ -58,7 +58,7 @@ use log::{debug, error};
 use crate::{
 	AttachGuard, JavaVM,
 	errors::*,
-	vm::java_vm::{sys_attach_current_thread, sys_detach_current_thread},
+	vm::{sys_attach_current_thread, sys_detach_current_thread},
 };
 
 use crate::windows_sys::{FlsAlloc, FlsGetValue, FlsSetValue};

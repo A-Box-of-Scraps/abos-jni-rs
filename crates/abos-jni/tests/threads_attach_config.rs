@@ -28,13 +28,13 @@ fn attach_config() {
 							jni_sig!("()Ljava/lang/Thread;"),
 							&[],
 						)
-						.unwrap()
+						.expect("static method call succeeds")
 						.l()
-						.unwrap();
+						.expect("JNI result contains an object");
 					let name = env
 						.call_method(thread, jni_str!("getName"), jni_sig!("()Ljava/lang/String;"), &[])?
 						.l()?;
-					let name = env.cast_local::<JString>(name).unwrap();
+					let name = env.cast_local::<JString>(name).expect("test operation succeeds");
 					let name = name.mutf8_chars(env)?;
 					assert_eq!(name.as_cstr(), c"test-thread");
 					Ok(())
@@ -43,5 +43,5 @@ fn attach_config() {
 		}
 	});
 
-	let _ = thread.join().unwrap();
+	let _ = thread.join().expect("test worker completes without panicking");
 }

@@ -1,6 +1,9 @@
-use super::*;
+use super::{
+	ConcreteType, Ident, IsInstanceOfEntry, Result, Span, TokenStream, TypeMappings, format_ident, lit_cstr_mutf8,
+	path_to_string_no_spaces, quote,
+};
 
-/// Generate IsAssignable checks for all declared is_instance_of types
+/// Generate `IsAssignable` checks for all declared `is_instance_of` types
 pub(super) fn generate_is_instance_of_assignable_checks(
 	type_name: &Ident,
 	java_class: &str,
@@ -16,10 +19,7 @@ pub(super) fn generate_is_instance_of_assignable_checks(
 			match type_mappings.map_alias(to_rust_type_alias) {
 				Some(ConcreteType::Primitive { .. }) => Err(syn::Error::new(
 					Span::call_site(),
-					format!(
-						"Primitive type '{}' cannot be used in is_instance_of",
-						to_rust_type_alias
-					),
+					format!("Primitive type '{to_rust_type_alias}' cannot be used in is_instance_of"),
 				)),
 				Some(ConcreteType::Object {
 					name: to_java_class,
@@ -30,10 +30,7 @@ pub(super) fn generate_is_instance_of_assignable_checks(
 					let to_java_class_str = to_java_class.to_java_dotted();
 
 					let to_type_path: syn::Path = syn::parse_str(to_type_path_str).map_err(|_| {
-						syn::Error::new(
-							Span::call_site(),
-							format!("Invalid Rust type path: {}", to_type_path_str),
-						)
+						syn::Error::new(Span::call_site(), format!("Invalid Rust type path: {to_type_path_str}"))
 					})?;
 
 					Ok(quote! {
@@ -72,10 +69,7 @@ pub(super) fn generate_is_instance_of_assignable_checks(
 				}
 				None => Err(syn::Error::new(
 					Span::call_site(),
-					format!(
-						"Type '{}' used in is_instance_of is not defined in types mapping",
-						to_rust_type_alias
-					),
+					format!("Type '{to_rust_type_alias}' used in is_instance_of is not defined in types mapping"),
 				)),
 			}
 		})
@@ -143,12 +137,10 @@ pub(super) fn generate_reference_impl(
 	}
 }
 
-/// Generate base methods (from_raw, null, into_raw)
+/// Generate base methods (`from_raw`, null, `into_raw`)
 pub(super) fn generate_base_methods(type_name: &Ident, sys_type: Option<&Ident>, jni: &syn::Path) -> TokenStream {
 	// Use the provided sys_type or default to jobject
-	let sys_type_ident = sys_type
-		.map(|ident| quote! { #ident })
-		.unwrap_or_else(|| quote! { jobject });
+	let sys_type_ident = sys_type.map_or_else(|| quote! { jobject }, |ident| quote! { #ident });
 
 	// Generate the full path to the sys type
 	let sys_type_path = quote! { #jni::sys::#sys_type_ident };
@@ -230,7 +222,7 @@ Returns [Error::WrongObjectType] if the `IsInstanceOf` check fails.
 	}
 }
 
-/// Generate is_instance_of methods and From trait implementations
+/// Generate `is_instance_of` methods and From trait implementations
 pub(super) fn generate_is_instance_of_code(
 	type_name: &Ident,
 	is_instance_of: &[IsInstanceOfEntry],
@@ -247,7 +239,7 @@ pub(super) fn generate_is_instance_of_code(
 			Some(ConcreteType::Primitive { .. }) => {
 				return Err(syn::Error::new(
 					Span::call_site(),
-					format!("Primitive type '{}' cannot be used in is_instance_of", type_alias),
+					format!("Primitive type '{type_alias}' cannot be used in is_instance_of"),
 				));
 			}
 			Some(ConcreteType::Object {
@@ -257,7 +249,7 @@ pub(super) fn generate_is_instance_of_code(
 				let type_path_str = rust_type.path();
 
 				let type_path: syn::Path = syn::parse_str(type_path_str).map_err(|_| {
-					syn::Error::new(Span::call_site(), format!("Invalid Rust type path: {}", type_path_str))
+					syn::Error::new(Span::call_site(), format!("Invalid Rust type path: {type_path_str}"))
 				})?;
 
 				if let Some(stem) = &entry.stem {
@@ -301,10 +293,7 @@ This does not require a runtime type check since any `"#, stringify!(#type_name)
 			None => {
 				return Err(syn::Error::new(
 					Span::call_site(),
-					format!(
-						"Type '{}' used in is_instance_of is not defined in types mapping",
-						type_alias
-					),
+					format!("Type '{type_alias}' used in is_instance_of is not defined in types mapping"),
 				));
 			}
 		}

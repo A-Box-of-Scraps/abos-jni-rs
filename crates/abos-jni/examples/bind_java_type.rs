@@ -27,23 +27,23 @@ struct ThingHandle(*const RustThing);
 impl ThingHandle {
 	pub fn new(thing: RustThing) -> Self {
 		let boxed = Box::new(thing);
-		ThingHandle(Box::into_raw(boxed))
+		Self(Box::into_raw(boxed))
 	}
 
-	unsafe fn as_ref(&self) -> &RustThing {
+	const unsafe fn as_ref(&self) -> &RustThing {
 		unsafe { &*self.0 }
 	}
 
 	// Safety: only convert back to Box (to drop) when sure handle is no longer shared.
 	pub unsafe fn into_box(self) -> Box<RustThing> {
-		unsafe { Box::from_raw(self.0 as *mut RustThing) }
+		unsafe { Box::from_raw(self.0.cast_mut()) }
 	}
 }
 // In order to pass ThingHandle values to/from Java as jlong, the macro expects
 // a From<ThingHandle> for jlong implementation
 impl From<ThingHandle> for jlong {
 	fn from(handle: ThingHandle) -> Self {
-		handle.0 as jlong
+		handle.0 as Self
 	}
 }
 
@@ -106,7 +106,7 @@ bind_java_type! {
 		/// Static method that refers to a type-mapped custom type
 		static fn echo_custom_type(custom: crate::JCustomType) -> JCustomType,
 		/// Static method that refers to a non-mapped Java class (an inner class in this case)
-		/// Note: either syntax for the OtherType here is equivalent
+		/// Note: either syntax for the `OtherType` here is equivalent
 		static fn echo_other_type(other: "com.example.BindJavaTypeOverview$OtherType") -> com.example.BindJavaTypeOverview::OtherType,
 
 		/// Private method binding with underscore prefix
@@ -184,7 +184,7 @@ impl JBindJavaTypeOverviewNativeInterface for JBindJavaTypeOverviewAPI {
 		name: JString<'local>,
 	) -> Result<JString<'local>, Self::Error> {
 		let name_str = name.try_to_string(env)?;
-		JString::from_str(env, format!("Hello, {}!", name_str))
+		JString::from_str(env, format!("Hello, {name_str}!"))
 	}
 
 	fn native_raw<'local>(_unowned_env: EnvUnowned<'local>, _this: JBindJavaTypeOverview<'local>, value: jint) -> jint {
@@ -231,7 +231,7 @@ impl JBindJavaTypeOverviewNativeInterface for JBindJavaTypeOverviewAPI {
 }
 
 // Direct function implementation for native_with_function
-fn native_with_function_impl<'local>(
+const fn native_with_function_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: JBindJavaTypeOverview<'local>,
 	value: jint,
@@ -270,7 +270,7 @@ fn main() {
 		println!("Called do_nothing()");
 
 		let sum = obj1.add_numbers(env, 10, 20)?;
-		println!("add_numbers(10, 20) = {}", sum);
+		println!("add_numbers(10, 20) = {sum}");
 
 		let str1 = env.new_string("Hello, ")?;
 		let str2 = env.new_string("World!")?;
@@ -285,13 +285,13 @@ fn main() {
 		// Custom method wrapper
 		println!("\n--- Custom Method Wrapper ---");
 		let info = obj2.get_info(env)?;
-		println!("get_info(): {}", info);
+		println!("get_info(): {info}");
 
 		// Fields
 		println!("\n--- Fields ---");
 		obj2.set_value(env, 99)?;
 		let val = obj2.value(env)?;
-		println!("value field: {}", val);
+		println!("value field: {val}");
 
 		let name = env.new_string("example")?;
 		obj2.set_name(env, &name)?;
@@ -307,10 +307,10 @@ fn main() {
 		println!("un-mapped OtherType (JObject) field retrieved");
 
 		let static_val = JBindJavaTypeOverview::static_value(env)?;
-		println!("static_value: {}", static_val);
+		println!("static_value: {static_val}");
 
 		let const_five = JBindJavaTypeOverview::CONSTANT_FIVE(env)?;
-		println!("CONSTANT_FIVE: {}", const_five);
+		println!("CONSTANT_FIVE: {const_five}");
 
 		// Native methods
 		println!("\n--- Native Methods ---");

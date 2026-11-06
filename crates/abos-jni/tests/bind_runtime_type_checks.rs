@@ -42,7 +42,7 @@ fn test_incorrect_type_mapping_panics() {
 
 	// If we got an error from attach_current_thread itself, unwrap it
 	// (which will panic with the wrong message)
-	result.unwrap();
+	result.expect("test operation succeeds");
 }
 
 // Add a test with correct type mapping to verify it works properly
@@ -73,7 +73,7 @@ fn test_correct_type_mapping_passes() {
 	});
 
 	// Unwrap should succeed
-	result.unwrap();
+	result.expect("test operation succeeds");
 }
 
 #[repr(transparent)]

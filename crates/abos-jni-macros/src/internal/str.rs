@@ -1,7 +1,7 @@
 //! String utilities for JNI signature and class name handling
 //!
 //! This module provides utilities for encoding strings to Java's Modified UTF-8 (MUTF-8)
-//! format and creating CStr and JNIStr literals for use in procedural macros.
+//! format and creating `CStr` and `JNIStr` literals for use in procedural macros.
 
 use proc_macro2::Span;
 use syn::LitCStr;
@@ -25,7 +25,7 @@ pub fn encode_mutf8(s: &str) -> Vec<u8> {
 	simd_cesu8::mutf8::encode(s).into_owned()
 }
 
-/// Create a LitCStr from a string with MUTF-8 encoding
+/// Create a `LitCStr` from a string with MUTF-8 encoding
 ///
 /// This function takes a UTF-8 string, encodes it to MUTF-8, and creates
 /// a `syn::LitCStr` for use in procedural macros.
@@ -64,8 +64,8 @@ fn literal_to_string(lit: &Lit) -> Result<String> {
 			// CStr must be valid UTF-8 for our purposes
 			let cstr = c.value();
 			cstr.to_str()
-				.map(|s| s.to_string())
-				.map_err(|e| syn::Error::new_spanned(c, format!("CStr literal must contain valid UTF-8: {}", e)))
+				.map(std::string::ToString::to_string)
+				.map_err(|e| syn::Error::new_spanned(c, format!("CStr literal must contain valid UTF-8: {e}")))
 		}
 		Lit::ByteStr(_) => Err(syn::Error::new_spanned(
 			lit,
@@ -83,7 +83,7 @@ fn literal_to_string(lit: &Lit) -> Result<String> {
 	}
 }
 
-/// Input for jni_cstr! and jni_str! macros
+/// Input for `jni_cstr`! and `jni_str`! macros
 /// Supports:
 /// - Multiple comma-separated literals (like concat!)
 /// - Optional `jni = <path>` as the first argument
@@ -119,15 +119,15 @@ impl Parse for JniStrInput {
 			}
 		}
 
-		Ok(JniStrInput {
+		Ok(Self {
 			jni_crate,
 			string: concatenated,
 		})
 	}
 }
 
-/// Implementation for jni_cstr! macro
-/// Takes UTF-8 string literals and returns a MUTF-8 encoded CStr literal
+/// Implementation for `jni_cstr`! macro
+/// Takes UTF-8 string literals and returns a MUTF-8 encoded `CStr` literal
 /// Supports:
 /// - Multiple comma-separated string literals (like concat!)
 /// - Optional `jni = <path>` as the first argument
@@ -142,8 +142,8 @@ pub fn jni_cstr_impl(input: TokenStream) -> Result<TokenStream> {
 	})
 }
 
-/// Implementation for jni_str! macro
-/// Takes UTF-8 string literals and returns a MUTF-8 encoded &'static JNIStr
+/// Implementation for `jni_str`! macro
+/// Takes UTF-8 string literals and returns a MUTF-8 encoded &'static `JNIStr`
 /// Supports:
 /// - Multiple comma-separated string literals (like concat!)
 /// - Optional `jni = <path>` as the first argument
@@ -171,7 +171,7 @@ mod tests {
 	#[test]
 	fn test_jni_cstr_single_literal() {
 		let input = quote! { "hello" };
-		let result = jni_cstr_impl(input).unwrap();
+		let result = jni_cstr_impl(input).expect("test C string expands");
 		let result_str = result.to_string();
 
 		// Should produce a CStr literal
@@ -181,7 +181,7 @@ mod tests {
 	#[test]
 	fn test_jni_cstr_multiple_literals() {
 		let input = quote! { "hello", " ", "world" };
-		let result = jni_cstr_impl(input).unwrap();
+		let result = jni_cstr_impl(input).expect("test C string expands");
 		let result_str = result.to_string();
 
 		// Should concatenate to "hello world"
@@ -191,7 +191,7 @@ mod tests {
 	#[test]
 	fn test_jni_cstr_with_jni_override() {
 		let input = quote! { jni = crate::my_jni, "test" };
-		let result = jni_cstr_impl(input).unwrap();
+		let result = jni_cstr_impl(input).expect("test C string expands");
 		let result_str = result.to_string();
 
 		// Should produce a CStr literal (jni override doesn't affect jni_cstr! output)
@@ -201,7 +201,7 @@ mod tests {
 	#[test]
 	fn test_jni_str_single_literal() {
 		let input = quote! { "hello" };
-		let result = jni_str_impl(input).unwrap();
+		let result = jni_str_impl(input).expect("test JNI string expands");
 		let result_str = result.to_string();
 
 		// Should produce JNIStr::from_cstr_unchecked call
@@ -213,7 +213,7 @@ mod tests {
 	#[test]
 	fn test_jni_str_multiple_literals() {
 		let input = quote! { "java.lang.", "String" };
-		let result = jni_str_impl(input).unwrap();
+		let result = jni_str_impl(input).expect("test JNI string expands");
 		let result_str = result.to_string();
 
 		// Should concatenate to "java.lang.String"
@@ -223,7 +223,7 @@ mod tests {
 	#[test]
 	fn test_jni_str_with_jni_override() {
 		let input = quote! { jni = ::my_custom_jni, "test" };
-		let result = jni_str_impl(input).unwrap();
+		let result = jni_str_impl(input).expect("test JNI string expands");
 		let result_str = result.to_string();
 
 		// Should use the custom jni crate path
@@ -234,7 +234,7 @@ mod tests {
 	#[test]
 	fn test_jni_str_with_jni_override_and_multiple_literals() {
 		let input = quote! { jni = crate, "part1", "part2" };
-		let result = jni_str_impl(input).unwrap();
+		let result = jni_str_impl(input).expect("test JNI string expands");
 		let result_str = result.to_string();
 
 		// Should use crate:: and concatenate literals
@@ -248,14 +248,14 @@ mod tests {
 		let result = jni_cstr_impl(input);
 		assert!(result.is_err());
 
-		let err = result.unwrap_err();
+		let err = result.expect_err("invalid test input is rejected");
 		assert!(err.to_string().contains("expected at least one literal"));
 	}
 
 	#[test]
 	fn test_jni_cstr_trailing_comma() {
 		let input = quote! { "hello", "world", };
-		let result = jni_cstr_impl(input).unwrap();
+		let result = jni_cstr_impl(input).expect("test C string expands");
 		let result_str = result.to_string();
 
 		// Should handle trailing comma and concatenate
@@ -275,26 +275,26 @@ mod tests {
 	fn test_mutf8_encoding() {
 		// Test that emoji is properly encoded using MUTF-8
 		let input = quote! { "😀" };
-		let result = jni_cstr_impl(input).unwrap();
+		let result = jni_cstr_impl(input).expect("test C string expands");
 		let result_str = result.to_string();
 
 		// Emoji should be encoded as surrogate pairs in MUTF-8
 		// The exact encoding will be in the c"..." literal
-		assert!(result_str.contains("c\"") || result_str.contains("\""));
+		assert!(result_str.contains("c\"") || result_str.contains('"'));
 	}
 
 	#[test]
 	fn test_literal_char() {
 		let input = quote! { 'a' };
-		let result = jni_cstr_impl(input).unwrap();
+		let result = jni_cstr_impl(input).expect("test C string expands");
 		let result_str = result.to_string();
-		assert!(result_str.contains("a"));
+		assert!(result_str.contains('a'));
 	}
 
 	#[test]
 	fn test_literal_int() {
 		let input = quote! { 42 };
-		let result = jni_cstr_impl(input).unwrap();
+		let result = jni_cstr_impl(input).expect("test C string expands");
 		let result_str = result.to_string();
 		assert!(result_str.contains("42"));
 	}
@@ -302,7 +302,7 @@ mod tests {
 	#[test]
 	fn test_literal_float() {
 		let input = quote! { 3.14 };
-		let result = jni_cstr_impl(input).unwrap();
+		let result = jni_cstr_impl(input).expect("test C string expands");
 		let result_str = result.to_string();
 		assert!(result_str.contains("3.14"));
 	}
@@ -310,12 +310,12 @@ mod tests {
 	#[test]
 	fn test_literal_bool() {
 		let input = quote! { true };
-		let result = jni_cstr_impl(input).unwrap();
+		let result = jni_cstr_impl(input).expect("test C string expands");
 		let result_str = result.to_string();
 		assert!(result_str.contains("true"));
 
 		let input = quote! { false };
-		let result = jni_cstr_impl(input).unwrap();
+		let result = jni_cstr_impl(input).expect("test C string expands");
 		let result_str = result.to_string();
 		assert!(result_str.contains("false"));
 	}
@@ -323,7 +323,7 @@ mod tests {
 	#[test]
 	fn test_literal_byte() {
 		let input = quote! { b'A' };
-		let result = jni_cstr_impl(input).unwrap();
+		let result = jni_cstr_impl(input).expect("test C string expands");
 		let result_str = result.to_string();
 		// Byte literals are formatted as their numeric value
 		assert!(result_str.contains("65")); // ASCII value of 'A'
@@ -332,7 +332,7 @@ mod tests {
 	#[test]
 	fn test_literal_cstr_valid_utf8() {
 		let input = quote! { c"hello" };
-		let result = jni_cstr_impl(input).unwrap();
+		let result = jni_cstr_impl(input).expect("test C string expands");
 		let result_str = result.to_string();
 		assert!(result_str.contains("hello"));
 	}
@@ -340,7 +340,7 @@ mod tests {
 	#[test]
 	fn test_mixed_literals() {
 		let input = quote! { "Port: ", 8080 };
-		let result = jni_cstr_impl(input).unwrap();
+		let result = jni_cstr_impl(input).expect("test C string expands");
 		let result_str = result.to_string();
 		assert!(result_str.contains("Port: 8080") || result_str.contains("Port : 8080"));
 	}
@@ -348,7 +348,7 @@ mod tests {
 	#[test]
 	fn test_mixed_literals_with_char() {
 		let input = quote! { "Version ", 1, '.', 2 };
-		let result = jni_cstr_impl(input).unwrap();
+		let result = jni_cstr_impl(input).expect("test C string expands");
 		let result_str = result.to_string();
 		assert!(result_str.contains("Version 1.2") || result_str.contains("Version 1 . 2"));
 	}
@@ -356,7 +356,7 @@ mod tests {
 	#[test]
 	fn test_jni_str_mixed_literals() {
 		let input = quote! { "localhost:", 8080 };
-		let result = jni_str_impl(input).unwrap();
+		let result = jni_str_impl(input).expect("test JNI string expands");
 		let result_str = result.to_string();
 		assert!(result_str.contains("localhost:8080") || result_str.contains("localhost : 8080"));
 		assert!(result_str.contains("JNIStr"));
@@ -368,7 +368,7 @@ mod tests {
 		let input = quote! { b"hello" };
 		let result = jni_cstr_impl(input);
 		assert!(result.is_err());
-		let err = result.unwrap_err();
+		let err = result.expect_err("invalid test input is rejected");
 		assert!(err.to_string().contains("byte string"));
 	}
 }

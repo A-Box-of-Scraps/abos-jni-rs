@@ -34,10 +34,10 @@ fn test_java_integers() {
 			})
 			.unwrap_or_else(|e| {
 				print_exception(env);
-				panic!("{:#?}", e);
-			})
+				panic!("{e:#?}");
+			});
 		}
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }

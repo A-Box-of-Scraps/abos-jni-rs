@@ -1,4 +1,6 @@
-use super::*;
+use super::{
+	Desc, Env, Error, JClass, JMethodID, JNIStr, JObject, JStaticMethodID, JniError, MethodSignature, Reference, Result,
+};
 
 impl<'local> Env<'local> {
 	/// Allocates a new object from a class descriptor without running a

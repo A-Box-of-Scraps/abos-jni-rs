@@ -5,11 +5,11 @@ fn get_super_class_ok() {
 	attach_current_thread(|env| {
 		let result = env.get_superclass(ARRAYLIST_CLASS);
 		assert!(result.is_ok());
-		assert!(result.unwrap().is_some());
+		assert!(result.expect("test operation succeeds").is_some());
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -17,11 +17,11 @@ fn get_super_class_null() {
 	attach_current_thread(|env| {
 		let result = env.get_superclass(jni_str!("java/lang/Object"));
 		assert!(result.is_ok());
-		assert!(result.unwrap().is_none());
+		assert!(result.expect("test operation succeeds").is_none());
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -31,14 +31,14 @@ fn local_ref_null() {
 
 		let result = env.new_local_ref::<&JObject>(&null_obj);
 		assert!(result.is_ok());
-		assert!(result.unwrap().is_null());
+		assert!(result.expect("test operation succeeds").is_null());
 
 		// "delete" null reference
 		env.delete_local_ref(null_obj);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -47,11 +47,11 @@ fn new_global_ref_null() {
 		let null_obj = JObject::null();
 		let result = env.new_global_ref(null_obj);
 		assert!(result.is_ok());
-		assert!(result.unwrap().is_null());
+		assert!(result.expect("test operation succeeds").is_null());
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -62,11 +62,15 @@ fn new_weak_ref_null() {
 		assert!(matches!(result, Err(Error::ObjectFreed)));
 
 		let null_weak: Weak<JObject<'static>> = Weak::null();
-		assert!(null_weak.is_garbage_collected(env).unwrap());
+		assert!(
+			null_weak
+				.is_garbage_collected(env)
+				.expect("is garbage collected succeeds")
+		);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -81,11 +85,13 @@ fn auto_null() {
 #[test]
 fn test_call_nonvirtual_method() {
 	attach_current_thread(|env| {
-		let a_string = JObject::from(env.new_string("test").unwrap());
-		let another_string = JObject::from(env.new_string("test").unwrap());
+		let a_string = JObject::from(env.new_string("test").expect("test string can be allocated"));
+		let another_string = JObject::from(env.new_string("test").expect("test string can be allocated"));
 
 		// The `equals` method in java/lang/Object will compare the reference
-		let obj_class = env.find_class(jni_str!("java/lang/Object")).unwrap();
+		let obj_class = env
+			.find_class(jni_str!("java/lang/Object"))
+			.expect("test class can be resolved");
 		let object_result = env
 			.call_nonvirtual_method(
 				&a_string,
@@ -94,13 +100,15 @@ fn test_call_nonvirtual_method() {
 				jni_sig!("(Ljava/lang/Object;)Z"),
 				&[JValue::from(&another_string)],
 			)
-			.unwrap()
+			.expect("call nonvirtual method succeeds")
 			.z()
-			.unwrap();
+			.expect("JNI result contains a boolean");
 		assert!(!object_result);
 
 		// However, java/lang/String overrided it and it now compares the content.
-		let string_class = env.find_class(jni_str!("java/lang/String")).unwrap();
+		let string_class = env
+			.find_class(jni_str!("java/lang/String"))
+			.expect("test class can be resolved");
 		let string_result = env
 			.call_nonvirtual_method(
 				&a_string,
@@ -109,14 +117,14 @@ fn test_call_nonvirtual_method() {
 				jni_sig!("(Ljava/lang/Object;)Z"),
 				&[JValue::from(&another_string)],
 			)
-			.unwrap()
+			.expect("call nonvirtual method succeeds")
 			.z()
-			.unwrap();
+			.expect("JNI result contains a boolean");
 		assert!(string_result);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -127,7 +135,7 @@ fn short_lifetime_with_local_frame() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 fn short_lifetime_with_local_frame_sub_fn<'local>(env: &'_ mut Env<'local>) -> Result<JObject<'local>, Error> {
@@ -139,13 +147,19 @@ fn short_lifetime_with_local_frame_sub_fn<'local>(env: &'_ mut Env<'local>) -> R
 #[test]
 fn short_lifetime_list() {
 	attach_current_thread(|env| {
-		let first_list_object = short_lifetime_list_sub_fn(env).unwrap();
+		let first_list_object = short_lifetime_list_sub_fn(env).expect("short lifetime list sub fn succeeds");
 		let value = env.call_method(first_list_object, jni_str!("intValue"), jni_sig!("()I"), &[]);
-		assert_eq!(value.unwrap().i().unwrap(), 1);
+		assert_eq!(
+			value
+				.expect("test operation succeeds")
+				.i()
+				.expect("JNI result contains an int"),
+			1
+		);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 fn short_lifetime_list_sub_fn<'local>(env: &'_ mut Env<'local>) -> Result<JObject<'local>, Error> {
@@ -156,26 +170,28 @@ fn short_lifetime_list_sub_fn<'local>(env: &'_ mut Env<'local>) -> Result<JObjec
 	short_lifetime_list_sub_fn_get_first_element(&list, env)
 }
 
-fn short_lifetime_list_sub_fn_get_first_element<'list_local, 'env_local>(
-	list: &'_ JList<'list_local>,
+fn short_lifetime_list_sub_fn_get_first_element<'env_local>(
+	list: &'_ JList<'_>,
 	env: &'_ mut Env<'env_local>,
 ) -> Result<JObject<'env_local>, Error> {
 	let iterator = list.iter(env)?;
-	Ok(iterator.next(env)?.unwrap())
+	Ok(iterator.next(env)?.expect("next succeeds"))
 }
 
 #[test]
 fn get_object_array_element() {
 	attach_current_thread(|env| {
-		let array = env.new_object_array(1, STRING_CLASS, JObject::null()).unwrap();
+		let array = env
+			.new_object_array(1, STRING_CLASS, JObject::null())
+			.expect("new object array succeeds");
 
 		assert!(!array.is_null());
-		assert!(array.get_element(env, 0).unwrap().is_null());
-		let test_str = env.new_string("test").unwrap();
-		array.set_element(env, 0, test_str).unwrap();
-		assert!(!array.get_element(env, 0).unwrap().is_null());
+		assert!(array.get_element(env, 0).expect("get element succeeds").is_null());
+		let test_str = env.new_string("test").expect("test string can be allocated");
+		array.set_element(env, 0, test_str).expect("set element succeeds");
+		assert!(!array.get_element(env, 0).expect("get element succeeds").is_null());
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }

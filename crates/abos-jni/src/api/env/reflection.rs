@@ -1,4 +1,4 @@
-use super::*;
+use super::{Desc, Env, JClass, JMethodID, JObject, JStaticMethodID, Reference, Result};
 
 impl<'local> Env<'local> {
 	/// Convert a [`JMethodID`] into a [`JObject`] with the corresponding

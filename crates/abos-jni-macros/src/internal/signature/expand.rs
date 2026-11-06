@@ -1,6 +1,9 @@
-use super::*;
+use super::{
+	ConcreteType, PrimitiveType, Result, SigType, Signature, SignatureInput, Span, TokenStream, TypeMappings,
+	lit_cstr_mutf8, quote,
+};
 
-/// Convert a JavaType to a TokenStream that constructs abos_jni::signature::JavaType
+/// Convert a `JavaType` to a `TokenStream` that constructs `abos_jni::signature::JavaType`
 pub(super) fn java_type_to_tokens(ty: &SigType, type_mappings: &TypeMappings) -> Result<TokenStream> {
 	let jni = type_mappings.jni_crate();
 
@@ -25,7 +28,7 @@ pub(super) fn java_type_to_tokens(ty: &SigType, type_mappings: &TypeMappings) ->
 					#jni::signature::JavaType::Primitive(#jni::signature::Primitive::#variant)
 				})
 			}
-			None => Err(syn::Error::new(Span::call_site(), format!("Unknown type '{}'", name))),
+			None => Err(syn::Error::new(Span::call_site(), format!("Unknown type '{name}'"))),
 		},
 		SigType::Object(_) => Ok(quote! {
 			#jni::signature::JavaType::Object
@@ -40,8 +43,8 @@ pub(super) fn java_type_to_tokens(ty: &SigType, type_mappings: &TypeMappings) ->
 	}
 }
 
-/// The actual procedural macro implementation for jni_sig!
-/// Returns a abos_jni::signature::{MethodSignature, FieldSignature}
+/// The actual procedural macro implementation for `jni_sig`!
+/// Returns a `abos_jni::signature::{MethodSignature`, `FieldSignature`}
 pub fn jni_sig_impl(input: TokenStream) -> Result<TokenStream> {
 	let SignatureInput {
 		signature,
@@ -102,7 +105,7 @@ pub fn jni_sig_impl(input: TokenStream) -> Result<TokenStream> {
 	}
 }
 
-/// Implementation for jni_sig_str! macro
+/// Implementation for `jni_sig_str`! macro
 /// Returns a &str string literal
 pub fn jni_sig_str_impl(input: TokenStream) -> Result<TokenStream> {
 	let SignatureInput {
@@ -118,8 +121,8 @@ pub fn jni_sig_str_impl(input: TokenStream) -> Result<TokenStream> {
 	})
 }
 
-/// Implementation for jni_sig_cstr! macro
-/// Returns a CStr literal (c"...") with MUTF-8 encoding
+/// Implementation for `jni_sig_cstr`! macro
+/// Returns a `CStr` literal (c"...") with MUTF-8 encoding
 pub fn jni_sig_cstr_impl(input: TokenStream) -> Result<TokenStream> {
 	let SignatureInput {
 		signature,
@@ -137,8 +140,8 @@ pub fn jni_sig_cstr_impl(input: TokenStream) -> Result<TokenStream> {
 	})
 }
 
-/// Implementation for jni_sig_jstr! macro
-/// Returns a &'static JNIStr with MUTF-8 encoding
+/// Implementation for `jni_sig_jstr`! macro
+/// Returns a &'static `JNIStr` with MUTF-8 encoding
 pub fn jni_sig_jstr_impl(input: TokenStream) -> Result<TokenStream> {
 	let SignatureInput {
 		signature,

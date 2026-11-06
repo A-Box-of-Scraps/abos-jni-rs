@@ -12,6 +12,7 @@
 /// This helper compiles the specified Java file and returns the path to the
 /// output directory containing the compiled .class files.
 #[allow(dead_code)]
+#[must_use]
 pub fn compile_test_class(test_name: &str, java_file: &str) -> std::path::PathBuf {
 	let out_dir = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
 		.join("jni_macros_tests")
@@ -36,20 +37,15 @@ pub fn load_test_class<'local>(
 	out_dir: &std::path::Path,
 	class_name: &str,
 ) -> abos_jni::errors::Result<abos_jni::objects::JClass<'local>> {
-	let class_path = out_dir.join(format!("com/example/{}.class", class_name));
-	assert!(
-		class_path.exists(),
-		"{}.class not found at {:?}",
-		class_name,
-		class_path
-	);
+	let class_path = out_dir.join(format!("com/example/{class_name}.class"));
+	assert!(class_path.exists(), "{class_name}.class not found at {class_path:?}");
 
-	let class_bytes = std::fs::read(&class_path).unwrap_or_else(|_| panic!("Failed to read {}.class", class_name));
+	let class_bytes = std::fs::read(&class_path).unwrap_or_else(|_| panic!("Failed to read {class_name}.class"));
 
 	let class_loader =
 		abos_jni::objects::JClassLoader::get_system_class_loader(env).expect("Failed to get system class loader");
 
-	let class_internal_name = format!("com/example/{}", class_name);
+	let class_internal_name = format!("com/example/{class_name}");
 	let class_jni = abos_jni::strings::JNIString::new(class_internal_name.as_str());
 
 	env.define_class(Some(&class_jni), &class_loader, &class_bytes)

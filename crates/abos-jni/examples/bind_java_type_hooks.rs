@@ -1,7 +1,7 @@
 #![allow(unsafe_code, reason = "Exercise JNI FFI and native method exports.")]
 #![allow(missing_docs, reason = "Executable examples and test fixtures are not library API.")]
 #![cfg(feature = "invocation")]
-//! Shows how the load_class and init_priv hooks can be used
+//! Shows how the `load_class` and `init_priv` hooks can be used
 
 use abos_jni_macros::bind_java_type;
 
@@ -34,5 +34,5 @@ bind_java_type! {
 }
 
 fn main() {
-	println!("Compiled successfully!")
+	println!("Compiled successfully!");
 }

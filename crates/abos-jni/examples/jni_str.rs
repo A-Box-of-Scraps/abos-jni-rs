@@ -1,7 +1,7 @@
 #![allow(unsafe_code, reason = "Exercise JNI FFI and native method exports.")]
 #![allow(missing_docs, reason = "Executable examples and test fixtures are not library API.")]
 #![cfg(feature = "invocation")]
-//! Example demonstrating the jni_str! macro
+//! Example demonstrating the `jni_str`! macro
 //!
 //! This macro converts UTF-8 string literals to MUTF-8 encoded literals at compile time.
 //! MUTF-8 is Java's modified UTF-8 encoding used for JNI string operations.

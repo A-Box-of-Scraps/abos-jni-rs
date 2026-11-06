@@ -31,5 +31,5 @@ fn test_bind_java_type_constructor_emits_assert_top() {
 		eprintln!("ERROR: Should not have reached here without a runtime check!");
 		Ok::<_, abos_jni::errors::Error>(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }

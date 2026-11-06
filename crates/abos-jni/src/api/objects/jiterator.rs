@@ -24,7 +24,7 @@ crate::bind_java_type! {
 	}
 }
 
-impl<'local> JIterator<'local> {
+impl JIterator<'_> {
 	/// Returns the next element in the iteration, if it exists.
 	///
 	/// Returns `Some(element)` if the iteration has more elements, or `None` if

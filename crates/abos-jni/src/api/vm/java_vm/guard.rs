@@ -1,4 +1,7 @@
-use super::*;
+#[cfg(doc)]
+use crate::{EnvUnowned, errors::Error, vm::JavaVM};
+
+use super::{Env, JThrowable, Result, THREAD_ATTACHMENT, THREAD_GUARD_NEST_LEVEL, sys, sys_detach_current_thread};
 
 /// Represents a JNI attachment of the current thread to a Java VM, which is
 /// required before you can access the [`Env`] API.
@@ -34,7 +37,7 @@ use super::*;
 /// [`crate::sys::JNIEnv`] pointer you could use
 /// [`JavaVM::attach_current_thread_guard`] to get an attachment guard.
 ///
-/// # JavaVM::singleton() guarantee
+/// # `JavaVM::singleton()` guarantee
 ///
 /// If you know that at least one [`AttachGuard`] has ever existed (which is
 /// implied if you have a [`Env`] reference) you can assume that
@@ -127,7 +130,7 @@ impl<'local> AttachGuard<'local> {
 	/// Wrap a raw [`sys::JNIEnv`] pointer in an `AttachGuard` that will detach
 	/// the current thread on drop.
 	///
-	/// An owned `AttachGuard` can be used to implement "for_scope" thread
+	/// An owned `AttachGuard` can be used to implement "`for_scope`" thread
 	/// attachments.
 	///
 	/// # Safety
@@ -197,7 +200,8 @@ impl<'local> AttachGuard<'local> {
 	/// [`JavaVM::attach_current_thread_for_scope`] will own the attachment,
 	/// since the scope may be nested under some other guard, lower on the stack
 	/// that has already attached the thread.
-	pub fn owns_attachment(&self) -> bool {
+	#[must_use]
+	pub const fn owns_attachment(&self) -> bool {
 		self.env.owns_attachment()
 	}
 

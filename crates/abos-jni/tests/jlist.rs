@@ -62,7 +62,7 @@ pub fn jlist_push_and_iterate() {
 		assert_eq!(orig, collected);
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -100,7 +100,7 @@ pub fn jlist_get_and_set() {
 		assert!(invalid.is_err());
 
 		assert!(matches!(
-			env.exception_catch().unwrap_err(),
+			env.exception_catch().expect_err("invalid test input is rejected"),
 			abos_jni::errors::Error::CaughtJavaException {
 				ref name, ..
 			} if name == "java.lang.IndexOutOfBoundsException"
@@ -108,7 +108,7 @@ pub fn jlist_get_and_set() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -170,7 +170,7 @@ pub fn jlist_insert_and_remove() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -232,7 +232,7 @@ pub fn jlist_size_and_remove() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -259,10 +259,10 @@ pub fn jlist_iterator_empty() {
 			env,
 		);
 
-		assert!(collected.is_empty());
+		assert_eq!(collected, [] as [abos_jni::strings::JNIString; 0]);
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -307,5 +307,5 @@ pub fn jlist_iterator_with_auto() {
 		assert_eq!(orig, collected);
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }

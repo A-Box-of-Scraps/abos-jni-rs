@@ -41,19 +41,20 @@ impl JFieldID {
 	}
 
 	/// Unwrap to the internal jni type.
+	#[must_use]
 	pub const fn into_raw(self) -> jfieldID {
 		self.internal
 	}
 }
 
-impl AsRef<JFieldID> for JFieldID {
-	fn as_ref(&self) -> &JFieldID {
+impl AsRef<Self> for JFieldID {
+	fn as_ref(&self) -> &Self {
 		self
 	}
 }
 
-impl AsMut<JFieldID> for JFieldID {
-	fn as_mut(&mut self) -> &mut JFieldID {
+impl AsMut<Self> for JFieldID {
+	fn as_mut(&mut self) -> &mut Self {
 		self
 	}
 }

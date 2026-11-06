@@ -17,24 +17,24 @@ pub fn get_public_field() {
 		// Get the x field value
 		let x_value = env
 			.get_field(&point, jni_str!("x"), jni_sig!("I"))
-			.unwrap()
+			.expect("test field can be read")
 			.i()
-			.unwrap();
+			.expect("JNI result contains an int");
 
 		assert_eq!(x_value, 5);
 
 		// Get the y field value
 		let y_value = env
 			.get_field(&point, jni_str!("y"), jni_sig!("I"))
-			.unwrap()
+			.expect("test field can be read")
 			.i()
-			.unwrap();
+			.expect("JNI result contains an int");
 
 		assert_eq!(y_value, 10);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -54,23 +54,23 @@ pub fn get_public_field_by_id() {
 		// Get the field ID for x field
 		let field_id = env
 			.get_field_id(jni_str!("java/awt/Point"), jni_str!("x"), jni_sig!("I"))
-			.unwrap();
+			.expect("get field id succeeds");
 
 		let field_type = ReturnType::Primitive(Primitive::Int);
 		// Safety: we have just looked up the field ID based on the given class and field_type
 		unsafe {
 			let x_value = env
 				.get_field_unchecked(&point, field_id, field_type)
-				.unwrap()
+				.expect("get field unchecked succeeds")
 				.i()
-				.unwrap();
+				.expect("JNI result contains an int");
 
 			assert_eq!(x_value, 5);
 		}
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -89,33 +89,33 @@ pub fn set_public_field() {
 
 		// Set the x field to a new value
 		env.set_field(&point, jni_str!("x"), jni_sig!("I"), JValue::Int(15))
-			.unwrap();
+			.expect("test field can be assigned");
 
 		// Verify the field was set
 		let x_value = env
 			.get_field(&point, jni_str!("x"), jni_sig!("I"))
-			.unwrap()
+			.expect("test field can be read")
 			.i()
-			.unwrap();
+			.expect("JNI result contains an int");
 
 		assert_eq!(x_value, 15);
 
 		// Set the y field to a new value
 		env.set_field(&point, jni_str!("y"), jni_sig!("I"), JValue::Int(25))
-			.unwrap();
+			.expect("test field can be assigned");
 
 		// Verify the field was set
 		let y_value = env
 			.get_field(&point, jni_str!("y"), jni_sig!("I"))
-			.unwrap()
+			.expect("test field can be read")
 			.i()
-			.unwrap();
+			.expect("JNI result contains an int");
 
 		assert_eq!(y_value, 25);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -135,26 +135,27 @@ pub fn set_public_field_by_id() {
 		// Get the field ID for x field
 		let field_id = env
 			.get_field_id(jni_str!("java/awt/Point"), jni_str!("x"), jni_sig!("I"))
-			.unwrap();
+			.expect("get field id succeeds");
 
 		// Set the x field using the field ID
 		// Safety: we have just looked up the field ID based on the given field name and type
 		unsafe {
-			env.set_field_unchecked(&point, field_id, JValue::Int(15)).unwrap();
+			env.set_field_unchecked(&point, field_id, JValue::Int(15))
+				.expect("set field unchecked succeeds");
 		}
 
 		// Verify the field was set
 		let x_value = env
 			.get_field(&point, jni_str!("x"), jni_sig!("I"))
-			.unwrap()
+			.expect("test field can be read")
 			.i()
-			.unwrap();
+			.expect("JNI result contains an int");
 
 		assert_eq!(x_value, 15);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 rusty_fork::rusty_fork_test! {
@@ -188,7 +189,7 @@ rusty_fork::rusty_fork_test! {
 
 			Ok(())
 		})
-		.unwrap();
+		.expect("attached JNI callback succeeds");
 	}
 
 	#[test]
@@ -223,7 +224,7 @@ rusty_fork::rusty_fork_test! {
 
 			Ok(())
 		})
-		.unwrap();
+		.expect("attached JNI callback succeeds");
 	}
 }
 
@@ -232,15 +233,15 @@ pub fn get_static_public_field() {
 	attach_current_thread(|env| {
 		let min_int_value = env
 			.get_static_field(INTEGER_CLASS, jni_str!("MIN_VALUE"), jni_sig!("I"))
-			.unwrap()
+			.expect("test static field can be read")
 			.i()
-			.unwrap();
+			.expect("JNI result contains an int");
 
 		assert_eq!(min_int_value, i32::MIN);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -248,23 +249,23 @@ pub fn get_static_public_field_by_id() {
 	attach_current_thread(|env| {
 		let field_id = env
 			.get_static_field_id(INTEGER_CLASS, jni_str!("MIN_VALUE"), jni_sig!("I"))
-			.unwrap();
+			.expect("get static field id succeeds");
 
 		let field_type = JavaType::Primitive(Primitive::Int);
 		// Safety: we have just looked up the field ID based on the given class and field_type
 		unsafe {
 			let min_int_value = env
 				.get_static_field_unchecked(INTEGER_CLASS, field_id, field_type)
-				.unwrap()
+				.expect("get static field unchecked succeeds")
 				.i()
-				.unwrap();
+				.expect("JNI result contains an int");
 
 			assert_eq!(min_int_value, i32::MIN);
 		}
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 rusty_fork_test! {
@@ -276,19 +277,19 @@ fn set_static_public_field() {
 		// Get the original System.in value
 		let original_in = env
 			.get_static_field(jni_str!("java/lang/System"), jni_str!("in"), jni_sig!("Ljava/io/InputStream;"))
-			.unwrap()
+			.expect("test static field can be read")
 			.l()
-			.unwrap();
+			.expect("JNI result contains an object");
 
 		// Create a new ByteArrayInputStream as a different InputStream
-		let byte_array = env.new_byte_array(10).unwrap();
+		let byte_array = env.new_byte_array(10).expect("new byte array succeeds");
 		let new_input_stream = env
 			.new_object(
 				jni_str!("java/io/ByteArrayInputStream"),
 				jni_sig!("([B)V"),
 				&[JValue::from(&byte_array)],
 			)
-			.unwrap();
+			.expect("test object can be allocated");
 
 		// Set System.in to our new ByteArrayInputStream
 		env.set_static_field(
@@ -297,14 +298,14 @@ fn set_static_public_field() {
 			jni_sig!("Ljava/io/InputStream;"),
 			JValue::from(&new_input_stream),
 		)
-		.unwrap();
+		.expect("set static field succeeds");
 
 		// Verify the field was set by getting it again and checking it's no longer null
 		let current_in = env
 			.get_static_field(jni_str!("java/lang/System"), jni_str!("in"), jni_sig!("Ljava/io/InputStream;"))
-			.unwrap()
+			.expect("test static field can be read")
 			.l()
-			.unwrap();
+			.expect("JNI result contains an object");
 
 		// The field should not be null after setting
 		assert!(!current_in.is_null());
@@ -316,20 +317,20 @@ fn set_static_public_field() {
 			jni_sig!("Ljava/io/InputStream;"),
 			JValue::from(&original_in),
 		)
-		.unwrap();
+		.expect("set static field succeeds");
 
 		// Verify restoration worked - the field should still not be null
 		let restored_in = env
 			.get_static_field(jni_str!("java/lang/System"), jni_str!("in"), jni_sig!("Ljava/io/InputStream;"))
-			.unwrap()
+			.expect("test static field can be read")
 			.l()
-			.unwrap();
+			.expect("JNI result contains an object");
 
 		assert!(!restored_in.is_null());
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 }
 
@@ -340,25 +341,25 @@ fn set_static_public_field_by_id() {
 		// Get the original System.in value
 		let original_in = env
 			.get_static_field(jni_str!("java/lang/System"), jni_str!("in"), jni_sig!("Ljava/io/InputStream;"))
-			.unwrap()
+			.expect("test static field can be read")
 			.l()
-			.unwrap();
+			.expect("JNI result contains an object");
 
 		// Get the field ID for System.in
 		let field_type = jni_sig!("Ljava/io/InputStream;");
 		let field_id = env
 			.get_static_field_id(jni_str!("java/lang/System"), jni_str!("in"), field_type)
-			.unwrap();
+			.expect("get static field id succeeds");
 
 		// Create a new ByteArrayInputStream as a different InputStream
-		let byte_array = env.new_byte_array(10).unwrap();
+		let byte_array = env.new_byte_array(10).expect("new byte array succeeds");
 		let new_input_stream = env
 			.new_object(
 				jni_str!("java/io/ByteArrayInputStream"),
 				jni_sig!("([B)V"),
 				&[JValue::from(&byte_array)],
 			)
-			.unwrap();
+			.expect("test object can be allocated");
 
 		// Set System.in to our new ByteArrayInputStream using the field ID
 		// Safety: we have just looked up the field ID based on the given field name and type
@@ -368,15 +369,15 @@ fn set_static_public_field_by_id() {
 				field_id,
 				JValue::from(&new_input_stream),
 			)
-			.unwrap();
+			.expect("set static field unchecked succeeds");
 		}
 
 		// Verify the field was set by getting it again (this ensures the set operation worked)
 		let current_in = env
 			.get_static_field(jni_str!("java/lang/System"), jni_str!("in"), jni_sig!("Ljava/io/InputStream;"))
-			.unwrap()
+			.expect("test static field can be read")
 			.l()
-			.unwrap();
+			.expect("JNI result contains an object");
 
 		// Verify that we can successfully retrieve a non-null input stream
 		assert!(!current_in.is_null());
@@ -389,22 +390,22 @@ fn set_static_public_field_by_id() {
 				field_id,
 				JValue::from(&original_in),
 			)
-			.unwrap();
+			.expect("set static field unchecked succeeds");
 		}
 
 		// Verify restoration worked
 		let restored_in = env
 			.get_static_field(jni_str!("java/lang/System"), jni_str!("in"), jni_sig!("Ljava/io/InputStream;"))
-			.unwrap()
+			.expect("test static field can be read")
 			.l()
-			.unwrap();
+			.expect("JNI result contains an object");
 
 		// The restored value should be the same as original
-		assert!(env.is_same_object(&original_in, &restored_in).unwrap());
+		assert!(env.is_same_object(&original_in, &restored_in).expect("is same object succeeds"));
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 }
 

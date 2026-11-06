@@ -11,14 +11,14 @@ pub fn java_byte_array_from_slice() {
 
 		assert!(!java_array.is_null());
 		let mut res: [i8; 3] = [0; 3];
-		java_array.get_region(env, 0, &mut res).unwrap();
+		java_array.get_region(env, 0, &mut res).expect("get region succeeds");
 		assert_eq!(res[0], 1);
 		assert_eq!(res[1], 2);
 		assert_eq!(res[2], 3);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 macro_rules! test_auto_array_read_write {
@@ -137,7 +137,11 @@ pub fn get_long_array_elements_commit() {
 		let _ = java_array.set_region(env, 0, buf);
 
 		// Get long array elements auto wrapper
-		let mut auto_ptr = unsafe { java_array.get_elements(env, ReleaseMode::CopyBack).unwrap() };
+		let mut auto_ptr = unsafe {
+			java_array
+				.get_elements(env, ReleaseMode::CopyBack)
+				.expect("get elements succeeds")
+		};
 
 		// Copying the array depends on the VM vendor/version/GC combinations.
 		// If the wrapped array is not being copied, we can skip the test.
@@ -150,29 +154,29 @@ pub fn get_long_array_elements_commit() {
 
 		// Modify
 		unsafe {
-			*ptr.offset(0) += 1;
-			*ptr.offset(1) += 1;
-			*ptr.offset(2) += 1;
+			*ptr += 1;
+			*ptr.add(1) += 1;
+			*ptr.add(2) += 1;
 		}
 
 		// Check that original Java array is unmodified
 		let mut res: [i64; 3] = [0; 3];
-		java_array.get_region(env, 0, &mut res).unwrap();
+		java_array.get_region(env, 0, &mut res).expect("get region succeeds");
 		assert_eq!(res[0], 1);
 		assert_eq!(res[1], 2);
 		assert_eq!(res[2], 3);
 
-		auto_ptr.commit().unwrap();
+		auto_ptr.commit().expect("commit succeeds");
 
 		// Confirm modification of original Java array
-		java_array.get_region(env, 0, &mut res).unwrap();
+		java_array.get_region(env, 0, &mut res).expect("get region succeeds");
 		assert_eq!(res[0], 2);
 		assert_eq!(res[1], 3);
 		assert_eq!(res[2], 4);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -187,7 +191,11 @@ pub fn get_array_elements_critical() {
 		// Use a scope to test Drop
 		{
 			// Get primitive array elements auto wrapper
-			let mut auto_ptr = unsafe { java_array.get_elements_critical(env, ReleaseMode::CopyBack).unwrap() };
+			let mut auto_ptr = unsafe {
+				java_array
+					.get_elements_critical(env, ReleaseMode::CopyBack)
+					.expect("get elements critical succeeds")
+			};
 
 			// Check array size
 			assert_eq!(auto_ptr.len(), 3);
@@ -218,14 +226,14 @@ pub fn get_array_elements_critical() {
 
 		// Confirm modification of original Java array
 		let mut res: [i8; 3] = [0; 3];
-		java_array.get_region(env, 0, &mut res).unwrap();
+		java_array.get_region(env, 0, &mut res).expect("get region succeeds");
 		assert_eq!(res[0], 2);
 		assert_eq!(res[1], 3);
 		assert_eq!(res[2], 4);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -235,39 +243,39 @@ pub fn new_primitive_array_ok() {
 
 		let result = env.new_boolean_array(SIZE);
 		assert!(result.is_ok());
-		assert!(!result.unwrap().is_null());
+		assert!(!result.expect("test operation succeeds").is_null());
 
 		let result = env.new_byte_array(SIZE);
 		assert!(result.is_ok());
-		assert!(!result.unwrap().is_null());
+		assert!(!result.expect("test operation succeeds").is_null());
 
 		let result = env.new_char_array(SIZE);
 		assert!(result.is_ok());
-		assert!(!result.unwrap().is_null());
+		assert!(!result.expect("test operation succeeds").is_null());
 
 		let result = env.new_short_array(SIZE);
 		assert!(result.is_ok());
-		assert!(!result.unwrap().is_null());
+		assert!(!result.expect("test operation succeeds").is_null());
 
 		let result = env.new_int_array(SIZE);
 		assert!(result.is_ok());
-		assert!(!result.unwrap().is_null());
+		assert!(!result.expect("test operation succeeds").is_null());
 
 		let result = env.new_long_array(SIZE);
 		assert!(result.is_ok());
-		assert!(!result.unwrap().is_null());
+		assert!(!result.expect("test operation succeeds").is_null());
 
 		let result = env.new_float_array(SIZE);
 		assert!(result.is_ok());
-		assert!(!result.unwrap().is_null());
+		assert!(!result.expect("test operation succeeds").is_null());
 
 		let result = env.new_double_array(SIZE);
 		assert!(result.is_ok());
-		assert!(!result.unwrap().is_null());
+		assert!(!result.expect("test operation succeeds").is_null());
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 // Group test for testing the family of new_PRIMITIVE_array functions with wrong arguments
@@ -302,20 +310,20 @@ pub fn new_primitive_array_bad_size() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
 fn convert_byte_array() {
 	attach_current_thread(|env| {
 		let src: Vec<u8> = vec![1, 2, 3, 4];
-		let java_byte_array = env.byte_array_from_slice(&src).unwrap();
+		let java_byte_array = env.byte_array_from_slice(&src).expect("byte array from slice succeeds");
 
 		let dest = env.convert_byte_array(java_byte_array);
 		assert!(dest.is_ok());
-		assert_eq!(dest.unwrap(), src);
+		assert_eq!(dest.expect("test operation succeeds"), src);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }

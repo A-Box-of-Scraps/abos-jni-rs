@@ -1,7 +1,7 @@
 use crate::{
 	Env,
 	descriptors::Desc,
-	errors::*,
+	errors::Result,
 	objects::{Auto, IntoAuto as _, JClass, LoaderContext},
 	strings::JNIStr,
 };

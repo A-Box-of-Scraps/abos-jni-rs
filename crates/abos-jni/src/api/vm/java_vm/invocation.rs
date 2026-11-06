@@ -1,7 +1,24 @@
-use super::*;
+#[cfg(doc)]
+use crate::{api::env, objects::JObject, vm::AttachGuard};
+
+use super::{Env, Error, JAVA_VM_SINGLETON, JavaVM, Result, jni_error_code_to_result, ptr, sys};
+#[cfg(all(feature = "invocation", not(target_os = "android"), use_fls_attach_guard))]
+use crate::internal::fls_attach_guard;
+#[cfg(all(feature = "invocation", not(target_os = "android"), use_tls_attach_guard))]
+use crate::internal::tls_attach_guard;
+#[cfg(all(feature = "invocation", not(target_os = "android")))]
+use std::{os::raw::c_void, path::PathBuf};
+#[cfg(feature = "invocation")]
+use {
+	crate::{
+		InitArgs,
+		errors::{StartJvmError, StartJvmResult},
+	},
+	std::ffi::OsStr,
+};
 
 impl JavaVM {
-	/// Launch a new JavaVM using the provided init args.
+	/// Launch a new `JavaVM` using the provided init args.
 	///
 	/// Unlike original JNI API, the main thread (the thread from which this method is called) will
 	/// not be attached to JVM. You must explicitly use `attach_current_thread…` methods (refer
@@ -73,8 +90,8 @@ impl JavaVM {
 	/// singleton state. So you should not make assumptions about this being initialized as a side
 	/// effect of other dependencies using `jni-rs` (unless you are using a re-exported version of
 	/// `jni-rs` from that dependency). For example the `android-activity` crate will initialize a
-	/// [JavaVM] before `android_main()` is called, but unless you are using the same version of
-	/// `jni-rs` as `android-activity` you can't immediately assume there is a [JavaVM] singleton.
+	/// [`JavaVM`] before `android_main()` is called, but unless you are using the same version of
+	/// `jni-rs` as `android-activity` you can't immediately assume there is a [`JavaVM`] singleton.
 	pub fn singleton() -> Result<Self> {
 		JAVA_VM_SINGLETON.get().cloned().ok_or(Error::UninitializedJavaVM)
 	}
@@ -93,8 +110,8 @@ impl JavaVM {
 
 		unsafe {
 			jni_error_code_to_result(create_fn_ptr(
-				&mut ptr as *mut _,
-				&mut env as *mut *mut sys::JNIEnv as *mut *mut c_void,
+				&raw mut ptr,
+				(&raw mut env).cast::<*mut c_void>(),
 				args.inner_ptr(),
 			))?;
 		}
@@ -125,7 +142,7 @@ impl JavaVM {
 		Ok(vm)
 	}
 
-	/// Launch a new JavaVM using the provided init args, loading it from the given shared library file if it's not already loaded.
+	/// Launch a new `JavaVM` using the provided init args, loading it from the given shared library file if it's not already loaded.
 	///
 	/// Unlike original JNI API, the main thread (the thread from which this method is called) will
 	/// not be attached to JVM. You must explicitly use `attach_current_thread…` methods (refer
@@ -159,7 +176,7 @@ impl JavaVM {
 				// Try to find the `JNI_CreateJavaVM` function in the loaded library.
 				let create_fn = libjvm
 					.get(b"JNI_CreateJavaVM\0")
-					.map_err(|error| StartJvmError::LoadError(libjvm_path_string.to_owned(), error))?;
+					.map_err(|error| StartJvmError::LoadError(libjvm_path_string.clone(), error))?;
 
 				// Create the JVM.
 				Self::with_create_fn_ptr(args, *create_fn).map_err(StartJvmError::Create)
@@ -190,7 +207,7 @@ impl JavaVM {
 		}
 	}
 
-	/// Launch a new JavaVM using the provided init args, loading it from the given shared library file if it's not already loaded.
+	/// Launch a new `JavaVM` using the provided init args, loading it from the given shared library file if it's not already loaded.
 	///
 	/// Unlike original JNI API, the main thread (the thread from which this method is called) will
 	/// not be attached to JVM. You must explicitly use `attach_current_thread…` methods (refer
@@ -220,24 +237,25 @@ impl JavaVM {
 		}
 	}
 
-	/// Create a JavaVM from a raw pointer.
+	/// Create a `JavaVM` from a raw pointer.
 	///
 	/// # Safety
 	///
-	/// Expects a valid, non-null JavaVM pointer that supports JNI version >= 1.4.
+	/// Expects a valid, non-null `JavaVM` pointer that supports JNI version >= 1.4.
 	///
 	/// Only does a `null` check.
 	pub unsafe fn from_raw(ptr: *mut sys::JavaVM) -> Self {
 		assert!(!ptr.is_null());
-		JAVA_VM_SINGLETON.get_or_init(|| JavaVM(ptr)).clone()
+		JAVA_VM_SINGLETON.get_or_init(|| Self(ptr)).clone()
 	}
 
 	/// Returns underlying [`sys::JavaVM`] interface.
-	pub fn get_raw(&self) -> *mut sys::JavaVM {
+	#[must_use]
+	pub const fn get_raw(&self) -> *mut sys::JavaVM {
 		self.0
 	}
 
-	/// Create a JavaVM from an Env reference.
+	/// Create a `JavaVM` from an Env reference.
 	///
 	/// This may return [`Error::JavaException`] if called while there is a pending exception.
 	pub(crate) fn from_env(env: &Env) -> Result<Self> {
@@ -247,11 +265,11 @@ impl JavaVM {
 			Ok(jvm.clone())
 		} else {
 			let mut raw = ptr::null_mut();
-			let res = unsafe { jni_call_no_post_check_ex!(env, v1_1, GetJavaVM, &mut raw)? };
+			let res = unsafe { jni_call_no_post_check_ex!(env, v1_1, GetJavaVM, &raw mut raw)? };
 			jni_error_code_to_result(res)?;
 
 			// Safety: The pointer from GetJavaVM should be valid
-			unsafe { Ok(JavaVM::from_raw(raw)) }
+			unsafe { Ok(Self::from_raw(raw)) }
 		}
 	}
 }

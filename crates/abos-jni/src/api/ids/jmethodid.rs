@@ -41,19 +41,20 @@ impl JMethodID {
 	}
 
 	/// Unwrap to the internal jni type.
+	#[must_use]
 	pub const fn into_raw(self) -> jmethodID {
 		self.internal
 	}
 }
 
-impl AsRef<JMethodID> for JMethodID {
-	fn as_ref(&self) -> &JMethodID {
+impl AsRef<Self> for JMethodID {
+	fn as_ref(&self) -> &Self {
 		self
 	}
 }
 
-impl AsMut<JMethodID> for JMethodID {
-	fn as_mut(&mut self) -> &mut JMethodID {
+impl AsMut<Self> for JMethodID {
+	fn as_mut(&mut self) -> &mut Self {
 		self
 	}
 }

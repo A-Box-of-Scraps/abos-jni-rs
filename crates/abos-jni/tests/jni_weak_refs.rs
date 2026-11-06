@@ -33,7 +33,7 @@ pub fn weak_ref_works_in_other_threads() {
 		let atomic_integer_weak = unwrap(env.new_weak_ref(&atomic_integer_local), env);
 
 		static ATOMIC_INT: OnceLock<Weak<JObject<'static>>> = OnceLock::new();
-		ATOMIC_INT.set(atomic_integer_weak).unwrap();
+		ATOMIC_INT.set(atomic_integer_weak).expect("set succeeds");
 
 		let mut join_handlers = Vec::new();
 
@@ -43,7 +43,7 @@ pub fn weak_ref_works_in_other_threads() {
 
 			for _ in 0..thread_num {
 				let barrier = barrier.clone();
-				let atomic_integer = ATOMIC_INT.get().unwrap();
+				let atomic_integer = ATOMIC_INT.get().expect("test bindings initialize");
 
 				let jh = spawn(move || {
 					attach_current_thread(|env| {
@@ -63,13 +63,13 @@ pub fn weak_ref_works_in_other_threads() {
 						}
 						Ok(())
 					})
-					.unwrap();
+					.expect("attached JNI callback succeeds");
 				});
 				join_handlers.push(jh);
 			}
 
 			for jh in join_handlers.drain(..) {
-				jh.join().unwrap();
+				jh.join().expect("test worker completes without panicking");
 			}
 
 			let expected = (ITERS_PER_THREAD * thread_num) as jint;
@@ -93,7 +93,7 @@ pub fn weak_ref_works_in_other_threads() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -133,7 +133,10 @@ fn weak_ref_is_actually_weak() {
 						.auto();
 
 					assert!(!obj_local_from_weak.is_null());
-					assert!(env.is_same_object(&obj_local_from_weak, &obj_local).unwrap());
+					assert!(
+						env.is_same_object(&obj_local_from_weak, &obj_local)
+							.expect("is same object succeeds")
+					);
 				}
 
 				{
@@ -141,18 +144,29 @@ fn weak_ref_is_actually_weak() {
 						unwrap(obj_weak.upgrade_global(env), env).expect("object shouldn't have been GC'd yet");
 
 					assert!(!obj_global_from_weak.is_null());
-					assert!(env.is_same_object(&obj_global_from_weak, &obj_local).unwrap());
+					assert!(
+						env.is_same_object(&obj_global_from_weak, &obj_local)
+							.expect("is same object succeeds")
+					);
 				}
 
-				assert!(env.is_same_object(obj_weak, &obj_local).unwrap());
+				assert!(
+					env.is_same_object(obj_weak, &obj_local)
+						.expect("is same object succeeds")
+				);
 
 				assert!(
-					!obj_weak.is_garbage_collected(env).unwrap(),
+					!obj_weak
+						.is_garbage_collected(env)
+						.expect("is garbage collected succeeds"),
 					"`is_garbage_collected` returned incorrect value"
 				);
 			}
 
-			assert!(env.is_same_object(&obj_weak, &obj_weak2).unwrap());
+			assert!(
+				env.is_same_object(&obj_weak, &obj_weak2)
+					.expect("is same object succeeds")
+			);
 
 			drop(obj_local);
 			run_gc(env);
@@ -171,15 +185,20 @@ fn weak_ref_is_actually_weak() {
 				}
 
 				assert!(
-					obj_weak.is_garbage_collected(env).unwrap(),
+					obj_weak
+						.is_garbage_collected(env)
+						.expect("is garbage collected succeeds"),
 					"`is_garbage_collected` returned incorrect value"
 				);
 			}
 
-			assert!(env.is_same_object(obj_weak, &obj_weak2).unwrap());
+			assert!(
+				env.is_same_object(obj_weak, &obj_weak2)
+					.expect("is same object succeeds")
+			);
 		}
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }

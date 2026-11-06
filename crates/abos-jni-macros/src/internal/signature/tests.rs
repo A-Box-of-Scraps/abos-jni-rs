@@ -30,7 +30,7 @@ fn test_slash_separated_package_fails() {
 	assert!(result.is_err());
 
 	// Verify the error is about parsing, not about finding the type
-	let err = result.unwrap_err();
+	let err = result.expect_err("invalid test input is rejected");
 	let err_msg = err.to_string();
 	// The error should be a parse error, not a "type not found" error
 	assert!(!err_msg.contains("No type mapping found"));
@@ -53,7 +53,7 @@ fn test_string_literal_with_slashes_in_type_mapping() {
 	assert!(result.is_err());
 
 	// The error should mention that dots are required
-	let err = result.unwrap_err();
+	let err = result.expect_err("invalid test input is rejected");
 	let err_msg = err.to_string();
 	assert!(err_msg.contains("must contain at least one dot"));
 }
@@ -70,7 +70,7 @@ fn test_no_dots_fails_for_java_class() {
 	// Should fail with "Unknown type" after attempting to resolve SomeType
 	// via type mappings
 	assert!(result.is_err());
-	let err = result.unwrap_err();
+	let err = result.expect_err("invalid test input is rejected");
 	let err_msg = err.to_string();
 	assert!(err_msg.contains("Unknown type"));
 }
@@ -82,7 +82,7 @@ fn test_string_literal_without_dots_fails() {
 	let result = syn::parse2::<JavaClassName>(input);
 
 	assert!(result.is_err());
-	let err = result.unwrap_err();
+	let err = result.expect_err("invalid test input is rejected");
 	let err_msg = err.to_string();
 	assert!(err_msg.contains("must contain at least one dot"));
 }
@@ -95,7 +95,7 @@ fn test_parse_java_class_name_rejects_single_ident() {
 	let result = syn::parse2::<JavaClassName>(input);
 
 	assert!(result.is_err());
-	let err = result.unwrap_err();
+	let err = result.expect_err("invalid test input is rejected");
 	let err_msg = err.to_string();
 	assert!(err_msg.contains("Expected Java class name"));
 }
@@ -120,24 +120,19 @@ fn test_raw_jni_field_primitives() {
 
 	for (input_sig, expected_sig, expected_type) in primitives {
 		let input = quote! { #input_sig };
-		let result = jni_sig_impl(input).unwrap();
+		let result = jni_sig_impl(input).expect("test signature expands");
 		let result_str = result.to_string();
 		assert!(
-			result_str.contains(&format!("\"{}\"", expected_sig)),
-			"Expected signature '{}' for input '{}'",
-			expected_sig,
-			input_sig
+			result_str.contains(&format!("\"{expected_sig}\"")),
+			"Expected signature '{expected_sig}' for input '{input_sig}'"
 		);
 		assert!(
-			result_str.contains(&format!("Primitive :: {}", expected_type)),
-			"Expected primitive type '{}' for input '{}'",
-			expected_type,
-			input_sig
+			result_str.contains(&format!("Primitive :: {expected_type}")),
+			"Expected primitive type '{expected_type}' for input '{input_sig}'"
 		);
 		assert!(
 			result_str.contains("FieldSignature"),
-			"Expected FieldSignature output for input '{}'",
-			input_sig
+			"Expected FieldSignature output for input '{input_sig}'"
 		);
 	}
 }
@@ -252,7 +247,7 @@ fn test_raw_jni_errors_leading_slash() {
 fn test_raw_jni_string_with_dots_as_field() {
 	// String literal with dots should be treated as Java class name for field
 	let input = quote! { "java.lang.String" };
-	let result = jni_sig_impl(input).unwrap();
+	let result = jni_sig_impl(input).expect("test signature expands");
 	let result_str = result.to_string();
 	assert!(result_str.contains("\"Ljava/lang/String;\""));
 	assert!(result_str.contains("FieldSignature :: from_raw_parts"));
@@ -262,7 +257,7 @@ fn test_raw_jni_string_with_dots_as_field() {
 fn test_raw_jni_inner_classes() {
 	// Test inner classes with $ separator
 	let input = quote! { "Ljava/lang/Outer$Inner;" };
-	let result = jni_sig_impl(input).unwrap();
+	let result = jni_sig_impl(input).expect("test signature expands");
 	let result_str = result.to_string();
 	assert!(result_str.contains("\"Ljava/lang/Outer$Inner;\""));
 }
@@ -270,7 +265,7 @@ fn test_raw_jni_inner_classes() {
 #[test]
 fn test_raw_jni_method_with_inner_class() {
 	let input = quote! { "(Ljava/lang/Outer$Inner;)V" };
-	let result = jni_sig_impl(input).unwrap();
+	let result = jni_sig_impl(input).expect("test signature expands");
 	let result_str = result.to_string();
 	assert!(result_str.contains("\"(Ljava/lang/Outer$Inner;)V\""));
 }
@@ -279,7 +274,7 @@ fn test_raw_jni_method_with_inner_class() {
 fn test_raw_jni_default_package_class() {
 	// Default package class (no package)
 	let input = quote! { "LNoPackage;" };
-	let result = jni_sig_impl(input).unwrap();
+	let result = jni_sig_impl(input).expect("test signature expands");
 	let result_str = result.to_string();
 	assert!(result_str.contains("\"LNoPackage;\""));
 }
@@ -287,7 +282,7 @@ fn test_raw_jni_default_package_class() {
 #[test]
 fn test_raw_jni_multidimensional_array() {
 	let input = quote! { "[[I" };
-	let result = jni_sig_impl(input).unwrap();
+	let result = jni_sig_impl(input).expect("test signature expands");
 	let result_str = result.to_string();
 	assert!(result_str.contains("\"[[I\""));
 }
@@ -295,7 +290,7 @@ fn test_raw_jni_multidimensional_array() {
 #[test]
 fn test_raw_jni_method_returns_array() {
 	let input = quote! { "()[[I" };
-	let result = jni_sig_impl(input).unwrap();
+	let result = jni_sig_impl(input).expect("test signature expands");
 	let result_str = result.to_string();
 	assert!(result_str.contains("\"()[[I\""));
 }
@@ -354,12 +349,11 @@ fn test_cstr_literal_invalid_utf8() {
 	// Should fail with a UTF-8 validation error
 	assert!(result.is_err(), "CStr literal with invalid UTF-8 should be rejected");
 
-	let err = result.unwrap_err();
+	let err = result.expect_err("invalid test input is rejected");
 	let err_msg = err.to_string();
 	assert!(
 		err_msg.contains("CStr literal must contain valid UTF-8"),
-		"Error message should mention UTF-8 validation, got: {}",
-		err_msg
+		"Error message should mention UTF-8 validation, got: {err_msg}"
 	);
 
 	// Also test that valid UTF-8 in CStr literals works correctly
@@ -367,6 +361,6 @@ fn test_cstr_literal_invalid_utf8() {
 	let result = jni_sig_impl(input);
 	assert!(result.is_ok(), "Valid UTF-8 CStr literal should parse successfully");
 
-	let result_str = result.unwrap().to_string();
+	let result_str = result.expect("test operation succeeds").to_string();
 	assert!(result_str.contains("\"(I)V\""), "Should contain the signature string");
 }

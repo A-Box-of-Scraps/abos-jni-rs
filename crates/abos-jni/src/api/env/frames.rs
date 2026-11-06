@@ -1,4 +1,10 @@
-use super::*;
+#[cfg(doc)]
+use crate::refs::Global;
+
+use super::{
+	AssertUnwindSafe, AttachGuard, Env, Error, JObject, JniError, Reference, Result, TryInto, catch_unwind,
+	jni_error_code_to_result, resume_unwind,
+};
 
 impl<'local> Env<'local> {
 	/// Creates a new local reference frame, in which at least a given number

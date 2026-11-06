@@ -34,33 +34,33 @@ fn serialized_threads() {
 #[test]
 fn concurrent_threads() {
 	const THREAD_NUM: usize = 8;
-	test_concurrent_threads(jvm().clone(), THREAD_NUM)
+	test_concurrent_threads(jvm().clone(), THREAD_NUM);
 }
 
 fn test_single_thread(vm: Arc<JavaVM>) {
-	let mut atomic = AtomicIntegerProxy::new(vm, 0).unwrap();
-	assert_eq!(0, atomic.get().unwrap());
-	assert_eq!(1, atomic.increment_and_get().unwrap());
-	assert_eq!(3, atomic.add_and_get(2).unwrap());
-	assert_eq!(3, atomic.get().unwrap());
+	let mut atomic = AtomicIntegerProxy::new(vm, 0).expect("test value can be constructed");
+	assert_eq!(0, atomic.get().expect("test bindings initialize"));
+	assert_eq!(1, atomic.increment_and_get().expect("increment and get succeeds"));
+	assert_eq!(3, atomic.add_and_get(2).expect("add and get succeeds"));
+	assert_eq!(3, atomic.get().expect("test bindings initialize"));
 }
 
 fn test_serialized_threads(vm: Arc<JavaVM>) {
-	let mut atomic = AtomicIntegerProxy::new(vm, 0).unwrap();
-	assert_eq!(0, atomic.get().unwrap());
+	let mut atomic = AtomicIntegerProxy::new(vm, 0).expect("test value can be constructed");
+	assert_eq!(0, atomic.get().expect("test bindings initialize"));
 	let jh = spawn(move || {
-		assert_eq!(1, atomic.increment_and_get().unwrap());
-		assert_eq!(3, atomic.add_and_get(2).unwrap());
+		assert_eq!(1, atomic.increment_and_get().expect("increment and get succeeds"));
+		assert_eq!(3, atomic.add_and_get(2).expect("add and get succeeds"));
 		atomic
 	});
-	let mut atomic = jh.join().unwrap();
-	assert_eq!(3, atomic.get().unwrap());
+	let mut atomic = jh.join().expect("test worker completes without panicking");
+	assert_eq!(3, atomic.get().expect("test bindings initialize"));
 }
 
 fn test_concurrent_threads(vm: Arc<JavaVM>, thread_num: usize) {
 	const ITERS_PER_THREAD: usize = 10_000;
 
-	let mut atomic = AtomicIntegerProxy::new(vm, 0).unwrap();
+	let mut atomic = AtomicIntegerProxy::new(vm, 0).expect("test value can be constructed");
 	let barrier = Arc::new(Barrier::new(thread_num));
 	let mut threads = Vec::new();
 
@@ -70,16 +70,16 @@ fn test_concurrent_threads(vm: Arc<JavaVM>, thread_num: usize) {
 		let jh = spawn(move || {
 			barrier.wait();
 			for _ in 0..ITERS_PER_THREAD {
-				atomic.increment_and_get().unwrap();
+				atomic.increment_and_get().expect("increment and get succeeds");
 			}
 		});
 		threads.push(jh);
 	}
 	for jh in threads {
-		jh.join().unwrap();
+		jh.join().expect("test worker completes without panicking");
 	}
 	let expected = (ITERS_PER_THREAD * thread_num) as jint;
-	assert_eq!(expected, atomic.get().unwrap());
+	assert_eq!(expected, atomic.get().expect("test bindings initialize"));
 }
 
 // We need to test `JavaVM::destroy()` in a separate process otherwise it will break
@@ -118,11 +118,11 @@ fn test_destroy() {
 
 				println!("use before destroy...");
 				// Make some token JNI call
-				let _class = env.find_class(MATH_CLASS).unwrap().auto();
+				let _class = env.find_class(MATH_CLASS).expect("test class can be resolved").auto();
 
 				atomic.fetch_add(1, Ordering::SeqCst);
 				Ok(())
-			}).unwrap();
+			}).expect("attached JNI callback succeeds");
 
 			println!("java thread finished");
 		});
@@ -135,12 +135,12 @@ fn test_destroy() {
 		let res = unsafe {
 			((*(*jvm)).v1_4.AttachCurrentThreadAsDaemon)(
 				jvm,
-				&mut env_ptr,
+				&raw mut env_ptr,
 				std::ptr::null_mut(),
 			)
 		};
 		abos_jni::errors::jni_error_code_to_result(res)?;
-		Ok(unsafe { AttachGuard::from_unowned(env_ptr as *mut abos_jni::sys::JNIEnv) })
+		Ok(unsafe { AttachGuard::from_unowned(env_ptr.cast::<abos_jni::sys::JNIEnv>()) })
 	}
 
 	unsafe fn detach_current_thread(vm: &abos_jni::JavaVM) {
@@ -161,7 +161,7 @@ fn test_destroy() {
 				// Safety: there is no other mutable `Env` in scope, so we aren't
 				// creating an opportunity for local references to be created
 				// in association with the wrong stack frame.
-				let mut guard = unsafe { attach_current_thread_as_daemon(&jvm).unwrap() };
+				let mut guard = unsafe { attach_current_thread_as_daemon(&jvm).expect("attach current thread as daemon succeeds") };
 				guard.borrow_env_mut().with_local_frame(DEFAULT_LOCAL_FRAME_CAPACITY, |env|-> errors::Result<()> {
 					println!("daemon thread attach");
 					attach_barrier.wait();
@@ -169,10 +169,10 @@ fn test_destroy() {
 
 					println!("daemon JVM use before destroy...");
 
-					let _class = env.find_class(MATH_CLASS).unwrap().auto();
+					let _class = env.find_class(MATH_CLASS).expect("test class can be resolved").auto();
 
 					Ok(())
-				}).unwrap();
+				}).expect("borrow env mut succeeds");
 			}
 
 			// For it to be safe to call `JavaVM::destroy()` we need to ensure that
@@ -221,7 +221,7 @@ fn test_destroy() {
 	// any use-after-free.
 	unsafe {
 		println!("MAIN: calling DestroyJavaVM()...");
-		jvm.destroy().unwrap();
+		jvm.destroy().expect("destroy succeeds");
 		drop(jvm);
 		println!("MAIN: jvm destroyed");
 	}
@@ -229,7 +229,7 @@ fn test_destroy() {
 	println!("MAIN: joining (waiting for) all threads");
 	let mut joined = 0;
 	for jh in threads {
-		jh.join().unwrap();
+		jh.join().expect("test worker completes without panicking");
 		joined += 1;
 		println!(
 			"joined {joined} threads, atomic = {}",

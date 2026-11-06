@@ -5,7 +5,7 @@ use log::warn;
 
 use crate::{
 	Env, JavaVM,
-	errors::*,
+	errors::Result,
 	objects::{JString, Reference},
 	strings::{JNIStr, JNIString},
 };
@@ -19,7 +19,7 @@ use ::{
 /// Borrows the contents of a `java.lang.String` object, in Java's [modified
 /// UTF-8] encoding.
 ///
-/// This guard type is returned by [JString::mutf8_chars] and represents the
+/// This guard type is returned by [`JString::mutf8_chars`] and represents the
 /// borrowed contents of a `java.lang.String` object that will be automatically
 /// released when dropped.
 ///
@@ -40,18 +40,18 @@ use ::{
 ///
 /// # JNI String Types
 ///
-/// From the point of view of JNI a [JString] is merely a reference to a
+/// From the point of view of JNI a [`JString`] is merely a reference to a
 /// `java.lang.String` object and to access the underlying data, you need to use
-/// JNI ([JString::mutf8_chars]) to explicitly borrow the underlying bytes
+/// JNI ([`JString::mutf8_chars`]) to explicitly borrow the underlying bytes
 /// of the string.
 ///
-/// [JNIStr] is to [JNIString] as `str` is to `String` or `CStr` is to
+/// [`JNIStr`] is to [`JNIString`] as `str` is to `String` or `CStr` is to
 /// `CString`.
 ///
-/// [JNIStr] and [JNIString] represent nul-terminated strings, like [`CStr`] and
+/// [`JNIStr`] and [`JNIString`] represent nul-terminated strings, like [`CStr`] and
 /// [`CString`], that are encoded in [modified UTF-8].
 ///
-/// This type is a guard that holds a temporary [JNIStr] reference to the
+/// This type is a guard that holds a temporary [`JNIStr`] reference to the
 /// underlying bytes of a `java.lang.String` object.
 ///
 /// [modified UTF-8]: https://en.wikipedia.org/wiki/UTF-8#Modified_UTF-8
@@ -98,7 +98,7 @@ where
 	/// garbage collector.
 	///
 	/// Returns a [`MUTF8Chars`] that will automatically release the underlying
-	/// character array when dropped (see [Self::release_string_utf_chars]).
+	/// character array when dropped (see [`Self::release_string_utf_chars`]).
 	pub(crate) fn from_get_string_utf_chars(env: &Env<'_>, obj: StringRef) -> Result<Self> {
 		let obj = null_check!(obj, "get_string_utf_chars obj argument")?;
 
@@ -111,7 +111,7 @@ where
 		unsafe {
 			let mut is_copy: jboolean = false;
 			let ptr: *const c_char =
-				jni_call_only_check_null_ret!(env, v1_1, GetStringUTFChars, obj.as_raw(), &mut is_copy as *mut _)?;
+				jni_call_only_check_null_ret!(env, v1_1, GetStringUTFChars, obj.as_raw(), &raw mut is_copy)?;
 
 			let is_copy = is_copy == JNI_TRUE;
 			Ok(Self {
@@ -180,7 +180,7 @@ where
 	/// # Ok(())
 	/// # }
 	/// ```
-	pub unsafe fn from_raw(_env: &Env<'_>, obj: StringRef, ptr: *const c_char, is_copy: bool) -> Self {
+	pub const unsafe fn from_raw(_env: &Env<'_>, obj: StringRef, ptr: *const c_char, is_copy: bool) -> Self {
 		Self {
 			obj,
 			chars: ptr,
@@ -190,7 +190,7 @@ where
 	}
 
 	/// Returns whether the string was copied or not.
-	pub fn is_copy(&self) -> bool {
+	pub const fn is_copy(&self) -> bool {
 		self.is_copy
 	}
 }
@@ -228,7 +228,7 @@ impl<'local, StringRef> From<MUTF8Chars<'local, StringRef>> for JNIString
 where
 	StringRef: AsRef<JString<'local>> + Reference,
 {
-	fn from(other: MUTF8Chars<'local, StringRef>) -> JNIString {
+	fn from(other: MUTF8Chars<'local, StringRef>) -> Self {
 		let jni_str: &JNIStr = &other;
 		jni_str.to_owned()
 	}
@@ -238,7 +238,7 @@ impl<'local, 'java_str, StringRef> From<&'java_str MUTF8Chars<'local, StringRef>
 where
 	StringRef: AsRef<JString<'local>> + Reference,
 {
-	fn from(other: &'java_str MUTF8Chars<'local, StringRef>) -> Cow<'java_str, str> {
+	fn from(other: &'java_str MUTF8Chars<'local, StringRef>) -> Self {
 		let jni_str: &JNIStr = other;
 		jni_str.into()
 	}
@@ -248,7 +248,7 @@ impl<'local, StringRef> From<MUTF8Chars<'local, StringRef>> for String
 where
 	StringRef: AsRef<JString<'local>> + Reference,
 {
-	fn from(other: MUTF8Chars<'local, StringRef>) -> String {
+	fn from(other: MUTF8Chars<'local, StringRef>) -> Self {
 		let cow: Cow<str> = (&other).into();
 		cow.into_owned()
 	}
@@ -272,7 +272,7 @@ where
 
 		match unsafe { release_string_utf_chars(self.obj.as_raw(), self.chars) } {
 			Ok(()) => {}
-			Err(e) => warn!("error dropping java str: {}", e),
+			Err(e) => warn!("error dropping java str: {e}"),
 		}
 	}
 }

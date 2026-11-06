@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+	ATTACHED_THREADS, AttachGuard, Env, Error, JNIVersion, JavaVM, JniError, Ordering, Result, ScopeToken,
+	THREAD_ATTACHMENT, THREAD_GUARD_NEST_LEVEL, jni_error_code_to_result, ptr, sys,
+};
 
 impl JavaVM {
 	/// Returns the current number of threads attached to the JVM.
@@ -17,6 +20,7 @@ impl JavaVM {
 	///
 	/// This is only really public since it's useful for unit tests
 	#[doc(hidden)]
+	#[must_use]
 	pub fn thread_attach_guard_level() -> usize {
 		THREAD_GUARD_NEST_LEVEL.get()
 	}
@@ -34,20 +38,20 @@ impl JavaVM {
 	/// dispatches calls differently).
 	///
 	/// If we ever find a JVM implementation that in fact returns a different pointer then we could
-	/// just repeat the GetEnv call with the maximum supported version after querying the version.
+	/// just repeat the `GetEnv` call with the maximum supported version after querying the version.
 	///
 	/// # Safety
 	///
 	/// You must know that the [`JavaVM`] supports at least JNI >= 1.2 (we require >= 1.4 but
-	/// we couldn't even call GetEnv without 1.2)
+	/// we couldn't even call `GetEnv` without 1.2)
 	///
 	/// See the 'Safety' rules for [`AttachGuard`]
 	pub(crate) unsafe fn sys_get_env_attachment<'local>(&self) -> Result<AttachGuard<'local>> {
 		unsafe {
 			let mut ptr = ptr::null_mut();
-			let res = java_vm_call_unchecked!(self, v1_2, GetEnv, &mut ptr, JNIVersion::V1_4.into());
+			let res = java_vm_call_unchecked!(self, v1_2, GetEnv, &raw mut ptr, JNIVersion::V1_4.into());
 			jni_error_code_to_result(res)?;
-			let jni = ptr as *mut sys::JNIEnv;
+			let jni = ptr.cast::<sys::JNIEnv>();
 			Ok(AttachGuard::from_unowned(jni))
 		}
 	}
@@ -85,7 +89,7 @@ impl JavaVM {
 	/// dropped, this API will return `None` even if a permanent attachment exists, that is being
 	/// tracked via TLS/FLS outside of an `AttachGuard`.
 	///
-	/// This API can be used speculatively before calling sys_get_env_attachment to avoid making a
+	/// This API can be used speculatively before calling `sys_get_env_attachment` to avoid making a
 	/// JNI call to query the current JNI environment.
 	///
 	/// # Safety
@@ -152,7 +156,7 @@ impl JavaVM {
 	/// [`sys::JNINativeInterface__1_2::PopLocalFrame`] after the closure is executed.
 	///
 	/// If you're not sure that the current thread is attached to the Java VM, consider using
-	/// [Self::attach_current_thread] instead.
+	/// [`Self::attach_current_thread`] instead.
 	///
 	/// # Runtime Top Frame Checks
 	///
@@ -203,7 +207,7 @@ impl JavaVM {
 		}
 	}
 
-	/// Unloads the JavaVM and frees all it's associated resources
+	/// Unloads the `JavaVM` and frees all it's associated resources
 	///
 	/// Firstly if this thread is not already attached to the `JavaVM` then it
 	/// will be attached.

@@ -1,4 +1,4 @@
-use super::*;
+use super::{Env, Error, JByteBuffer, JniError, Reference, Result, c_void, jlong};
 
 impl<'local> Env<'local> {
 	/// Create a new instance of a direct java.nio.ByteBuffer
@@ -43,7 +43,7 @@ impl<'local> Env<'local> {
 				self,
 				v1_4,
 				NewDirectByteBuffer,
-				data as *mut c_void,
+				data.cast::<c_void>(),
 				len as jlong
 			)?;
 			Ok(JByteBuffer::from_raw(self, obj))
@@ -63,7 +63,7 @@ impl<'local> Env<'local> {
 		unsafe {
 			// GetDirectBufferAddress has no documented exceptions that it can throw
 			let ptr = jni_call_only_check_null_ret!(self, v1_4, GetDirectBufferAddress, buf.as_raw())?;
-			Ok(ptr as _)
+			Ok(ptr.cast())
 		}
 	}
 

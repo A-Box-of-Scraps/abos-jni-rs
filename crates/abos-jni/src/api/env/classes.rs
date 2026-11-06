@@ -1,4 +1,10 @@
-use super::*;
+#[cfg(doc)]
+use crate::objects::{JByteArray, JThread};
+
+use super::{
+	Desc, Env, Error, JClass, JClassLoader, JNIStr, JObject, JThrowable, JniError, LoaderContext, Reference, Result,
+	c_char, jbyte, jsize, ptr,
+};
 
 impl<'local> Env<'local> {
 	/// Load a class from a buffer of raw class data.
@@ -98,10 +104,10 @@ impl<'local> Env<'local> {
 		N: AsRef<JNIStr>,
 		L: AsRef<JClassLoader<'any_loader>>,
 	{
-		let name: Option<&JNIStr> = name.as_ref().map(|n| n.as_ref());
-		let name = name.map_or(ptr::null(), |n| n.as_ptr());
+		let name: Option<&JNIStr> = name.as_ref().map(std::convert::AsRef::as_ref);
+		let name = name.map_or(ptr::null(), JNIStr::as_ptr);
 		// Safety: we know the pointer for the u8 slice is valid for buf.len() bytes
-		unsafe { self.define_class_impl(name, loader.as_ref(), buf.as_ptr() as *const jbyte, buf.len()) }
+		unsafe { self.define_class_impl(name, loader.as_ref(), buf.as_ptr().cast::<jbyte>(), buf.len()) }
 	}
 
 	/// Load a class from a buffer of raw class data.
@@ -145,10 +151,10 @@ impl<'local> Env<'local> {
 		N: AsRef<JNIStr>,
 		L: AsRef<JClassLoader<'any_loader>>,
 	{
-		let name: Option<&JNIStr> = name.as_ref().map(|n| n.as_ref());
+		let name: Option<&JNIStr> = name.as_ref().map(std::convert::AsRef::as_ref);
 		let name = name.as_ref().map_or(ptr::null(), |n| n.as_ptr());
 		// Safety: we know the pointer for the u8 slice is valid for buf.len() bytes
-		unsafe { self.define_class_impl(name, loader.as_ref(), buf.as_ptr() as *const jbyte, buf.len()) }
+		unsafe { self.define_class_impl(name, loader.as_ref(), buf.as_ptr().cast::<jbyte>(), buf.len()) }
 	}
 
 	/// Look up a class by its fully-qualified "internal" JNI name, via JNI
@@ -156,8 +162,8 @@ impl<'local> Env<'local> {
 	///
 	/// **Note:** Only use this method if you _strictly_ need the JNI
 	/// `FindClass` behavior exactly, otherwise, it is strongly recommended to
-	/// use [Reference::lookup_class] (cached), [Env::load_class] or
-	/// [LoaderContext::load_class].
+	/// use [`Reference::lookup_class`] (cached), [`Env::load_class`] or
+	/// [`LoaderContext::load_class`].
 	///
 	/// The `name` must be in the "internal" form, with slashes instead of dots,
 	/// like `jni_str!("java/lang/IllegalArgumentException")` or an array
@@ -197,8 +203,8 @@ impl<'local> Env<'local> {
 	/// to find application classes when called from a native thread, outside of
 	/// a native method call.
 	///
-	/// [Env::load_class] can work on Android if a loader has been set up for
-	/// the current thread (see: [JThread::set_context_class_loader]) and if you
+	/// [`Env::load_class`] can work on Android if a loader has been set up for
+	/// the current thread (see: [`JThread::set_context_class_loader`]) and if you
 	/// use the `android-activity` crate this may be done for you.
 	pub fn find_class<S>(&mut self, name: S) -> Result<JClass<'local>>
 	where
@@ -261,13 +267,13 @@ impl<'local> Env<'local> {
 	/// Look up a class by its fully-qualified name, via `Class.forName(<name>,
 	/// <initialize>, <loader>)` with a `FindClass` fallback.
 	///
-	/// This is a convenience wrapper around [LoaderContext::load_class] with
-	/// [LoaderContext::None].
+	/// This is a convenience wrapper around [`LoaderContext::load_class`] with
+	/// [`LoaderContext::None`].
 	///
 	/// `name` should be a binary name like `jni_str!("java.lang.Number")` or an
 	/// array descriptor like `jni_str!("[Ljava.lang.Number;")`.
 	///
-	/// **Note:** that unlike [Env::find_class], the name uses **dots instead of
+	/// **Note:** that unlike [`Env::find_class`], the name uses **dots instead of
 	/// slashes** and should conform to the format that `Class.getName()`
 	/// returns and that `Class.forName()` expects.
 	///
@@ -330,7 +336,7 @@ impl<'local> Env<'local> {
 	}
 
 	/// Returns the superclass for a particular class. Returns None for `java.lang.Object` or
-	/// an interface. As with [Self::find_class], takes a descriptor
+	/// an interface. As with [`Self::find_class`], takes a descriptor
 	///
 	/// # Errors
 	///

@@ -15,7 +15,7 @@ use crate::{
 ///
 /// This can be used to cast global or local references.
 ///
-/// See: [Env::as_cast]
+/// See: [`Env::as_cast`]
 ///
 #[repr(transparent)]
 #[derive(Debug)]
@@ -32,7 +32,7 @@ impl<'any, 'from, To: Reference> Cast<'any, 'from, To> {
 	///
 	/// This can be used to cast global or local references.
 	///
-	/// Returns [Error::WrongObjectType] if the object is not of the expected type.
+	/// Returns [`Error::WrongObjectType`] if the object is not of the expected type.
 	pub(crate) fn new<'env_local, From: Reference + AsRef<JObject<'any>>>(
 		env: &Env<'env_local>,
 		from: &'from From,
@@ -73,7 +73,7 @@ impl<'any, 'from, To: Reference> Cast<'any, 'from, To> {
 
 	/// Creates a [`Cast`] from a raw JNI reference pointer
 	///
-	/// Returns [Error::WrongObjectType] if the object is not of the expected type.
+	/// Returns [`Error::WrongObjectType`] if the object is not of the expected type.
 	///
 	/// # Safety
 	///
@@ -185,7 +185,7 @@ impl<'any, 'from, To: Reference> Cast<'any, 'from, To> {
 	}
 }
 
-impl<'local, 'from, To: Reference> Deref for Cast<'local, 'from, To> {
+impl<'local, To: Reference> Deref for Cast<'local, '_, To> {
 	type Target = To::Kind<'local>;
 
 	fn deref(&self) -> &Self::Target {
@@ -193,13 +193,13 @@ impl<'local, 'from, To: Reference> Deref for Cast<'local, 'from, To> {
 	}
 }
 
-impl<'local, 'from, To: Reference> AsRef<To::Kind<'local>> for Cast<'local, 'from, To> {
+impl<'local, To: Reference> AsRef<To::Kind<'local>> for Cast<'local, '_, To> {
 	fn as_ref(&self) -> &To::Kind<'local> {
 		&self.to
 	}
 }
 
-unsafe impl<'any, 'from, To: Reference> Reference for Cast<'any, 'from, To> {
+unsafe impl<To: Reference> Reference for Cast<'_, '_, To> {
 	type Kind<'local> = To::Kind<'local>;
 	type GlobalKind = To::GlobalKind;
 

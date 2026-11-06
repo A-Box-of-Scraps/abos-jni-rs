@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+	FieldSignature, Ident, JavaClassName, MethodSignature, Parameter, Parse, ParseStream, Result, SigType, Signature,
+	SignatureInput, Span, Token, TypeMappings, parenthesized, parse_parameter_with_index, parse_type, token,
+};
 
 impl Parse for SignatureInput {
 	fn parse(input: ParseStream) -> Result<Self> {
@@ -60,10 +63,7 @@ impl Parse for SignatureInput {
 					_ => {
 						return Err(syn::Error::new(
 							prop_name.span(),
-							format!(
-								"unknown property '{}'. Valid properties are: sig, type_map, jni",
-								prop_str
-							),
+							format!("unknown property '{prop_str}'. Valid properties are: sig, type_map, jni"),
 						));
 					}
 				}
@@ -91,7 +91,7 @@ impl Parse for SignatureInput {
 			)
 		})?;
 
-		Ok(SignatureInput {
+		Ok(Self {
 			signature,
 			type_mappings,
 		})
@@ -110,7 +110,7 @@ pub(super) fn parse_signature(input: ParseStream, type_mappings: &TypeMappings) 
 			let lit = input.parse::<syn::LitCStr>()?;
 			let cstr = lit.value();
 			cstr.to_str()
-				.map_err(|e| syn::Error::new(lit.span(), format!("CStr literal must contain valid UTF-8: {}", e)))?
+				.map_err(|e| syn::Error::new(lit.span(), format!("CStr literal must contain valid UTF-8: {e}")))?
 				.to_string()
 		} else {
 			let lit = input.parse::<syn::LitStr>()?;
@@ -129,12 +129,18 @@ pub(super) fn parse_signature(input: ParseStream, type_mappings: &TypeMappings) 
 			if parts.is_empty() {
 				return Err(syn::Error::new(
 					input.span(),
-					format!("Empty Java class name in string literal: '{}'", raw_sig),
+					format!("Empty Java class name in string literal: '{raw_sig}'"),
 				));
 			}
 
-			let class = parts.last().unwrap().to_string();
-			let package: Vec<String> = parts[..parts.len() - 1].iter().map(|s| s.to_string()).collect();
+			let class = parts
+				.last()
+				.expect("splitting a class name yields at least one component")
+				.to_string();
+			let package: Vec<String> = parts[..parts.len() - 1]
+				.iter()
+				.map(std::string::ToString::to_string)
+				.collect();
 
 			let java_class = JavaClassName { package, class };
 			Ok(Signature::Field(FieldSignature {
@@ -201,7 +207,7 @@ pub(super) fn parse_raw_jni_method_signature(sig: &str) -> Result<Signature> {
 	if !sig.starts_with('(') {
 		return Err(syn::Error::new(
 			Span::call_site(),
-			format!("Method signature must start with '(': '{}'", sig),
+			format!("Method signature must start with '(': '{sig}'"),
 		));
 	}
 
@@ -209,7 +215,7 @@ pub(super) fn parse_raw_jni_method_signature(sig: &str) -> Result<Signature> {
 	let close_paren = sig.find(')').ok_or_else(|| {
 		syn::Error::new(
 			Span::call_site(),
-			format!("Method signature missing closing ')': '{}'", sig),
+			format!("Method signature missing closing ')': '{sig}'"),
 		)
 	})?;
 
@@ -230,7 +236,7 @@ pub(super) fn parse_raw_jni_method_signature(sig: &str) -> Result<Signature> {
 	if ret_str.is_empty() {
 		return Err(syn::Error::new(
 			Span::call_site(),
-			format!("Method signature missing return type: '{}'", sig),
+			format!("Method signature missing return type: '{sig}'"),
 		));
 	}
 
@@ -247,7 +253,7 @@ pub(super) fn parse_raw_jni_method_signature(sig: &str) -> Result<Signature> {
 		.into_iter()
 		.enumerate()
 		.map(|(i, ty)| Parameter {
-			name: Ident::new(&format!("arg{}", i), Span::call_site()),
+			name: Ident::new(&format!("arg{i}"), Span::call_site()),
 			ty,
 		})
 		.collect();
@@ -272,7 +278,7 @@ pub(super) fn parse_raw_jni_field_signature(sig: &str) -> Result<Signature> {
 	if matches!(field_type, SigType::Alias(ref name) if name == "void") {
 		return Err(syn::Error::new(
 			Span::call_site(),
-			format!("void cannot be used as a field type in signature: '{}'", sig),
+			format!("void cannot be used as a field type in signature: '{sig}'"),
 		));
 	}
 
@@ -280,7 +286,7 @@ pub(super) fn parse_raw_jni_field_signature(sig: &str) -> Result<Signature> {
 }
 
 /// Parse a single JNI type descriptor from a string
-/// Returns the JavaType and the number of bytes consumed
+/// Returns the `JavaType` and the number of bytes consumed
 pub(super) fn parse_raw_jni_type(s: &str) -> Result<(SigType, usize)> {
 	let bytes = s.as_bytes();
 	if bytes.is_empty() {
@@ -308,7 +314,7 @@ pub(super) fn parse_raw_jni_type(s: &str) -> Result<(SigType, usize)> {
 			if matches!(elem_type, SigType::Alias(ref name) if name == "void") {
 				return Err(syn::Error::new(
 					Span::call_site(),
-					format!("void cannot be used as an array element type in signature: '{}'", s),
+					format!("void cannot be used as an array element type in signature: '{s}'"),
 				));
 			}
 
@@ -316,9 +322,9 @@ pub(super) fn parse_raw_jni_type(s: &str) -> Result<(SigType, usize)> {
 		}
 		'L' => {
 			// Object type - find the semicolon
-			let end = s.find(';').ok_or_else(|| {
-				syn::Error::new(Span::call_site(), format!("Object type missing closing ';': '{}'", s))
-			})?;
+			let end = s
+				.find(';')
+				.ok_or_else(|| syn::Error::new(Span::call_site(), format!("Object type missing closing ';': '{s}'")))?;
 
 			let class_name = &s[1..end];
 
@@ -326,19 +332,19 @@ pub(super) fn parse_raw_jni_type(s: &str) -> Result<(SigType, usize)> {
 			if class_name.is_empty() {
 				return Err(syn::Error::new(
 					Span::call_site(),
-					format!("Empty class name in object type: '{}'", s),
+					format!("Empty class name in object type: '{s}'"),
 				));
 			}
 			if class_name.starts_with('/') {
 				return Err(syn::Error::new(
 					Span::call_site(),
-					format!("Class name cannot start with '/': '{}'", s),
+					format!("Class name cannot start with '/': '{s}'"),
 				));
 			}
 			if class_name.ends_with('/') {
 				return Err(syn::Error::new(
 					Span::call_site(),
-					format!("Class name cannot end with '/': '{}'", s),
+					format!("Class name cannot end with '/': '{s}'"),
 				));
 			}
 
@@ -346,7 +352,7 @@ pub(super) fn parse_raw_jni_type(s: &str) -> Result<(SigType, usize)> {
 			if class_name.contains("//") {
 				return Err(syn::Error::new(
 					Span::call_site(),
-					format!("Class name contains empty segment: '{}'", s),
+					format!("Class name contains empty segment: '{s}'"),
 				));
 			}
 
@@ -355,10 +361,16 @@ pub(super) fn parse_raw_jni_type(s: &str) -> Result<(SigType, usize)> {
 			let parts: Vec<&str> = class_name.split('/').collect();
 
 			// The last part is the class name (may contain '$' for inner classes)
-			let class = parts.last().unwrap().to_string();
+			let class = parts
+				.last()
+				.expect("splitting a class name yields at least one component")
+				.to_string();
 
 			// Everything before the last part is the package
-			let package: Vec<String> = parts[..parts.len() - 1].iter().map(|s| s.to_string()).collect();
+			let package: Vec<String> = parts[..parts.len() - 1]
+				.iter()
+				.map(std::string::ToString::to_string)
+				.collect();
 
 			let java_class = JavaClassName { package, class };
 
@@ -366,7 +378,7 @@ pub(super) fn parse_raw_jni_type(s: &str) -> Result<(SigType, usize)> {
 		}
 		c => Err(syn::Error::new(
 			Span::call_site(),
-			format!("Invalid type descriptor: '{}'", c),
+			format!("Invalid type descriptor: '{c}'"),
 		)),
 	}
 }

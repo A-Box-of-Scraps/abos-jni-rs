@@ -2,10 +2,10 @@
 #![allow(missing_docs, reason = "Executable examples and test fixtures are not library API.")]
 #![cfg(feature = "invocation")]
 //! Example demonstrating a wrapper macro that can inject the jni crate path
-//! and a type_map into jni_sig! invocations.
+//! and a `type_map` into `jni_sig`! invocations.
 //!
-//! Notably the wrapper doesn't need to know anything about the syntax of jni_sig!
-//! and it doesn't block the user from adding their own type_map.
+//! Notably the wrapper doesn't need to know anything about the syntax of `jni_sig`!
+//! and it doesn't block the user from adding their own `type_map`.
 
 use abos_jni::signature::MethodSignature;
 

@@ -19,7 +19,7 @@ fn test_exception_unsafe_calls() {
 
 		let res = env.new_string("Test");
 
-		println!("new_string res = {:?}", res);
+		println!("new_string res = {res:?}");
 		// No new string should be allocated because there is a pending exception
 		// and until the exception is cleared, the JNI calls would lead to
 		// undefined behavior
@@ -33,7 +33,7 @@ fn test_exception_unsafe_calls() {
 		Ok(())
 	});
 
-	println!("res = {:?}", res);
+	println!("res = {res:?}");
 	assert!(matches!(res, Err(abos_jni::errors::Error::CaughtJavaException {
 		ref name,
 		ref msg,
@@ -58,7 +58,7 @@ fn test_bind_java_type_exception_safety_checks() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -66,15 +66,15 @@ fn test_get_method_id_exception_side_effects() {
 	let jvm = util::jvm();
 
 	jvm.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
-		let s = env.new_string("Test").unwrap();
+		let s = env.new_string("Test").expect("test string can be allocated");
 
-		let str_class = env.get_object_class(&s).unwrap();
+		let str_class = env.get_object_class(&s).expect("get object class succeeds");
 		let res = env.get_method_id(
 			str_class,
 			abos_jni::jni_str!("invalidMethod"),
 			abos_jni::jni_sig!("()V"),
 		);
-		println!("method ID lookup result {:?}", res);
+		println!("method ID lookup result {res:?}");
 
 		match res {
 			Err(abos_jni::errors::Error::MethodNotFound { .. }) => {
@@ -97,7 +97,7 @@ fn test_get_method_id_exception_side_effects() {
 		}
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -105,11 +105,11 @@ fn test_get_field_id_exception_side_effects() {
 	let jvm = util::jvm();
 
 	jvm.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
-		let s = env.new_string("Test").unwrap();
+		let s = env.new_string("Test").expect("test string can be allocated");
 
-		let str_class = env.get_object_class(&s).unwrap();
+		let str_class = env.get_object_class(&s).expect("get object class succeeds");
 		let res = env.get_field_id(str_class, abos_jni::jni_str!("invalidField"), abos_jni::jni_sig!("Z"));
-		println!("field ID lookup result {:?}", res);
+		println!("field ID lookup result {res:?}");
 
 		match res {
 			Err(abos_jni::errors::Error::FieldNotFound { .. }) => {
@@ -132,7 +132,7 @@ fn test_get_field_id_exception_side_effects() {
 		}
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn test_find_class_exception_side_effects() {
 
 	jvm.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
 		let res = env.find_class(abos_jni::jni_str!("java/lang/string")); // typo of `String`
-		println!("result = {:?}", res);
+		println!("result = {res:?}");
 		match res {
 			Err(abos_jni::errors::Error::NoClassDefFound { .. }) => {
 				assert!(
@@ -166,7 +166,7 @@ fn test_find_class_exception_side_effects() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -175,7 +175,7 @@ fn test_load_class_exception_side_effects() {
 
 	jvm.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
 		let res = env.load_class(abos_jni::jni_str!("java/lang/string")); // typo of `String`
-		println!("result = {:?}", res);
+		println!("result = {res:?}");
 		match res {
 			Err(abos_jni::errors::Error::NoClassDefFound { .. }) => {
 				assert!(
@@ -200,7 +200,7 @@ fn test_load_class_exception_side_effects() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -208,8 +208,8 @@ fn test_global_drop_no_exception_side_effects() {
 	let jvm = util::jvm();
 
 	jvm.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
-		let s = env.new_string("Test").unwrap();
-		let global = env.new_global_ref(s).unwrap();
+		let s = env.new_string("Test").expect("test string can be allocated");
+		let global = env.new_global_ref(s).expect("global reference can be allocated");
 
 		// Don't use '?' here because we want to continue with the JavaException error
 		// indicating a pending exception.
@@ -228,7 +228,7 @@ fn test_global_drop_no_exception_side_effects() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -236,8 +236,8 @@ fn test_weak_drop_no_exception_side_effects() {
 	let jvm = util::jvm();
 
 	jvm.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
-		let s = env.new_string("Test").unwrap();
-		let weak = env.new_weak_ref(s).unwrap();
+		let s = env.new_string("Test").expect("test string can be allocated");
+		let weak = env.new_weak_ref(s).expect("weak reference can be allocated");
 
 		// Don't use '?' here because we want to continue with the JavaException error
 		// indicating a pending exception.
@@ -255,7 +255,7 @@ fn test_weak_drop_no_exception_side_effects() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -268,7 +268,7 @@ fn test_env_throw_apis_return_java_exception_err() {
 		assert!(env.exception_check());
 
 		let catch = env.exception_catch();
-		println!("Caught exception: {:?}", catch);
+		println!("Caught exception: {catch:?}");
 		assert!(matches!(catch, Err(abos_jni::errors::Error::CaughtJavaException {
                 ref name,
                 ref msg,
@@ -284,7 +284,7 @@ fn test_env_throw_apis_return_java_exception_err() {
 		assert!(env.exception_check());
 
 		let catch = env.exception_catch();
-		println!("Caught exception: {:?}", catch);
+		println!("Caught exception: {catch:?}");
 		assert!(matches!(catch, Err(abos_jni::errors::Error::CaughtJavaException {
                 ref name,
                 ref msg,
@@ -297,7 +297,7 @@ fn test_env_throw_apis_return_java_exception_err() {
 		assert!(env.exception_check());
 
 		let catch = env.exception_catch();
-		println!("Caught exception: {:?}", catch);
+		println!("Caught exception: {catch:?}");
 		assert!(matches!(catch, Err(abos_jni::errors::Error::CaughtJavaException {
                 ref name,
                 ref msg,
@@ -307,7 +307,7 @@ fn test_env_throw_apis_return_java_exception_err() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -315,7 +315,7 @@ fn test_no_attach_current_thread_side_effects() {
 	let jvm = util::jvm();
 
 	jvm.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
-		let jvm = abos_jni::JavaVM::singleton().unwrap();
+		let jvm = abos_jni::JavaVM::singleton().expect("test JVM has been initialized");
 
 		// Don't use '?' here because we want to continue with the JavaException error
 		// indicating a pending exception.
@@ -327,7 +327,7 @@ fn test_no_attach_current_thread_side_effects() {
 			let e: JThrowable = e.into();
 			env.throw(e)
 		});
-		println!("attach_current_thread_result = {:?}", res);
+		println!("attach_current_thread_result = {res:?}");
 		// The test exception should have been temporarily cleared before running the
 		// nested attachment closure, and we should get back the exception that the
 		// closure throws
@@ -339,7 +339,7 @@ fn test_no_attach_current_thread_side_effects() {
 
 		// The original 'Test Exception' should be re-thrown and still be pending here
 		let catch = env.exception_catch();
-		println!("Caught exception: {:?}", catch);
+		println!("Caught exception: {catch:?}");
 		assert!(matches!(catch, Err(abos_jni::errors::Error::CaughtJavaException {
                 ref name,
                 ref msg,
@@ -364,7 +364,7 @@ fn test_no_attach_current_thread_side_effects() {
 		assert!(matches!(res, Err(abos_jni::errors::Error::JavaException)));
 
 		let catch = env.exception_catch();
-		println!("Caught exception: {:?}", catch);
+		println!("Caught exception: {catch:?}");
 		assert!(matches!(catch, Err(abos_jni::errors::Error::CaughtJavaException {
                 ref name,
                 ref msg,
@@ -393,5 +393,5 @@ fn test_no_attach_current_thread_side_effects() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }

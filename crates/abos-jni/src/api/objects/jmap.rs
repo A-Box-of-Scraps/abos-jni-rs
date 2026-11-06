@@ -1,6 +1,6 @@
 use crate::{
 	Env,
-	errors::*,
+	errors::Result,
 	objects::{JIterator, JObject, Reference},
 };
 
@@ -75,7 +75,7 @@ crate::bind_java_type! {
 		///
 		/// - `UnsupportedOperationException` - if the replace operation is not supported by this map
 		/// - `ClassCastException` - if the key or value are of an inappropriate type for this map
-		/// - `NullPointerException` - if the key, new_value or old_value is null and this map does not allow null keys or values
+		/// - `NullPointerException` - if the key, `new_value` or `old_value` is null and this map does not allow null keys or values
 		/// - `IllegalArgumentException` - if some property of the value prevents it from being stored by this map
 		fn replace_value {
 			name = "replace",
@@ -99,7 +99,7 @@ crate::bind_java_type! {
 		///
 		/// Returns a [JSet] view of the mappings contained in the map, which can be used to iterate over the key/value pairs.
 		///
-		/// Also see [JSet::iterator] and [Self::iter]
+		/// Also see [`JSet::iterator`] and [`Self::iter`]
 		fn entry_set() -> JSet,
 		/// Get a `JSet` view of the keys contained in this map
 		fn key_set() -> JSet,
@@ -108,7 +108,7 @@ crate::bind_java_type! {
 	}
 }
 
-impl<'local> JMap<'local> {
+impl JMap<'_> {
 	/// Cast a local reference to a `JMap`
 	///
 	/// See [`JMap::cast_local`] for more information.
@@ -130,7 +130,7 @@ impl<'local> JMap<'local> {
 	///
 	/// If the map permits null values, this method cannot distinguish between a
 	/// key that is not present and a key that is explicitly mapped to `null`.
-	/// In that case, use [JMap::contains_key] to determine if the key is
+	/// In that case, use [`JMap::contains_key`] to determine if the key is
 	/// present.
 	///
 	/// # Throws
@@ -262,9 +262,9 @@ crate::bind_java_type! {
 /// information.
 ///
 /// This is implemented as a thin wrapper over [`JIterator`] and the only
-/// difference is that [JMapIter::next] will yield [JMapEntry] values,
+/// difference is that [`JMapIter::next`] will yield [`JMapEntry`] values,
 /// (avoiding the need for a runtime type check, compared to using
-/// [JIterator::next] followed by [`JMapEntry::cast_local`]).
+/// [`JIterator::next`] followed by [`JMapEntry::cast_local`]).
 ///
 /// This derefs to [`JIterator`].
 #[derive(Debug)]
@@ -280,7 +280,7 @@ impl<'local> Deref for JMapIter<'local> {
 	}
 }
 
-impl<'local> JMapIter<'local> {
+impl JMapIter<'_> {
 	/// Advances the iterator and returns the next key-value pair in the
 	/// `java.util.Map`, or `None` if there are no more objects.
 	///

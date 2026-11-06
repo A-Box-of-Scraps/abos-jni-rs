@@ -1,10 +1,13 @@
-use super::*;
+use super::{
+	ConcreteType, Ident, JavaClassName, ParseStream, PrimitiveType, Rc, Result, RustType, RustTypeTarget, Span, Token,
+	braced, path_to_string_no_spaces, typealias,
+};
 
 /// Type mappings from Rust Reference types to Java class names and aliases for
 /// primitive types
 ///
 /// Firstly, the type mappings start with a set of N:1 mapping from Rust type
-/// aliases to RustTypes that either represent a `Primitive` type or a
+/// aliases to `RustTypes` that either represent a `Primitive` type or a
 /// `Reference` type.
 ///
 /// E.g. `"jint"` => `{ Primitive(Int), abos_jni::sys::jint }`, `"i32"` => `{
@@ -14,12 +17,12 @@ use super::*;
 /// ## Reference Types
 ///
 ///   A Reference type is represented by a full Rust type path (e.g.,
-///   "abos_jni::objects::JString") (such as "JString" => "abos_jni::objects::JString")
+///   "`abos_jni::objects::JString`") (such as "`JString`" => "`abos_jni::objects::JString`")
 ///
 ///   Additionally, for the Reference types there are also:
 ///
 /// - A N:1 mapping from canonical Rust type paths to Java class names (such as
-///   "abos_jni::objects::JString" => "java.lang.String")
+///   "`abos_jni::objects::JString`" => "java.lang.String")
 ///
 ///   Note: that multiple Rust type paths can map to the same Java class name,
 ///   such as if a third-party crate provides it's own bindings for a java.lang
@@ -31,7 +34,7 @@ use super::*;
 ///   java.lang.Throwable.
 ///
 /// - A 1:1 mapping from Java class names to canonical Rust type paths (such as
-///   "java.lang.String" => "abos_jni::objects::JString")
+///   "java.lang.String" => "`abos_jni::objects::JString`")
 ///
 ///   Note: When there are multiple Rust type paths that map to the same Java
 ///   class name, then the most-recently added mapping takes precedence in the
@@ -41,11 +44,11 @@ use super::*;
 /// ## Primitive Types
 ///
 /// A primitive type is represented by the `PrimitiveType` enum, and a full path
-/// to the `abos_jni::sys` primitive type (e.g., "abos_jni::sys::jint") or the name of an
+/// to the `abos_jni::sys` primitive type (e.g., "`abos_jni::sys::jint`") or the name of an
 /// equivalent Rust primitive type (e.g., "i32").
 ///
-/// Each JNI primitive typically has two primitive RustTypes:
-/// - The `abos_jni::sys` type (e.g., "abos_jni::sys::jint")
+/// Each JNI primitive typically has two primitive `RustTypes`:
+/// - The `abos_jni::sys` type (e.g., "`abos_jni::sys::jint`")
 /// - The Rust primitive type (e.g., "i32")
 ///
 /// and then one alias for the Java type name (e.g., "int") that points to the
@@ -53,12 +56,12 @@ use super::*;
 ///
 /// A `type_map` may add additional aliases for primitive types,
 ///
-/// There are no other mappings for primitive types beyond the alias -> RustType
+/// There are no other mappings for primitive types beyond the alias -> `RustType`
 pub struct TypeMappings {
 	/// Maps Rust type names to canonical Rust type paths
 	///
 	/// For example, built-in types have multiple aliases, so signatures can
-	/// use types like "JString" or "abos_jni::objects::JString" for the same type.
+	/// use types like "`JString`" or "`abos_jni::objects::JString`" for the same type.
 	///
 	/// Note: Even if the jni crate is renamed, the full-path alias for built-in
 	/// types will still have a `abos_jni::` prefix, and it's only the
@@ -69,9 +72,9 @@ pub struct TypeMappings {
 	/// Maps `RustType::path`s to Java class names
 	///
 	/// Only includes the canonical Rust type paths, so make sure to resolve
-	/// aliases like "JString" before looking up in this map.
+	/// aliases like "`JString`" before looking up in this map.
 	rust_to_java: std::collections::HashMap<Rc<RustType>, Rc<JavaClassName>>,
-	/// Reverse mapping from Java class names to the canonical RustType path
+	/// Reverse mapping from Java class names to the canonical `RustType` path
 	java_to_rust: std::collections::HashMap<Rc<JavaClassName>, Rc<RustType>>,
 	/// Set of core Java types that can not be mapped to non-jni-crate types
 	///

@@ -1,6 +1,6 @@
 use crate::{
 	Env,
-	errors::*,
+	errors::Result,
 	objects::{JIterator, JObject, Reference},
 	sys::jint,
 };
@@ -15,7 +15,7 @@ crate::bind_java_type! {
 		///
 		/// # Throws
 		///
-		/// - `IndexOutOfBoundsException` - if the index is out of range (index < 0 || index >= size())
+		/// - `IndexOutOfBoundsException` - if the index is out of range (index < 0 || index >= `size()`)
 		fn get(index: jint) -> JObject,
 		/// Insert an element at a specific index
 		fn insert {
@@ -34,7 +34,7 @@ crate::bind_java_type! {
 	}
 }
 
-impl<'local> JList<'local> {
+impl JList<'_> {
 	/// Cast a local reference to a `JList`
 	///
 	/// See [`JList::cast_local`] for more information.
@@ -54,7 +54,7 @@ impl<'local> JList<'local> {
 		self.as_collection().add(env, value)
 	}
 
-	/// Removes the first occurrence of `value` from this [JList], if it's present.
+	/// Removes the first occurrence of `value` from this [`JList`], if it's present.
 	///
 	/// Returns `true` if an element was removed.
 	///

@@ -19,13 +19,13 @@ fn invocation_character_encoding() {
 		// such as GBK.
 		.option("-Dnbsp=\u{00a0}")
 		.build()
-		.unwrap_or_else(|e| panic!("{:#?}", e));
+		.unwrap_or_else(|e| panic!("{e:#?}"));
 
-	let jvm = JavaVM::new(jvm_args).unwrap_or_else(|e| panic!("{:#?}", e));
+	let jvm = JavaVM::new(jvm_args).unwrap_or_else(|e| panic!("{e:#?}"));
 
 	jvm.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
 		println!("creating new_string, env = {:?}", env.get_raw());
-		let prop_name = env.new_string("nbsp").unwrap();
+		let prop_name = env.new_string("nbsp").expect("test string can be allocated");
 
 		println!("calling getProperty");
 		let prop_value = env
@@ -35,15 +35,17 @@ fn invocation_character_encoding() {
 				jni_sig!("(Ljava/lang/String;)Ljava/lang/String;"),
 				&[(&prop_name).into()],
 			)
-			.unwrap()
+			.expect("static method call succeeds")
 			.l()
-			.unwrap();
+			.expect("JNI result contains an object");
 		let prop_value = env.cast_local::<JString>(prop_value)?;
-		let prop_value_str = prop_value.mutf8_chars(env).unwrap();
+		let prop_value_str = prop_value
+			.mutf8_chars(env)
+			.expect("modified UTF-8 characters are accessible");
 		let prop_value_str: Cow<str> = prop_value_str.to_str();
 
 		assert_eq!("\u{00a0}", prop_value_str);
 		Ok(())
 	})
-	.unwrap()
+	.expect("attached JNI callback succeeds");
 }

@@ -136,7 +136,7 @@ where
 	/// # Safety
 	///
 	/// If the given reference is non-null, it must represent a weak global JNI reference.
-	pub(crate) unsafe fn new(_env: &Env, obj: T) -> Self {
+	pub(crate) const unsafe fn new(_env: &Env, obj: T) -> Self {
 		Self { obj }
 	}
 
@@ -146,6 +146,7 @@ where
 	///
 	/// A `null` [`Weak`] acts as-if the object has been garbage collected
 	/// ([`Self::is_garbage_collected()`] will return `true`).
+	#[must_use]
 	pub fn null() -> Self {
 		Self { obj: T::default() }
 	}
@@ -275,7 +276,7 @@ where
 			};
 
 			if let Err(err) = exception_safe_delete() {
-				debug!("error dropping weak ref: {:#?}", err);
+				debug!("error dropping weak ref: {err:#?}");
 			}
 		}
 	}

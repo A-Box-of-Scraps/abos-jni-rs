@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+	AbiCheck, Ident, NativeMethod, TokenStream, TypeMappings, extract_cfg_attrs, format_ident,
+	generate_native_method_abi_check, quote, sig_type_to_rust_native_trait_arg_type, sig_type_to_rust_return_type,
+};
 
 /// Generate wrapper functions for native methods as API struct methods
 #[allow(clippy::too_many_arguments)]
@@ -97,10 +100,10 @@ pub(super) fn generate_single_native_wrapper(
 		(Some(raw_fn), true) => {
 			// Call the function directly with unowned env - no with_env wrapper
 			let mut call_args = vec![quote! { unowned_env }];
-			if !method.is_static {
-				call_args.push(quote! { this });
-			} else {
+			if method.is_static {
 				call_args.push(quote! { class });
+			} else {
+				call_args.push(quote! { this });
 			}
 			for param in &method.method_signature.parameters {
 				let param_name = &param.name;
@@ -117,10 +120,10 @@ pub(super) fn generate_single_native_wrapper(
 		(Some(safe_fn), false) => {
 			// Wrap with EnvUnowned::with_env and error handling but skip trait
 			let mut call_args = vec![quote! { env }];
-			if !method.is_static {
-				call_args.push(quote! { this });
-			} else {
+			if method.is_static {
 				call_args.push(quote! { class });
+			} else {
+				call_args.push(quote! { this });
 			}
 			for param in &method.method_signature.parameters {
 				let param_name = &param.name;
@@ -135,8 +138,7 @@ pub(super) fn generate_single_native_wrapper(
 				.error_policy
 				.as_ref()
 				.or(default_error_policy.as_ref())
-				.map(|p| quote! { #p })
-				.unwrap_or_else(|| quote! { #jni::errors::ThrowRuntimeExAndDefault });
+				.map_or_else(|| quote! { #jni::errors::ThrowRuntimeExAndDefault }, |p| quote! { #p });
 
 			quote! {
 				unowned_env
@@ -152,10 +154,10 @@ pub(super) fn generate_single_native_wrapper(
 		(None, true) => {
 			// Call trait method directly without with_env wrapper
 			let mut call_args = vec![quote! { unowned_env }];
-			if !method.is_static {
-				call_args.push(quote! { this });
-			} else {
+			if method.is_static {
 				call_args.push(quote! { class });
+			} else {
+				call_args.push(quote! { this });
 			}
 			for param in &method.method_signature.parameters {
 				let param_name = &param.name;
@@ -172,10 +174,10 @@ pub(super) fn generate_single_native_wrapper(
 		(None, false) => {
 			// Use trait method with with_env wrapper and error handling
 			let mut call_args = vec![quote! { env }];
-			if !method.is_static {
-				call_args.push(quote! { this });
-			} else {
+			if method.is_static {
 				call_args.push(quote! { class });
+			} else {
+				call_args.push(quote! { this });
 			}
 			for param in &method.method_signature.parameters {
 				let param_name = &param.name;
@@ -190,8 +192,7 @@ pub(super) fn generate_single_native_wrapper(
 				.error_policy
 				.as_ref()
 				.or(default_error_policy.as_ref())
-				.map(|p| quote! { #p })
-				.unwrap_or_else(|| quote! { #jni::errors::ThrowRuntimeExAndDefault });
+				.map_or_else(|| quote! { #jni::errors::ThrowRuntimeExAndDefault }, |p| quote! { #p });
 
 			quote! {
 				unowned_env

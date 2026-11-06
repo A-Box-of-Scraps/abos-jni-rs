@@ -16,7 +16,7 @@ use rusty_fork::rusty_fork_test;
 // Native method implementations
 // ====================================================================================
 
-fn native_add_impl<'local>(
+const fn native_add_impl<'local>(
 	_env: &mut Env<'local>,
 	_this: abos_jni::objects::JObject<'local>,
 	a: jint,
@@ -30,7 +30,7 @@ fn native_log_impl<'local>(
 	_this: abos_jni::objects::JObject<'local>,
 	message: JString<'local>,
 ) -> Result<(), abos_jni::errors::Error> {
-	println!("Native log: {}", message);
+	println!("Native log: {message}");
 	Ok(())
 }
 
@@ -94,14 +94,14 @@ fn native_get_message_impl<'local>(
 	Ok(result)
 }
 
-fn native_get_version_impl<'local>(
+const fn native_get_version_impl<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
 ) -> Result<jint, abos_jni::errors::Error> {
 	Ok(100)
 }
 
-fn native_string_array_echo_impl<'local>(
+const fn native_string_array_echo_impl<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
 	arr: JObjectArray<'local, JString<'local>>,
@@ -109,7 +109,7 @@ fn native_string_array_echo_impl<'local>(
 	Ok(arr)
 }
 
-fn native_2d_string_array_echo_impl<'local>(
+const fn native_2d_string_array_echo_impl<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
 	arr: JObjectArray<'local, JObjectArray<'local, JString<'local>>>,

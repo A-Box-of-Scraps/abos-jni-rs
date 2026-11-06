@@ -136,10 +136,7 @@ pub trait ErrorPolicy<T, E> {
 	where
 		T: Default,
 	{
-		log::error!(
-			"Secondary failure while handling error or panic in native method: {:?}",
-			err
-		);
+		log::error!("Secondary failure while handling error or panic in native method: {err:?}");
 		T::default()
 	}
 
@@ -196,7 +193,7 @@ impl<T: Default, E: std::error::Error> ErrorPolicy<T, E> for ThrowRuntimeExAndDe
 		if env.exception_check() {
 			return Ok(T::default()); // already thrown
 		}
-		let err_string = format!("Rust error: {}", err);
+		let err_string = format!("Rust error: {err}");
 		// Note: `env.throw()` will return `Err(Error::JavaException)` after throwing but in this case
 		// (where we are going to be letting the exception propagate to Java), we want to ensure we
 		// don't return that as an error
@@ -215,7 +212,7 @@ impl<T: Default, E: std::error::Error> ErrorPolicy<T, E> for ThrowRuntimeExAndDe
 				// Since it's possible that dropping a panic payload may itself panic,
 				// we catch any panic and fallback to forgetting/leaking the payload.
 				if let Err(drop_panic) = catch_unwind(AssertUnwindSafe(|| drop(payload))) {
-					log::error!("Panic while dropping panic payload: {:?}", drop_panic);
+					log::error!("Panic while dropping panic payload: {drop_panic:?}");
 					std::mem::forget(drop_panic);
 				}
 				"non-string panic payload".to_string()
@@ -225,7 +222,7 @@ impl<T: Default, E: std::error::Error> ErrorPolicy<T, E> for ThrowRuntimeExAndDe
 		// Note: `env.throw()` will return `Err(Error::JavaException)` after throwing but in this case
 		// (where we are going to be letting the exception propagate to Java), we want to ensure we
 		// don't return that as an error
-		let _ = env.throw(format!("Rust panic: {}", panic_string));
+		let _ = env.throw(format!("Rust panic: {panic_string}"));
 		Ok(T::default())
 	}
 }
@@ -245,7 +242,7 @@ impl<T: Default, E: std::error::Error> ErrorPolicy<T, E> for LogErrorAndDefault 
 		_cap: &mut Self::Captures<'unowned_env_local, 'native_method>,
 		err: E,
 	) -> crate::errors::Result<T> {
-		log::error!("Rust error: {}", err);
+		log::error!("Rust error: {err}");
 		Ok(T::default())
 	}
 
@@ -260,13 +257,13 @@ impl<T: Default, E: std::error::Error> ErrorPolicy<T, E> for LogErrorAndDefault 
 				// Since it's possible that dropping a panic payload may itself panic,
 				// we catch any panic and fallback to forgetting/leaking the payload.
 				if let Err(drop_panic) = catch_unwind(AssertUnwindSafe(|| drop(payload))) {
-					log::error!("Panic while dropping panic payload: {:?}", drop_panic);
+					log::error!("Panic while dropping panic payload: {drop_panic:?}");
 					std::mem::forget(drop_panic);
 				}
 				"non-string panic payload".to_string()
 			}
 		};
-		log::error!("Rust panic: {}", panic_string);
+		log::error!("Rust panic: {panic_string}");
 		Ok(T::default())
 	}
 }
@@ -324,7 +321,7 @@ impl<T: Default, E: std::error::Error> ErrorPolicy<T, E> for LogContextErrorAndD
 				// Since it's possible that dropping a panic payload may itself panic,
 				// we catch any panic and fallback to forgetting/leaking the payload.
 				if let Err(drop_panic) = catch_unwind(AssertUnwindSafe(|| drop(payload))) {
-					log::error!("Panic while dropping panic payload: {:?}", drop_panic);
+					log::error!("Panic while dropping panic payload: {drop_panic:?}");
 					std::mem::forget(drop_panic);
 				}
 				"non-string panic payload".to_string()
@@ -374,7 +371,7 @@ mod tests {
 			payload: Box<dyn std::any::Any + Send + 'static>,
 		) -> crate::errors::Result<T> {
 			// Handle the panic, possibly throwing a Java exception
-			eprintln!("Panic: {:?}", payload);
+			eprintln!("Panic: {payload:?}");
 			// You can access cap.context here
 			Ok(T::default())
 		}

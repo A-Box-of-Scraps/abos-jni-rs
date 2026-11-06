@@ -13,9 +13,9 @@ pub fn jvm() -> JavaVM {
 			.version(JNIVersion::V1_8)
 			.option("-Xcheck:jni")
 			.build()
-			.unwrap_or_else(|e| panic!("{:#?}", e));
+			.unwrap_or_else(|e| panic!("{e:#?}"));
 
-		let _jvm = JavaVM::new(jvm_args).unwrap_or_else(|e| panic!("{:#?}", e));
+		let _jvm = JavaVM::new(jvm_args).unwrap_or_else(|e| panic!("{e:#?}"));
 	});
 	JavaVM::singleton().expect("Failed to get singleton JVM")
 }
@@ -37,15 +37,16 @@ fn setup_javac_output_dir() -> PathBuf {
 			// OUT_DIR is something like .../target/debug/build/jni-macros-xxxx/out
 			let mut path = PathBuf::from(out_dir);
 			while path.file_name().is_some() {
-				if path.file_name().unwrap() == "target" {
+				if path.file_name().expect("build output path has a final component") == "target" {
 					break;
 				}
 				path.pop();
 			}
 			let cachedir_tag = path.join("CACHEDIR.TAG");
-			if !Path::exists(&cachedir_tag) {
-				panic!("Couldn't find 'target' directory from OUT_DIR");
-			}
+			assert!(
+				Path::exists(&cachedir_tag),
+				"Couldn't find 'target' directory from OUT_DIR"
+			);
 			path
 		} else {
 			PathBuf::from("target")
@@ -53,7 +54,7 @@ fn setup_javac_output_dir() -> PathBuf {
 		target_dir.join("examples-java-classes")
 	};
 
-	std::fs::create_dir_all(&build_dir).unwrap_or_else(|e| panic!("Failed to create javac output directory: {}", e));
+	std::fs::create_dir_all(&build_dir).unwrap_or_else(|e| panic!("Failed to create javac output directory: {e}"));
 
 	build_dir
 }
@@ -77,7 +78,7 @@ pub fn compile_class(name: &str) -> Vec<PathBuf> {
 		.cargo_metadata(false) // don't output build.rs lines like "cargo:rerun-if-changed=..."
 		.compile();
 
-	println!("Compiled Java class {name}.java as: {:?}", files);
+	println!("Compiled Java class {name}.java as: {files:?}");
 	files
 }
 
@@ -103,7 +104,7 @@ pub fn load_class(env: &mut Env, name: &str) -> abos_jni::errors::Result<()> {
 }
 
 /// Define a stub Reference type for use in examples, without depending on
-/// the bind_java_type! macro.
+/// the `bind_java_type`! macro.
 #[macro_export]
 macro_rules! define_stub_type {
 	($rust_type:ident, $java_type:literal) => {

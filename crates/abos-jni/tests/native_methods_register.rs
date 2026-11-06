@@ -9,20 +9,30 @@ use abos_jni::sys::{jint, jlong};
 use abos_jni::{Env, NativeMethod, native_method};
 
 // Instance method implementations
-fn add_impl<'local>(_env: &mut Env<'local>, _this: JObject<'local>, a: jint, b: jint) -> Result<jint, Error> {
+const fn add_impl<'local>(_env: &mut Env<'local>, _this: JObject<'local>, a: jint, b: jint) -> Result<jint, Error> {
 	Ok(a + b)
 }
 
-fn multiply_impl<'local>(_env: &mut Env<'local>, _this: JObject<'local>, a: jint, b: jint) -> Result<jint, Error> {
+const fn multiply_impl<'local>(
+	_env: &mut Env<'local>,
+	_this: JObject<'local>,
+	a: jint,
+	b: jint,
+) -> Result<jint, Error> {
 	Ok(a * b)
 }
 
 // Static method implementations
-fn static_add_impl<'local>(_env: &mut Env<'local>, _class: JClass<'local>, a: jlong, b: jlong) -> Result<jlong, Error> {
+const fn static_add_impl<'local>(
+	_env: &mut Env<'local>,
+	_class: JClass<'local>,
+	a: jlong,
+	b: jlong,
+) -> Result<jlong, Error> {
 	Ok(a + b)
 }
 
-fn static_multiply_impl<'local>(
+const fn static_multiply_impl<'local>(
 	_env: &mut Env<'local>,
 	_class: JClass<'local>,
 	a: jlong,

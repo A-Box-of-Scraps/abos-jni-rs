@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+	Field, Ident, TokenStream, TypeMappings, extract_cfg_attrs, format_ident, generate_jni_get_field_call,
+	generate_jni_set_field_call, quote, sig_type_to_rust_arg_type, sig_type_to_rust_return_type,
+};
 
 /// Generate field getter/setter implementations (without any impl block wrapper)
 pub(super) fn generate_fields(
@@ -89,13 +92,13 @@ pub(super) fn generate_fields(
 			// Determine which attributes to apply to getter
 			// If getter_attrs are explicitly set, use those (plus field cfg)
 			// Otherwise, use the field's attrs
-			let mut getter_attributes = if !field.getter_attrs.is_empty() {
+			let mut getter_attributes = if field.getter_attrs.is_empty() {
+				field.attrs.clone()
+			} else {
 				// Merge: field cfg attrs + explicit getter attrs
 				let mut attrs = field_cfg_attrs.clone();
 				attrs.extend(field.getter_attrs.clone());
 				attrs
-			} else {
-				field.attrs.clone()
 			};
 
 			if !getter_attributes.iter().any(|attr| attr.path().is_ident("doc")) {
@@ -158,18 +161,18 @@ pub(super) fn generate_fields(
 			// Determine which attributes to apply to setter
 			// If setter_attrs are explicitly set, use those (plus field cfg)
 			// Otherwise, use the field's attrs (excluding doc)
-			let mut setter_attributes: Vec<syn::Attribute> = if !field.setter_attrs.is_empty() {
-				// Merge: field cfg attrs + explicit setter attrs
-				let mut attrs = field_cfg_attrs.clone();
-				attrs.extend(field.setter_attrs.clone());
-				attrs
-			} else {
+			let mut setter_attributes: Vec<syn::Attribute> = if field.setter_attrs.is_empty() {
 				field
 					.attrs
 					.iter()
 					.filter(|attr| !attr.path().is_ident("doc"))
 					.cloned()
 					.collect()
+			} else {
+				// Merge: field cfg attrs + explicit setter attrs
+				let mut attrs = field_cfg_attrs.clone();
+				attrs.extend(field.setter_attrs.clone());
+				attrs
 			};
 
 			if !setter_attributes.iter().any(|attr| attr.path().is_ident("doc")) {

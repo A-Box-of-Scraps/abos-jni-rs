@@ -19,14 +19,14 @@ crate::bind_java_type! {
 	}
 }
 
-impl<'local> JStackTraceElement<'local> {
+impl JStackTraceElement<'_> {
 	// In jni 0.22.0 and 0.22.1 we were incorrectly trying to lookup an isNative
 	// method and although it was impossible to call (because this API binding
 	// would fail to initialize) we also exported a public `is_native()` method
 	// that code could potentially have linked against.
 	#[doc(hidden)]
 	#[deprecated(since = "0.22.1", note = "Use `is_native_method` instead")]
-	pub fn is_native<'env_local>(&self, env: &::abos_jni::Env<'env_local>) -> ::abos_jni::errors::Result<bool> {
+	pub fn is_native(&self, env: &::abos_jni::Env<'_>) -> ::abos_jni::errors::Result<bool> {
 		self.is_native_method(env)
 	}
 }

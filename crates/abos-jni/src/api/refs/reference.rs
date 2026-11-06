@@ -230,6 +230,7 @@ pub unsafe trait Reference: Sized {
 	}
 
 	/// Returns `null` reference based on [`Self::Kind`]
+	#[must_use]
 	fn null<'any>() -> Self::Kind<'any> {
 		Self::Kind::default()
 	}
@@ -242,7 +243,7 @@ pub unsafe trait Reference: Sized {
 	///
 	/// For example: `"com.example.MyClass"`
 	///
-	/// Note: this format is very similar to the FindClass naming conventions,
+	/// Note: this format is very similar to the `FindClass` naming conventions,
 	/// except for the use of dots instead of slashes.
 	///
 	/// An array of objects would look like: "[Ljava.lang.Object;" An array of
@@ -272,8 +273,8 @@ pub unsafe trait Reference: Sized {
 	///
 	/// Whenever you need the class associated with some reference wrapper type
 	/// (e.g. [`JObject`], [`JClass`], [`JString`] etc), prefer using this
-	/// method instead of [Env::find_class], [Env::load_class] or
-	/// [LoaderContext::load_class].
+	/// method instead of [`Env::find_class`], [`Env::load_class`] or
+	/// [`LoaderContext::load_class`].
 	///
 	/// This [`Reference`] trait is implemented for all reference wrapper types
 	/// like [`JObject`], [`JString`], [`JClass`] etc.
@@ -286,7 +287,7 @@ pub unsafe trait Reference: Sized {
 	/// will return a guard that derefs to a `Global<JClass>`, rather than a
 	/// `JClass` directly.
 	///
-	/// For example, lookup the class for `java.lang.String` / [JString] like
+	/// For example, lookup the class for `java.lang.String` / [`JString`] like
 	/// this:
 	/// ```rust,no_run
 	/// # use abos_jni::{errors::Result, Env, objects::JClass};
@@ -309,7 +310,7 @@ pub unsafe trait Reference: Sized {
 	/// similar) to lookup cached API state, including a `Global<JClass>`.
 	///
 	/// In case no class reference is already cached then use
-	/// [`LoaderContext::load_class`] (not [Env::find_class]) to lookup a class
+	/// [`LoaderContext::load_class`] (not [`Env::find_class`]) to lookup a class
 	/// reference.
 	///
 	/// A bare-bones implementation could look like this:
@@ -362,7 +363,7 @@ pub unsafe trait Reference: Sized {
 	/// (as an exception it can be OK to create a temporary, hidden wrapper while borrowing an
 	/// original, owning wrapper - e.g. as part of a type cast)
 	///
-	/// Local references must have a lifetime that's associated with an AttachGuard or a Env that
+	/// Local references must have a lifetime that's associated with an `AttachGuard` or a Env that
 	/// limits them to a single JNI stack frame.
 	///
 	/// This can also be used to create a borrowed view of a global reference (e.g. as part of a

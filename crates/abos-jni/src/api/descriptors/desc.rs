@@ -1,6 +1,6 @@
 use crate::{
 	Env,
-	errors::*,
+	errors::Result,
 	objects::{Auto, Global, JObject, Reference},
 };
 
@@ -8,6 +8,7 @@ use crate::{
 use crate::objects::{JClass, JMethodID};
 
 /// Trait for things that can be looked up through the JNI via a descriptor.
+///
 /// This will be something like the fully-qualified class name
 /// `java/lang/String` or a tuple containing a class descriptor, method name,
 /// and method signature. For convenience, this is also implemented for the

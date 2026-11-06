@@ -48,7 +48,7 @@ impl From<&JNIStr> for JNIString {
 /// Similar to `CStr` and [`str`], instances of `JNIStr` are borrowed from a
 /// [`JNIString`].
 ///
-/// [JNIStr] is generally used for passing string arguments to JNI functions or
+/// [`JNIStr`] is generally used for passing string arguments to JNI functions or
 /// for viewing the borrowed contents of a `java.lang.String` object.
 ///
 /// As a special-case, a `&CStr` can be coerced into a `&JNIStr` if the `CStr`
@@ -94,7 +94,7 @@ where
 {
 	fn from(other: T) -> Self {
 		let enc = mutf8::encode(other.as_ref()).into_owned();
-		JNIString {
+		Self {
 			internal: unsafe { CString::from_vec_unchecked(enc) },
 		}
 	}
@@ -107,12 +107,12 @@ impl From<JNIString> for CString {
 }
 
 impl<'str_ref> From<&'str_ref JNIStr> for Cow<'str_ref, str> {
-	fn from(other: &'str_ref JNIStr) -> Cow<'str_ref, str> {
+	fn from(other: &'str_ref JNIStr) -> Self {
 		let bytes = other.as_cstr().to_bytes();
 		match mutf8::decode(bytes) {
 			Ok(s) => s,
 			Err(e) => {
-				debug!("error decoding java cesu8: {:#?}", e);
+				debug!("error decoding java cesu8: {e:#?}");
 				String::from_utf8_lossy(bytes)
 			}
 		}
@@ -133,7 +133,7 @@ impl<'str_ref> From<&'str_ref JNIString> for Cow<'str_ref, JNIStr> {
 }
 
 impl From<JNIString> for String {
-	fn from(other: JNIString) -> String {
+	fn from(other: JNIString) -> Self {
 		other.to_str().into_owned()
 	}
 }
@@ -141,7 +141,7 @@ impl From<JNIString> for String {
 impl std::fmt::Display for JNIStr {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let s = self.to_str();
-		write!(f, "{}", s)
+		write!(f, "{s}")
 	}
 }
 
@@ -164,6 +164,7 @@ impl JNIString {
 	/// The `string` must be in [modified UTF-8] encoding.
 	///
 	/// [modified UTF-8]: https://en.wikipedia.org/wiki/UTF-8#Modified_UTF-8
+	#[must_use]
 	pub const unsafe fn from_cstring(string: CString) -> Self {
 		Self { internal: string }
 	}
@@ -171,6 +172,7 @@ impl JNIString {
 	/// Converts a `JNIString` into a `CString`.
 	///
 	/// This method is zero-cost.
+	#[must_use]
 	pub fn into_cstring(self) -> CString {
 		self.internal
 	}
@@ -193,6 +195,7 @@ impl JNIString {
 	/// // …and so does this.
 	/// let borrowed: &JNIStr = &string;
 	/// ```
+	#[must_use]
 	pub fn borrowed(&self) -> &JNIStr {
 		self
 	}
@@ -294,8 +297,9 @@ impl JNIStr {
 	/// encoding.
 	///
 	/// [modified UTF-8]: https://en.wikipedia.org/wiki/UTF-8#Modified_UTF-8
-	pub unsafe fn from_ptr<'a>(ptr: *const c_char) -> &'a JNIStr {
-		unsafe { &*(CStr::from_ptr(ptr) as *const CStr as *const JNIStr) }
+	#[must_use]
+	pub const unsafe fn from_ptr<'a>(ptr: *const c_char) -> &'a Self {
+		unsafe { &*(std::ptr::from_ref::<CStr>(CStr::from_ptr(ptr)) as *const Self) }
 	}
 
 	/// Returns a pointer to the string.
@@ -307,6 +311,7 @@ impl JNIStr {
 	/// <code>self.[as_cstr][JNIStr::as_cstr]().[as_ptr][CStr::as_ptr]()</code>.
 	///
 	/// [modified UTF-8]: https://en.wikipedia.org/wiki/UTF-8#Modified_UTF-8
+	#[must_use]
 	pub const fn as_ptr(&self) -> *const c_char {
 		self.as_cstr().as_ptr()
 	}
@@ -321,9 +326,10 @@ impl JNIStr {
 	/// Note that standard UTF-8 has the same encoding as Modified UTF-8 for the code points U+0001 through U+FFFF (inclusive).
 	///
 	/// [Modified UTF-8]: https://docs.oracle.com/en/java/javase/11/docs/specs/jni/types.html#modified-utf-8-strings
-	pub const unsafe fn from_cstr_unchecked(cstr: &CStr) -> &JNIStr {
+	#[must_use]
+	pub const unsafe fn from_cstr_unchecked(cstr: &CStr) -> &Self {
 		// The reason we don't just use `from_ptr` here is that `CStr::from_ptr` is not yet a `const fn`.
-		unsafe { &*(cstr as *const CStr as *const JNIStr) }
+		unsafe { &*(std::ptr::from_ref::<CStr>(cstr) as *const Self) }
 	}
 
 	/// `const` casts a `&CStr` as a `&JNIStr`, after validating the input.
@@ -337,7 +343,8 @@ impl JNIStr {
 	/// In general though, it's recommended to use the [`crate::jni_str!`] macro
 	/// to encode string literals, since it has full unicode support and it
 	/// guarantees that the string is encoded at compile time.
-	pub const fn from_cstr(cstr: &CStr) -> Option<&JNIStr> {
+	#[must_use]
+	pub const fn from_cstr(cstr: &CStr) -> Option<&Self> {
 		if !is_valid_mutf8_cstr(cstr) {
 			return None;
 		}
@@ -365,6 +372,7 @@ impl JNIStr {
 	/// To convert to a Rust string, use the [`JNIStr::to_str`] method instead.
 	///
 	/// [modified UTF-8]: https://en.wikipedia.org/wiki/UTF-8#Modified_UTF-8
+	#[must_use]
 	pub const fn as_cstr(&self) -> &CStr {
 		&self.internal
 	}
@@ -386,6 +394,7 @@ impl JNIStr {
 	/// which has the same effect as this method.
 	///
 	/// [modified UTF-8]: https://en.wikipedia.org/wiki/UTF-8#Modified_UTF-8
+	#[must_use]
 	pub fn to_str(&'_ self) -> Cow<'_, str> {
 		self.into()
 	}
@@ -394,7 +403,8 @@ impl JNIStr {
 	///
 	/// The returned slice will **not** contain the trailing nul terminator that this JNI
 	/// string has.
-	pub fn to_bytes(&self) -> &[u8] {
+	#[must_use]
+	pub const fn to_bytes(&self) -> &[u8] {
 		self.as_cstr().to_bytes()
 	}
 }
@@ -416,8 +426,8 @@ impl ToOwned for JNIStr {
 	}
 }
 
-impl AsRef<JNIStr> for JNIStr {
-	fn as_ref(&self) -> &JNIStr {
+impl AsRef<Self> for JNIStr {
+	fn as_ref(&self) -> &Self {
 		self
 	}
 }

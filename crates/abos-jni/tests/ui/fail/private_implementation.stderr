@@ -1,0 +1,88 @@
+error[E0603]: struct `JObjectAPI` is private
+ --> tests/ui/fail/private_implementation.rs:1:25
+  |
+1 | use abos_jni::objects::{JObjectAPI, JObjectArrayAPI, JPrimitiveArrayAPI_jboolean, TypeArraySealed};
+  |                         ^^^^^^^^^^ private struct
+  |
+note: the struct `JObjectAPI` is defined here
+ --> src/api/objects/mod.rs
+  |
+  | pub(crate) use self::jobject::JObjectAPI;
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: struct `JObjectArrayAPI` is private
+ --> tests/ui/fail/private_implementation.rs:1:37
+  |
+1 | use abos_jni::objects::{JObjectAPI, JObjectArrayAPI, JPrimitiveArrayAPI_jboolean, TypeArraySealed};
+  |                                     ^^^^^^^^^^^^^^^ private struct
+  |
+note: the struct `JObjectArrayAPI` is defined here
+ --> src/api/objects/mod.rs
+  |
+  | pub(crate) use self::jobject_array::JObjectArrayAPI;
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: struct `JPrimitiveArrayAPI_jboolean` is private
+ --> tests/ui/fail/private_implementation.rs:1:54
+  |
+1 | use abos_jni::objects::{JObjectAPI, JObjectArrayAPI, JPrimitiveArrayAPI_jboolean, TypeArraySealed};
+  |                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ private struct
+  |
+note: the struct `JPrimitiveArrayAPI_jboolean` is defined here
+ --> src/api/objects/mod.rs
+  |
+  | pub(crate) use self::jprimitive_array::JPrimitiveArrayAPI_jboolean;
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: trait `TypeArraySealed` is private
+ --> tests/ui/fail/private_implementation.rs:1:83
+  |
+1 | use abos_jni::objects::{JObjectAPI, JObjectArrayAPI, JPrimitiveArrayAPI_jboolean, TypeArraySealed};
+  |                                                                                   ^^^^^^^^^^^^^^^ private trait
+  |
+note: the trait `TypeArraySealed` is defined here
+ --> src/api/objects/mod.rs
+  |
+  | pub(crate) use self::type_array::TypeArraySealed;
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function `sys_attach_current_thread` is private
+ --> tests/ui/fail/private_implementation.rs:2:20
+  |
+2 | use abos_jni::vm::{sys_attach_current_thread, sys_detach_current_thread};
+  |                    ^^^^^^^^^^^^^^^^^^^^^^^^^ private function
+  |
+note: the function `sys_attach_current_thread` is defined here
+ --> src/api/vm/mod.rs
+  |
+  | pub(crate) use self::java_vm::{sys_attach_current_thread, sys_detach_current_thread};
+  |                                ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function `sys_detach_current_thread` is private
+ --> tests/ui/fail/private_implementation.rs:2:47
+  |
+2 | use abos_jni::vm::{sys_attach_current_thread, sys_detach_current_thread};
+  |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^ private function
+  |
+note: the function `sys_detach_current_thread` is defined here
+ --> src/api/vm/mod.rs
+  |
+  | pub(crate) use self::java_vm::{sys_attach_current_thread, sys_detach_current_thread};
+  |                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function `sys_detach_current_thread` is private
+ --> tests/ui/fail/private_implementation.rs:4:15
+  |
+4 | use abos_jni::sys_detach_current_thread as root_detach;
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^ private function
+  |
+note: the function `sys_detach_current_thread` is defined here
+ --> src/lib.rs
+  |
+  | pub use api::*;
+  |         ^^^
+help: import `sys_detach_current_thread` directly
+  |
+4 - use abos_jni::sys_detach_current_thread as root_detach;
+4 + use abos_jni::api::vm::java_vm::sys_detach_current_thread;
+  |

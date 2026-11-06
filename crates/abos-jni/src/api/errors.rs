@@ -43,7 +43,7 @@ pub enum Error {
 	/// Note: This specifically represents a `ClassNotFoundException` thrown by
 	/// a class *loader* and is not expected to be returned by [`abos_jni::Env::find_class`],
 	/// [`abos_jni::Env::load_class`] or [`abos_jni::refs::LoaderContext`] that will
-	/// generally return [Self::NoClassDefFound] in case a class could not be found.
+	/// generally return [`Self::NoClassDefFound`] in case a class could not be found.
 	#[error("Class not found: {name:?}")]
 	ClassNotFound { name: String },
 
@@ -206,7 +206,7 @@ pub enum JniError {
 
 impl<T> From<::std::sync::TryLockError<T>> for Error {
 	fn from(_: ::std::sync::TryLockError<T>) -> Self {
-		Error::TryLock
+		Self::TryLock
 	}
 }
 

@@ -208,7 +208,7 @@ fn valid_namespace(namespace: &str) -> bool {
 	true
 }
 
-/// Converts a snake_case identifier to lowerCamelCase.
+/// Converts a `snake_case` identifier to lowerCamelCase.
 /// This transformation is idempotent - if the input is already in lowerCamelCase, it returns unchanged.
 /// If the input contains any uppercase letters, it's returned unchanged to preserve intentional casing.
 /// Leading underscores are preserved except for one underscore that is removed.
@@ -218,24 +218,24 @@ fn valid_namespace(namespace: &str) -> bool {
 /// This ensures that segments with numeric prefixes are properly capitalized.
 ///
 /// Examples:
-/// - "say_hello" -> "sayHello"
-/// - "get_user_name" -> "getUserName"
-/// - "_private_method" -> "privateMethod" (one leading underscore removed)
+/// - "`say_hello`" -> "sayHello"
+/// - "`get_user_name`" -> "getUserName"
+/// - "_`private_method`" -> "privateMethod" (one leading underscore removed)
 /// - "__dunder__" -> "_dunder__" (one leading underscore removed)
 /// - "___priv" -> "__priv" (one leading underscore removed)
 /// - "trailing_" -> "trailing_"
 /// - "sayHello" -> "sayHello" (unchanged)
 /// - "getUserName" -> "getUserName" (unchanged)
-/// - "Foo_Bar" -> "Foo_Bar" (unchanged - contains uppercase)
-/// - "XMLParser" -> "XMLParser" (unchanged - contains uppercase)
+/// - "`Foo_Bar`" -> "`Foo_Bar`" (unchanged - contains uppercase)
+/// - "`XMLParser`" -> "`XMLParser`" (unchanged - contains uppercase)
 /// - "init" -> "init" (unchanged - no underscores)
-/// - "test_αλφα" -> "testΑλφα" (Unicode-aware)
-/// - "array_2d_foo" -> "array2DFoo" (capitalizes first char after digits)
-/// - "test_3d" -> "test3D" (capitalizes first char after digits)
+/// - "`test_αλφα`" -> "testΑλφα" (Unicode-aware)
+/// - "`array_2d_foo`" -> "array2DFoo" (capitalizes first char after digits)
+/// - "`test_3d`" -> "test3D" (capitalizes first char after digits)
 pub fn snake_case_to_lower_camel_case(s: &str) -> String {
 	// If the string contains any uppercase letters, assume it's intentionally cased
 	// and return it unchanged
-	if s.chars().any(|c| c.is_uppercase()) {
+	if s.chars().any(char::is_uppercase) {
 		return s.to_string();
 	}
 
@@ -348,7 +348,7 @@ pub fn create_jni_fn_name(namespace: &str, fn_name: &str, signature: Option<&str
 	let namespace_underscored = mangle_identifier(namespace);
 	let fn_name_underscored = mangle_identifier(fn_name);
 
-	let mut result = format!("Java_{}_{}", namespace_underscored, fn_name_underscored);
+	let mut result = format!("Java_{namespace_underscored}_{fn_name_underscored}");
 
 	if let Some(sig) = signature {
 		// Extract only the argument types (between parentheses), ignoring return type

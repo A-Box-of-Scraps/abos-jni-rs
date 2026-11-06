@@ -1,6 +1,12 @@
-use super::*;
+#[cfg(doc)]
+use crate::{
+	refs::{Global, Weak},
+	vm::AttachGuard,
+};
 
-impl<'local> Env<'local> {
+use super::{Env, Error, JNIVersion, JavaVM, PhantomData, Result, sys};
+
+impl Env<'_> {
 	/// Returns an `UnsupportedVersion` error if the current JNI version is
 	/// lower than the one given.
 	///
@@ -17,7 +23,7 @@ impl<'local> Env<'local> {
 	/// Create a [`Env`] associated with single JNI local reference frame.
 	///
 	/// `level` represents the nesting level of the [`AttachGuard`] that owns
-	/// this [`Env`]. This can be compared to [JavaVM::thread_attach_guard_level()]
+	/// this [`Env`]. This can be compared to [`JavaVM::thread_attach_guard_level()`]
 	/// to check that this [`Env`] is associated with the top-most JNI stack frame.
 	///
 	/// `owns_attachment` should be true if this [`Env`] is associated with an
@@ -54,7 +60,7 @@ impl<'local> Env<'local> {
 		assert_eq!(
 			self.level,
 			JavaVM::thread_attach_guard_level(),
-			r#" jni runtime check failure: attempt to create a new local reference using an Env<'not_top> that is not associated with the top JNI stack frame.
+			r" jni runtime check failure: attempt to create a new local reference using an Env<'not_top> that is not associated with the top JNI stack frame.
 
 This implies that there is more than one mutable Env in scope.
 
@@ -63,7 +69,7 @@ This should only be possible by misusing APIs like JavaVM::attach_current_thread
 To fix this, ensure that you only ever have one mutable Env in scope at a time, which is associated with the top JNI stack frame.
 
 See the jni-rs Env documentation for more details.
-"#
+"
 		);
 	}
 
@@ -82,12 +88,14 @@ See the jni-rs Env documentation for more details.
 	/// implementation for [`Global`] and [`Weak`] will print a warning if they
 	/// are dropped on a thread that is not attached, which is recognised with
 	/// this method.
-	pub fn owns_attachment(&self) -> bool {
+	#[must_use]
+	pub const fn owns_attachment(&self) -> bool {
 		self.owns_attachment
 	}
 
 	/// Get the raw Env pointer
-	pub fn get_raw(&self) -> *mut sys::JNIEnv {
+	#[must_use]
+	pub const fn get_raw(&self) -> *mut sys::JNIEnv {
 		self.raw
 	}
 

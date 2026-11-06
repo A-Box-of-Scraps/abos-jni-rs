@@ -91,7 +91,7 @@ fn test_code_generation() {
 
 	// Note: close_it becomes closeIt (lowerCamelCase)
 	assert_eq!(
-		format!("{}", expanded),
+		format!("{expanded}"),
 		format!(
 			"{}",
 			quote::quote! {
@@ -120,7 +120,7 @@ fn test_unsafe_fn() {
 
 	// Note: close_it becomes closeIt (lowerCamelCase)
 	assert_eq!(
-		format!("{}", expanded),
+		format!("{expanded}"),
 		format!(
 			"{}",
 			quote::quote! {
@@ -147,7 +147,7 @@ fn test_non_function() {
 	let expanded = jni_mangle2(attr, source);
 
 	assert_eq!(
-		format!("{}", expanded),
+		format!("{expanded}"),
 		format!(
 			"{}",
 			quote::quote! {
@@ -169,7 +169,7 @@ fn test_empty_attribute() {
 	let expanded = jni_mangle2(attr, source);
 
 	assert_eq!(
-		format!("{}", expanded),
+		format!("{expanded}"),
 		format!(
 			"{}",
 			quote::quote! {
@@ -191,7 +191,7 @@ fn test_invalid_namespace() {
 	let expanded = jni_mangle2(attr, source);
 
 	assert_eq!(
-		format!("{}", expanded),
+		format!("{expanded}"),
 		format!(
 			"{}",
 			quote::quote! {
@@ -213,7 +213,7 @@ fn test_wrong_abi_generates_error() {
 	let expanded = jni_mangle2(attr, source);
 
 	// Should generate an error for non-system ABI
-	let expanded_str = format!("{}", expanded);
+	let expanded_str = format!("{expanded}");
 	assert!(expanded_str.contains("compile_error"));
 	assert!(expanded_str.contains("must use `extern \\\"system\\\"` ABI"));
 	assert!(expanded_str.contains("found `extern \\\"C\\\"`"));
@@ -232,7 +232,7 @@ fn test_system_abi_is_preserved() {
 
 	// The "system" ABI should be preserved
 	assert_eq!(
-		format!("{}", expanded),
+		format!("{expanded}"),
 		format!(
 			"{}",
 			quote::quote! {
@@ -258,7 +258,7 @@ fn test_wrong_visibility() {
 	let expanded = jni_mangle2(attr, source);
 
 	assert_eq!(
-		format!("{}", expanded),
+		format!("{expanded}"),
 		format!(
 			"{}",
 			quote::quote! {
@@ -282,7 +282,7 @@ fn test_with_method_name() {
 	let expanded = jni_mangle2(attr, source);
 
 	assert_eq!(
-		format!("{}", expanded),
+		format!("{expanded}"),
 		format!(
 			"{}",
 			quote::quote! {
@@ -310,7 +310,7 @@ fn test_with_signature_only() {
 	let expanded = jni_mangle2(attr, source);
 
 	assert_eq!(
-		format!("{}", expanded),
+		format!("{expanded}"),
 		format!(
 			"{}",
 			quote::quote! {
@@ -338,7 +338,7 @@ fn test_with_method_name_and_signature() {
 	let expanded = jni_mangle2(attr, source);
 
 	assert_eq!(
-		format!("{}", expanded),
+		format!("{expanded}"),
 		format!(
 			"{}",
 			quote::quote! {
@@ -425,7 +425,7 @@ fn test_snake_case_function_name_conversion() {
 	let expanded = jni_mangle2(attr, source);
 
 	assert_eq!(
-		format!("{}", expanded),
+		format!("{expanded}"),
 		format!(
 			"{}",
 			quote::quote! {
@@ -454,7 +454,7 @@ fn test_camel_case_function_name_unchanged() {
 	let expanded = jni_mangle2(attr, source);
 
 	assert_eq!(
-		format!("{}", expanded),
+		format!("{expanded}"),
 		format!(
 			"{}",
 			quote::quote! {
@@ -483,7 +483,7 @@ fn test_snake_case_with_signature() {
 	let expanded = jni_mangle2(attr, source);
 
 	assert_eq!(
-		format!("{}", expanded),
+		format!("{expanded}"),
 		format!(
 			"{}",
 			quote::quote! {
@@ -513,7 +513,7 @@ fn test_signature_with_no_args() {
 
 	// Should have __ even with no arguments (indicates overloaded method)
 	assert_eq!(
-		format!("{}", expanded),
+		format!("{expanded}"),
 		format!(
 			"{}",
 			quote::quote! {

@@ -154,13 +154,14 @@ where
 	/// # Safety
 	///
 	/// If the given reference is non-null, it must represent a global JNI reference.
-	pub(crate) unsafe fn new(_env: &Env, obj: T) -> Self {
+	pub(crate) const unsafe fn new(_env: &Env, obj: T) -> Self {
 		Self { obj }
 	}
 
 	/// Creates a [`Global`] wrapper for a `null` reference
 	///
 	/// This is equivalent [`Global::default()`]
+	#[must_use]
 	pub fn null() -> Self {
 		Self { obj: T::default() }
 	}
@@ -245,7 +246,7 @@ where
 			};
 
 			if let Err(err) = exception_safe_delete() {
-				debug!("error dropping global ref: {:#?}", err);
+				debug!("error dropping global ref: {err:#?}");
 			}
 		}
 	}

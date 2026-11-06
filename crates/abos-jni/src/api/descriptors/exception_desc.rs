@@ -1,7 +1,7 @@
 use crate::{
 	Env,
 	descriptors::Desc,
-	errors::*,
+	errors::{Exception, Result},
 	jni_str,
 	objects::{Auto, IntoAuto as _, JClass, JObject, JString, JThrowable, JValue},
 	signature::{JavaType, MethodSignature, Primitive},

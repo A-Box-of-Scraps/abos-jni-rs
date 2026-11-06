@@ -6,7 +6,7 @@ pub fn jni_str(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 		.into()
 }
 
-/// Converts UTF-8 string literals to a MUTF-8 encoded CStr literal.
+/// Converts UTF-8 string literals to a MUTF-8 encoded `CStr` literal.
 ///
 /// This macro is equivalent to [`jni_str!`] but returns a `&CStr` instead of a `&'static JNIStr`.
 ///
@@ -45,7 +45,7 @@ pub fn jni_sig_str(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 		.into()
 }
 
-/// Parses a JNI method or field signature at compile time and returns a CStr literal.
+/// Parses a JNI method or field signature at compile time and returns a `CStr` literal.
 ///
 /// This macro is similar to `jni_sig!` but returns a C string literal (e.g., `c"(IZ)V"`)
 /// with MUTF-8 encoding instead of a `MethodSignature` or `FieldSignature` struct.

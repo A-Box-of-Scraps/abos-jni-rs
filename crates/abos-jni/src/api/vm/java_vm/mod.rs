@@ -1,6 +1,5 @@
 use std::{
 	cell::Cell,
-	os::raw::c_char,
 	ptr,
 	sync::atomic::{AtomicUsize, Ordering},
 	thread::{Thread, current},
@@ -10,21 +9,11 @@ use log::debug;
 
 use crate::{
 	Env, JNIVersion,
-	errors::*,
+	errors::{Error, JniError, Result, jni_error_code_to_result},
 	objects::{Global, JObject, JThrowable, Reference},
 	strings::{JNIStr, JNIString},
 	sys,
 };
-
-#[cfg(all(feature = "invocation", not(target_os = "android")))]
-use std::{os::raw::c_void, path::PathBuf};
-#[cfg(feature = "invocation")]
-use {crate::InitArgs, std::ffi::OsStr};
-
-#[cfg(use_fls_attach_guard)]
-use crate::internal::fls_attach_guard;
-#[cfg(use_tls_attach_guard)]
-use crate::internal::tls_attach_guard;
 
 #[cfg(doc)]
 use {
@@ -37,21 +26,21 @@ use {
 pub const DEFAULT_LOCAL_FRAME_CAPACITY: usize = 32;
 
 /// The `jni-rs` crate makes the assumption that it's not possible to create more than one Java VM
-/// per-process, or even re-initialize a JavaVM that is "destroyed".
+/// per-process, or even re-initialize a `JavaVM` that is "destroyed".
 ///
-/// This allows us to save a global pointer for the JavaVM.
+/// This allows us to save a global pointer for the `JavaVM`.
 ///
 /// We also guarantee that if you currently have an [`AttachGuard`] thread attachment (or a `Env`
 /// reference), that implies that [`JavaVM::singleton()`] has been initialized and will return a
 /// valid [`JavaVM`].
 ///
-/// For example, this guarantee is relied on internally to avoid redundantly saving JavaVM pointers
+/// For example, this guarantee is relied on internally to avoid redundantly saving `JavaVM` pointers
 /// if know we can assume that `JavaVM::singleton()` will return a `JavaVM` when needed.
 static JAVA_VM_SINGLETON: std::sync::OnceLock<JavaVM> = std::sync::OnceLock::new();
 
 /// The Java VM API, including (optional) [Invocation API][invocation-api] support.
 ///
-/// An existing JavaVM can be obtained either via [`JavaVM::singleton`], or [`Env::get_java_vm`]
+/// An existing `JavaVM` can be obtained either via [`JavaVM::singleton`], or [`Env::get_java_vm`]
 /// in an already attached thread, or a new VM can be [launched](#launching-jvm-from-rust) via
 /// [`JavaVM::new`].
 ///
@@ -169,7 +158,7 @@ static JAVA_VM_SINGLETON: std::sync::OnceLock<JavaVM> = std::sync::OnceLock::new
 /// For the operating system to correctly load the `jvm` library it may also be necessary to update
 /// the path that the OS uses to find dependencies of the `jvm` library.
 /// * On **Windows**, append the path to `$JAVA_HOME/bin` to the `PATH` environment variable.
-/// * On **MacOS**, append the path to `libjvm.dylib` to `LD_LIBRARY_PATH` environment variable.
+/// * On **`MacOS`**, append the path to `libjvm.dylib` to `LD_LIBRARY_PATH` environment variable.
 /// * On **Linux**, append the path to `libjvm.so` to `LD_LIBRARY_PATH` environment variable.
 ///
 /// The exact relative path to `jvm` library is version-specific.
@@ -200,12 +189,12 @@ unsafe impl Sync for JavaVM {}
 /// observe that something has already attached the OS thread).
 ///
 /// In the unlikely situation where JNI is manually used to detach an OS thread (allowed if there
-/// are no active AttachGuards), then multiple fibers could separately attach the same OS thread and
+/// are no active `AttachGuards`), then multiple fibers could separately attach the same OS thread and
 /// both increment this counter. They will also both decrement the counter when they are freed (or
-/// if detach_current_thread() is called from each fiber).
+/// if `detach_current_thread()` is called from each fiber).
 pub(super) static ATTACHED_THREADS: AtomicUsize = AtomicUsize::new(0);
 
-pub(crate) unsafe fn sys_attach_current_thread(
+pub unsafe fn sys_attach_current_thread(
 	vm: &JavaVM,
 	config: &AttachConfig,
 	thread: &Thread,
@@ -216,25 +205,24 @@ pub(crate) unsafe fn sys_attach_current_thread(
 
 	let mut args = sys::JavaVMAttachArgs {
 		version: JNIVersion::V1_4.into(),
-		name: config
-			.thread_name
-			.map(|s| s.as_ptr() as *mut c_char)
-			.unwrap_or_else(|| {
+		name: config.thread_name.map_or_else(
+			|| {
 				config
 					.deprecated_thread_name
 					.as_ref()
-					.map(|s| s.as_ptr() as *mut c_char)
-					.unwrap_or(ptr::null_mut())
-			}),
-		group: config.group.as_ref().map(|g| g.as_raw()).unwrap_or(ptr::null_mut()),
+					.map_or(ptr::null_mut(), |s| s.as_ptr().cast_mut())
+			},
+			|s| s.as_ptr().cast_mut(),
+		),
+		group: config.group.as_ref().map_or(ptr::null_mut(), Reference::as_raw),
 	};
 	let res = unsafe {
 		java_vm_call_unchecked!(
 			vm,
 			v1_1,
 			AttachCurrentThread,
-			&mut env_ptr,
-			&mut args as *mut sys::JavaVMAttachArgs as *mut core::ffi::c_void
+			&raw mut env_ptr,
+			(&raw mut args).cast::<core::ffi::c_void>()
 		)
 	};
 	jni_error_code_to_result(res)?;
@@ -258,7 +246,7 @@ pub(crate) unsafe fn sys_attach_current_thread(
 		ATTACHED_THREADS.load(Ordering::SeqCst)
 	);
 
-	Ok(env_ptr as *mut sys::JNIEnv)
+	Ok(env_ptr.cast::<sys::JNIEnv>())
 }
 
 /// Check if the process is currently shutting down.
@@ -282,13 +270,13 @@ fn windows_is_shutdown_in_progress() -> bool {
 /// current attachment. We only use this when detaching scoped attachments.
 ///
 /// `cross_check_env` is not provided for permanent TLS/FLS attachments since we allow external
-/// code to detach these early (as long as there are no AttachGuards currently on the stack).
+/// code to detach these early (as long as there are no `AttachGuards` currently on the stack).
 ///
 /// The `ATTACHED_THREADS` count is always decremented when this is called, even if the thread
 /// was already detached by other means (e.g., manual `DetachCurrentThread` call via raw JNI API,
 /// or by another fiber on Windows). This maintains correct logical accounting - we track how many
 /// times *we* attached, not the actual JVM attachment state.
-pub(crate) unsafe fn sys_detach_current_thread(
+pub unsafe fn sys_detach_current_thread(
 	cross_check_env: Option<*mut abos_jni_sys::JNIEnv>,
 	thread: &Thread,
 ) -> Result<()> {
@@ -403,7 +391,7 @@ thread_local! {
 /// This is only relevant for `unsafe` code that is manually creating
 /// [`AttachGuard`]s.
 ///
-/// See: [JavaVM::attach_current_thread_guard] and [JavaVM::get_env_attachment].
+/// See: [`JavaVM::attach_current_thread_guard`] and [`JavaVM::get_env_attachment`].
 #[derive(Debug, Default)]
 pub struct ScopeToken {
 	_non_send_sync: std::marker::PhantomData<*const ()>,

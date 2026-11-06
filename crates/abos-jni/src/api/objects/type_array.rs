@@ -1,10 +1,13 @@
 use crate::sys::{jboolean, jbyte, jchar, jdouble, jfloat, jint, jlong, jshort};
 
-pub(crate) mod type_array_sealed {
+mod type_array_sealed {
 	use abos_jni_sys::jsize;
 
 	use crate::sys::{jarray, jboolean, jbyte, jchar, jdouble, jfloat, jint, jlong, jshort};
-	use crate::{Env, errors::*};
+	use crate::{
+		Env,
+		errors::{Error, JniError, Result},
+	};
 	use std::ptr::NonNull;
 
 	/// Trait to define type array access/release
@@ -268,3 +271,5 @@ impl TypeArray for jchar {}
 impl TypeArray for jshort {}
 impl TypeArray for jfloat {}
 impl TypeArray for jdouble {}
+
+pub use type_array_sealed::TypeArraySealed;

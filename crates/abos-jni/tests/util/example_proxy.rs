@@ -39,7 +39,7 @@ impl AtomicIntegerProxy {
 				)?;
 				env.new_global_ref(i)
 			})?;
-			Ok(AtomicIntegerProxy {
+			Ok(Self {
 				inner: Arc::new(AtomicIntegerProxyInner { obj }),
 			})
 		})

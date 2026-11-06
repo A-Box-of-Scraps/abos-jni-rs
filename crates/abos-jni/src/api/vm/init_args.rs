@@ -103,7 +103,7 @@ const SPECIAL_OPTIONS: &[&str] = &["vfprintf", "abort", "exit"];
 
 const SPECIAL_OPTIONS_C: &[&CStr] = &[c"vfprintf", c"abort", c"exit"];
 
-/// Builder for JavaVM InitArgs.
+/// Builder for `JavaVM` `InitArgs`.
 ///
 /// *This API requires "invocation" feature to be enabled,
 /// see ["Launching JVM from Rust"](struct.JavaVM.html#launching-jvm-from-rust).*
@@ -125,7 +125,8 @@ impl Default for InitArgsBuilder<'_> {
 }
 
 impl<'a> InitArgsBuilder<'a> {
-	/// Create a new default InitArgsBuilder
+	/// Create a new default `InitArgsBuilder`
+	#[must_use]
 	pub fn new() -> Self {
 		Default::default()
 	}
@@ -275,7 +276,8 @@ impl<'a> InitArgsBuilder<'a> {
 	/// Set JNI version for the init args
 	///
 	/// Default: V8
-	pub fn version(self, version: JNIVersion) -> Self {
+	#[must_use]
+	pub const fn version(self, version: JNIVersion) -> Self {
 		let mut s = self;
 		s.version = version;
 		s
@@ -283,12 +285,13 @@ impl<'a> InitArgsBuilder<'a> {
 
 	/// Set the `ignoreUnrecognized` init arg flag
 	///
-	/// If ignoreUnrecognized is true, JavaVM::new ignores all unrecognized option strings that
-	/// begin with "-X" or "_". If ignoreUnrecognized is false, JavaVM::new returns Err as soon as
+	/// If ignoreUnrecognized is true, `JavaVM::new` ignores all unrecognized option strings that
+	/// begin with "-X" or "_". If ignoreUnrecognized is false, `JavaVM::new` returns Err as soon as
 	/// it encounters any unrecognized option strings.
 	///
 	/// Default: `false`
-	pub fn ignore_unrecognized(self, ignore: bool) -> Self {
+	#[must_use]
+	pub const fn ignore_unrecognized(self, ignore: bool) -> Self {
 		let mut s = self;
 		s.ignore_unrecognized = ignore;
 		s
@@ -306,7 +309,7 @@ impl<'a> InitArgsBuilder<'a> {
 		let opts: Vec<JavaVMOption> = opt_strings
 			.iter()
 			.map(|opt_string| JavaVMOption {
-				optionString: opt_string.as_ptr() as _,
+				optionString: opt_string.as_ptr().cast_mut(),
 				extraInfo: ptr::null_mut(),
 			})
 			.collect();
@@ -315,7 +318,7 @@ impl<'a> InitArgsBuilder<'a> {
 			inner: JavaVMInitArgs {
 				version: self.version.into(),
 				ignoreUnrecognized: self.ignore_unrecognized as _,
-				options: opts.as_ptr() as _,
+				options: opts.as_ptr().cast_mut(),
 				nOptions: opts.len() as _,
 			},
 			_opts: opts,
@@ -332,7 +335,7 @@ impl<'a> InitArgsBuilder<'a> {
 	}
 }
 
-/// JavaVM InitArgs.
+/// `JavaVM` `InitArgs`.
 ///
 /// *This API requires "invocation" feature to be enabled,
 /// see ["Launching JVM from Rust"](struct.JavaVM.html#launching-jvm-from-rust).*
@@ -351,7 +354,7 @@ pub struct InitArgs<'a> {
 
 impl InitArgs<'_> {
 	#[allow(dead_code)]
-	pub(crate) fn inner_ptr(&self) -> *mut c_void {
-		&self.inner as *const _ as _
+	pub(crate) const fn inner_ptr(&self) -> *mut c_void {
+		&raw const self.inner as _
 	}
 }

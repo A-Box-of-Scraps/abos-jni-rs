@@ -1,4 +1,6 @@
-use super::*;
+use super::{
+	DEFAULT_LOCAL_FRAME_CAPACITY, Desc, Env, Error, JClass, JNIStr, JThrowable, LoaderContext, Reference, Result,
+};
 
 impl<'local> Env<'local> {
 	/// Raise an exception from an existing object. This will continue being thrown in java unless
@@ -65,7 +67,7 @@ impl<'local> Env<'local> {
 		if !self.is_assignable_from_class(class.as_ref(), throwable_class)? {
 			return Err(Error::WrongObjectType);
 		}
-		let msg = msg.as_ref().map(|m| m.as_ref());
+		let msg = msg.as_ref().map(std::convert::AsRef::as_ref);
 
 		// Safety:
 		// ThrowNew is 1.1 API that must be valid
@@ -78,7 +80,7 @@ impl<'local> Env<'local> {
 				v1_1,
 				ThrowNew,
 				class.as_raw(),
-				msg.map(|m| m.as_ptr()).unwrap_or(std::ptr::null())
+				msg.map_or(std::ptr::null(), JNIStr::as_ptr)
 			)?
 		};
 
@@ -111,7 +113,7 @@ impl<'local> Env<'local> {
 	/// # }
 	/// ```
 	///
-	/// Alternatively, see [Env::throw_new_void] if you want to construct an exception with no
+	/// Alternatively, see [`Env::throw_new_void`] if you want to construct an exception with no
 	/// message argument.
 	pub fn throw_new<'other_local, S, T>(&mut self, class: T, msg: S) -> Result<()>
 	where
@@ -144,7 +146,7 @@ impl<'local> Env<'local> {
 	///
 	/// This will expect to find a constructor for the given `class` that takes no arguments.
 	///
-	/// Alternatively, see [Env::throw_new] if you want to construct an exception with a message.
+	/// Alternatively, see [`Env::throw_new`] if you want to construct an exception with a message.
 	pub fn throw_new_void<'other_local, T>(&mut self, class: T) -> Result<()>
 	where
 		T: Desc<'local, JClass<'other_local>>,
@@ -157,6 +159,7 @@ impl<'local> Env<'local> {
 	///
 	/// This doesn't need to create any local references
 	#[inline]
+	#[must_use]
 	pub fn exception_check(&self) -> bool {
 		// Safety: ExceptionCheck is 1.2 API, which we check for in `from_raw()`
 		unsafe { ex_safe_jni_call_no_post_check_ex!(self, v1_2, ExceptionCheck) }

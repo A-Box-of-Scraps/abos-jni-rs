@@ -13,8 +13,8 @@ use log::error;
 
 use crate::{
 	JavaVM,
-	errors::*,
-	vm::java_vm::{AttachConfig, AttachGuard, sys_attach_current_thread, sys_detach_current_thread},
+	errors::{Error, Result},
+	vm::{AttachConfig, AttachGuard, sys_attach_current_thread, sys_detach_current_thread},
 };
 
 thread_local! {
@@ -26,13 +26,13 @@ thread_local! {
 /// Data stored in TLS for automatic thread detachment.
 ///
 /// Note: We don't store the env pointer because we consider the possibility that external code
-/// may manually detach the thread so long as there are no active AttachGuards. In that case,
+/// may manually detach the thread so long as there are no active `AttachGuards`. In that case,
 /// the env pointer can become invalid before the TLS destructor runs.
 #[derive(Debug)]
 struct TLSAttachGuard {
-	/// A call std::thread::current() function can panic in case the local data has been destroyed
+	/// A call `std::thread::current()` function can panic in case the local data has been destroyed
 	/// before the thread local variables. The possibility of this happening depends on the platform
-	/// implementation of the sys_common::thread_local_dtor::register_dtor_fallback.
+	/// implementation of the `sys_common::thread_local_dtor::register_dtor_fallback`.
 	///
 	/// Since this struct will be saved as a thread-local variable, we capture the thread meta-data
 	/// during creation
@@ -68,13 +68,13 @@ impl Drop for TLSAttachGuard {
 /// This function stores attachment information in thread-local storage so that when the thread
 /// terminates, the TLS destructor will automatically detach the thread from the JVM.
 ///
-/// Note: This function assumes that the caller has already used GetEnv to check if the thread
+/// Note: This function assumes that the caller has already used `GetEnv` to check if the thread
 /// is already attached, and only calls this function if it is not attached.
 ///
 /// # Panics
 ///
 /// This function will panic if called while there are active `AttachGuard`s.
-pub(crate) unsafe fn tls_attach_current_thread<'local>(
+pub unsafe fn tls_attach_current_thread<'local>(
 	java_vm: &JavaVM,
 	config: &AttachConfig,
 ) -> Result<AttachGuard<'local>> {
@@ -105,7 +105,7 @@ pub(crate) unsafe fn tls_attach_current_thread<'local>(
 /// Detach a thread before the thread terminates **IFF** it was previously attached via
 /// [`JavaVM::attach_current_thread`] **AND** there is no active [`AttachGuard`] in use
 /// for this thread.
-pub(crate) fn tls_detach_current_thread() -> Result<()> {
+pub fn tls_detach_current_thread() -> Result<()> {
 	if JavaVM::thread_attach_guard_level() != 0 {
 		return Err(Error::ThreadAttachmentGuarded);
 	}

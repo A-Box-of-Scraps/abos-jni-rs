@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+	DEFAULT_LOCAL_FRAME_CAPACITY, Desc, Env, Error, JFieldID, JNIStr, JObject, MonitorGuard, Mutex, MutexGuard,
+	Primitive, Result, ReturnType, jni_sig, sys,
+};
 
 impl<'local> Env<'local> {
 	/// Looks up the field ID for the given field name and takes the monitor
@@ -148,7 +151,7 @@ impl<'local> Env<'local> {
 					.j()? as *mut Mutex<T>;
 				null_check!(field_ptr, "rust value from Java")?;
 				// dereferencing is safe, because we checked it for null
-				Ok((*field_ptr).lock().unwrap())
+				Ok((*field_ptr).lock().expect("Rust field mutex is not poisoned"))
 			}
 		})
 	}
@@ -204,7 +207,7 @@ impl<'local> Env<'local> {
 				env.set_field_unchecked(obj, field_id, (0 as sys::jlong).into())?;
 			}
 
-			Ok(mbox.into_inner().unwrap())
+			Ok(mbox.into_inner().expect("Rust field mutex is not poisoned"))
 		})
 	}
 }

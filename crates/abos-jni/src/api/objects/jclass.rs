@@ -42,7 +42,7 @@ crate::bind_java_type! {
 		///
 		/// This is a method binding for `java.lang.Class.forName(String, boolean, ClassLoader)`
 		///
-		/// This method is used to locate a class by its name (via the ClassLoader) which may be either
+		/// This method is used to locate a class by its name (via the `ClassLoader`) which may be either
 		/// a fully-qualified binary name (e.g., `java.lang.String`) or an array descriptor (e.g.,
 		/// `[Ljava.lang.String;`).
 		///

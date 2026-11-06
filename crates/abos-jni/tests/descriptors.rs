@@ -14,14 +14,18 @@ use abos_jni::{
 #[test]
 fn test_descriptors() {
 	attach_current_thread(|env| {
-		let class_local = env.find_class(jni_str!("java/lang/String")).unwrap();
-		let class_as_ref = Desc::<JClass>::lookup(&class_local, env).unwrap();
-		let class_global = env.new_global_ref(class_as_ref).unwrap();
-		let _class_as_ref = Desc::<JClass>::lookup(&class_global, env).unwrap();
-		let class_auto: Auto<_> = Desc::<JClass>::lookup(jni_str!("java/lang/String"), env).unwrap();
-		let _class_as_ref = Desc::<JClass>::lookup(&class_auto, env).unwrap();
+		let class_local = env
+			.find_class(jni_str!("java/lang/String"))
+			.expect("test class can be resolved");
+		let class_as_ref = Desc::<JClass>::lookup(&class_local, env).expect("lookup succeeds");
+		let class_global = env
+			.new_global_ref(class_as_ref)
+			.expect("global reference can be allocated");
+		let _class_as_ref = Desc::<JClass>::lookup(&class_global, env).expect("lookup succeeds");
+		let class_auto: Auto<_> = Desc::<JClass>::lookup(jni_str!("java/lang/String"), env).expect("lookup succeeds");
+		let _class_as_ref = Desc::<JClass>::lookup(&class_auto, env).expect("lookup succeeds");
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }

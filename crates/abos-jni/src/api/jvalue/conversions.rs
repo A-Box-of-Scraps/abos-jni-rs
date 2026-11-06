@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+	CharToJavaError, Error, JObject, JValue, JValueOwned, Result, TryFrom, TryInto, char_to_java, jboolean, jbyte,
+	jchar, jdouble, jfloat, jint, jlong, jshort,
+};
 
 impl<'obj_ref> From<&'obj_ref JValueOwned<'obj_ref>> for JValue<'obj_ref> {
 	fn from(other: &'obj_ref JValueOwned) -> Self {
@@ -284,7 +287,7 @@ impl TryFrom<JValue<'_>> for jbyte {
 
 // jvoid
 impl From<()> for JValueOwned<'_> {
-	fn from(_: ()) -> Self {
+	fn from((): ()) -> Self {
 		Self::Void
 	}
 }
@@ -298,7 +301,7 @@ impl TryFrom<JValueOwned<'_>> for () {
 }
 
 impl From<()> for JValue<'_> {
-	fn from(_: ()) -> Self {
+	fn from((): ()) -> Self {
 		Self::Void
 	}
 }

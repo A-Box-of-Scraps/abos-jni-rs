@@ -79,10 +79,10 @@ clear compiler errors if trying to access the real `Env` API through the `EnvUno
 /// pointer wrapper.
 ///
 /// FFI usage of `JNIEnv`, within native method arguments, should be
-/// migrated to [EnvUnowned], followed by [`EnvUnowned::with_env`].
+/// migrated to [`EnvUnowned`], followed by [`EnvUnowned::with_env`].
 ///
 /// To help make this clear and sign post how to safely migrate to the [Env]
-/// and [EnvUnowned] types, we export this deprecated alias with a warning.
+/// and [`EnvUnowned`] types, we export this deprecated alias with a warning.
 pub type JNIEnv<'frame> = EnvUnowned<'frame>;
 
 /// Java VM interface.
@@ -116,7 +116,7 @@ pub use abos_jni_macros::native_method;
 // For internal jni call macros to ensure their results are checked
 #[doc(hidden)]
 #[must_use]
-pub fn __must_use<T>(v: T) -> T {
+pub const fn __must_use<T>(v: T) -> T {
 	v
 }
 

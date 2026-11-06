@@ -1,4 +1,10 @@
-use super::*;
+use super::{
+	AbiCheck, BindClassInput, Ident, IdentExt, IsInstanceOfEntry, JavaClassName, LitBool, Parse, ParseStream, Result,
+	Token, TypeMappings, abi_check, api, braced, constructors, fields, hooks, is_instance_of, java_type, methods,
+	native_methods, native_methods_catch_unwind, native_methods_error_policy, native_methods_export, native_trait,
+	parse_constructors, parse_fields, parse_methods, parse_native_methods, parse_visibility, priv_type, quote,
+	rust_type, rust_type_vis, type_map,
+};
 
 impl Parse for BindClassInput {
 	fn parse(input: ParseStream) -> Result<Self> {
@@ -142,7 +148,7 @@ impl Parse for BindClassInput {
 							stem = None;
 						}
 
-						let type_path_str = quote!(#type_path).to_string().replace(" ", "");
+						let type_path_str = quote!(#type_path).to_string().replace(' ', "");
 
 						// Validate that JObject is not explicitly specified
 						if type_path_str == "JObject" || type_path_str == "abos_jni::objects::JObject" {
@@ -193,7 +199,7 @@ impl Parse for BindClassInput {
 							_ => {
 								return Err(syn::Error::new(
 									hooks_key.span(),
-									format!("Unknown hooks property: {}", hooks_key),
+									format!("Unknown hooks property: {hooks_key}"),
 								));
 							}
 						}
@@ -337,7 +343,7 @@ impl Parse for BindClassInput {
 					) {
 						return Err(syn::Error::new(
 							type_name.span(),
-							format!("Failed to register Self type mapping: {}", err),
+							format!("Failed to register Self type mapping: {err}"),
 						));
 					}
 				}
@@ -356,7 +362,7 @@ impl Parse for BindClassInput {
 		let java_class = java_class_opt
 			.ok_or_else(|| syn::Error::new(input.span(), "Missing required property: java_type = java.class.Name"))?;
 
-		Ok(BindClassInput {
+		Ok(Self {
 			type_name,
 			type_visibility,
 			type_attrs,

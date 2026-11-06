@@ -1,5 +1,6 @@
 mod jobject;
-pub use self::jobject::*;
+pub use self::jobject::JObject;
+pub(crate) use self::jobject::JObjectAPI;
 
 mod jthrowable;
 pub use self::jthrowable::*;
@@ -42,14 +43,20 @@ pub use self::jthread::*;
 
 /// Primitive Array types
 mod jobject_array;
-pub use self::jobject_array::*;
+pub use self::jobject_array::JObjectArray;
+pub(crate) use self::jobject_array::JObjectArrayAPI;
 
 mod type_array;
-pub use self::type_array::*;
+pub use self::type_array::TypeArray;
+pub(crate) use self::type_array::TypeArraySealed;
 
 /// Primitive Array types
 mod jprimitive_array;
-pub use self::jprimitive_array::*;
+pub(crate) use self::jprimitive_array::JPrimitiveArrayAPI_jboolean;
+pub use self::jprimitive_array::{
+	AsJArrayRaw, JBooleanArray, JByteArray, JCharArray, JDoubleArray, JFloatArray, JIntArray, JLongArray,
+	JPrimitiveArray, JShortArray,
+};
 
 #[doc(hidden)]
 #[deprecated(

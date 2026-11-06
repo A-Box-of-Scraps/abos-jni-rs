@@ -1,4 +1,4 @@
-use super::*;
+use super::{ConcreteType, PrimitiveType, Result, SigType, Span, TokenStream, TypeMappings, lit_cstr_mutf8, quote};
 
 /// Helper function to validate that a type can be used as an array element
 /// Returns an error if the element type is void
@@ -13,7 +13,7 @@ pub(super) fn validate_array_element_type(elem_type: &SigType, type_mappings: &T
 			}
 			Some(_) => {}
 			None => {
-				return Err(syn::Error::new(span, format!("Unknown type '{}'", name)));
+				return Err(syn::Error::new(span, format!("Unknown type '{name}'")));
 			}
 		}
 	}
@@ -21,8 +21,8 @@ pub(super) fn validate_array_element_type(elem_type: &SigType, type_mappings: &T
 	Ok(())
 }
 
-/// Core function to convert a JavaType to a concrete Rust type with lifetime
-/// Returns the type WITHOUT any AsRef wrapper
+/// Core function to convert a `JavaType` to a concrete Rust type with lifetime
+/// Returns the type WITHOUT any `AsRef` wrapper
 pub fn sig_type_to_rust_type_core(
 	java_type: &SigType,
 	lifetime: &TokenStream,
@@ -32,11 +32,11 @@ pub fn sig_type_to_rust_type_core(
 	match java_type {
 		SigType::Alias(alias) => match type_mappings.map_alias(alias) {
 			Some(ConcreteType::Primitive { primitive, path, .. }) => {
-				if let PrimitiveType::Void = primitive {
+				if primitive == PrimitiveType::Void {
 					quote! { () }
 				} else {
 					let path: syn::Path =
-						syn::parse_str(&path).unwrap_or_else(|_| panic!("Invalid Rust type path: {}", path));
+						syn::parse_str(&path).unwrap_or_else(|_| panic!("Invalid Rust type path: {path}"));
 
 					quote! { #path  }
 				}
@@ -48,7 +48,7 @@ pub fn sig_type_to_rust_type_core(
 				let path_str = rust_type.path();
 
 				let path: syn::Path =
-					syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {}", path_str));
+					syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
 
 				quote! { #path<#lifetime> }
 			}
@@ -63,7 +63,7 @@ pub fn sig_type_to_rust_type_core(
 				// Parse the rust path and generate the type
 				let path_str = rust_type.path();
 				let path: syn::Path =
-					syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {}", path_str));
+					syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
 				quote! { #path<#lifetime> }
 			} else {
 				// Use JObject for unmapped class types
@@ -102,7 +102,7 @@ pub fn sig_type_to_rust_type_core(
 						}) => {
 							let path_str = rust_type.path();
 							let path: syn::Path = syn::parse_str(path_str)
-								.unwrap_or_else(|_| panic!("Invalid Rust type path: {}", path_str));
+								.unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
 							quote! { #jni::objects::JObjectArray<#lifetime, #path<#lifetime>> }
 						}
 						None => {
@@ -116,7 +116,7 @@ pub fn sig_type_to_rust_type_core(
 					if let Some(rust_type) = type_mappings.map_java_class_to_rust_type(class_name) {
 						let path_str = rust_type.path();
 						let path: syn::Path =
-							syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {}", path_str));
+							syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
 						quote! { #jni::objects::JObjectArray<#lifetime, #path<#lifetime>> }
 					} else {
 						// Object array with unmapped type
@@ -156,8 +156,8 @@ pub fn generate_type_mapping_checks(type_mappings: &TypeMappings, jni: &syn::Pat
 		.rust_to_java_iter()
 		.filter(|(rust_type, _)| !rust_type.is_builtin())
 	{
-		let rust_path: syn::Path = syn::parse_str(rust_type.path())
-			.unwrap_or_else(|_| panic!("Invalid Rust type path: {}", &rust_type.path()));
+		let rust_path: syn::Path =
+			syn::parse_str(rust_type.path()).unwrap_or_else(|_| panic!("Invalid Rust type path: {}", rust_type.path()));
 
 		let java_class_dotted = java_class.to_java_dotted();
 		let java_class_cstr = lit_cstr_mutf8(&java_class_dotted);
@@ -187,10 +187,13 @@ pub fn generate_type_mapping_checks(type_mappings: &TypeMappings, jni: &syn::Pat
 		.filter(|rt| rt.primitive().is_some())
 		.filter(|rt| !rt.is_builtin())
 	{
-		let rust_path: syn::Path = syn::parse_str(rust_type.path())
-			.unwrap_or_else(|_| panic!("Invalid Rust type path: {}", &rust_type.path()));
+		let rust_path: syn::Path =
+			syn::parse_str(rust_type.path()).unwrap_or_else(|_| panic!("Invalid Rust type path: {}", rust_type.path()));
 
-		let jni_sys_prim = match rust_type.primitive().unwrap() {
+		let jni_sys_prim = match rust_type
+			.primitive()
+			.expect("primitive mappings have a JNI primitive kind")
+		{
 			PrimitiveType::Void => {
 				unreachable!("Void type should not have a custom type mapping")
 			}

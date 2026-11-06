@@ -11,7 +11,7 @@ crate::bind_java_type! {
 	}
 }
 
-impl<'local> JSet<'local> {
+impl JSet<'_> {
 	/// Adds the given element to this set if it is not already present
 	///
 	/// Returns `true` if the element was added, `false` if it was already present.

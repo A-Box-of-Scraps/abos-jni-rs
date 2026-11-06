@@ -28,7 +28,6 @@ java-locator = { workspace = true, optional = true }
 abos-javac.workspace = true
 assert_matches.workspace = true
 criterion.workspace = true
-lazy_static.workspace = true
 rusty-fork.workspace = true
 static_assertions.workspace = true
 trybuild.workspace = true

@@ -1,7 +1,11 @@
-use super::*;
+use super::{
+	AutoElements, AutoElementsCritical, Desc, Env, Error, JClass, JObject, JPrimitiveArray, JavaVM, JniError,
+	MonitorGuard, NativeMethod, Reference, ReleaseMode, Result, TryInto, TypeArray, jint, jni_error_code_to_result,
+	sys,
+};
 
 impl<'local> Env<'local> {
-	/// Lock a Java object. The MonitorGuard that this returns is responsible
+	/// Lock a Java object. The `MonitorGuard` that this returns is responsible
 	/// for ensuring that it gets unlocked.
 	pub fn lock_obj<'other_local, O>(&self, obj: O) -> Result<MonitorGuard<'local>>
 	where
@@ -130,7 +134,7 @@ impl<'local> Env<'local> {
 	///
 	/// # Safety
 	///
-	/// See: [JPrimitiveArray::get_elements] for more details
+	/// See: [`JPrimitiveArray::get_elements`] for more details
 	#[deprecated(
 		since = "0.22.0",
 		note = "use JPrimitiveArray::get_elements instead. This API will be removed in a future version"
@@ -151,7 +155,7 @@ impl<'local> Env<'local> {
 	///
 	/// # Safety
 	///
-	/// See: [JPrimitiveArray::get_elements_critical] for more details
+	/// See: [`JPrimitiveArray::get_elements_critical`] for more details
 	#[deprecated(
 		since = "0.22.0",
 		note = "use JPrimitiveArray::get_elements_critical instead. This API will be removed in a future version"

@@ -45,7 +45,7 @@ crate::bind_java_type! {
 
 		/// Returns the number of elements in this collection.
 		///
-		/// Returns [i32::MAX] if the collection size is too large to be represented as an i32.
+		/// Returns [`i32::MAX`] if the collection size is too large to be represented as an i32.
 		fn size() -> jint,
 
 		/// Returns `true` if this collection contains no elements.

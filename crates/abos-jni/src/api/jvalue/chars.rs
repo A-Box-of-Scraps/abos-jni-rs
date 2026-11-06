@@ -1,4 +1,7 @@
-use super::*;
+#[cfg(doc)]
+use crate::{Env, JValue, JValueOwned};
+
+use super::{CharToJavaError, CharTryFromError, DecodeUtf16Error, TryFrom, jchar, jint};
 
 /// Converts a Java `char` to a Rust `char`, if possible. (Error-prone; see warning.)
 ///
@@ -33,7 +36,9 @@ use super::*;
 ///     https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html#codePoints()
 /// [surrogate pair]: https://en.wikipedia.org/wiki/Surrogate_pair
 pub fn char_from_java(char: jchar) -> std::result::Result<char, DecodeUtf16Error> {
-	char::decode_utf16([char]).next().unwrap()
+	char::decode_utf16([char])
+		.next()
+		.expect("one UTF-16 code unit produces one decoding result")
 }
 
 /// Converts a Rust `char` to a Java `char`, if possible. (Error-prone; see warning.)
@@ -64,7 +69,7 @@ pub fn char_from_java(char: jchar) -> std::result::Result<char, DecodeUtf16Error
 /// surrogate pair, and therefore cannot be converted to a single Java `char`.
 ///
 /// [surrogate pair]: https://en.wikipedia.org/wiki/Surrogate_pair
-pub fn char_to_java(char: char) -> std::result::Result<jchar, CharToJavaError> {
+pub const fn char_to_java(char: char) -> std::result::Result<jchar, CharToJavaError> {
 	if char.len_utf16() != 1 {
 		return Err(CharToJavaError { char });
 	}
@@ -88,6 +93,7 @@ pub fn char_to_java(char: char) -> std::result::Result<jchar, CharToJavaError> {
 /// * [`char_to_java`], an alternative to this function that converts to Java `char` but is likely to fail
 ///
 /// [`String.codePointAt`]: https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html#codePointAt(int)
+#[must_use]
 pub fn char_to_java_int(char: char) -> jint {
 	u32::from(char) as jint
 }

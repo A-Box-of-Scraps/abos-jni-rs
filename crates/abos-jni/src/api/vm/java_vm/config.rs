@@ -1,4 +1,7 @@
-use super::*;
+#[cfg(doc)]
+use crate::{errors::Error, vm::JavaVM};
+
+use super::{Global, JNIStr, JNIString, JObject};
 
 /// The policy for how exceptions are handled before and after running
 /// an attachment closure.
@@ -83,6 +86,7 @@ pub struct AttachConfig<'a> {
 
 impl<'a> AttachConfig<'a> {
 	/// Creates a new `AttachConfig` with default values.
+	#[must_use]
 	pub fn new() -> Self {
 		Self::default()
 	}
@@ -95,7 +99,8 @@ impl<'a> AttachConfig<'a> {
 	///
 	/// It is normally best to attach permanently because it can reduce the cost
 	/// of repeatedly attaching and detaching threads.
-	pub fn scoped(mut self, scoped: bool) -> Self {
+	#[must_use]
+	pub const fn scoped(mut self, scoped: bool) -> Self {
 		self.scoped = scoped;
 		self
 	}
@@ -111,7 +116,8 @@ impl<'a> AttachConfig<'a> {
 	/// to use JNI from within a `Drop` implementation, without being influenced
 	/// by external pending exceptions but also ensuring that external pending
 	/// exception continue to propagate.
-	pub fn exceptions_policy(mut self, policy: AttachmentExceptionPolicy) -> Self {
+	#[must_use]
+	pub const fn exceptions_policy(mut self, policy: AttachmentExceptionPolicy) -> Self {
 		self.exceptions_policy = policy;
 		self
 	}
@@ -124,14 +130,16 @@ impl<'a> AttachConfig<'a> {
 	}
 
 	/// Sets the name of the thread as seen by the JVM and operating system.
-	pub fn thread_name(mut self, name: &'a JNIStr) -> Self {
+	#[must_use]
+	pub const fn thread_name(mut self, name: &'a JNIStr) -> Self {
 		self.thread_name = Some(name);
 		self
 	}
 
 	/// Specifies a global reference to a `ThreadGroup` that the thread should
 	/// be associated with.
-	pub fn group(mut self, group: &'a Global<JObject<'static>>) -> Self {
+	#[must_use]
+	pub const fn group(mut self, group: &'a Global<JObject<'static>>) -> Self {
 		self.group = Some(group);
 		self
 	}

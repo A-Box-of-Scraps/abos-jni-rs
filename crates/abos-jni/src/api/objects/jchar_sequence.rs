@@ -16,7 +16,7 @@ crate::bind_java_type! {
 		///
 		/// # Throws
 		/// - `IndexOutOfBoundsException` - if start or end are negative, if end is greater than
-		///   length(), or if start is greater than end.
+		///   `length()`, or if start is greater than end.
 		fn sub_sequence(start: jint, end: jint) -> JCharSequence,
 	}
 }

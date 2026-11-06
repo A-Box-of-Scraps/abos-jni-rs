@@ -11,7 +11,7 @@ pub fn throw_new() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -28,25 +28,28 @@ pub fn throw_new_void() {
 
 		assert_exception_type(env, &exception, RUNTIME_EXCEPTION_CLASS);
 
-		let message = exception.get_message(env).unwrap();
+		let message = exception.get_message(env).expect("get message succeeds");
 		assert!(message.is_null());
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
 #[should_panic(expected = "WrongObjectType")]
 pub fn throw_new_non_throwable_class() {
 	attach_current_thread(|env| {
-		let string_class = env.find_class(jni_str!("java/lang/String")).unwrap();
+		let string_class = env
+			.find_class(jni_str!("java/lang/String"))
+			.expect("test class can be resolved");
 
-		env.throw_new(string_class, jni_str!("Test Exception")).unwrap();
+		env.throw_new(string_class, jni_str!("Test Exception"))
+			.expect("throw new succeeds");
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -58,13 +61,13 @@ pub fn throw_new_fail() {
 		// making a `ThrowNew` JNI call.
 		let result = env.throw_new(jni_str!("java/lang/NonexistentException"), jni_str!("Test Exception"));
 		assert!(result.is_err());
-		eprintln!("result = {:?}", result);
+		eprintln!("result = {result:?}");
 
 		assert!(matches!(result, Err(Error::NoClassDefFound { .. })));
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
@@ -76,33 +79,44 @@ pub fn throw_defaults() {
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
 pub fn test_conversion() {
 	attach_current_thread(|env| {
-		let orig_obj: JObject = env.new_string("Hello, world!").unwrap().into();
+		let orig_obj: JObject = env
+			.new_string("Hello, world!")
+			.expect("test string can be allocated")
+			.into();
 
 		let obj: JObject = unwrap(env.new_local_ref(&orig_obj), env);
 
-		let string = env.cast_local::<JString>(obj).unwrap();
+		let string = env.cast_local::<JString>(obj).expect("test operation succeeds");
 		let actual = JObject::from(string);
-		assert!(env.is_same_object(&orig_obj, actual).unwrap());
+		assert!(env.is_same_object(&orig_obj, actual).expect("is same object succeeds"));
 
-		let global_ref = env.new_global_ref(&orig_obj).unwrap();
-		assert!(env.is_same_object(&orig_obj, global_ref).unwrap());
+		let global_ref = env
+			.new_global_ref(&orig_obj)
+			.expect("global reference can be allocated");
+		assert!(
+			env.is_same_object(&orig_obj, global_ref)
+				.expect("is same object succeeds")
+		);
 
 		let weak_ref = unwrap(env.new_weak_ref(&orig_obj), env);
 		let actual = unwrap(weak_ref.upgrade_local(env), env).expect("weak ref should not have been GC'd");
-		assert!(env.is_same_object(&orig_obj, actual).unwrap());
+		assert!(env.is_same_object(&orig_obj, actual).expect("is same object succeeds"));
 
 		let auto_local = unwrap(env.new_local_ref(&orig_obj), env).auto();
-		assert!(env.is_same_object(&orig_obj, auto_local).unwrap());
+		assert!(
+			env.is_same_object(&orig_obj, auto_local)
+				.expect("is same object succeeds")
+		);
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 rusty_fork_test! {
@@ -122,27 +136,27 @@ fn test_jstring_conversion() {
 	assert_eq!(invalid.to_string(), "<JNI Not Initialized>");
 
 	attach_current_thread(|env| {
-		let hello: JString = env.new_string("Hello, world!").unwrap();
+		let hello: JString = env.new_string("Hello, world!").expect("test string can be allocated");
 
 		assert_eq!(hello.to_string(), "Hello, world!");
-		assert_eq!(hello.to_string(), hello.try_to_string(env).unwrap());
+		assert_eq!(hello.to_string(), hello.try_to_string(env).expect("test Java string can be converted to Rust"));
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 }
 
 #[test]
 pub fn test_null_string_mutf8_chars() {
 	attach_current_thread(|env| {
-		let s = unsafe { JString::from_raw(env, std::ptr::null_mut() as _) };
+		let s = unsafe { JString::from_raw(env, std::ptr::null_mut()) };
 		let ret = s.mutf8_chars(env);
 		assert!(ret.is_err());
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 fn test_throwable_descriptor_with_default_type<'local, D>(env: &mut Env<'local>, descriptor: D)
@@ -151,7 +165,7 @@ where
 {
 	let result = descriptor.lookup(env);
 	assert!(result.is_ok());
-	let exception = result.unwrap();
+	let exception = result.expect("test operation succeeds");
 	let exception = exception.as_ref();
 
 	assert_exception_type(env, exception, RUNTIME_EXCEPTION_CLASS);
@@ -165,42 +179,48 @@ fn test_throwable_get_stack_trace() {
 		// we want to continue regardless
 		let res = env.throw("Test exception");
 		assert!(matches!(res, Err(Error::JavaException)));
-		let exception = env.exception_occurred().unwrap();
+		let exception = env.exception_occurred().expect("exception occurred succeeds");
 		env.exception_clear();
 
-		let stack_trace = exception.get_stack_trace(env).unwrap();
-		let _len = stack_trace.len(env).unwrap();
+		let stack_trace = exception.get_stack_trace(env).expect("get stack trace succeeds");
+		let _len = stack_trace.len(env).expect("array length is available");
 
 		// Test conversion to JObjectArray<JObject> and back
-		let obj_arr = env.cast_local::<JObjectArray>(stack_trace).unwrap();
+		let obj_arr = env
+			.cast_local::<JObjectArray>(stack_trace)
+			.expect("test operation succeeds");
 
-		let stack_trace = env.as_cast::<JObjectArray<JStackTraceElement>>(&obj_arr).unwrap();
+		let stack_trace = env
+			.as_cast::<JObjectArray<JStackTraceElement>>(&obj_arr)
+			.expect("test operation succeeds");
 		let stack_trace = stack_trace.as_ref();
-		let len = stack_trace.len(env).unwrap();
+		let len = stack_trace.len(env).expect("array length is available");
 
 		// XXX: we can't actually test walking the stack trace without some Java code
 		assert_eq!(len, 0);
 
 		for i in 0..len {
-			let element = stack_trace.get_element(env, i).unwrap();
-			let _class_name = element.get_class_name(env).unwrap();
-			let _method_name = element.get_method_name(env).unwrap();
-			let _file_name = element.get_file_name(env).unwrap();
-			let _line_number = element.get_line_number(env).unwrap();
-			let _s = element.try_to_string(env).unwrap();
+			let element = stack_trace.get_element(env, i).expect("get element succeeds");
+			let _class_name = element.get_class_name(env).expect("get class name succeeds");
+			let _method_name = element.get_method_name(env).expect("get method name succeeds");
+			let _file_name = element.get_file_name(env).expect("get file name succeeds");
+			let _line_number = element.get_line_number(env).expect("get line number succeeds");
+			let _s = element
+				.try_to_string(env)
+				.expect("test Java string can be converted to Rust");
 
 			// Do something with the stack trace element
 		}
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 #[test]
 fn test_exception_match() {
 	attach_current_thread(|env| {
-		let jstring_not_numeric = env.new_string("NOT A NUMBER").unwrap();
+		let jstring_not_numeric = env.new_string("NOT A NUMBER").expect("test string can be allocated");
 
 		let err_result = env.call_static_method(
 			abos_jni::jni_str!("java/lang/Integer"),
@@ -224,7 +244,7 @@ fn test_exception_match() {
 					let msg = msg.to_string();
 					Err(Error::ParseFailed(msg))
 				} else {
-					eprintln!("Unexpected exception: {:?}", e);
+					eprintln!("Unexpected exception: {e:?}");
 					Err(Error::JniCall(JniError::Unknown))
 				}
 			})
@@ -232,10 +252,10 @@ fn test_exception_match() {
 			Ok(())
 		};
 
-		eprintln!("Caught exception: {:?}", res);
+		eprintln!("Caught exception: {res:?}");
 		assert!(matches!(res, Err(Error::ParseFailed(_))));
 
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }

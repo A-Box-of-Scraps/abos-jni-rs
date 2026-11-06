@@ -21,16 +21,16 @@ use crate::{MonitorGuard, errors::Error, objects::JObjectArray};
 /// `int[]`.
 ///
 /// For convenience it's recommended to use one of the type aliases like:
-/// - [JBooleanArray]
-/// - [JByteArray]
-/// - [JCharArray]
-/// - [JShortArray]
-/// - [JIntArray]
-/// - [JLongArray]
-/// - [JFloatArray]
-/// - [JDoubleArray]
+/// - [`JBooleanArray`]
+/// - [`JByteArray`]
+/// - [`JCharArray`]
+/// - [`JShortArray`]
+/// - [`JIntArray`]
+/// - [`JLongArray`]
+/// - [`JFloatArray`]
+/// - [`JDoubleArray`]
 ///
-/// See [JObjectArray] for non-primitive object arrays.
+/// See [`JObjectArray`] for non-primitive object arrays.
 ///
 /// See the [`JObject`] documentation for more information about reference wrappers, how to cast
 /// them, and local reference frame lifetimes.
@@ -42,14 +42,14 @@ pub struct JPrimitiveArray<'local, T: TypeArray> {
 	_marker: PhantomData<T>,
 }
 
-impl<'local, T: TypeArray> AsRef<JPrimitiveArray<'local, T>> for JPrimitiveArray<'local, T> {
-	fn as_ref(&self) -> &JPrimitiveArray<'local, T> {
+impl<T: TypeArray> AsRef<Self> for JPrimitiveArray<'_, T> {
+	fn as_ref(&self) -> &Self {
 		self
 	}
 }
 
-impl<'local, T: TypeArray> AsMut<JPrimitiveArray<'local, T>> for JPrimitiveArray<'local, T> {
-	fn as_mut(&mut self) -> &mut JPrimitiveArray<'local, T> {
+impl<T: TypeArray> AsMut<Self> for JPrimitiveArray<'_, T> {
+	fn as_mut(&mut self) -> &mut Self {
 		self
 	}
 }
@@ -69,7 +69,7 @@ impl<'local, T: TypeArray> ::std::ops::Deref for JPrimitiveArray<'local, T> {
 }
 
 impl<'local, T: TypeArray> From<JPrimitiveArray<'local, T>> for JObject<'local> {
-	fn from(other: JPrimitiveArray<'local, T>) -> JObject<'local> {
+	fn from(other: JPrimitiveArray<'local, T>) -> Self {
 		other.obj
 	}
 }
@@ -116,6 +116,7 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 	///
 	/// Null references are always valid and do not belong to a local reference frame. Therefore,
 	/// the returned `JPrimitiveArray` always has the `'static` lifetime.
+	#[must_use]
 	pub const fn null() -> JPrimitiveArray<'static, T> {
 		JPrimitiveArray {
 			obj: JObject::null(),
@@ -124,6 +125,7 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 	}
 
 	/// Unwrap to the raw jni type.
+	#[must_use]
 	pub const fn into_raw(self) -> jarray {
 		self.obj.into_raw() as jarray
 	}
@@ -151,7 +153,7 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 	/// Since the returned array may be a copy of the Java array, changes made to the
 	/// returned array will not necessarily be reflected in the original array until
 	/// the corresponding `Release*ArrayElements` JNI method is called.
-	/// [`AutoElements`] has a commit() method, to force a copy back of pending
+	/// [`AutoElements`] has a `commit()` method, to force a copy back of pending
 	/// array changes if needed (and without releasing it).
 	///
 	/// # Safety
@@ -301,7 +303,7 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 	///
 	/// # Errors
 	///
-	/// Returns [Error::IndexOutOfBounds] if `start` is negative _or_ `start +
+	/// Returns [`Error::IndexOutOfBounds`] if `start` is negative _or_ `start +
 	/// buf.len()` is greater than [`Self::len`].
 	///
 	/// This API catches exceptions internally and is not expected to return
@@ -316,7 +318,7 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 	///
 	/// # Errors
 	///
-	/// Returns [Error::IndexOutOfBounds] if `start` is negative _or_ `start +
+	/// Returns [`Error::IndexOutOfBounds`] if `start` is negative _or_ `start +
 	/// buf.len()` is greater than [`Self::len`].
 	///
 	/// This API catches exceptions internally and is not expected to return
@@ -369,15 +371,12 @@ unsafe impl<'local, T: TypeArray> AsJArrayRaw<'local> for JPrimitiveArray<'local
 macro_rules! impl_ref_for_jprimitive_array {
 	($type:ident, $class_name:expr, $api_type:ident) => {
 		#[allow(non_camel_case_types)]
-		pub(crate) struct $api_type {
+		pub struct $api_type {
 			class: Global<JClass<'static>>,
 		}
 
 		impl $api_type {
-			pub(crate) fn get<'any_local>(
-				env: &Env<'_>,
-				loader_context: &LoaderContext<'any_local, '_>,
-			) -> Result<&'static Self> {
+			pub(crate) fn get(env: &Env<'_>, loader_context: &LoaderContext<'_, '_>) -> Result<&'static Self> {
 				static API: std::sync::OnceLock<$api_type> = std::sync::OnceLock::new();
 				// Fast path
 				if let Some(api) = API.get() {

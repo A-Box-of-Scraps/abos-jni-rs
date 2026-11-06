@@ -15,7 +15,7 @@ use util::jvm;
 fn nested_attach() {
 	// A newly created VM will be attached
 	assert_eq!(jvm().threads_attached(), 1);
-	jvm().detach_current_thread().unwrap();
+	jvm().detach_current_thread().expect("test JVM is available");
 	assert_eq!(jvm().threads_attached(), 0);
 
 	let thread = spawn(|| {
@@ -23,7 +23,7 @@ fn nested_attach() {
 		check_nested_attach(jvm());
 		assert_eq!(jvm().threads_attached(), 1);
 	});
-	thread.join().unwrap();
+	thread.join().expect("test worker completes without panicking");
 	assert_eq!(jvm().threads_attached(), 0);
 }
 
@@ -40,12 +40,12 @@ fn check_nested_attach(vm: &Arc<JavaVM>) {
 			check_attached(vm);
 			Ok(())
 		})
-		.unwrap();
+		.expect("attached JNI callback succeeds");
 
 		check_attached(vm);
 		Ok(())
 	})
-	.unwrap();
+	.expect("attached JNI callback succeeds");
 }
 
 fn check_attached(vm: &JavaVM) {

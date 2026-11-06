@@ -11,7 +11,7 @@
 //! - Panics are NOT caught and converted to Java exceptions
 //!
 //! When `catch_unwind = true` (default):
-//! - Native method wrappers use `EnvUnowned::with_env` (including catch_unwind)
+//! - Native method wrappers use `EnvUnowned::with_env` (including `catch_unwind`)
 //! - Panics are converted to Java exceptions via the error policy
 //!
 //! Testing `catch_unwind = false` is tricky because the native method
@@ -100,7 +100,7 @@ fn test_catch_unwind_false_causes_abort() {
 
 	if output.status.success() {
 		eprintln!("Expected the test to abort/fail, but it succeeded:");
-		eprintln!("Ran: {:?}", cmd);
+		eprintln!("Ran: {cmd:?}");
 		eprintln!("------------------");
 		eprintln!("Stdout: {}", String::from_utf8_lossy(&output.stdout));
 		eprintln!("Stderr: {}", String::from_utf8_lossy(&output.stderr));
@@ -112,20 +112,17 @@ fn test_catch_unwind_false_causes_abort() {
 	// Check the combined output (stderr and stdout) for the panic message
 	let stderr = String::from_utf8_lossy(&output.stderr);
 	let stdout = String::from_utf8_lossy(&output.stdout);
-	let combined = format!("{}{}", stdout, stderr);
+	let combined = format!("{stdout}{stderr}");
 
 	assert!(
 		combined.contains("This panic should cause abort because catch_unwind = false"),
-		"Expected panic message in output, got stdout: {}\nstderr: {}",
-		stdout,
-		stderr
+		"Expected panic message in output, got stdout: {stdout}\nstderr: {stderr}"
 	);
 
 	// The test should have failed
 	assert!(
 		combined.contains("test test_catch_unwind_false_causes_abort_impl ... FAILED"),
-		"Expected test failure in output, got: {}",
-		combined
+		"Expected test failure in output, got: {combined}"
 	);
 }
 

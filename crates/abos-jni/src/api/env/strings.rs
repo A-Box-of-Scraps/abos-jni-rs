@@ -1,7 +1,7 @@
-use super::*;
+use super::{Env, JList, JMap, JObject, JString, MUTF8Chars, Reference, Result};
 
 impl<'local> Env<'local> {
-	/// Cast a [JObject] to a [JList].
+	/// Cast a [`JObject`] to a [`JList`].
 	///
 	/// Returns `Error::WrongObjectType` if the object is not a `java.util.List`.
 	#[deprecated(
@@ -15,7 +15,7 @@ impl<'local> Env<'local> {
 		JList::cast_local(self, obj)
 	}
 
-	/// Cast a [JObject] to a [JMap].
+	/// Cast a [`JObject`] to a [`JMap`].
 	///
 	/// Returns `Error::WrongObjectType` if the object is not a `java.util.Map`.
 	#[deprecated(
@@ -31,7 +31,7 @@ impl<'local> Env<'local> {
 
 	/// Gets the contents of a Java string, in [modified UTF-8] encoding.
 	///
-	/// The returned [MUTF8Chars] can be used to access the modified UTF-8 bytes,
+	/// The returned [`MUTF8Chars`] can be used to access the modified UTF-8 bytes,
 	/// or to convert to a Rust string (which uses standard UTF-8 encoding).
 	///
 	/// This entails calling the JNI function `GetStringUTFChars`.
@@ -57,7 +57,7 @@ impl<'local> Env<'local> {
 
 	/// Gets the contents of a Java string, in [modified UTF-8] encoding.
 	///
-	/// The returned [MUTF8Chars] can be used to access the modified UTF-8 bytes,
+	/// The returned [`MUTF8Chars`] can be used to access the modified UTF-8 bytes,
 	/// or to convert to a Rust string (which uses standard UTF-8 encoding).
 	///
 	/// This entails calling the JNI function `GetStringUTFChars`.

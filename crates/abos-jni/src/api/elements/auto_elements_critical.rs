@@ -5,7 +5,11 @@ use std::ptr::NonNull;
 use crate::JavaVM;
 use crate::objects::{JPrimitiveArray, ReleaseMode, TypeArray};
 use crate::sys::jboolean;
-use crate::{Env, errors::*, sys};
+use crate::{
+	Env,
+	errors::{Error, JniError, Result},
+	sys,
+};
 
 #[cfg(doc)]
 use crate::objects::JByteArray;
@@ -56,20 +60,20 @@ where
 				v1_2,
 				GetPrimitiveArrayCritical,
 				array.as_ref().as_raw(),
-				&mut is_copy
-			)? as *mut T
+				&raw mut is_copy
+			)?
+			.cast::<T>()
 		};
 
 		// Check for NULL return (indicates OutOfMemory)
 		// If we got NULL, no critical section was created, so we can safely
 		// make JNI calls to clear any pending exception.
-		let ptr = match NonNull::new(ptr) {
-			Some(ptr) => ptr,
-			None => {
-				// Clear any pending OutOfMemoryError before returning
-				env.exception_clear();
-				return Err(Error::JniCall(JniError::NoMemory));
-			}
+		let ptr = if let Some(ptr) = NonNull::new(ptr) {
+			ptr
+		} else {
+			// Clear any pending OutOfMemoryError before returning
+			env.exception_clear();
+			return Err(Error::JniCall(JniError::NoMemory));
 		};
 
 		Ok(AutoElementsCritical {
@@ -132,27 +136,26 @@ where
 	}
 
 	/// Indicates if the array is a copy or not
-	pub fn is_copy(&self) -> bool {
+	pub const fn is_copy(&self) -> bool {
 		self.is_copy
 	}
 
 	/// Returns the array length (number of elements)
-	pub fn len(&self) -> usize {
+	pub const fn len(&self) -> usize {
 		self.len
 	}
 
 	/// Returns true if the vector contains no elements.
-	pub fn is_empty(&self) -> bool {
+	pub const fn is_empty(&self) -> bool {
 		self.len == 0
 	}
 }
 
-impl<'array_local, T: TypeArray, TArrayRef> AsRef<AutoElementsCritical<'array_local, T, TArrayRef>>
-	for AutoElementsCritical<'array_local, T, TArrayRef>
+impl<'array_local, T: TypeArray, TArrayRef> AsRef<Self> for AutoElementsCritical<'array_local, T, TArrayRef>
 where
 	TArrayRef: AsRef<JPrimitiveArray<'array_local, T>>,
 {
-	fn as_ref(&self) -> &AutoElementsCritical<'array_local, T, TArrayRef> {
+	fn as_ref(&self) -> &Self {
 		self
 	}
 }
@@ -167,7 +170,7 @@ where
 
 		match res {
 			Ok(()) => {}
-			Err(e) => error!("error releasing primitive array: {:#?}", e),
+			Err(e) => error!("error releasing primitive array: {e:#?}"),
 		}
 	}
 }

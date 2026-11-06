@@ -2,10 +2,10 @@
 #![allow(missing_docs, reason = "Executable examples and test fixtures are not library API.")]
 #![cfg(feature = "invocation")]
 //! Example demonstrating a wrapper macro that can inject the jni crate path and
-//! a type_map into bind_java_type! invocations.
+//! a `type_map` into `bind_java_type`! invocations.
 //!
 //! Notably the wrapper doesn't need to know anything about the syntax of
-//! bind_java_type! and it doesn't stop you from adding additional type_map
+//! `bind_java_type`! and it doesn't stop you from adding additional `type_map`
 //! entries.
 //!
 //! This could be useful in a workspace with:

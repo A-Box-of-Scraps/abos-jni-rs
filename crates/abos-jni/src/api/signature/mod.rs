@@ -1,7 +1,7 @@
 use std::{fmt, str::FromStr};
 
 use crate::{
-	errors::*,
+	errors::{Error, Result},
 	strings::{JNIStr, JNIString},
 };
 
@@ -27,15 +27,15 @@ pub enum Primitive {
 impl fmt::Display for Primitive {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
-			Primitive::Boolean => write!(f, "Z"),
-			Primitive::Byte => write!(f, "B"),
-			Primitive::Char => write!(f, "C"),
-			Primitive::Double => write!(f, "D"),
-			Primitive::Float => write!(f, "F"),
-			Primitive::Int => write!(f, "I"),
-			Primitive::Long => write!(f, "J"),
-			Primitive::Short => write!(f, "S"),
-			Primitive::Void => write!(f, "V"),
+			Self::Boolean => write!(f, "Z"),
+			Self::Byte => write!(f, "B"),
+			Self::Char => write!(f, "C"),
+			Self::Double => write!(f, "D"),
+			Self::Float => write!(f, "F"),
+			Self::Int => write!(f, "I"),
+			Self::Long => write!(f, "J"),
+			Self::Short => write!(f, "S"),
+			Self::Void => write!(f, "V"),
 		}
 	}
 }
@@ -74,9 +74,9 @@ impl FromStr for JavaType {
 impl fmt::Display for JavaType {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
-			JavaType::Primitive(ref ty) => ty.fmt(f),
-			JavaType::Object => write!(f, "L;"),
-			JavaType::Array => write!(f, "["),
+			Self::Primitive(ref ty) => ty.fmt(f),
+			Self::Object => write!(f, "L;"),
+			Self::Array => write!(f, "["),
 		}
 	}
 }
@@ -114,28 +114,32 @@ impl<'sig, 'args> MethodSignature<'sig, 'args> {
 	/// In order for the returned `MethodSignature` to be used safely to make
 	/// JNI calls, the caller must ensure that the provided signature string,
 	/// argument types, and return type are consistent
+	#[must_use]
 	pub const unsafe fn from_raw_parts(sig: &'sig JNIStr, args: &'args [JavaType], ret: ReturnType) -> Self {
 		Self { sig, args, ret }
 	}
 
 	/// Get the JNI signature string
-	pub fn sig(&self) -> &JNIStr {
+	#[must_use]
+	pub const fn sig(&self) -> &JNIStr {
 		self.sig
 	}
 
 	/// Get the argument types
-	pub fn args(&self) -> &[JavaType] {
+	#[must_use]
+	pub const fn args(&self) -> &[JavaType] {
 		self.args
 	}
 
 	/// Get the return type
-	pub fn ret(&self) -> JavaType {
+	#[must_use]
+	pub const fn ret(&self) -> JavaType {
 		self.ret
 	}
 }
 
-impl<'sig, 'args> From<&MethodSignature<'sig, 'args>> for MethodSignature<'sig, 'args> {
-	fn from(sig: &MethodSignature<'sig, 'args>) -> Self {
+impl From<&Self> for MethodSignature<'_, '_> {
+	fn from(sig: &Self) -> Self {
 		sig.clone()
 	}
 }
@@ -169,23 +173,27 @@ impl<'sig> FieldSignature<'sig> {
 	/// In order for the returned `FieldSignature` to be used safely to get or
 	/// set fields via JNI calls, the caller must ensure that the provided
 	/// signature string and field type are consistent
+	#[must_use]
 	pub const unsafe fn from_raw_parts(sig: &'sig JNIStr, ty: JavaType) -> Self {
 		Self { sig, ty }
 	}
 
 	/// Get the JNI signature string
-	pub fn sig(&self) -> &JNIStr {
+	#[must_use]
+	pub const fn sig(&self) -> &JNIStr {
 		self.sig
 	}
 
 	/// Get the field type
-	pub fn ty(&self) -> JavaType {
+	#[must_use]
+	pub const fn ty(&self) -> JavaType {
 		self.ty
 	}
 
 	/// Check if the type of this field is compatible with the given type. This
 	/// is not quite an equality check on `Self::ty()` because `JavaType::Array`
 	/// signatures are considered compatible with `JavaType::Object` values
+	#[must_use]
 	pub fn type_is_compatible_with(&self, ty: JavaType) -> bool {
 		match (self.ty, ty) {
 			(JavaType::Array | JavaType::Object, JavaType::Array | JavaType::Object) => true,
@@ -213,8 +221,8 @@ pub struct RuntimeMethodSignature {
 	ret: JavaType,
 }
 
-impl<'sig, 'args> AsRef<MethodSignature<'sig, 'args>> for MethodSignature<'sig, 'args> {
-	fn as_ref(&self) -> &MethodSignature<'sig, 'args> {
+impl AsRef<Self> for MethodSignature<'_, '_> {
+	fn as_ref(&self) -> &Self {
 		self
 	}
 }
@@ -244,27 +252,28 @@ where
 }
 
 impl RuntimeMethodSignature {
-	/// Parse a method signature string into a RuntimeMethodSignature enum.
+	/// Parse a method signature string into a `RuntimeMethodSignature` enum.
 	#[allow(clippy::should_implement_trait)]
-	pub fn from_str<S: AsRef<str>>(s: S) -> Result<RuntimeMethodSignature> {
+	pub fn from_str<S: AsRef<str>>(s: S) -> Result<Self> {
 		let input = s.as_ref();
 		match parse_method_sig(input)? {
 			// Note: the parser initially returns a placeholder, empty signature string,
-			(RuntimeMethodSignature { sig: _, args, ret }, "") => Ok(RuntimeMethodSignature {
+			(Self { sig: _, args, ret }, "") => Ok(Self {
 				sig: JNIString::new(input),
 				args,
 				ret,
 			}),
-			(RuntimeMethodSignature { .. }, tail) => Err(Error::ParseFailed(format!(
+			(Self { .. }, tail) => Err(Error::ParseFailed(format!(
 				"Trailing input: '{tail}' while parsing '{input}'"
 			))),
 		}
 	}
 
-	/// Convert to a [MethodSignature] (for use with [Env] calls like [`Env::call_method`]).
+	/// Convert to a [`MethodSignature`] (for use with [Env] calls like [`Env::call_method`]).
 	///
 	/// This is a cheap conversion, which borrows the signature string and
 	/// slices the argument vector, without any allocations.
+	#[must_use]
 	pub fn method_signature(&self) -> MethodSignature<'_, '_> {
 		self.into()
 	}
@@ -274,7 +283,7 @@ impl FromStr for RuntimeMethodSignature {
 	type Err = Error;
 
 	fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-		RuntimeMethodSignature::from_str(s)
+		Self::from_str(s)
 	}
 }
 
@@ -307,8 +316,8 @@ pub struct RuntimeFieldSignature {
 	ty: JavaType,
 }
 
-impl<'sig> AsRef<FieldSignature<'sig>> for FieldSignature<'sig> {
-	fn as_ref(&self) -> &FieldSignature<'sig> {
+impl AsRef<Self> for FieldSignature<'_> {
+	fn as_ref(&self) -> &Self {
 		self
 	}
 }
@@ -335,26 +344,27 @@ where
 }
 
 impl RuntimeFieldSignature {
-	/// Parse a field signature string into a RuntimeFieldSignature.
+	/// Parse a field signature string into a `RuntimeFieldSignature`.
 	#[allow(clippy::should_implement_trait)]
-	pub fn from_str<S: AsRef<str>>(s: S) -> Result<RuntimeFieldSignature> {
+	pub fn from_str<S: AsRef<str>>(s: S) -> Result<Self> {
 		let input = s.as_ref();
 		match parse_field_sig(input)? {
 			// Note: the parser initially returns a placeholder, empty signature string,
-			(RuntimeFieldSignature { sig: _, ty }, "") => Ok(RuntimeFieldSignature {
+			(Self { sig: _, ty }, "") => Ok(Self {
 				sig: JNIString::new(input),
 				ty,
 			}),
-			(RuntimeFieldSignature { .. }, tail) => Err(Error::ParseFailed(format!(
+			(Self { .. }, tail) => Err(Error::ParseFailed(format!(
 				"Trailing input: '{tail}' while parsing '{input}'"
 			))),
 		}
 	}
 
-	/// Convert to a [FieldSignature] (for use with [Env] calls like [`Env::get_field`]).
+	/// Convert to a [`FieldSignature`] (for use with [Env] calls like [`Env::get_field`]).
 	///
 	/// This is a cheap conversion, which borrows the signature string and
 	/// slices the argument vector, without any allocations.
+	#[must_use]
 	pub fn field_signature(&self) -> FieldSignature<'_> {
 		self.into()
 	}
@@ -364,7 +374,7 @@ impl FromStr for RuntimeFieldSignature {
 	type Err = Error;
 
 	fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-		RuntimeFieldSignature::from_str(s)
+		Self::from_str(s)
 	}
 }
 
@@ -375,6 +385,6 @@ impl fmt::Display for RuntimeFieldSignature {
 }
 
 mod parser;
-use parser::*;
+use parser::{parse_field_sig, parse_method_sig, parse_type};
 #[cfg(test)]
 mod tests;
