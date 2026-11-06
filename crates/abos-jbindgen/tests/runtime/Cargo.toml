@@ -7,7 +7,7 @@ publish = false
 [workspace]
 
 [dependencies]
-jni = { version = "=0.22.4", features = ["invocation"] }
+abos-jni = { path = "../../../abos-jni", features = ["invocation"] }
 
 [build-dependencies]
 abos-jbindgen = { path = "../.." }

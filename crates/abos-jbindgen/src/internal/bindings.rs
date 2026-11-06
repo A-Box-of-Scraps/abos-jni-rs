@@ -64,7 +64,7 @@ pub fn walk<F: FnMut(&Module, ModuleEvent)>(module: &Module, callback: &mut F) {
 
 fn initialization(bindings: &[BindingInfo], children: impl Iterator<Item = impl AsRef<str>>) -> String {
 	let mut output: String = String::from(
-		"/// Initialize the Java bindings in this module.\npub fn jni_init(env: &::jni::Env, loader: &::jni::refs::LoaderContext) -> ::jni::errors::Result<()> {\n",
+		"/// Initialize the Java bindings in this module.\npub fn jni_init(env: &::abos_jni::Env, loader: &::abos_jni::refs::LoaderContext) -> ::abos_jni::errors::Result<()> {\n",
 	);
 	for binding in bindings {
 		writeln!(output, "    let _ = {}::get(env, loader)?;", binding.rust_api_type_name).expect("writing to String");

@@ -3,9 +3,9 @@ include!(concat!(env!("OUT_DIR"), "/net_uri_bindings.rs"));
 use crate::test_error::{TestResult, require};
 use android::net::AndroidUri;
 
-pub fn test_net_uri<'local>(env: &mut jni::Env<'local>) -> TestResult {
+pub fn test_net_uri<'local>(env: &mut abos_jni::Env<'local>) -> TestResult {
 	// Parse a URI using the generated bindings
-	let uri_str = jni::objects::JString::from_str(env, "https://github.com/jni-rs/jni-rs")?;
+	let uri_str = abos_jni::objects::JString::from_str(env, "https://github.com/jni-rs/jni-rs")?;
 	let uri = AndroidUri::parse(env, uri_str)?;
 
 	// Get URI components

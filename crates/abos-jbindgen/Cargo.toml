@@ -12,8 +12,8 @@ workspace = true
 [dependencies]
 abos-cafebabe.workspace = true
 abos-jbindgen-annotations.workspace = true
+abos-jni = { workspace = true, features = ["invocation"] }
 clap.workspace = true
-jni.workspace = true
 log.workspace = true
 thiserror.workspace = true
 unicode-ident.workspace = true

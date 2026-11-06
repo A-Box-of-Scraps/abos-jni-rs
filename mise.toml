@@ -15,6 +15,9 @@ android-cli = "1.1.16717390"
 task.output = "interleave"
 task.quiet = true
 
+[tasks."bench:abos-jni"]
+run = "cargo bench --package abos-jni --features invocation --bench api_calls"
+
 [tasks.check]
 depends = ["fmt", "lint", "check:duplicates", "check:file-length"]
 
@@ -77,6 +80,9 @@ run = "mvn --batch-mode --no-transfer-progress -q spotless:apply"
 [tasks."fmt:java:check"]
 run = "mvn --batch-mode --no-transfer-progress -q spotless:check"
 
+[tasks."generate:abos-jni:windows-bindings"]
+run = "cargo run --manifest-path tools/abos-jni-gen-windows-bindings/Cargo.toml -q"
+
 [tasks.lint]
 depends = ["lint:docs"]
 env = { DYLINT_RUSTFLAGS = "-D warnings" }
@@ -126,6 +132,12 @@ run = "cargo test --package abos-jbindgen --all-features -q"
 [tasks."test:abos-jbindgen-annotations"]
 run = "cargo test --package abos-jbindgen-annotations -q"
 
+[tasks."test:abos-jni"]
+run = "cargo test --package abos-jni -q"
+
+[tasks."test:abos-jni-macros"]
+run = "cargo test --package abos-jni-macros -q"
+
 [tasks."test:abos-jni-sys"]
 run = "cargo test --package abos-jni-sys -q"
 
@@ -137,6 +149,22 @@ run = "cargo test --package abos-jni-sys --test invocation -q -- --ignored"
 
 [tasks."test:abos-jni-sys:systest"]
 run = "cargo test --manifest-path tests/abos-jni-sys-systest/Cargo.toml -q"
+
+[tasks."test:abos-jni:examples"]
+run = [
+  "cargo run --package abos-jni --features invocation --example bind_java_type -q",
+  "cargo run --package abos-jni --features invocation --example bind_java_type_hooks -q",
+  "cargo run --package abos-jni --features invocation --example bind_java_type_is_instance_of -q",
+  "cargo run --package abos-jni --features invocation --example bind_java_type_wrapper -q",
+  "cargo run --package abos-jni --features invocation --example jni_sig -q",
+  "cargo run --package abos-jni --features invocation --example jni_sig_wrapper -q",
+  "cargo run --package abos-jni --features invocation --example jni_str -q",
+  "cargo run --package abos-jni --features invocation --example native_method -q",
+  "cargo run --package abos-jni --features invocation --example native_method_wrapper -q",
+]
+
+[tasks."test:abos-jni:jvm"]
+run = "cargo test --package abos-jni --all-features -q"
 
 [tasks."test:android"]
 run = "python tests/android-test-activity/tests/run.py"
@@ -159,31 +187,3 @@ run = "cargo test -q"
 
 [tasks."test:scripts"]
 run = "python -B -m unittest discover --start-directory scripts/tests --quiet"
-
-[tasks."test:abos-jni"]
-run = "cargo test --package abos-jni -q"
-
-[tasks."test:abos-jni-macros"]
-run = "cargo test --package abos-jni-macros -q"
-
-[tasks."test:abos-jni:jvm"]
-run = "cargo test --package abos-jni --all-features -q"
-
-[tasks."test:abos-jni:examples"]
-run = [
-  "cargo run --package abos-jni --features invocation --example bind_java_type -q",
-  "cargo run --package abos-jni --features invocation --example bind_java_type_hooks -q",
-  "cargo run --package abos-jni --features invocation --example bind_java_type_is_instance_of -q",
-  "cargo run --package abos-jni --features invocation --example bind_java_type_wrapper -q",
-  "cargo run --package abos-jni --features invocation --example jni_sig -q",
-  "cargo run --package abos-jni --features invocation --example jni_sig_wrapper -q",
-  "cargo run --package abos-jni --features invocation --example jni_str -q",
-  "cargo run --package abos-jni --features invocation --example native_method -q",
-  "cargo run --package abos-jni --features invocation --example native_method_wrapper -q",
-]
-
-[tasks."bench:abos-jni"]
-run = "cargo bench --package abos-jni --features invocation --bench api_calls"
-
-[tasks."generate:abos-jni:windows-bindings"]
-run = "cargo run --manifest-path tools/abos-jni-gen-windows-bindings/Cargo.toml -q"

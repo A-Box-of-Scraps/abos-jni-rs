@@ -3,12 +3,12 @@ use std::fmt;
 /// Failures are propagated as Java exceptions by the generated native wrappers.
 #[derive(Debug)]
 pub enum TestError {
-	Jni(jni::errors::Error),
+	Jni(abos_jni::errors::Error),
 	Assertion(String),
 }
 
-impl From<jni::errors::Error> for TestError {
-	fn from(error: jni::errors::Error) -> Self {
+impl From<abos_jni::errors::Error> for TestError {
+	fn from(error: abos_jni::errors::Error) -> Self {
 		Self::Jni(error)
 	}
 }

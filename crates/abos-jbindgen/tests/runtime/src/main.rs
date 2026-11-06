@@ -41,12 +41,14 @@ mod collisions;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	use bindings::com::example::SimpleClass;
-	let args = jni::InitArgsBuilder::new()
-		.version(jni::JNIVersion::V1_8)
+	let args = abos_jni::InitArgsBuilder::new()
+		.version(abos_jni::JNIVersion::V1_8)
 		.option(format!("-Djava.class.path={}", env!("FIXTURE_CLASSES")))
 		.build()?;
-	let vm = jni::JavaVM::new(args)?;
-	vm.attach_current_thread(|env| -> jni::errors::Result<()> {
+	let vm = abos_jni::JavaVM::new(args)?;
+	vm.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
+		bindings::jni_init(env, &abos_jni::refs::LoaderContext::default())?;
+		tree::jni_init(env, &abos_jni::refs::LoaderContext::default())?;
 		let instance = SimpleClass::new(env)?;
 		instance.set_value(env, 42)?;
 		assert_eq!(instance.get_value(env)?, 42);

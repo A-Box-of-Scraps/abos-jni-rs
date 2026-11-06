@@ -1,8 +1,8 @@
 //! Exercise renamed members rather than only checking that generated code compiles.
 use crate::{bindings::com::example::MemberCollisions, collision_overrides::com::example::MemberCollisions as Renamed};
 
-pub fn check(env: &mut jni::Env<'_>) -> jni::errors::Result<()> {
-	let text = jni::objects::JString::from_str(env, "four")?;
+pub fn check(env: &mut abos_jni::Env<'_>) -> abos_jni::errors::Result<()> {
+	let text = abos_jni::objects::JString::from_str(env, "four")?;
 	let instance = MemberCollisions::new_int(env, 42)?;
 	assert_eq!(instance.new_int_(env)?, 42);
 	assert_eq!(instance.new_int__(env)?, 142);
@@ -32,13 +32,13 @@ pub fn check(env: &mut jni::Env<'_>) -> jni::errors::Result<()> {
 impl crate::native_collisions::com::example::MixedMethodsNativeInterface
 	for crate::native_collisions::com::example::MixedMethodsAPI
 {
-	type Error = jni::errors::Error;
+	type Error = abos_jni::errors::Error;
 
 	fn call_<'local>(
-		_env: &mut jni::Env<'local>,
+		_env: &mut abos_jni::Env<'local>,
 		_this: crate::native_collisions::com::example::MixedMethods<'local>,
-		_value: jni::sys::jlong,
-	) -> Result<jni::sys::jint, Self::Error> {
+		_value: abos_jni::sys::jlong,
+	) -> Result<abos_jni::sys::jint, Self::Error> {
 		Ok(42)
 	}
 }

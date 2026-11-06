@@ -67,7 +67,7 @@ pub fn generate_with_type_map(class: &ClassInfo, options: &BindgenOptions, types
 			.iter()
 			.map(|part| identifiers::rust_identifier(part))
 			.collect(),
-		use_statements: vec!["use jni::bind_java_type;".to_owned()],
+		use_statements: vec!["use abos_jni::bind_java_type;".to_owned()],
 		binding_code: output,
 		rust_api_type_name: format!("{name}API"),
 		rust_type_name: name,

@@ -11,7 +11,7 @@ pub struct BuiltinType {
 	pub(crate) is_core: bool,
 }
 
-/// Get the list of builtin JNI types from the jni crate
+/// Get the list of builtin JNI types from the `abos-jni` crate
 pub const fn builtin_jni_types() -> &'static [BuiltinType] {
 	&[
 		BuiltinType {
@@ -106,7 +106,7 @@ pub fn derive_rust_type_name(class_name: &str, rust_type_override: Option<&str>,
 	rust_identifier(&format!("{}{base_name_cleaned}", name_prefix.unwrap_or_default()))
 }
 
-// Match jni-macros naming rules so shorthand bindings resolve the original Java name.
+// Match abos-jni-macros naming rules so shorthand bindings resolve the original Java name.
 pub fn jni_macros_snake_case_to_lower_camel_case(s: &str) -> String {
 	// If the string contains any uppercase letters, assume it's intentionally cased
 	// and return it unchanged

@@ -41,7 +41,7 @@ pub fn validate_java_member_name(name: &str) -> crate::Result<()> {
 		return Ok(());
 	}
 	Err(crate::Error::Unsupported(format!(
-		"jni::bind_java_type! cannot represent Java member name {name:?}; omit it with skip_signature"
+		"abos_jni::bind_java_type! cannot represent Java member name {name:?}; omit it with skip_signature"
 	)))
 }
 

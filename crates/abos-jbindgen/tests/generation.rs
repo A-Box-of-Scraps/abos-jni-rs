@@ -34,7 +34,10 @@ fn supports_source_class_bytes_and_jar_inputs() -> TestResult {
 			"fn new(",
 			"fn add(",
 			"fn get_value(",
-			"pub fn jni_init",
+			"use abos_jni::bind_java_type;",
+			"pub fn jni_init(env: &::abos_jni::Env",
+			"loader: &::abos_jni::refs::LoaderContext",
+			"-> ::abos_jni::errors::Result<()>",
 		] {
 			assert!(code.contains(fragment), "missing {fragment}: {code}");
 		}
