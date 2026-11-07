@@ -14,10 +14,16 @@ crates/
   abos-javac/
   abos-jbindgen/
   abos-jbindgen-annotations/
+  abos-jni/
+  abos-jni-macros/
+  abos-jni-sys/
+  abos-jni-sys-macros/
+fuzz/
 licenses/
 lints/
 scripts/
 tests/
+tools/
 .gitattributes
 .gitignore
 .jscpd.json
