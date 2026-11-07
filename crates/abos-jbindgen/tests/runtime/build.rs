@@ -12,6 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let names = [
 		"SimpleClass",
 		"GenericTypes",
+		"EnclosingTypes",
 		"Calculator",
 		"NoPackage",
 		"DefaultType",
@@ -37,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.iter()
 		.map(|name| PathBuf::from("../java").join(format!("{name}.java")))
 		.collect();
-	abos_javac::Build::new()
+	let compiled = abos_javac::Build::new()
 		.files(&sources)
 		.output_dir(&classes)
 		.emit_rerun_if_changed(true)
@@ -112,6 +113,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.root_path("crate::generic_bytecode")
 		.generate()?
 		.write_to_file(output.join("generic_bytecode.rs"))?;
+	let entries = compiled
+		.iter()
+		.map(|file| {
+			let name = file.strip_prefix(&classes)?.to_string_lossy().replace('\\', "/");
+			Ok((name, std::fs::read(file)?))
+		})
+		.collect::<Result<Vec<_>, Box<dyn std::error::Error>>>()?;
+	let jar = output.join("fixture-classes.jar");
+	jar_fixtures::write_jar(&jar, &entries)?;
+	abos_jbindgen::Builder::new()
+		.input_jar(&jar)
+		.patterns(["com.example.EnclosingTypes"])
+		.root_path("crate::enclosing_bytecode")
+		.generate()?
+		.write_to_file(output.join("enclosing_bytecode.rs"))?;
 	archive_bindings(&output)?;
 	Ok(())
 }

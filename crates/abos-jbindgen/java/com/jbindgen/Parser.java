@@ -144,7 +144,8 @@ public class Parser implements AutoCloseable {
                         if (element instanceof TypeElement) {
                             TypeElement typeElement = (TypeElement) element;
 
-                            String binaryName = getBinaryName(typeElement);
+                            String binaryName =
+                                    elements.getBinaryName(typeElement).toString();
                             String simpleName = typeElement.getSimpleName().toString();
 
                             // Exclude anonymous and synthetic classes, which have no usable binding name.
@@ -276,6 +277,16 @@ public class Parser implements AutoCloseable {
     private ClassDescription analyzeClass(TypeElement element, Elements elements, Types types) {
         if (hasRustSkipAnnotation(element)) {
             return null;
+        }
+
+        // Local classes (and their members) can have compiler-specific captured
+        // constructor parameters that the source element model does not expose.
+        for (Element owner = element; owner != null; owner = owner.getEnclosingElement()) {
+            if (owner instanceof TypeElement && ((TypeElement) owner).getNestingKind() == NestingKind.LOCAL) {
+                throw new UnsupportedOperationException("Unsupported local class "
+                        + elements.getBinaryName(element)
+                        + ": captured constructor parameters require class-file input");
+            }
         }
 
         ClassDescription desc = new ClassDescription();
@@ -428,18 +439,21 @@ public class Parser implements AutoCloseable {
 
         List<ParameterDescription> parameters = new ArrayList<>();
 
+        TypeElement declaringClass = (TypeElement) element.getEnclosingElement();
+        if (isConstructor
+                && declaringClass.getNestingKind() == NestingKind.MEMBER
+                && !declaringClass.getModifiers().contains(Modifier.STATIC)) {
+            // The JVM constructor takes the immediate enclosing instance before
+            // source parameters, including for implicit default constructors.
+            TypeElement enclosingClass = (TypeElement) declaringClass.getEnclosingElement();
+            parameters.add(createParameterDescription("enclosingInstance", enclosingClass.asType(), types));
+        }
+
         for (VariableElement param : element.getParameters()) {
             TypeMirror paramType = param.asType();
 
-            ParameterDescription paramDesc = new ParameterDescription();
-            paramDesc.name = param.getSimpleName().toString();
-            TypeDescription typeDesc = createTypeDescription(paramType, types);
-            paramDesc.typeName = typeDesc.typeName;
-            paramDesc.descriptor = typeDesc.descriptor;
-            paramDesc.arrayDimensions = typeDesc.arrayDimensions;
-            paramDesc.isPrimitive = typeDesc.isPrimitive;
-
-            paramDesc.rustPrimitive = null;
+            ParameterDescription paramDesc =
+                    createParameterDescription(param.getSimpleName().toString(), paramType, types);
             for (AnnotationMirror annotation : param.getAnnotationMirrors()) {
                 String annotationType = annotation.getAnnotationType().toString();
                 if (annotationType.equals("io.github.jni_rs.jbindgen.RustPrimitive")) {
@@ -462,6 +476,17 @@ public class Parser implements AutoCloseable {
         TypeMirror returnType = element.getReturnType();
         desc.returnType = createTypeDescription(returnType, types);
 
+        return desc;
+    }
+
+    private ParameterDescription createParameterDescription(String name, TypeMirror type, Types types) {
+        ParameterDescription desc = new ParameterDescription();
+        TypeDescription typeDesc = createTypeDescription(type, types);
+        desc.name = name;
+        desc.typeName = typeDesc.typeName;
+        desc.descriptor = typeDesc.descriptor;
+        desc.arrayDimensions = typeDesc.arrayDimensions;
+        desc.isPrimitive = typeDesc.isPrimitive;
         return desc;
     }
 

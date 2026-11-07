@@ -14,7 +14,7 @@ struct RuntimeApi {
 
 fn runtime_api(class: &ClassInfo) -> RuntimeApi {
 	// Parameter names, documentation, and source annotations are not JVM signatures.
-	// This fixture has no compiler-generated bridge/synthetic members to filter out.
+	// Callers explicitly exclude compiler-generated members absent from the source API.
 	RuntimeApi {
 		class_name: class.class_name.clone(),
 		methods: class
@@ -131,5 +131,84 @@ fn check_java_descriptors(env: &mut Env<'_>, class: &ClassDescription<'_>) -> ab
 			type_to_dex_signature(&info.type_info)
 		);
 	}
+	Ok(())
+}
+
+#[test]
+fn inner_class_source_matches_bytecode_constructors() -> std::result::Result<(), Box<dyn std::error::Error>> {
+	let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/java/EnclosingTypes.java");
+	let output = tempfile::tempdir()?;
+	let paths = abos_javac::Build::new()
+		.file(&source)
+		.output_dir(output.path())
+		.cargo_metadata(false)
+		.try_compile()?;
+	let sources = parse_java_sources(&[source], &[], "*")?;
+	let expected = [
+		("EnclosingTypes", "(I)V"),
+		("EnclosingTypes$Inner", "(Lcom/example/EnclosingTypes;I)V"),
+		("EnclosingTypes$Inner$Deep", "(Lcom/example/EnclosingTypes$Inner;I)V"),
+		("EnclosingTypes$Implicit", "(Lcom/example/EnclosingTypes;)V"),
+		("EnclosingTypes$Derived", "(Lcom/example/EnclosingTypes;I)V"),
+		("EnclosingTypes$StaticNested", "(I)V"),
+		("EnclosingTypes$Container$Member", "(I)V"),
+	];
+	assert_eq!(sources.len(), expected.len() + 1); // Includes the constructor-less interface.
+	assert_eq!(paths.len(), sources.len());
+	for (name, descriptor) in expected {
+		let name = format!("com/example/{name}");
+		let source = sources
+			.iter()
+			.find(|class| class.class_name == name)
+			.expect("source class");
+		let bytes = std::fs::read(output.path().join(format!("{name}.class")))?;
+		let mut bytecode = parse_class(&bytes)?;
+		// javac emits synthetic enclosing-instance fields absent from the source API.
+		// Only ACC_SYNTHETIC (0x1000) fields are excluded from the parity comparison.
+		let raw = abos_cafebabe::parse_class(&bytes)?;
+		let synthetic: BTreeSet<_> = raw
+			.fields
+			.iter()
+			.filter(|field| field.access_flags.contains(abos_cafebabe::AccessFlags(0x1000)))
+			.map(|field| field.name.as_str())
+			.collect();
+		bytecode.fields.retain(|field| !synthetic.contains(field.name.as_str()));
+		assert_eq!(bytecode.constructors.len(), 1);
+		assert_eq!(
+			generate_dex_signature(&name, &bytecode.constructors[0]),
+			format!("L{name};-><init>{descriptor}")
+		);
+		assert_eq!(runtime_api(source), runtime_api(&bytecode));
+	}
+	Ok(())
+}
+
+#[test]
+fn rejects_selected_local_classes_with_diagnostics() -> std::result::Result<(), Box<dyn std::error::Error>> {
+	let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/java/LocalClasses.java");
+	for pattern in [
+		"*",
+		"com.example.LocalClasses$1Captured",
+		"com.example.LocalClasses$1Captured$Member",
+		"com.example.LocalClasses$1Uncaptured",
+	] {
+		let error = crate::Builder::new()
+			.input_sources(vec![source.clone()], vec![], vec![pattern.to_owned()])
+			.generate()
+			.expect_err("selected local classes must not generate invalid bindings");
+		let message = error.to_string();
+		assert!(message.contains("Unsupported local class"), "{message}");
+		assert!(message.contains("com.example.LocalClasses$1"), "{message}");
+		assert!(message.contains("class-file input"), "{message}");
+	}
+	// Unselected implementation-local classes must not prevent supported member generation.
+	let bindings = crate::Builder::new()
+		.input_sources(
+			vec![source],
+			vec![],
+			vec!["com.example.LocalClasses$Supported".to_owned()],
+		)
+		.generate()?;
+	assert_eq!(bindings.len(), 1);
 	Ok(())
 }

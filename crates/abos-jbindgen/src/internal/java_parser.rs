@@ -191,7 +191,11 @@ pub fn parse_java_sources(
 		let pattern_jstring: abos_jni::objects::JString<'_> = JString::from_str(env, class_pattern)?;
 
 		let result_array: abos_jni::objects::JObjectArray<'_, crate::internal::java_parser::ClassDescription<'_>> =
-			ParserWrapper::parse(env, &source_paths_array, &classpath_array, &pattern_jstring)?;
+			ParserWrapper::parse(env, &source_paths_array, &classpath_array, &pattern_jstring).or_else(|error| {
+				// Preserve the parser's diagnostic instead of reporting only a pending Java exception.
+				env.exception_catch()?;
+				Err(error)
+			})?;
 
 		let mut classes: Vec<crate::ClassInfo> = Vec::new();
 		let len: usize = result_array.len(env)?;

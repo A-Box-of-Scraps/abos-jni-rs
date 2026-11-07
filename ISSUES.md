@@ -79,6 +79,8 @@ workspace and standalone runtime crate passed.
 
 ## 4. P2: Non-static inner-class constructors omit the enclosing instance
 
+**status:fixed**
+
 **Location:** `crates/abos-jbindgen/java/com/jbindgen/Parser.java:429–460`
 
 Constructor parameters are copied directly from the source model, missing the enclosing-instance parameter present in
@@ -89,6 +91,19 @@ fails with `MethodNotFound`, preventing ordinary methods on that wrapper from wo
 
 **Fix:** include the enclosing-instance parameter for non-static member classes. Explicitly reject unsupported
 captured/local-class cases rather than generating incorrect signatures.
+
+**Resolution:** confirmed by a failing source/bytecode constructor comparison. Non-static member-class constructors
+now prepend the erased type of their immediate enclosing class, including implicit default constructors. Static nested
+classes are unchanged. Selected local classes and their members are rejected with a diagnostic recommending class-file
+input; selection uses compiler binary names, and parser exception messages are preserved in Rust errors.
+
+**Verification:** explicit expected constructor descriptors and source/bytecode API parity cover generic enclosing
+classes, deep nesting, default constructors, inheritance, static nested classes, and implicitly static interface members.
+Only bytecode fields marked synthetic are excluded from this comparison. Both generated binding sets initialize and
+execute constructors and methods against the same compiled fixture under `-Xcheck:jni`, including a parameter-name
+collision. Tests also cover captured and uncaptured local classes, local-class members, and successful generation after
+excluding unsupported classes. Workspace all-feature tests and strict Clippy checks for the workspace and standalone
+runtime crate passed.
 
 ## 5. P2: Records and annotation types receive invalid class names
 
