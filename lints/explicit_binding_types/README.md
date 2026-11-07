@@ -1,6 +1,6 @@
 # Explicit binding types
 
-`explicit_binding_types` requires a type annotation on simple `let` and `let mut` bindings when the initializer does not
+`explicit_binding_types` requires type annotations on simple `let` and `let mut` bindings whose initializer does not
 show the type.
 
 ```rust
@@ -16,36 +16,23 @@ let players = Vec::<ServerPlayer>::new();
 
 ## Rules
 
-- Literals, casts, and explicit type ascriptions are obvious. References, negation, tuples, and arrays are obvious when
-  their contents are obvious.
-- Struct literals and `Type::new()` are obvious when the named type matches the resulting struct or enum, and its
-  required type and const arguments are written explicitly. `Vec::new()` and `Vec::<_>::new()` need an annotation.
-- Other function calls, method calls, field accesses, and variable copies need an annotation. A function named `new`
-  that returns a different type is not treated as a constructor.
-- `_` placeholders, including nested ones such as `Vec<Option<_>>`, do not count as explicit types.
-- Destructuring, discarded values (`let _ = ...`), generated bindings, closures, and opaque `impl Trait` results are
-  skipped. This rule does not cover `if let`, `while let`, match arms, or loop patterns.
-- Type aliases and constructors other than `new` are not recognized as obvious yet.
+- Literals, casts, and explicit type ascriptions need no annotation. References, negation, tuples, and arrays follow the
+  same rule when their contents show the type.
+- Struct literals and `Type::new()` need no annotation when the named type matches the resulting struct or enum and
+  required type and const arguments are explicit. `Vec::new()` and `Vec::<_>::new()` require annotations.
+- Other calls, field accesses, and variable copies require annotations. Type aliases and constructors other than `new`
+  are not recognized as showing the type.
+- Type annotations containing `_`, including nested placeholders such as `Vec<Option<_>>`, are insufficient.
+- Destructuring, discarded values, generated bindings, closures, and opaque `impl Trait` results are skipped. `if let`,
+  `while let`, match arms, and loop patterns are not checked.
 
-Use `#[allow(explicit_binding_types)]` on an exceptional binding when spelling out its type would be impractical.
-Diagnostics provide help rather than automatic fixes because compiler-rendered types are not always valid source
-annotations.
+Use `#[allow(explicit_binding_types)]` for exceptions. Diagnostics offer guidance, not automatic fixes.
 
-## Development
+## Checks
 
-This crate belongs to the shared `lints/` workspace, which owns the pinned nightly toolchain, `rustc-dev`, dependency
-versions, and lockfile. The application workspace continues to use its own toolchain. Dylint's compiler APIs are
-unstable; update the toolchain and lint implementation together.
-
-From the repository root:
+Run from the repository root:
 
 ```sh
-mise install
 mise run lint
 mise run test:lints
 ```
-
-`lint` runs Clippy followed by Dylint, treating warnings as errors. `test:lints` compares diagnostics from `ui/main.rs`
-with `ui/main.stderr`, covering both accepted and rejected bindings. Review snapshot changes when changing the rule. The
-root formatting tasks also format this lint crate; UI fixtures are maintained separately to preserve diagnostic
-locations.
