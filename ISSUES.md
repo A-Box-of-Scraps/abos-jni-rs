@@ -207,9 +207,8 @@ references or JVM aborts. Valid edge cases continue to work.
 
 **Verification:** `cargo test --workspace --all-features --locked -q` passed with 654 tests and 7 ignored.
 Default-feature JNI tests, strict workspace Clippy, and package-scoped JNI Dylint checks passed on Linux with JDK 25.
-Full `mise run lint` remains blocked by existing explicit-binding-type errors in
-`crates/abos-jbindgen/tests/unit/internal/java_parser.rs`. This deterministic suite is not an exhaustive soundness
-review; Windows and Android execution remain unverified.
+Full `mise run lint` also passed after adding explicit binding types to the Java parser tests. This deterministic suite
+is not an exhaustive soundness review; Windows and Android execution remain unverified.
 
 ## Source-versus-bytecode parity suites
 

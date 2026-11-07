@@ -77,27 +77,27 @@ fn expected_api() -> RuntimeApi {
 
 #[test]
 fn generic_source_matches_bytecode_runtime_signatures() -> std::result::Result<(), Box<dyn std::error::Error>> {
-	let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/java/GenericTypes.java");
-	let output = tempfile::tempdir()?;
-	let classes = abos_javac::Build::new()
+	let source: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/java/GenericTypes.java");
+	let output: tempfile::TempDir = tempfile::tempdir()?;
+	let classes: Vec<PathBuf> = abos_javac::Build::new()
 		.file(&source)
 		.output_dir(output.path())
 		.cargo_metadata(false)
 		.try_compile()?;
 	assert_eq!(classes.len(), 1);
-	let bytecode = parse_class(&std::fs::read(&classes[0])?)?;
+	let bytecode: ClassInfo = parse_class(&std::fs::read(&classes[0])?)?;
 	assert_eq!(runtime_api(&bytecode), expected_api());
-	let sources = parse_java_sources(std::slice::from_ref(&source), &[], "*")?;
+	let sources: Vec<ClassInfo> = parse_java_sources(std::slice::from_ref(&source), &[], "*")?;
 	assert_eq!(sources.len(), 1);
 	assert_eq!(runtime_api(&sources[0]), runtime_api(&bytecode));
 
 	// Also check the Java descriptor fields, which Rust's TypeInfo conversion does not consume.
 	get_parser_jvm()?.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
-		let paths = create_string_array(env, &[source])?;
-		let classpath = create_string_array(env, &[])?;
-		let pattern = env.new_string("*")?;
-		let classes = ParserWrapper::parse(env, paths, classpath, pattern)?;
-		let class = classes.get_element(env, 0)?;
+		let paths: JObjectArray<'_, JString<'_>> = create_string_array(env, &[source])?;
+		let classpath: JObjectArray<'_, JString<'_>> = create_string_array(env, &[])?;
+		let pattern: JString<'_> = env.new_string("*")?;
+		let classes: JObjectArray<'_, ClassDescription<'_>> = ParserWrapper::parse(env, paths, classpath, pattern)?;
+		let class: ClassDescription<'_> = classes.get_element(env, 0)?;
 		check_java_descriptors(env, &class)
 	})?;
 	Ok(())
@@ -106,14 +106,14 @@ fn generic_source_matches_bytecode_runtime_signatures() -> std::result::Result<(
 fn check_java_descriptors(env: &mut Env<'_>, class: &ClassDescription<'_>) -> abos_jni::errors::Result<()> {
 	for methods in [class.constructors(env)?, class.methods(env)?] {
 		for i in 0..methods.len(env)? {
-			let method = methods.get_element(env, i)?;
-			let info = java_to_method_info(env, &method)?;
-			let result = method.return_type(env)?;
+			let method: MethodDescription<'_> = methods.get_element(env, i)?;
+			let info: MethodInfo = java_to_method_info(env, &method)?;
+			let result: TypeDescription<'_> = method.return_type(env)?;
 			assert_eq!(
 				result.descriptor(env)?.to_string(),
 				type_to_dex_signature(&info.signature.return_type)
 			);
-			let parameters = method.parameters(env)?;
+			let parameters: JObjectArray<'_, ParameterDescription<'_>> = method.parameters(env)?;
 			for (i, arg) in info.signature.arguments.iter().enumerate() {
 				assert_eq!(
 					parameters.get_element(env, i)?.descriptor(env)?.to_string(),
@@ -122,10 +122,10 @@ fn check_java_descriptors(env: &mut Env<'_>, class: &ClassDescription<'_>) -> ab
 			}
 		}
 	}
-	let fields = class.fields(env)?;
+	let fields: JObjectArray<'_, FieldDescription<'_>> = class.fields(env)?;
 	for i in 0..fields.len(env)? {
-		let field = fields.get_element(env, i)?;
-		let info = java_to_field_info(env, &field)?;
+		let field: FieldDescription<'_> = fields.get_element(env, i)?;
+		let info: FieldInfo = java_to_field_info(env, &field)?;
 		assert_eq!(
 			field.descriptor(env)?.to_string(),
 			type_to_dex_signature(&info.type_info)
@@ -136,14 +136,14 @@ fn check_java_descriptors(env: &mut Env<'_>, class: &ClassDescription<'_>) -> ab
 
 #[test]
 fn inner_class_source_matches_bytecode_constructors() -> std::result::Result<(), Box<dyn std::error::Error>> {
-	let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/java/EnclosingTypes.java");
-	let output = tempfile::tempdir()?;
-	let paths = abos_javac::Build::new()
+	let source: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/java/EnclosingTypes.java");
+	let output: tempfile::TempDir = tempfile::tempdir()?;
+	let paths: Vec<PathBuf> = abos_javac::Build::new()
 		.file(&source)
 		.output_dir(output.path())
 		.cargo_metadata(false)
 		.try_compile()?;
-	let sources = parse_java_sources(&[source], &[], "*")?;
+	let sources: Vec<ClassInfo> = parse_java_sources(&[source], &[], "*")?;
 	let expected = [
 		("EnclosingTypes", "(I)V"),
 		("EnclosingTypes$Inner", "(Lcom/example/EnclosingTypes;I)V"),
@@ -156,17 +156,17 @@ fn inner_class_source_matches_bytecode_constructors() -> std::result::Result<(),
 	assert_eq!(sources.len(), expected.len() + 1); // Includes the constructor-less interface.
 	assert_eq!(paths.len(), sources.len());
 	for (name, descriptor) in expected {
-		let name = format!("com/example/{name}");
-		let source = sources
+		let name: String = format!("com/example/{name}");
+		let source: &ClassInfo = sources
 			.iter()
 			.find(|class| class.class_name == name)
 			.expect("source class");
-		let bytes = std::fs::read(output.path().join(format!("{name}.class")))?;
-		let mut bytecode = parse_class(&bytes)?;
+		let bytes: Vec<u8> = std::fs::read(output.path().join(format!("{name}.class")))?;
+		let mut bytecode: ClassInfo = parse_class(&bytes)?;
 		// javac emits synthetic enclosing-instance fields absent from the source API.
 		// Only ACC_SYNTHETIC (0x1000) fields are excluded from the parity comparison.
-		let raw = abos_cafebabe::parse_class(&bytes)?;
-		let synthetic: BTreeSet<_> = raw
+		let raw: abos_cafebabe::ClassFile = abos_cafebabe::parse_class(&bytes)?;
+		let synthetic: BTreeSet<&str> = raw
 			.fields
 			.iter()
 			.filter(|field| field.access_flags.contains(abos_cafebabe::AccessFlags(0x1000)))
@@ -185,24 +185,24 @@ fn inner_class_source_matches_bytecode_constructors() -> std::result::Result<(),
 
 #[test]
 fn rejects_selected_local_classes_with_diagnostics() -> std::result::Result<(), Box<dyn std::error::Error>> {
-	let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/java/LocalClasses.java");
+	let source: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/java/LocalClasses.java");
 	for pattern in [
 		"*",
 		"com.example.LocalClasses$1Captured",
 		"com.example.LocalClasses$1Captured$Member",
 		"com.example.LocalClasses$1Uncaptured",
 	] {
-		let error = crate::Builder::new()
+		let error: Error = crate::Builder::new()
 			.input_sources(vec![source.clone()], vec![], vec![pattern.to_owned()])
 			.generate()
 			.expect_err("selected local classes must not generate invalid bindings");
-		let message = error.to_string();
+		let message: String = error.to_string();
 		assert!(message.contains("Unsupported local class"), "{message}");
 		assert!(message.contains("com.example.LocalClasses$1"), "{message}");
 		assert!(message.contains("class-file input"), "{message}");
 	}
 	// Unselected implementation-local classes must not prevent supported member generation.
-	let bindings = crate::Builder::new()
+	let bindings: crate::Bindings = crate::Builder::new()
 		.input_sources(
 			vec![source],
 			vec![],
@@ -215,15 +215,15 @@ fn rejects_selected_local_classes_with_diagnostics() -> std::result::Result<(), 
 
 #[test]
 fn records_and_annotations_match_bytecode_names() -> std::result::Result<(), Box<dyn std::error::Error>> {
-	let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/java");
-	let files = [fixtures.join("RecordTypes.java"), fixtures.join("Marker.java")];
-	let output = tempfile::tempdir()?;
-	let paths = abos_javac::Build::new()
+	let fixtures: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/java");
+	let files: [PathBuf; 2] = [fixtures.join("RecordTypes.java"), fixtures.join("Marker.java")];
+	let output: tempfile::TempDir = tempfile::tempdir()?;
+	let paths: Vec<PathBuf> = abos_javac::Build::new()
 		.files(&files)
 		.output_dir(output.path())
 		.cargo_metadata(false)
 		.try_compile()?;
-	let sources = parse_java_sources(&files, &[], "*")?;
+	let sources: Vec<ClassInfo> = parse_java_sources(&files, &[], "*")?;
 	let expected = [
 		("RecordTypes", "<init>(I)V"),
 		("RecordTypes$Nested", "<init>([Lcom/example/RecordTypes;)V"),
@@ -238,25 +238,25 @@ fn records_and_annotations_match_bytecode_names() -> std::result::Result<(), Box
 	assert_eq!(sources.len(), expected.len());
 	assert_eq!(paths.len(), expected.len());
 	for (name, signature) in expected {
-		let name = format!("com/example/{name}");
-		let source = sources
+		let name: String = format!("com/example/{name}");
+		let source: &ClassInfo = sources
 			.iter()
 			.find(|class| class.class_name == name)
 			.unwrap_or_else(|| panic!("missing source class {name}"));
-		let bytecode = parse_class(&std::fs::read(output.path().join(format!("{name}.class")))?)?;
-		let api = runtime_api(source);
+		let bytecode: ClassInfo = parse_class(&std::fs::read(output.path().join(format!("{name}.class")))?)?;
+		let api: RuntimeApi = runtime_api(source);
 		assert!(api.methods.contains(&(format!("L{name};->{signature}"), false)));
 		// Record-generated accessors, equals/hashCode/toString are present in both models.
 		// No members are excluded from this comparison.
 		assert_eq!(api, runtime_api(&bytecode));
 	}
 	get_parser_jvm()?.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
-		let paths = create_string_array(env, &files)?;
-		let classpath = create_string_array(env, &[])?;
-		let pattern = env.new_string("*")?;
-		let classes = ParserWrapper::parse(env, paths, classpath, pattern)?;
+		let paths: JObjectArray<'_, JString<'_>> = create_string_array(env, &files)?;
+		let classpath: JObjectArray<'_, JString<'_>> = create_string_array(env, &[])?;
+		let pattern: JString<'_> = env.new_string("*")?;
+		let classes: JObjectArray<'_, ClassDescription<'_>> = ParserWrapper::parse(env, paths, classpath, pattern)?;
 		for i in 0..classes.len(env)? {
-			let class = classes.get_element(env, i)?;
+			let class: ClassDescription<'_> = classes.get_element(env, i)?;
 			check_java_descriptors(env, &class)?;
 		}
 		Ok(())
@@ -266,14 +266,14 @@ fn records_and_annotations_match_bytecode_names() -> std::result::Result<(), Box
 
 #[test]
 fn enum_constants_match_bytecode_runtime_api() -> std::result::Result<(), Box<dyn std::error::Error>> {
-	let file = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/java/EnumTypes.java");
-	let output = tempfile::tempdir()?;
-	let paths = abos_javac::Build::new()
+	let file: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/java/EnumTypes.java");
+	let output: tempfile::TempDir = tempfile::tempdir()?;
+	let paths: Vec<PathBuf> = abos_javac::Build::new()
 		.file(&file)
 		.output_dir(output.path())
 		.cargo_metadata(false)
 		.try_compile()?;
-	let sources = parse_java_sources(std::slice::from_ref(&file), &[], "*")?;
+	let sources: Vec<ClassInfo> = parse_java_sources(std::slice::from_ref(&file), &[], "*")?;
 	assert_eq!(sources.len(), 3);
 	// The fourth class is BLUE's anonymous constant body, not a separately named API.
 	assert_eq!(paths.len(), 4);
@@ -282,7 +282,7 @@ fn enum_constants_match_bytecode_runtime_api() -> std::result::Result<(), Box<dy
 		("EnumTypes$State", &["ON", "OFF"][..]),
 		("EnumTypes$Empty", &[][..]),
 	] {
-		let name = format!("com/example/{simple_name}");
+		let name: String = format!("com/example/{simple_name}");
 		let mut expected = RuntimeApi {
 			class_name: name.clone(),
 			methods: [
@@ -300,9 +300,9 @@ fn enum_constants_match_bytecode_runtime_api() -> std::result::Result<(), Box<dy
 			expected.methods.insert((format!("L{name};->code()I"), false));
 			expected.fields.insert((format!("L{name};->id:I"), false, true));
 		}
-		let bytecode = parse_class(&std::fs::read(output.path().join(format!("{name}.class")))?)?;
+		let bytecode: ClassInfo = parse_class(&std::fs::read(output.path().join(format!("{name}.class")))?)?;
 		assert_eq!(runtime_api(&bytecode), expected);
-		let source = sources
+		let source: &ClassInfo = sources
 			.iter()
 			.find(|class| class.class_name == name)
 			.expect("source enum");
@@ -311,12 +311,12 @@ fn enum_constants_match_bytecode_runtime_api() -> std::result::Result<(), Box<dy
 		assert_eq!(runtime_api(source), expected);
 	}
 	get_parser_jvm()?.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
-		let paths = create_string_array(env, &[file])?;
-		let classpath = create_string_array(env, &[])?;
-		let pattern = env.new_string("*")?;
-		let classes = ParserWrapper::parse(env, paths, classpath, pattern)?;
+		let paths: JObjectArray<'_, JString<'_>> = create_string_array(env, &[file])?;
+		let classpath: JObjectArray<'_, JString<'_>> = create_string_array(env, &[])?;
+		let pattern: JString<'_> = env.new_string("*")?;
+		let classes: JObjectArray<'_, ClassDescription<'_>> = ParserWrapper::parse(env, paths, classpath, pattern)?;
 		for i in 0..classes.len(env)? {
-			let class = classes.get_element(env, i)?;
+			let class: ClassDescription<'_> = classes.get_element(env, i)?;
 			check_java_descriptors(env, &class)?;
 		}
 		Ok(())
