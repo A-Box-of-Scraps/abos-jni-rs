@@ -320,16 +320,15 @@ pub fn create_jni_fn_name(namespace: &str, fn_name: &str, signature: Option<&str
 
 	let mut result: String = format!("Java_{namespace_underscored}_{fn_name_underscored}");
 
-	if let Some(sig) = signature {
-		if let Some(start) = sig.find('(')
-			&& let Some(end) = sig.find(')')
-		{
-			let args: &str = &sig[start + 1..end];
-			// Always add __ when signature is provided (indicates overloaded method)
-			result.push_str("__");
-			if !args.is_empty() {
-				result.push_str(&mangle_signature_args(args));
-			}
+	if let Some(sig) = signature
+		&& let Some(start) = sig.find('(')
+		&& let Some(end) = sig.find(')')
+	{
+		let args: &str = &sig[start + 1..end];
+		// Always add __ when signature is provided (indicates overloaded method)
+		result.push_str("__");
+		if !args.is_empty() {
+			result.push_str(&mangle_signature_args(args));
 		}
 	}
 
