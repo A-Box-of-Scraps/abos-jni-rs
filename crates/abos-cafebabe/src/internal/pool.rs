@@ -1,4 +1,5 @@
-use crate::{Result, reader::Reader};
+use super::reader::Reader;
+use crate::Result;
 
 #[derive(Clone, Copy)]
 enum Constant<'a> {
@@ -7,10 +8,10 @@ enum Constant<'a> {
 	Class(u16),
 }
 
-pub struct Pool<'a>(Vec<Constant<'a>>);
+pub(super) struct Pool<'a>(Vec<Constant<'a>>);
 
 impl<'a> Pool<'a> {
-	pub fn read(reader: &mut Reader<'a>) -> Result<Self> {
+	pub(super) fn read(reader: &mut Reader<'a>) -> Result<Self> {
 		let count: usize = usize::from(reader.u16()?);
 		if count == 0 {
 			return Err(reader.error("constant pool count must be nonzero"));
@@ -52,26 +53,26 @@ impl<'a> Pool<'a> {
 		Ok(Self(entries))
 	}
 
-	pub fn utf8(&self, index: u16, reader: &Reader<'_>) -> Result<&'a [u8]> {
+	pub(super) fn utf8(&self, index: u16, reader: &Reader<'_>) -> Result<&'a [u8]> {
 		match self.0.get(usize::from(index)) {
 			Some(Constant::Utf8(bytes)) => Ok(bytes),
 			_ => Err(reader.error("expected UTF-8 constant-pool reference")),
 		}
 	}
 
-	pub fn text(&self, index: u16, reader: &Reader<'_>) -> Result<String> {
+	pub(super) fn text(&self, index: u16, reader: &Reader<'_>) -> Result<String> {
 		decode_modified_utf8(self.utf8(index, reader)?)
 			.ok_or_else(|| reader.error("invalid modified UTF-8 or unpaired surrogate in metadata"))
 	}
 
-	pub fn class(&self, index: u16, reader: &Reader<'_>) -> Result<String> {
+	pub(super) fn class(&self, index: u16, reader: &Reader<'_>) -> Result<String> {
 		match self.0.get(usize::from(index)) {
 			Some(Constant::Class(name)) => self.text(*name, reader),
 			_ => Err(reader.error("expected class constant-pool reference")),
 		}
 	}
 
-	pub fn class_name(&self, reader: &mut Reader<'_>) -> Result<String> {
+	pub(super) fn class_name(&self, reader: &mut Reader<'_>) -> Result<String> {
 		self.class(reader.u16()?, reader)
 	}
 }
@@ -112,5 +113,5 @@ fn continuation(bytes: &mut std::slice::Iter<'_, u8>) -> Option<u16> {
 }
 
 #[cfg(test)]
-#[path = "../tests/unit/pool.rs"]
+#[path = "../../tests/unit/pool.rs"]
 mod tests;
