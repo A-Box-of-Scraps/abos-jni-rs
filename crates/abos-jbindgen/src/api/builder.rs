@@ -106,6 +106,8 @@ impl Builder {
 
 	/// Set the input to Java source files.
 	///
+	/// Source and bytecode inputs include non-private constructors, ordinary methods, and fields.
+	/// Native methods, including private ones, are retained for registration bindings.
 	/// Non-static member-class constructors include the enclosing-instance parameter.
 	/// Selected local classes and their members are rejected because captured constructor
 	/// parameters are not exposed by the source model; use class-file input for those classes.

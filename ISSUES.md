@@ -212,25 +212,55 @@ is not an exhaustive soundness review; Windows and Android execution remain unve
 
 ## Source-versus-bytecode parity suites
 
-The source-generation failures show that generated text alone is not enough to validate bindings. Both input paths
-should agree on the runtime API represented by the same compiled Java fixture.
+**status:fixed**
 
-**Coverage to add:**
+Generated text alone is not enough to validate bindings. The suite now compares source, class-file, and JAR metadata
+against independent expected APIs, then compiles and executes both generated binding sets against the same Java classes.
 
-- Unbounded and bounded generics, generic methods, and arrays of type variables.
-- Static nested classes and non-static inner classes, including their constructor descriptors.
-- Records, annotation types, enums and enum constants, including nested declarations.
-- Overloads, inheritance, covariant returns, visibility, and static/final members.
-- Default-package classes and unusual but valid Java identifiers.
+**Coverage:**
 
-**Test approach:** compile each fixture once, then generate bindings independently from its source and resulting class
-files or JAR. Compare normalized class names and member signatures, including descriptors and static flags, rather than
-requiring identical Rust text. Parameter names, documentation, source-only annotations, and compiler-generated
-synthetic/bridge members need explicit comparison rules; differences must not be silently ignored.
+- Unbounded, bounded, dependent, recursive, intersection, and shadowed generics; generic methods and type-variable
+  arrays.
+- Static nested and non-static inner classes, implicit constructors, immediate enclosing-instance parameters, and
+  inheritance.
+- Records, annotations, enums, constants, nested declarations, and generated record/enum API members.
+- Overloads, covariant and generic bridges, interface defaults, declared versus inherited members, visibility, native
+  modifiers, and static/final fields.
+- Default-package and single-letter classes, cross-class references, arrays, Unicode, dollar signs, and Rust-keyword
+  collisions.
+- Selected unsupported local classes produce actionable errors; excluding them permits generation of supported
+  declarations.
 
-Compile both generated binding sets in separate Rust modules or test crates, initialize them against the same compiled
-Java classes, and exercise representative constructors, methods, and field accessors. Assert expected member presence so
-an omission shared by both paths cannot make a test pass.
+**Resolution:** consolidated the earlier parser regressions into `tests/unit/internal/java_parser/parity/`, with a
+shared fixture inventory in `tests/support/parity.rs`. Each metadata run compiles its batch once and packages the same
+bytes into a JAR. All three input paths must match exact handwritten class/member inventories, descriptors, represented
+modifiers, and direct inheritance relationships. Duplicate entries fail before collection can hide them. Java descriptor
+fields are checked separately, including native methods.
 
-**Acceptance:** supported fixtures expose the expected runtime API through both paths. Unsupported constructs return
-clear generation errors rather than successful output with invalid names, missing members, or nonexistent signatures.
+Parameter names, documentation, ordering, and source-only annotations have explicit comparison rules. Raw bytecode
+synthetic/bridge inventories must match exact expected owner/name/descriptor/access-flag entries before normalization;
+unexpected, changed, or missing artifacts fail. The enum's anonymous constant implementation is explicitly accounted
+for. Source-only binding annotation behavior remains covered separately by generation tests.
+
+The standalone runtime crate reuses the shared fixtures, compiles its batch once, and generates independent source and
+JAR modules. Shared assertions exercise both paths, including protected/package-private constructors, overload results,
+field round trips, inherited/default dispatch, typed arrays, and both bridge methods. Eight named child-process
+scenarios run under `-Xcheck:jni`, each with captured diagnostics and a 120-second execution limit. The metadata and
+runtime stages use separate artifacts, not a mutable cross-test cache.
+
+Comparator tests prove that shared omissions, descriptor/modifier/parent changes, duplicates, and unapproved or stale
+compiler artifacts are rejected. `mise run test:abos-jbindgen:parity` runs the focused suite; normal package and
+workspace tests retain the same coverage. The suite README records the comparison contract and fixture matrix.
+
+**Additional defects found:** a failing visibility fixture confirmed that source parsing omitted protected and
+package-private constructors retained by bytecode parsing. Source parsing now includes non-private constructors,
+consistent with ordinary members. Inheritance comparison also exposed a literal `<NULL>` superclass for interfaces; the
+Java parser now represents an absent superclass as an empty string.
+
+**Acceptance:** supported fixtures expose the expected runtime API through both paths, both binding sets compile and
+initialize, and representative operations return the expected values. Unsupported local-class selections fail clearly.
+
+**Verification:** workspace all-feature tests passed with 656 tests and 7 ignored. Strict workspace and
+standalone-runtime Clippy, package-scoped Jbindgen Dylint checks, the focused parity task, and `mise run check:ci`
+passed on Linux with the pinned JDK 25. Compiler artifact expectations are deliberately explicit and require review on
+JDK upgrades. Windows/Android and other JDK versions remain unverified.

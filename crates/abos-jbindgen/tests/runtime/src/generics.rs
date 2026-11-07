@@ -81,10 +81,9 @@ macro_rules! check_bindings {
 }
 
 check_bindings!(source, crate::bindings::com::example::GenericTypes);
-check_bindings!(bytecode, crate::generic_bytecode::com::example::GenericTypes);
+check_bindings!(bytecode, crate::parity_bytecode::com::example::GenericTypes);
 
 pub fn check(env: &mut Env<'_>) -> Result<()> {
-	crate::generic_bytecode::jni_init(env, &abos_jni::refs::LoaderContext::default())?;
 	source::check(env)?;
 	bytecode::check(env)
 }

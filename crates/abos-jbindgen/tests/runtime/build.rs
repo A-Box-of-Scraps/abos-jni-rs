@@ -1,6 +1,8 @@
 //! Compile fixture Java and generate Rust bindings for execution tests.
 #[path = "../support/jars.rs"]
 mod jar_fixtures;
+#[path = "../support/parity.rs"]
+mod parity_fixtures;
 use std::{
 	env,
 	path::{Path, PathBuf},
@@ -11,17 +13,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let classes = output.join("classes");
 	let names = [
 		"SimpleClass",
-		"GenericTypes",
-		"EnclosingTypes",
-		"EnumTypes",
-		"RecordTypes",
-		"Marker",
 		"Calculator",
 		"NoPackage",
-		"DefaultType",
-		"DefaultPeer",
 		"OuterClass",
-		"Overloads",
 		"AwkwardNames",
 		"NameCollisionTest",
 		"WithFields",
@@ -33,10 +27,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		"GeneratedMembers",
 		"GeneratedNatives",
 		"GeneratedNativesNativeInterface",
-		"Identifiers",
-		"UnsupportedNames",
-		"keywords/match",
 	];
+	let names: std::collections::BTreeSet<&str> = names
+		.into_iter()
+		.chain(parity_fixtures::FIXTURES.iter().map(|(name, _)| *name))
+		.collect();
 	let sources: Vec<PathBuf> = names
 		.iter()
 		.map(|name| PathBuf::from("../java").join(format!("{name}.java")))
@@ -44,6 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let compiled = abos_javac::Build::new()
 		.files(&sources)
 		.output_dir(&classes)
+		.encoding("UTF-8")
 		.emit_rerun_if_changed(true)
 		.try_compile()?;
 	let bindings = abos_jbindgen::Builder::new()
@@ -111,11 +107,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.generate_jni_init(false)
 		.generate()?
 		.write_to_file(output.join("helper_no_init.rs"))?;
-	abos_jbindgen::Builder::new()
-		.input_class(classes.join("com/example/GenericTypes.class"))
-		.root_path("crate::generic_bytecode")
-		.generate()?
-		.write_to_file(output.join("generic_bytecode.rs"))?;
 	let entries = compiled
 		.iter()
 		.map(|file| {
@@ -127,22 +118,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	jar_fixtures::write_jar(&jar, &entries)?;
 	abos_jbindgen::Builder::new()
 		.input_jar(&jar)
-		.patterns(["com.example.EnclosingTypes"])
-		.root_path("crate::enclosing_bytecode")
+		.patterns(parity_fixtures::FIXTURES.iter().map(|(_, name)| *name))
+		.root_path("crate::parity_bytecode")
+		.generate_native_interfaces(false)
 		.generate()?
-		.write_to_file(output.join("enclosing_bytecode.rs"))?;
-	abos_jbindgen::Builder::new()
-		.input_jar(&jar)
-		.patterns(["com.example.RecordTypes", "com.example.Marker"])
-		.root_path("crate::record_bytecode")
-		.generate()?
-		.write_to_file(output.join("record_bytecode.rs"))?;
-	abos_jbindgen::Builder::new()
-		.input_jar(&jar)
-		.patterns(["com.example.EnumTypes"])
-		.root_path("crate::enum_bytecode")
-		.generate()?
-		.write_to_file(output.join("enum_bytecode.rs"))?;
+		.write_to_file(output.join("parity_bytecode.rs"))?;
 	archive_bindings(&output)?;
 	Ok(())
 }

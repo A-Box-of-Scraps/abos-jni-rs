@@ -69,21 +69,9 @@ mod generated_natives {
 mod helper_no_init {
 	include!(concat!(env!("OUT_DIR"), "/helper_no_init.rs"));
 }
-#[allow(dead_code, non_snake_case)]
-mod generic_bytecode {
-	include!(concat!(env!("OUT_DIR"), "/generic_bytecode.rs"));
-}
-#[allow(dead_code, non_snake_case)]
-mod enclosing_bytecode {
-	include!(concat!(env!("OUT_DIR"), "/enclosing_bytecode.rs"));
-}
-#[allow(dead_code, non_snake_case)]
-mod record_bytecode {
-	include!(concat!(env!("OUT_DIR"), "/record_bytecode.rs"));
-}
-#[allow(dead_code, non_snake_case)]
-mod enum_bytecode {
-	include!(concat!(env!("OUT_DIR"), "/enum_bytecode.rs"));
+#[allow(dead_code, non_snake_case, non_camel_case_types)]
+mod parity_bytecode {
+	include!(concat!(env!("OUT_DIR"), "/parity_bytecode.rs"));
 }
 mod collisions;
 mod default_package;
@@ -91,6 +79,7 @@ mod enclosing;
 mod enums;
 mod generated_collisions;
 mod generics;
+mod parity;
 mod records;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -102,7 +91,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.build()?;
 	let vm = abos_jni::JavaVM::new(args)?;
 	vm.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
+		let scenario = std::env::args().nth(1).unwrap_or_else(|| "all".to_owned());
+		eprintln!("runtime scenario: {scenario}");
 		bindings::jni_init(env, &abos_jni::refs::LoaderContext::default())?;
+		parity_bytecode::jni_init(env, &abos_jni::refs::LoaderContext::default())?;
+		match scenario.as_str() {
+			"generics" => return generics::check(env),
+			"enclosing" => return enclosing::check(env),
+			"records" => return records::check(env),
+			"enums" => return enums::check(env),
+			"members" => return parity::members(env),
+			"inheritance" => return parity::inheritance(env),
+			"identifiers" => return parity::identifiers(env),
+			"existing" | "all" => {}
+			_ => panic!("unknown runtime scenario: {scenario}"),
+		}
 		tree::jni_init(env, &abos_jni::refs::LoaderContext::default())?;
 		let instance = SimpleClass::new(env)?;
 		instance.set_value(env, 42)?;
@@ -146,10 +149,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		collisions::check(env)?;
 		generated_collisions::check(env)?;
 		default_package::check(env)?;
-		generics::check(env)?;
-		enclosing::check(env)?;
-		records::check(env)?;
-		enums::check(env)?;
+		if scenario == "all" {
+			generics::check(env)?;
+			enclosing::check(env)?;
+			records::check(env)?;
+			enums::check(env)?;
+			parity::members(env)?;
+			parity::inheritance(env)?;
+			parity::identifiers(env)?;
+		}
 		assert_eq!(modular_jar::fixture::archive::ModularExample::answer(env)?, 42);
 		// Binding generation uses base classes; the JVM still selects its runtime variant.
 		assert_eq!(multi_release_jar::fixture::archive::VersionedExample::version(env)?, 17);

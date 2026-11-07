@@ -196,6 +196,12 @@ run = "cargo test --package abos-jbindgen --all-features -q"
 [tasks."test:abos-jbindgen-annotations"]
 run = "cargo test --package abos-jbindgen-annotations -q"
 
+[tasks."test:abos-jbindgen:parity"]
+run = [
+  "cargo test --package abos-jbindgen --lib internal::java_parser::tests --locked -q",
+  "cargo test --package abos-jbindgen --test runtime --locked -q",
+]
+
 [tasks."test:abos-jni"]
 run = "cargo test --package abos-jni -q"
 

@@ -331,7 +331,8 @@ public class Parser implements AutoCloseable {
                 }
             } else if (enclosed.getKind() == ElementKind.CONSTRUCTOR) {
                 ExecutableElement constructorElement = (ExecutableElement) enclosed;
-                if (!constructorElement.getModifiers().contains(Modifier.PUBLIC)) {
+                // Match the class-file path and ordinary methods: include non-private members.
+                if (constructorElement.getModifiers().contains(Modifier.PRIVATE)) {
                     continue;
                 }
                 if (hasRustSkipAnnotation(constructorElement)) {
@@ -639,7 +640,8 @@ public class Parser implements AutoCloseable {
         public MethodDescription[] methods;
         public FieldDescription[] fields;
         public MethodDescription[] nativeMethods;
-        public String superClass;
+        // Interfaces have no superclass; keep absence distinct from a Java null string.
+        public String superClass = "";
         public String[] interfaces;
     }
 
