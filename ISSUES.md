@@ -131,6 +131,8 @@ all-feature tests and strict Clippy checks for the workspace and standalone runt
 
 ## 6. P2: Source generation silently omits enum constants
 
+**status:fixed**
+
 **Location:** `crates/abos-jbindgen/java/com/jbindgen/Parser.java:331–332`
 
 Field collection handles `ElementKind.FIELD`, but not `ENUM_CONSTANT`.
@@ -139,6 +141,17 @@ Field collection handles `ElementKind.FIELD`, but not `ENUM_CONSTANT`.
 emits both accessors.
 
 **Fix:** process enum constants as fields and test source/bytecode API parity.
+
+**Resolution:** confirmed by a failing source/bytecode regression showing missing `RED` and `BLUE` fields. Source
+collection now processes `ElementKind.ENUM_CONSTANT` through the existing field pipeline, preserving type metadata,
+static/final flags, annotations, and skip handling.
+
+**Verification:** explicit expected runtime APIs cover top-level, nested, and empty enums, ordinary instance fields,
+and a constant-specific subclass. Source and bytecode metadata match without member exclusions for the named enums;
+the anonymous constant body is not treated as a separately named source API. Java descriptor fields are also checked.
+Both generated binding sets initialize and read constants, invoke overridden methods, access fields, and verify identity
+through `values()` and `valueOf()` under `-Xcheck:jni`. Workspace all-feature tests and strict Clippy checks for the
+workspace and standalone runtime crate passed.
 
 ## Verification baseline
 

@@ -81,9 +81,14 @@ mod enclosing_bytecode {
 mod record_bytecode {
 	include!(concat!(env!("OUT_DIR"), "/record_bytecode.rs"));
 }
+#[allow(dead_code, non_snake_case)]
+mod enum_bytecode {
+	include!(concat!(env!("OUT_DIR"), "/enum_bytecode.rs"));
+}
 mod collisions;
 mod default_package;
 mod enclosing;
+mod enums;
 mod generated_collisions;
 mod generics;
 mod records;
@@ -144,6 +149,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		generics::check(env)?;
 		enclosing::check(env)?;
 		records::check(env)?;
+		enums::check(env)?;
 		assert_eq!(modular_jar::fixture::archive::ModularExample::answer(env)?, 42);
 		// Binding generation uses base classes; the JVM still selects its runtime variant.
 		assert_eq!(multi_release_jar::fixture::archive::VersionedExample::version(env)?, 17);

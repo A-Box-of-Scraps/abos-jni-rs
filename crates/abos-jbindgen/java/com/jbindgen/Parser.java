@@ -321,7 +321,7 @@ public class Parser implements AutoCloseable {
         }
 
         for (Element enclosed : element.getEnclosedElements()) {
-            if (enclosed.getKind() == ElementKind.FIELD) {
+            if (enclosed.getKind() == ElementKind.FIELD || enclosed.getKind() == ElementKind.ENUM_CONSTANT) {
                 if (hasRustSkipAnnotation(enclosed)) {
                     continue;
                 }

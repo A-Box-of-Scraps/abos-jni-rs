@@ -13,6 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		"SimpleClass",
 		"GenericTypes",
 		"EnclosingTypes",
+		"EnumTypes",
 		"RecordTypes",
 		"Marker",
 		"Calculator",
@@ -136,6 +137,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.root_path("crate::record_bytecode")
 		.generate()?
 		.write_to_file(output.join("record_bytecode.rs"))?;
+	abos_jbindgen::Builder::new()
+		.input_jar(&jar)
+		.patterns(["com.example.EnumTypes"])
+		.root_path("crate::enum_bytecode")
+		.generate()?
+		.write_to_file(output.join("enum_bytecode.rs"))?;
 	archive_bindings(&output)?;
 	Ok(())
 }

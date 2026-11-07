@@ -263,3 +263,63 @@ fn records_and_annotations_match_bytecode_names() -> std::result::Result<(), Box
 	})?;
 	Ok(())
 }
+
+#[test]
+fn enum_constants_match_bytecode_runtime_api() -> std::result::Result<(), Box<dyn std::error::Error>> {
+	let file = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/java/EnumTypes.java");
+	let output = tempfile::tempdir()?;
+	let paths = abos_javac::Build::new()
+		.file(&file)
+		.output_dir(output.path())
+		.cargo_metadata(false)
+		.try_compile()?;
+	let sources = parse_java_sources(std::slice::from_ref(&file), &[], "*")?;
+	assert_eq!(sources.len(), 3);
+	// The fourth class is BLUE's anonymous constant body, not a separately named API.
+	assert_eq!(paths.len(), 4);
+	for (simple_name, constants) in [
+		("EnumTypes", &["RED", "BLUE"][..]),
+		("EnumTypes$State", &["ON", "OFF"][..]),
+		("EnumTypes$Empty", &[][..]),
+	] {
+		let name = format!("com/example/{simple_name}");
+		let mut expected = RuntimeApi {
+			class_name: name.clone(),
+			methods: [
+				(format!("L{name};->values()[L{name};"), true),
+				(format!("L{name};->valueOf(Ljava/lang/String;)L{name};"), true),
+			]
+			.into_iter()
+			.collect(),
+			fields: constants
+				.iter()
+				.map(|constant| (format!("L{name};->{constant}:L{name};"), true, true))
+				.collect(),
+		};
+		if simple_name == "EnumTypes" {
+			expected.methods.insert((format!("L{name};->code()I"), false));
+			expected.fields.insert((format!("L{name};->id:I"), false, true));
+		}
+		let bytecode = parse_class(&std::fs::read(output.path().join(format!("{name}.class")))?)?;
+		assert_eq!(runtime_api(&bytecode), expected);
+		let source = sources
+			.iter()
+			.find(|class| class.class_name == name)
+			.expect("source enum");
+		// No public members are excluded: constants are static final fields of the enum type,
+		// even when the value has an anonymous constant-specific subclass.
+		assert_eq!(runtime_api(source), expected);
+	}
+	get_parser_jvm()?.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
+		let paths = create_string_array(env, &[file])?;
+		let classpath = create_string_array(env, &[])?;
+		let pattern = env.new_string("*")?;
+		let classes = ParserWrapper::parse(env, paths, classpath, pattern)?;
+		for i in 0..classes.len(env)? {
+			let class = classes.get_element(env, i)?;
+			check_java_descriptors(env, &class)?;
+		}
+		Ok(())
+	})?;
+	Ok(())
+}
