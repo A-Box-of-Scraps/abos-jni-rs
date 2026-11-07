@@ -129,47 +129,20 @@ pub(super) fn generate_jni_call_for_return_type(
 
 	// The JNI spec asserts that `Call<Type>MethodA` _must_ not be called with a `null` object reference
 	// Note: we assume that the class will never be null when calling static methods
-	let null_check: TokenStream = if is_static {
-		quote! {}
-	} else {
-		let error_msg: String = format!("Attempted to call '{debug_name}' with a null object");
-		quote! {
-			if #this_or_class.is_null() {
-				return Err(#jni::errors::Error::NullPtr(#error_msg));
-			}
-		}
-	};
+	let null_check: TokenStream = generate_receiver_null_check(
+		is_static,
+		this_or_class,
+		&format!("Attempted to call '{debug_name}' with a null object"),
+		jni,
+	);
 
-	quote! {
-		{
-			// JNI method calls must not run with a pending exception.
-			if env.exception_check() {
-				return Err(#jni::errors::Error::JavaException);
-			}
-
-			#null_check
-
-			#top_check
-
-			let ret = unsafe {
-				use #jni::refs::Reference as _;
-				let env_ptr: *mut #jni::sys::JNIEnv = env.get_raw();
-				let interface: *const #jni::sys::JNINativeInterface_ = *env_ptr;
-				((*interface).v1_1.#call_fn)(
-					env_ptr,
-					#this_or_class.as_raw(),
-					#method_id,
-					#jni_args.as_ptr()
-				)
-			};
-
-			if env.exception_check() {
-				return Err(#jni::errors::Error::JavaException);
-			}
-
-			Ok(#return_tokens)
-		}
-	}
+	generate_checked_jni_call(
+		jni,
+		&call_fn,
+		&quote! { #this_or_class.as_raw(), #method_id, #jni_args.as_ptr() },
+		&quote! { #null_check #top_check },
+		&return_tokens,
+	)
 }
 
 /// Generate method implementations (instance or static methods)
@@ -326,6 +299,51 @@ impl JniCallArgs {
 			quote! { : [#jni::sys::jvalue; 0] }
 		} else {
 			quote! {}
+		}
+	}
+}
+
+/// Keep exception checks around the raw call, including before allocating a local reference.
+pub(super) fn generate_checked_jni_call(
+	jni: &syn::Path,
+	call_fn: &Ident,
+	args: &TokenStream,
+	preflight: &TokenStream,
+	return_tokens: &TokenStream,
+) -> TokenStream {
+	quote! {
+		{
+			if env.exception_check() {
+				return Err(#jni::errors::Error::JavaException);
+			}
+			#preflight
+			let ret = unsafe {
+				use #jni::refs::Reference as _;
+				let env_ptr: *mut #jni::sys::JNIEnv = env.get_raw();
+				let interface: *const #jni::sys::JNINativeInterface_ = *env_ptr;
+				((*interface).v1_1.#call_fn)(env_ptr, #args)
+			};
+			if env.exception_check() {
+				return Err(#jni::errors::Error::JavaException);
+			}
+			Ok(#return_tokens)
+		}
+	}
+}
+
+pub(super) fn generate_receiver_null_check(
+	is_static: bool,
+	receiver: &TokenStream,
+	message: &str,
+	jni: &syn::Path,
+) -> TokenStream {
+	if is_static {
+		quote! {}
+	} else {
+		quote! {
+			if #receiver.is_null() {
+				return Err(#jni::errors::Error::NullPtr(#message));
+			}
 		}
 	}
 }

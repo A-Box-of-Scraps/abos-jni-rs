@@ -4,6 +4,10 @@ use crate::{
 };
 
 use super::*;
+use std::sync::{
+	Arc,
+	atomic::{AtomicBool, Ordering},
+};
 struct TestCustomPolicyCaptures<'local, 'native_method>
 where
 	'local: 'native_method,
@@ -76,4 +80,52 @@ pub extern "system" fn Java_HelloWorld_logErrorWithContextString<'local>(
 			Ok(class)
 		})
 		.resolve_with::<LogContextErrorAndDefault, _>(|| format!("In 'logErrorWithContextString' with arg: {arg}"))
+}
+
+#[test]
+fn panic_payload_preserves_string_messages() {
+	assert_eq!(
+		panic_payload_to_string(Box::new("borrowed message")),
+		"borrowed message"
+	);
+	assert_eq!(
+		panic_payload_to_string(Box::new(String::from("owned message"))),
+		"owned message"
+	);
+}
+
+struct DropTracker(Arc<AtomicBool>);
+
+impl Drop for DropTracker {
+	fn drop(&mut self) {
+		self.0.store(true, Ordering::SeqCst);
+	}
+}
+
+#[test]
+fn non_string_panic_payload_is_dropped() {
+	let dropped: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+	assert_eq!(
+		panic_payload_to_string(Box::new(DropTracker(dropped.clone()))),
+		"non-string panic payload"
+	);
+	assert!(dropped.load(Ordering::SeqCst));
+}
+
+#[test]
+fn panic_during_payload_drop_is_caught_and_secondary_payload_is_leaked() {
+	struct PanicOnDrop(Arc<AtomicBool>);
+
+	impl Drop for PanicOnDrop {
+		fn drop(&mut self) {
+			std::panic::panic_any(DropTracker(self.0.clone()));
+		}
+	}
+
+	let secondary_dropped: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+	assert_eq!(
+		panic_payload_to_string(Box::new(PanicOnDrop(secondary_dropped.clone()))),
+		"non-string panic payload"
+	);
+	assert!(!secondary_dropped.load(Ordering::SeqCst));
 }

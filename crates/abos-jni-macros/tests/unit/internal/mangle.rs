@@ -1,5 +1,21 @@
 use super::*;
 
+fn assert_expansion(
+	attr: proc_macro2::TokenStream,
+	source: proc_macro2::TokenStream,
+	expected: &proc_macro2::TokenStream,
+) {
+	assert_eq!(jni_mangle2(attr, source).to_string(), expected.to_string());
+}
+
+fn close_it_source() -> proc_macro2::TokenStream {
+	quote::quote! {
+		pub fn close_it(env: JNIEnv, _: JClass, filename: JString) -> jboolean {
+			unimplemented!()
+		}
+	}
+}
+
 #[test]
 fn test_create_jni_fn_name() {
 	assert_eq!(
@@ -80,26 +96,18 @@ fn test_code_generation() {
 	let attr: proc_macro2::TokenStream = quote::quote! {
 		"com.example.Bar"
 	};
-	let source: proc_macro2::TokenStream = quote::quote! {
-		pub fn close_it(env: JNIEnv, _: JClass, filename: JString) -> jboolean {
-			unimplemented!()
-		}
-	};
+	let source: proc_macro2::TokenStream = close_it_source();
 
-	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
-
-	assert_eq!(
-		format!("{expanded}"),
-		format!(
-			"{}",
-			quote::quote! {
-				#[unsafe(export_name = "Java_com_example_Bar_closeIt")]
-				#[allow(non_snake_case)]
-				pub extern "system" fn close_it(env: JNIEnv, _: JClass, filename: JString) -> jboolean {
-					unimplemented!()
-				}
+	assert_expansion(
+		attr,
+		source,
+		&quote::quote! {
+			#[unsafe(export_name = "Java_com_example_Bar_closeIt")]
+			#[allow(non_snake_case)]
+			pub extern "system" fn close_it(env: JNIEnv, _: JClass, filename: JString) -> jboolean {
+				unimplemented!()
 			}
-		)
+		},
 	);
 }
 
@@ -114,20 +122,16 @@ fn test_unsafe_fn() {
 		}
 	};
 
-	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
-
-	assert_eq!(
-		format!("{expanded}"),
-		format!(
-			"{}",
-			quote::quote! {
-				#[unsafe(export_name = "Java_com_example_Bar_closeIt")]
-				#[allow(non_snake_case)]
-				pub unsafe extern "system" fn close_it(env: JNIEnv, _: JClass, filename: JString) -> jboolean {
-					unimplemented!()
-				}
+	assert_expansion(
+		attr,
+		source,
+		&quote::quote! {
+			#[unsafe(export_name = "Java_com_example_Bar_closeIt")]
+			#[allow(non_snake_case)]
+			pub unsafe extern "system" fn close_it(env: JNIEnv, _: JClass, filename: JString) -> jboolean {
+				unimplemented!()
 			}
-		)
+		},
 	);
 }
 
@@ -141,60 +145,40 @@ fn test_non_function() {
 		}
 	};
 
-	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
-
-	assert_eq!(
-		format!("{expanded}"),
-		format!(
-			"{}",
-			quote::quote! {
-				::core::compile_error! { "The `jni_mangle` attribute can only be applied to `fn` items" }
-			}
-		)
+	assert_expansion(
+		attr,
+		source,
+		&quote::quote! {
+			::core::compile_error! { "The `jni_mangle` attribute can only be applied to `fn` items" }
+		},
 	);
 }
 
 #[test]
 fn test_empty_attribute() {
 	let attr: proc_macro2::TokenStream = quote::quote! {};
-	let source: proc_macro2::TokenStream = quote::quote! {
-		pub fn close_it(env: JNIEnv, _: JClass, filename: JString) -> jboolean {
-			unimplemented!()
-		}
-	};
+	let source: proc_macro2::TokenStream = close_it_source();
 
-	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
-
-	assert_eq!(
-		format!("{expanded}"),
-		format!(
-			"{}",
-			quote::quote! {
-				::core::compile_error! { "The `jni_mangle` attribute must have 1-3 string literal arguments" }
-			}
-		)
+	assert_expansion(
+		attr,
+		source,
+		&quote::quote! {
+			::core::compile_error! { "The `jni_mangle` attribute must have 1-3 string literal arguments" }
+		},
 	);
 }
 
 #[test]
 fn test_invalid_namespace() {
 	let attr: proc_macro2::TokenStream = quote::quote! { "." };
-	let source: proc_macro2::TokenStream = quote::quote! {
-		pub fn close_it(env: JNIEnv, _: JClass, filename: JString) -> jboolean {
-			unimplemented!()
-		}
-	};
+	let source: proc_macro2::TokenStream = close_it_source();
 
-	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
-
-	assert_eq!(
-		format!("{expanded}"),
-		format!(
-			"{}",
-			quote::quote! {
-				::core::compile_error! { "Invalid package namespace supplied to `jni_mangle` attribute" }
-			}
-		)
+	assert_expansion(
+		attr,
+		source,
+		&quote::quote! {
+			::core::compile_error! { "Invalid package namespace supplied to `jni_mangle` attribute" }
+		},
 	);
 }
 
@@ -224,20 +208,16 @@ fn test_system_abi_is_preserved() {
 		}
 	};
 
-	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
-
-	assert_eq!(
-		format!("{expanded}"),
-		format!(
-			"{}",
-			quote::quote! {
-				#[unsafe(export_name = "Java_com_example_Foo_closeIt")]
-				#[allow(non_snake_case)]
-				pub extern "system" fn closeIt (env: JNIEnv, _: JClass, filename: JString) -> jboolean {
-					unimplemented!()
-				}
+	assert_expansion(
+		attr,
+		source,
+		&quote::quote! {
+			#[unsafe(export_name = "Java_com_example_Foo_closeIt")]
+			#[allow(non_snake_case)]
+			pub extern "system" fn closeIt (env: JNIEnv, _: JClass, filename: JString) -> jboolean {
+				unimplemented!()
 			}
-		)
+		},
 	);
 }
 
@@ -250,16 +230,12 @@ fn test_wrong_visibility() {
 		}
 	};
 
-	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
-
-	assert_eq!(
-		format!("{expanded}"),
-		format!(
-			"{}",
-			quote::quote! {
-				::core::compile_error! { "`jni_mangle` attributed functions must have public visibility (`pub`)" }
-			}
-		)
+	assert_expansion(
+		attr,
+		source,
+		&quote::quote! {
+			::core::compile_error! { "`jni_mangle` attributed functions must have public visibility (`pub`)" }
+		},
 	);
 }
 
@@ -274,20 +250,16 @@ fn test_with_method_name() {
 		}
 	};
 
-	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
-
-	assert_eq!(
-		format!("{expanded}"),
-		format!(
-			"{}",
-			quote::quote! {
-				#[unsafe(export_name = "Java_com_example_Bar_customMethod")]
-				#[allow(non_snake_case)]
-				pub extern "system" fn rust_function (env: JNIEnv, _: JClass) -> jboolean {
-					unimplemented!()
-				}
+	assert_expansion(
+		attr,
+		source,
+		&quote::quote! {
+			#[unsafe(export_name = "Java_com_example_Bar_customMethod")]
+			#[allow(non_snake_case)]
+			pub extern "system" fn rust_function (env: JNIEnv, _: JClass) -> jboolean {
+				unimplemented!()
 			}
-		)
+		},
 	);
 }
 
@@ -302,20 +274,16 @@ fn test_with_signature_only() {
 		}
 	};
 
-	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
-
-	assert_eq!(
-		format!("{expanded}"),
-		format!(
-			"{}",
-			quote::quote! {
-				#[unsafe(export_name = "Java_com_example_Bar_boolMethod__I")]
-				#[allow(non_snake_case)]
-				pub extern "system" fn boolMethod (env: JNIEnv, _: JClass) -> jboolean {
-					unimplemented!()
-				}
+	assert_expansion(
+		attr,
+		source,
+		&quote::quote! {
+			#[unsafe(export_name = "Java_com_example_Bar_boolMethod__I")]
+			#[allow(non_snake_case)]
+			pub extern "system" fn boolMethod (env: JNIEnv, _: JClass) -> jboolean {
+				unimplemented!()
 			}
-		)
+		},
 	);
 }
 
@@ -330,20 +298,16 @@ fn test_with_method_name_and_signature() {
 		}
 	};
 
-	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
-
-	assert_eq!(
-		format!("{expanded}"),
-		format!(
-			"{}",
-			quote::quote! {
-				#[unsafe(export_name = "Java_com_example_Bar_testMethod__Ljava_lang_String_2")]
-				#[allow(non_snake_case)]
-				pub extern "system" fn rust_func (env: JNIEnv, _: JClass) {
-					unimplemented!()
-				}
+	assert_expansion(
+		attr,
+		source,
+		&quote::quote! {
+			#[unsafe(export_name = "Java_com_example_Bar_testMethod__Ljava_lang_String_2")]
+			#[allow(non_snake_case)]
+			pub extern "system" fn rust_func (env: JNIEnv, _: JClass) {
+				unimplemented!()
 			}
-		)
+		},
 	);
 }
 
@@ -410,20 +374,16 @@ fn test_snake_case_function_name_conversion() {
 		}
 	};
 
-	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
-
-	assert_eq!(
-		format!("{expanded}"),
-		format!(
-			"{}",
-			quote::quote! {
-				#[unsafe(export_name = "Java_com_example_Bar_sayHelloWorld")]
-				#[allow(non_snake_case)]
-				pub extern "system" fn say_hello_world (env: JNIEnv, _: JClass) {
-					unimplemented!()
-				}
+	assert_expansion(
+		attr,
+		source,
+		&quote::quote! {
+			#[unsafe(export_name = "Java_com_example_Bar_sayHelloWorld")]
+			#[allow(non_snake_case)]
+			pub extern "system" fn say_hello_world (env: JNIEnv, _: JClass) {
+				unimplemented!()
 			}
-		)
+		},
 	);
 }
 
@@ -438,20 +398,16 @@ fn test_camel_case_function_name_unchanged() {
 		}
 	};
 
-	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
-
-	assert_eq!(
-		format!("{expanded}"),
-		format!(
-			"{}",
-			quote::quote! {
-				#[unsafe(export_name = "Java_com_example_Bar_sayHelloWorld")]
-				#[allow(non_snake_case)]
-				pub extern "system" fn sayHelloWorld (env: JNIEnv, _: JClass) {
-					unimplemented!()
-				}
+	assert_expansion(
+		attr,
+		source,
+		&quote::quote! {
+			#[unsafe(export_name = "Java_com_example_Bar_sayHelloWorld")]
+			#[allow(non_snake_case)]
+			pub extern "system" fn sayHelloWorld (env: JNIEnv, _: JClass) {
+				unimplemented!()
 			}
-		)
+		},
 	);
 }
 
@@ -466,20 +422,16 @@ fn test_snake_case_with_signature() {
 		}
 	};
 
-	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
-
-	assert_eq!(
-		format!("{expanded}"),
-		format!(
-			"{}",
-			quote::quote! {
-				#[unsafe(export_name = "Java_com_example_Bar_checkValid__I")]
-				#[allow(non_snake_case)]
-				pub extern "system" fn check_valid (env: JNIEnv, _: JClass) -> jboolean {
-					unimplemented!()
-				}
+	assert_expansion(
+		attr,
+		source,
+		&quote::quote! {
+			#[unsafe(export_name = "Java_com_example_Bar_checkValid__I")]
+			#[allow(non_snake_case)]
+			pub extern "system" fn check_valid (env: JNIEnv, _: JClass) -> jboolean {
+				unimplemented!()
 			}
-		)
+		},
 	);
 }
 
@@ -494,19 +446,15 @@ fn test_signature_with_no_args() {
 		}
 	};
 
-	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
-
-	assert_eq!(
-		format!("{expanded}"),
-		format!(
-			"{}",
-			quote::quote! {
-				#[unsafe(export_name = "Java_com_example_Bar_noArgs__")]
-				#[allow(non_snake_case)]
-				pub extern "system" fn noArgs (env: JNIEnv, _: JClass) {
-					unimplemented!()
-				}
+	assert_expansion(
+		attr,
+		source,
+		&quote::quote! {
+			#[unsafe(export_name = "Java_com_example_Bar_noArgs__")]
+			#[allow(non_snake_case)]
+			pub extern "system" fn noArgs (env: JNIEnv, _: JClass) {
+				unimplemented!()
 			}
-		)
+		},
 	);
 }

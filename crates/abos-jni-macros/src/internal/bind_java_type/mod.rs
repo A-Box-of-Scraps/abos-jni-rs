@@ -300,3 +300,25 @@ use native_exports::{generate_native_exports, generate_native_registration_code}
 #[cfg(test)]
 #[path = "../../../tests/unit/internal/bind_java_type.rs"]
 mod tests;
+
+/// Parse the property-block syntax shared by field and method declarations.
+fn parse_property_block(input: ParseStream, mut parse_property: impl FnMut(ParseStream) -> Result<()>) -> Result<()> {
+	if input.peek(Token![=]) {
+		input.parse::<Token![=]>()?;
+	}
+	let body;
+	braced!(body in input);
+	while !body.is_empty() {
+		parse_property(&body)?;
+		if !body.is_empty() {
+			body.parse::<Token![,]>()?;
+		}
+	}
+	Ok(())
+}
+
+fn parse_bool_property<K: Parse>(input: ParseStream) -> Result<bool> {
+	input.parse::<K>()?;
+	input.parse::<Token![=]>()?;
+	Ok(input.parse::<LitBool>()?.value())
+}

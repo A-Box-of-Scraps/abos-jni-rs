@@ -1,7 +1,6 @@
 use super::{
-	Field, FieldSignature, Ident, LitBool, ParseStream, Result, Token, TypeMappings, VisibilitySpec, braced,
-	format_ident, get, name, non_null, parse_field_sig, parse_name_spec, parse_type, parse_visibility, set, sig,
-	snake_case_to_lower_camel_case,
+	Field, FieldSignature, Ident, ParseStream, Result, Token, TypeMappings, VisibilitySpec, format_ident, get, name,
+	non_null, parse_field_sig, parse_name_spec, parse_type, parse_visibility, set, sig, snake_case_to_lower_camel_case,
 };
 
 struct Accessor {
@@ -68,7 +67,7 @@ pub(super) fn parse_field(input: ParseStream, type_mappings: &TypeMappings) -> R
 			field_type: parse_type(input, type_mappings)?,
 		});
 	} else if input.peek(syn::token::Brace) || input.peek(Token![=]) {
-		parser.parse_body(input, type_mappings)?;
+		super::parse_property_block(input, |property| parser.parse_property(property, type_mappings))?;
 	} else {
 		return Err(syn::Error::new(
 			parser.rust_name.span(),
@@ -95,21 +94,6 @@ fn parse_qualifiers(input: ParseStream) -> Result<(bool, bool)> {
 }
 
 impl FieldParser {
-	fn parse_body(&mut self, input: ParseStream, mappings: &TypeMappings) -> Result<()> {
-		if input.peek(Token![=]) {
-			input.parse::<Token![=]>()?;
-		}
-		let body;
-		braced!(body in input);
-		while !body.is_empty() {
-			self.parse_property(&body, mappings)?;
-			if !body.is_empty() {
-				body.parse::<Token![,]>()?;
-			}
-		}
-		Ok(())
-	}
-
 	fn parse_property(&mut self, input: ParseStream, mappings: &TypeMappings) -> Result<()> {
 		let attrs: Vec<syn::Attribute> = input.call(syn::Attribute::parse_outer)?;
 		let visibility: Option<VisibilitySpec> = parse_visibility(input)?;
@@ -143,13 +127,9 @@ impl FieldParser {
 		} else if lookahead.peek(sig) {
 			self.signature = Some(parse_field_sig(input, mappings)?);
 		} else if lookahead.peek(Token![static]) {
-			input.parse::<Token![static]>()?;
-			input.parse::<Token![=]>()?;
-			self.is_static = input.parse::<LitBool>()?.value();
+			self.is_static = super::parse_bool_property::<Token![static]>(input)?;
 		} else if lookahead.peek(non_null) {
-			input.parse::<non_null>()?;
-			input.parse::<Token![=]>()?;
-			self.non_null = input.parse::<LitBool>()?.value();
+			self.non_null = super::parse_bool_property::<non_null>(input)?;
 		} else {
 			return Err(lookahead.error());
 		}

@@ -7,6 +7,21 @@ use super::{
 	MethodSignature, Primitive, Reference, Result, ReturnType, jvalue,
 };
 
+// Reference assignability is checked separately after resolving the method ID.
+fn validate_call_args(sig: &MethodSignature<'_, '_>, args: &[JValue]) -> Result<()> {
+	if sig.args().len() != args.len() {
+		return Err(Error::InvalidArgList(sig.into()));
+	}
+	let base_types_match: bool = sig.args().iter().zip(args).all(|(expected, actual)| match expected {
+		JavaType::Primitive(primitive) => actual.primitive_type() == Some(*primitive),
+		JavaType::Object | JavaType::Array => actual.primitive_type().is_none(),
+	});
+	if !base_types_match {
+		return Err(Error::InvalidArgList(sig.into()));
+	}
+	Ok(())
+}
+
 impl<'local> Env<'local> {
 	/// Calls an object method safely. This comes with a number of lookups/checks. It
 	///
@@ -60,18 +75,7 @@ impl<'local> Env<'local> {
 		let obj: &JObject<'_> = null_check!(obj, "call_method obj argument")?;
 		let sig: &MethodSignature<'_, '_> = sig.as_ref();
 
-		if sig.args().len() != args.len() {
-			return Err(Error::InvalidArgList(sig.into()));
-		}
-
-		// check arguments types
-		let base_types_match: bool = sig.args().iter().zip(args.iter()).all(|(exp, act)| match exp {
-			JavaType::Primitive(p) => act.primitive_type() == Some(*p),
-			JavaType::Object | JavaType::Array => act.primitive_type().is_none(),
-		});
-		if !base_types_match {
-			return Err(Error::InvalidArgList(sig.into()));
-		}
+		validate_call_args(sig, args)?;
 
 		let class: crate::refs::Auto<'_, JClass<'_>> = self.get_object_class(obj)?.auto();
 
@@ -119,18 +123,7 @@ impl<'local> Env<'local> {
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let sig: &MethodSignature<'_, '_> = sig.as_ref();
-		if sig.args().len() != args.len() {
-			return Err(Error::InvalidArgList(sig.into()));
-		}
-
-		// check arguments types
-		let base_types_match: bool = sig.args().iter().zip(args.iter()).all(|(exp, act)| match exp {
-			JavaType::Primitive(p) => act.primitive_type() == Some(*p),
-			JavaType::Object | JavaType::Array => act.primitive_type().is_none(),
-		});
-		if !base_types_match {
-			return Err(Error::InvalidArgList(sig.into()));
-		}
+		validate_call_args(sig, args)?;
 
 		// go ahead and look up the class since we'll need that for the next call.
 		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
@@ -185,18 +178,7 @@ impl<'local> Env<'local> {
 		let obj: &JObject<'_> = obj.as_ref();
 		let obj: &JObject<'_> = null_check!(obj, "call_nonvirtual_method obj argument")?;
 		let sig: &MethodSignature<'_, '_> = sig.as_ref();
-		if sig.args().len() != args.len() {
-			return Err(Error::InvalidArgList(sig.into()));
-		}
-
-		// check arguments types
-		let base_types_match: bool = sig.args().iter().zip(args.iter()).all(|(exp, act)| match exp {
-			JavaType::Primitive(p) => act.primitive_type() == Some(*p),
-			JavaType::Object | JavaType::Array => act.primitive_type().is_none(),
-		});
-		if !base_types_match {
-			return Err(Error::InvalidArgList(sig.into()));
-		}
+		validate_call_args(sig, args)?;
 
 		// go ahead and look up the class since we'll need that for the next call.
 		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
@@ -242,23 +224,7 @@ impl<'local> Env<'local> {
 		self.assert_top();
 		let ctor_sig: &MethodSignature<'_, '_> = ctor_sig.as_ref();
 
-		// check arguments length
-		if ctor_sig.args().len() != ctor_args.len() {
-			return Err(Error::InvalidArgList(ctor_sig.into()));
-		}
-
-		// check arguments types
-		let base_types_match: bool = ctor_sig
-			.args()
-			.iter()
-			.zip(ctor_args.iter())
-			.all(|(exp, act)| match exp {
-				JavaType::Primitive(p) => act.primitive_type() == Some(*p),
-				JavaType::Object | JavaType::Array => act.primitive_type().is_none(),
-			});
-		if !base_types_match {
-			return Err(Error::InvalidArgList(ctor_sig.into()));
-		}
+		validate_call_args(ctor_sig, ctor_args)?;
 
 		// check return value
 		if ctor_sig.ret() != ReturnType::Primitive(Primitive::Void) {
@@ -333,3 +299,7 @@ impl<'local> Env<'local> {
 		Ok(obj)
 	}
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/api/env/calls.rs"]
+mod tests;

@@ -63,21 +63,7 @@ pub(super) fn generate_single_native_wrapper(
 
 	let lifetime: TokenStream = quote! { 'local };
 
-	let mut params: Vec<TokenStream> = Vec::new();
-	params.push(quote! { mut unowned_env: #jni::EnvUnowned<#lifetime> });
-
-	if method.is_static {
-		params.push(quote! { class: #jni::objects::JClass<#lifetime> });
-	} else {
-		params.push(quote! { this: #type_name<#lifetime> });
-	}
-
-	// Use native trait arg type (without AsRef) to match the trait signature
-	for param in &method.signature.parameters {
-		let param_name: &Ident = &param.name;
-		let rust_type: TokenStream = sig_type_to_rust_native_trait_arg_type(&param.ty, &lifetime, type_mappings, jni);
-		params.push(quote! { #param_name: #rust_type });
-	}
+	let params: Vec<TokenStream> = method.native_parameters(type_name, &lifetime, type_mappings, jni);
 
 	let return_type: TokenStream =
 		sig_type_to_rust_return_type(&method.signature.return_type, &lifetime, type_mappings, jni);
@@ -156,5 +142,34 @@ fn wrapper_body(
 	);
 	quote! {
 		unowned_env.#with_env_api(|env| { #abi_check #call }).resolve::<#error_policy>()
+	}
+}
+
+impl NativeMethod {
+	pub(super) fn native_parameters(
+		&self,
+		type_name: &Ident,
+		lifetime: &TokenStream,
+		type_mappings: &TypeMappings,
+		jni: &syn::Path,
+	) -> Vec<TokenStream> {
+		let mut params: Vec<TokenStream> = Vec::new();
+		params.push(quote! { mut unowned_env: #jni::EnvUnowned<#lifetime> });
+
+		if self.is_static {
+			params.push(quote! { class: #jni::objects::JClass<#lifetime> });
+		} else {
+			params.push(quote! { this: #type_name<#lifetime> });
+		}
+
+		// Use native trait arg type (without AsRef) to match the trait signature
+		for param in &self.signature.parameters {
+			let param_name: &Ident = &param.name;
+			let rust_type: TokenStream =
+				sig_type_to_rust_native_trait_arg_type(&param.ty, lifetime, type_mappings, jni);
+			params.push(quote! { #param_name: #rust_type });
+		}
+
+		params
 	}
 }

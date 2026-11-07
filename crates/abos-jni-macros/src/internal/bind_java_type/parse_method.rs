@@ -1,8 +1,8 @@
 use super::{
 	AbiCheck, Constructor, Ident, LitBool, LitStr, Method, MethodKind, MethodSignature, NativeMethod,
 	NativeMethodExport, ParseStream, ParsedMethod, Result, SigType, Token, TypeMappings, VisibilitySpec, abi_check,
-	braced, catch_unwind, error_policy, export, name, non_null, parenthesized, parse_method_sig,
-	parse_parameter_with_index, parse_type, raw, sig, snake_case_to_lower_camel_case,
+	catch_unwind, error_policy, export, name, non_null, parenthesized, parse_method_sig, parse_parameter_with_index,
+	parse_type, raw, sig, snake_case_to_lower_camel_case,
 };
 
 /// Parse an optional visibility specifier
@@ -93,7 +93,7 @@ pub(super) fn parse_method(input: ParseStream, type_mappings: &TypeMappings, kin
 	if input.peek(syn::token::Paren) {
 		options.signature = Some(parse_shorthand(input, type_mappings)?);
 	} else if input.peek(syn::token::Brace) || input.peek(Token![=]) {
-		options.parse_body(input, type_mappings)?;
+		super::parse_property_block(input, |property| options.parse_property(property, type_mappings))?;
 	} else {
 		return Err(syn::Error::new(
 			rust_name.span(),
@@ -126,21 +126,6 @@ impl MethodOptions {
 		}
 	}
 
-	fn parse_body(&mut self, input: ParseStream, mappings: &TypeMappings) -> Result<()> {
-		if input.peek(Token![=]) {
-			input.parse::<Token![=]>()?;
-		}
-		let body;
-		braced!(body in input);
-		while !body.is_empty() {
-			self.parse_property(&body, mappings)?;
-			if !body.is_empty() {
-				body.parse::<Token![,]>()?;
-			}
-		}
-		Ok(())
-	}
-
 	fn parse_property(&mut self, input: ParseStream, mappings: &TypeMappings) -> Result<()> {
 		let lookahead: syn::parse::Lookahead1<'_> = input.lookahead1();
 		if lookahead.peek(name) {
@@ -152,13 +137,9 @@ impl MethodOptions {
 			input.parse::<Token![=]>()?;
 			self.native_fn = Some(input.parse()?);
 		} else if lookahead.peek(Token![static]) {
-			input.parse::<Token![static]>()?;
-			input.parse::<Token![=]>()?;
-			self.is_static = input.parse::<LitBool>()?.value();
+			self.is_static = super::parse_bool_property::<Token![static]>(input)?;
 		} else if lookahead.peek(raw) {
-			input.parse::<raw>()?;
-			input.parse::<Token![=]>()?;
-			self.is_raw = input.parse::<LitBool>()?.value();
+			self.is_raw = super::parse_bool_property::<raw>(input)?;
 		} else if lookahead.peek(error_policy) {
 			input.parse::<error_policy>()?;
 			input.parse::<Token![=]>()?;
@@ -172,13 +153,9 @@ impl MethodOptions {
 			input.parse::<Token![=]>()?;
 			self.abi_check = Some(input.parse()?);
 		} else if lookahead.peek(catch_unwind) {
-			input.parse::<catch_unwind>()?;
-			input.parse::<Token![=]>()?;
-			self.catch_unwind = Some(input.parse::<LitBool>()?.value());
+			self.catch_unwind = Some(super::parse_bool_property::<catch_unwind>(input)?);
 		} else if lookahead.peek(non_null) {
-			input.parse::<non_null>()?;
-			input.parse::<Token![=]>()?;
-			self.non_null = input.parse::<LitBool>()?.value();
+			self.non_null = super::parse_bool_property::<non_null>(input)?;
 		} else {
 			return Err(lookahead.error());
 		}

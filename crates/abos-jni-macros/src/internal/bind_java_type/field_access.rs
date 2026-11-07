@@ -31,46 +31,20 @@ pub(super) fn generate_jni_get_field_call(
 
 	// The JNI spec asserts that `Get<Type>Field` _must_ not be called with a `null` object reference
 	// Note: we assume that the class will never be null when getting static fields
-	let null_check: TokenStream = if is_static {
-		quote! {}
-	} else {
-		let error_msg: String = format!("Attempted to set '{debug_name}' field with a null object");
-		quote! {
-			if #this_or_class.is_null() {
-				return Err(#jni::errors::Error::NullPtr(#error_msg));
-			}
-		}
-	};
+	let null_check: TokenStream = super::calls::generate_receiver_null_check(
+		is_static,
+		this_or_class,
+		&format!("Attempted to set '{debug_name}' field with a null object"),
+		jni,
+	);
 
-	quote! {
-		{
-			// JNI field getters must not run with a pending exception.
-			if env.exception_check() {
-				return Err(#jni::errors::Error::JavaException);
-			}
-
-			#null_check
-
-			#top_check
-
-			let ret = unsafe {
-				use #jni::refs::Reference as _;
-				let env_ptr: *mut #jni::sys::JNIEnv = env.get_raw();
-				let interface: *const #jni::sys::JNINativeInterface_ = *env_ptr;
-				((*interface).v1_1.#call_fn)(
-					env_ptr,
-					#this_or_class.as_raw(),
-					#field_id
-				)
-			};
-
-			if env.exception_check() {
-				return Err(#jni::errors::Error::JavaException);
-			}
-
-			Ok(#return_tokens)
-		}
-	}
+	super::calls::generate_checked_jni_call(
+		jni,
+		&call_fn,
+		&quote! { #this_or_class.as_raw(), #field_id },
+		&quote! { #null_check #top_check },
+		&return_tokens,
+	)
 }
 
 /// Generate JNI set field call code for a given field type
@@ -136,16 +110,12 @@ pub(super) fn generate_jni_set_field_call(
 
 	// The JNI spec asserts that `Set<Type>Field` _must_ not be called with a `null` object reference
 	// Note: we assume that the class will never be null when setting static fields
-	let null_check: TokenStream = if is_static {
-		quote! {}
-	} else {
-		let error_msg: String = format!("Attempted to set '{debug_name}' field with a null object");
-		quote! {
-			if #this_or_class.is_null() {
-				return Err(#jni::errors::Error::NullPtr(#error_msg));
-			}
-		}
-	};
+	let null_check: TokenStream = super::calls::generate_receiver_null_check(
+		is_static,
+		this_or_class,
+		&format!("Attempted to set '{debug_name}' field with a null object"),
+		jni,
+	);
 
 	quote! {
 		{
