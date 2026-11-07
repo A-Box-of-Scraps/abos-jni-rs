@@ -77,11 +77,16 @@ mod generic_bytecode {
 mod enclosing_bytecode {
 	include!(concat!(env!("OUT_DIR"), "/enclosing_bytecode.rs"));
 }
+#[allow(dead_code, non_snake_case)]
+mod record_bytecode {
+	include!(concat!(env!("OUT_DIR"), "/record_bytecode.rs"));
+}
 mod collisions;
 mod default_package;
 mod enclosing;
 mod generated_collisions;
 mod generics;
+mod records;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	use bindings::com::example::SimpleClass;
@@ -138,6 +143,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		default_package::check(env)?;
 		generics::check(env)?;
 		enclosing::check(env)?;
+		records::check(env)?;
 		assert_eq!(modular_jar::fixture::archive::ModularExample::answer(env)?, 42);
 		// Binding generation uses base classes; the JVM still selects its runtime variant.
 		assert_eq!(multi_release_jar::fixture::archive::VersionedExample::version(env)?, 17);

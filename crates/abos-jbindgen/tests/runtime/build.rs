@@ -13,6 +13,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		"SimpleClass",
 		"GenericTypes",
 		"EnclosingTypes",
+		"RecordTypes",
+		"Marker",
 		"Calculator",
 		"NoPackage",
 		"DefaultType",
@@ -128,6 +130,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.root_path("crate::enclosing_bytecode")
 		.generate()?
 		.write_to_file(output.join("enclosing_bytecode.rs"))?;
+	abos_jbindgen::Builder::new()
+		.input_jar(&jar)
+		.patterns(["com.example.RecordTypes", "com.example.Marker"])
+		.root_path("crate::record_bytecode")
+		.generate()?
+		.write_to_file(output.join("record_bytecode.rs"))?;
 	archive_bindings(&output)?;
 	Ok(())
 }

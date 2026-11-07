@@ -107,6 +107,8 @@ runtime crate passed.
 
 ## 5. P2: Records and annotation types receive invalid class names
 
+**status:fixed**
+
 **Location:** `crates/abos-jbindgen/java/com/jbindgen/Parser.java:685–695`
 
 The handwritten binary-name builder recognizes only classes, interfaces, and enums.
@@ -116,6 +118,16 @@ The handwritten binary-name builder recognizes only classes, interfaces, and enu
 
 **Fix:** use `Elements.getBinaryName` instead of reconstructing binary names manually. Include nested records and
 annotations in tests.
+
+**Resolution:** confirmed by a failing source/bytecode regression for a missing record binary name. Class names and
+runtime type metadata now use `Elements.getBinaryName`, including descriptors, array element types, and inheritance
+metadata. Package names use `Elements.getPackageOf`; the handwritten binary-name builder was removed.
+
+**Verification:** explicit expected names and member signatures cover top-level records and annotations, nested records
+and annotations, and classes nested inside records. Full normalized source/bytecode APIs match without member exclusions,
+and Java descriptor fields are checked separately. Both generated binding sets compile, initialize, and exercise record
+constructors, accessors, annotation values, and typed arrays against the same fixtures under `-Xcheck:jni`. Workspace
+all-feature tests and strict Clippy checks for the workspace and standalone runtime crate passed.
 
 ## 6. P2: Source generation silently omits enum constants
 

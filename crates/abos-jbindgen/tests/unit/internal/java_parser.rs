@@ -212,3 +212,54 @@ fn rejects_selected_local_classes_with_diagnostics() -> std::result::Result<(), 
 	assert_eq!(bindings.len(), 1);
 	Ok(())
 }
+
+#[test]
+fn records_and_annotations_match_bytecode_names() -> std::result::Result<(), Box<dyn std::error::Error>> {
+	let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/java");
+	let files = [fixtures.join("RecordTypes.java"), fixtures.join("Marker.java")];
+	let output = tempfile::tempdir()?;
+	let paths = abos_javac::Build::new()
+		.files(&files)
+		.output_dir(output.path())
+		.cargo_metadata(false)
+		.try_compile()?;
+	let sources = parse_java_sources(&files, &[], "*")?;
+	let expected = [
+		("RecordTypes", "<init>(I)V"),
+		("RecordTypes$Nested", "<init>([Lcom/example/RecordTypes;)V"),
+		(
+			"RecordTypes$Member",
+			"echo(Lcom/example/RecordTypes;)Lcom/example/RecordTypes;",
+		),
+		("Marker", "value()I"),
+		("Marker$Nested", "value()[Lcom/example/Marker;"),
+		("Marker$Member", "<init>([Lcom/example/Marker;)V"),
+	];
+	assert_eq!(sources.len(), expected.len());
+	assert_eq!(paths.len(), expected.len());
+	for (name, signature) in expected {
+		let name = format!("com/example/{name}");
+		let source = sources
+			.iter()
+			.find(|class| class.class_name == name)
+			.unwrap_or_else(|| panic!("missing source class {name}"));
+		let bytecode = parse_class(&std::fs::read(output.path().join(format!("{name}.class")))?)?;
+		let api = runtime_api(source);
+		assert!(api.methods.contains(&(format!("L{name};->{signature}"), false)));
+		// Record-generated accessors, equals/hashCode/toString are present in both models.
+		// No members are excluded from this comparison.
+		assert_eq!(api, runtime_api(&bytecode));
+	}
+	get_parser_jvm()?.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
+		let paths = create_string_array(env, &files)?;
+		let classpath = create_string_array(env, &[])?;
+		let pattern = env.new_string("*")?;
+		let classes = ParserWrapper::parse(env, paths, classpath, pattern)?;
+		for i in 0..classes.len(env)? {
+			let class = classes.get_element(env, i)?;
+			check_java_descriptors(env, &class)?;
+		}
+		Ok(())
+	})?;
+	Ok(())
+}

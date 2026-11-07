@@ -291,31 +291,12 @@ public class Parser implements AutoCloseable {
 
         ClassDescription desc = new ClassDescription();
 
-        String binaryName = getBinaryName(element);
+        String binaryName = elements.getBinaryName(element).toString();
 
         desc.className = binaryName.replace('.', '/');
         desc.simpleName = element.getSimpleName().toString();
 
-        Element enclosingElement = element.getEnclosingElement();
-        if (enclosingElement != null && enclosingElement.getKind() == ElementKind.CLASS) {
-            Element e = element;
-            while (e.getEnclosingElement() != null && e.getEnclosingElement().getKind() != ElementKind.PACKAGE) {
-                e = e.getEnclosingElement();
-            }
-            if (e.getEnclosingElement() != null && e.getEnclosingElement().getKind() == ElementKind.PACKAGE) {
-                PackageElement pkg = (PackageElement) e.getEnclosingElement();
-                desc.packageName = pkg.getQualifiedName().toString();
-            } else {
-                desc.packageName = "";
-            }
-        } else {
-            int lastDot = binaryName.lastIndexOf('.');
-            if (lastDot > 0) {
-                desc.packageName = binaryName.substring(0, lastDot);
-            } else {
-                desc.packageName = "";
-            }
-        }
+        desc.packageName = elements.getPackageOf(element).getQualifiedName().toString();
 
         String docComment = elements.getDocComment(element);
         desc.documentation = (docComment != null) ? docComment.trim() : "";
@@ -330,12 +311,12 @@ public class Parser implements AutoCloseable {
 
         TypeMirror superclass = element.getSuperclass();
         if (superclass.getKind() != TypeKind.NONE) {
-            String superClassName = getTypeName(superclass, types);
+            String superClassName = getTypeName(superclass, types, elements);
             desc.superClass = superClassName;
         }
 
         for (TypeMirror interfaceType : element.getInterfaces()) {
-            String interfaceName = getTypeName(interfaceType, types);
+            String interfaceName = getTypeName(interfaceType, types, elements);
             interfaces.add(interfaceName);
         }
 
@@ -400,7 +381,7 @@ public class Parser implements AutoCloseable {
 
         desc.rustName = getRustNameAnnotation(element);
 
-        TypeDescription typeDesc = createTypeDescription(element.asType(), types);
+        TypeDescription typeDesc = createTypeDescription(element.asType(), types, elements);
         desc.typeName = typeDesc.typeName;
         desc.descriptor = typeDesc.descriptor;
         desc.arrayDimensions = typeDesc.arrayDimensions;
@@ -446,14 +427,14 @@ public class Parser implements AutoCloseable {
             // The JVM constructor takes the immediate enclosing instance before
             // source parameters, including for implicit default constructors.
             TypeElement enclosingClass = (TypeElement) declaringClass.getEnclosingElement();
-            parameters.add(createParameterDescription("enclosingInstance", enclosingClass.asType(), types));
+            parameters.add(createParameterDescription("enclosingInstance", enclosingClass.asType(), types, elements));
         }
 
         for (VariableElement param : element.getParameters()) {
             TypeMirror paramType = param.asType();
 
             ParameterDescription paramDesc =
-                    createParameterDescription(param.getSimpleName().toString(), paramType, types);
+                    createParameterDescription(param.getSimpleName().toString(), paramType, types, elements);
             for (AnnotationMirror annotation : param.getAnnotationMirrors()) {
                 String annotationType = annotation.getAnnotationType().toString();
                 if (annotationType.equals("io.github.jni_rs.jbindgen.RustPrimitive")) {
@@ -474,14 +455,15 @@ public class Parser implements AutoCloseable {
         desc.parameters = parameters.toArray(new ParameterDescription[0]);
 
         TypeMirror returnType = element.getReturnType();
-        desc.returnType = createTypeDescription(returnType, types);
+        desc.returnType = createTypeDescription(returnType, types, elements);
 
         return desc;
     }
 
-    private ParameterDescription createParameterDescription(String name, TypeMirror type, Types types) {
+    private ParameterDescription createParameterDescription(
+            String name, TypeMirror type, Types types, Elements elements) {
         ParameterDescription desc = new ParameterDescription();
-        TypeDescription typeDesc = createTypeDescription(type, types);
+        TypeDescription typeDesc = createTypeDescription(type, types, elements);
         desc.name = name;
         desc.typeName = typeDesc.typeName;
         desc.descriptor = typeDesc.descriptor;
@@ -490,7 +472,7 @@ public class Parser implements AutoCloseable {
         return desc;
     }
 
-    private String getTypeDescriptor(TypeMirror type, Types types) {
+    private String getTypeDescriptor(TypeMirror type, Types types, Elements elements) {
         switch (type.getKind()) {
             case BOOLEAN:
                 return "Z";
@@ -512,14 +494,14 @@ public class Parser implements AutoCloseable {
                 return "V";
             case ARRAY:
                 ArrayType arrayType = (ArrayType) type;
-                return "[" + getTypeDescriptor(arrayType.getComponentType(), types);
+                return "[" + getTypeDescriptor(arrayType.getComponentType(), types, elements);
             case DECLARED:
                 DeclaredType declaredType = (DeclaredType) type;
                 TypeElement element = (TypeElement) declaredType.asElement();
-                String binaryName = getBinaryName(element);
+                String binaryName = elements.getBinaryName(element).toString();
                 return "L" + binaryName.replace('.', '/') + ";";
             case TYPEVAR:
-                return getTypeDescriptor(types.erasure(type), types);
+                return getTypeDescriptor(types.erasure(type), types, elements);
             default:
                 return "Ljava/lang/Object;";
         }
@@ -528,7 +510,7 @@ public class Parser implements AutoCloseable {
     /**
      * Create a TypeDescription with proper array dimension tracking.
      */
-    private TypeDescription createTypeDescription(TypeMirror type, Types types) {
+    private TypeDescription createTypeDescription(TypeMirror type, Types types, Elements elements) {
         // JNI uses erased JVM types, including bounds and components of generic arrays.
         type = types.erasure(type);
         TypeDescription desc = new TypeDescription();
@@ -544,13 +526,13 @@ public class Parser implements AutoCloseable {
         // TypeKind.VOID.isPrimitive() returns false, but we treat void as primitive for
         // DEX signatures
         desc.isPrimitive = elementType.getKind().isPrimitive() || elementType.getKind() == TypeKind.VOID;
-        desc.typeName = getTypeName(elementType, types);
-        desc.descriptor = getTypeDescriptor(type, types);
+        desc.typeName = getTypeName(elementType, types, elements);
+        desc.descriptor = getTypeDescriptor(type, types, elements);
 
         return desc;
     }
 
-    private String getTypeName(TypeMirror type, Types types) {
+    private String getTypeName(TypeMirror type, Types types, Elements elements) {
         switch (type.getKind()) {
             case BOOLEAN:
                 return "boolean";
@@ -573,13 +555,13 @@ public class Parser implements AutoCloseable {
             case ARRAY:
                 ArrayType arrayType = (ArrayType) type;
                 TypeMirror componentType = arrayType.getComponentType();
-                return getTypeName(componentType, types);
+                return getTypeName(componentType, types, elements);
             case DECLARED:
                 DeclaredType declaredType = (DeclaredType) type;
                 TypeElement element = (TypeElement) declaredType.asElement();
-                return getBinaryName(element);
+                return elements.getBinaryName(element).toString();
             case TYPEVAR:
-                return getTypeName(types.erasure(type), types);
+                return getTypeName(types.erasure(type), types, elements);
             default:
                 return type.toString();
         }
@@ -701,51 +683,6 @@ public class Parser implements AutoCloseable {
         public boolean isStatic;
         public boolean isFinal;
         public boolean isDeprecated;
-    }
-
-    /**
-     * Get the binary name of a TypeElement.
-     * For inner classes, uses $ separator. For example: com.example.Outer$Inner
-     * This properly handles the class hierarchy by walking up the enclosing
-     * elements.
-     */
-    private String getBinaryName(TypeElement element) {
-        List<String> nameParts = new ArrayList<>();
-        Element current = element;
-
-        while (current != null && current.getKind() != ElementKind.PACKAGE) {
-            if (current.getKind() == ElementKind.CLASS
-                    || current.getKind() == ElementKind.INTERFACE
-                    || current.getKind() == ElementKind.ENUM) {
-                nameParts.add(0, current.getSimpleName().toString());
-            }
-            current = current.getEnclosingElement();
-        }
-
-        if (current != null && current.getKind() == ElementKind.PACKAGE) {
-            PackageElement pkg = (PackageElement) current;
-            String pkgName = pkg.getQualifiedName().toString();
-            if (!pkgName.isEmpty()) {
-                StringBuilder result = new StringBuilder(pkgName);
-                result.append('.');
-                for (int i = 0; i < nameParts.size(); i++) {
-                    if (i > 0) {
-                        result.append('$');
-                    }
-                    result.append(nameParts.get(i));
-                }
-                return result.toString();
-            }
-        }
-
-        StringBuilder result = new StringBuilder();
-        for (int i = 0; i < nameParts.size(); i++) {
-            if (i > 0) {
-                result.append('$');
-            }
-            result.append(nameParts.get(i));
-        }
-        return result.toString();
     }
 
     /**
