@@ -12,16 +12,13 @@ pub fn group_methods_by_name(methods: &[MethodInfo]) -> Vec<(&str, Vec<&MethodIn
 	// Sort by name for deterministic output
 	result.sort_by_key(|(name, _)| *name);
 
-	// Sort methods within each group by argument count, then by JNI signature
 	for (_, methods) in &mut result {
 		methods.sort_by(|a, b| {
 			let a_arg_count: usize = a.signature.arguments.len();
 			let b_arg_count: usize = b.signature.arguments.len();
 
-			// First, sort by argument count
 			match a_arg_count.cmp(&b_arg_count) {
 				std::cmp::Ordering::Equal => {
-					// If argument counts are equal, sort by JNI signature
 					let a_sig: String = generate_jni_signature_for_sorting(a);
 					let b_sig: String = generate_jni_signature_for_sorting(b);
 					a_sig.cmp(&b_sig)
@@ -59,7 +56,6 @@ pub fn resolve_name_collision(
 
 /// Convert a Java type name to a `snake_case` suffix for method naming
 pub fn java_type_to_snake_case_suffix(type_info: &crate::api::types::TypeInfo) -> String {
-	// Handle primitive types
 	let base_name: String = if type_info.is_primitive {
 		match type_info.name.as_str() {
 			"boolean" => "bool",
@@ -67,19 +63,13 @@ pub fn java_type_to_snake_case_suffix(type_info: &crate::api::types::TypeInfo) -
 		}
 		.to_string()
 	} else {
-		// For object types, extract the simple class name and convert to snake_case
-		// e.g., "java.lang.String" -> "string"
-		// e.g., "com.example.MyType$Inner" -> "my_type_inner"
 		let simple_name: &str = type_info.name.split('.').next_back().unwrap_or(&type_info.name);
 
-		// Remove '$' characters used for inner classes
 		let without_dollar: String = simple_name.replace('$', "");
 
-		// Convert to snake_case
 		java_name_to_rust(&without_dollar).0
 	};
 
-	// Add array dimension suffix
 	if type_info.array_dimensions > 0 {
 		format!("{}_{}d", base_name, type_info.array_dimensions)
 	} else {

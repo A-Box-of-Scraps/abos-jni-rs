@@ -118,31 +118,24 @@ public class BindJavaTypeOverview {
     public String testAllNativeMethods() {
         StringBuilder result = new StringBuilder();
 
-        // Test instance native method
         int sum = nativeAdd(10, 20);
         result.append("nativeAdd(10, 20) = ").append(sum).append("; ");
 
-        // Test static native method
         String greeting = nativeGreet("World");
         result.append("nativeGreet(World) = ").append(greeting).append("; ");
 
-        // Test raw native method
         int raw = nativeRaw(42);
         result.append("nativeRaw(42) = ").append(raw).append("; ");
 
-        // Test function-based native method
         int func = nativeWithFunction(100);
         result.append("nativeWithFunction(100) = ").append(func).append("; ");
 
-        // Test not-exported native method
         int notExported = nativeNotExported(7);
         result.append("nativeNotExported(7) = ").append(notExported).append("; ");
 
-        // Test no-unwind native method
         int noUnwind = nativeNoUnwind(99);
         result.append("nativeNoUnwind(99) = ").append(noUnwind).append("; ");
 
-        // Test custom error policy native method
         int customError = nativeCustomErrorPolicy(50);
         result.append("nativeCustomErrorPolicy(50) = ").append(customError);
 

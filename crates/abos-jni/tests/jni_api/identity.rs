@@ -3,10 +3,8 @@ use super::*;
 #[test]
 pub fn call_method_returning_null() {
 	attach_current_thread(|env| {
-		// Create an Exception with no message
 		let obj: abos_jni::refs::Auto<'_, JObject<'_>> =
 			unwrap(env.new_object(EXCEPTION_CLASS, jni_sig!("()V"), &[]), env).auto();
-		// Call Throwable#getMessage must return null
 		let message: abos_jni::JValueOwned<'_> = unwrap(
 			env.call_method(&obj, jni_str!("getMessage"), jni_sig!("()Ljava/lang/String;"), &[]),
 			env,

@@ -162,8 +162,6 @@ fn test_mixed_builtin_rust_types() {
 	assert_eq!(sig.ret(), JavaType::Primitive(Primitive::Void));
 }
 
-// Field signature tests
-
 #[test]
 fn test_field_primitive() {
 	let sig: abos_jni::signature::FieldSignature<'_> = jni_sig!(jint);
@@ -298,5 +296,3 @@ fn test_default_package_nested_inner_classes() {
 	assert_eq!(sig.sig().to_bytes(), b"LOuter$Inner1$Inner2;");
 	assert_eq!(sig.ty(), JavaType::Object);
 }
-
-// Test parsing of raw signature strings

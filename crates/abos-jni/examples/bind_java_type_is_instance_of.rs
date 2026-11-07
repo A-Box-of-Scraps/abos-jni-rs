@@ -21,7 +21,6 @@ use abos_jni_macros::bind_java_type;
 #[path = "utils/lib.rs"]
 mod utils;
 
-// Bind our custom Java class that extends ArrayList
 bind_java_type! {
 	rust_type = JInstanceOf,
 	java_type = "com.example.InstanceOf",
@@ -45,14 +44,12 @@ fn main() {
 	utils::attach_current_thread(|env| {
 		utils::load_class(env, "InstanceOf")?;
 
-		// Get the API (requires LoaderContext for class loading)
-		// This loads the class and caches method/field IDs
+		// Initialize the class and cached member IDs with this loader.
 		let _api: &JInstanceOfAPI = JInstanceOfAPI::get(env, &LoaderContext::default())?;
 
 		let instance: JInstanceOf<'_> = JInstanceOf::new(env)?;
 		println!("Created empty JInstanceOf instance");
 
-		// Call methods from our custom class via the API
 		let item: JString<'_> = env.new_string("hello")?;
 		instance.add_upper(env, &item)?;
 		println!("Added upper-case element to list");
@@ -63,7 +60,6 @@ fn main() {
 		let size: i32 = as_list.size(env)?;
 		println!("  List size: {size}");
 
-		// Add an item to the list
 		let item: JString<'_> = env.new_string("World")?;
 		as_list.add(env, &item)?;
 

@@ -3,7 +3,6 @@ use super::*;
 #[test]
 pub fn get_public_field() {
 	attach_current_thread(|env| {
-		// Create a new Point(5, 10)
 		let point: abos_jni::refs::Auto<'_, JObject<'_>> = unwrap(
 			env.new_object(
 				jni_str!("java/awt/Point"),
@@ -14,7 +13,6 @@ pub fn get_public_field() {
 		)
 		.auto();
 
-		// Get the x field value
 		let x_value: i32 = env
 			.get_field(&point, jni_str!("x"), jni_sig!("I"))
 			.expect("test field can be read")
@@ -23,7 +21,6 @@ pub fn get_public_field() {
 
 		assert_eq!(x_value, 5);
 
-		// Get the y field value
 		let y_value: i32 = env
 			.get_field(&point, jni_str!("y"), jni_sig!("I"))
 			.expect("test field can be read")
@@ -40,7 +37,6 @@ pub fn get_public_field() {
 #[test]
 pub fn get_public_field_by_id() {
 	attach_current_thread(|env| {
-		// Create a new Point(5, 10)
 		let point: abos_jni::refs::Auto<'_, JObject<'_>> = unwrap(
 			env.new_object(
 				jni_str!("java/awt/Point"),
@@ -51,7 +47,6 @@ pub fn get_public_field_by_id() {
 		)
 		.auto();
 
-		// Get the field ID for x field
 		let field_id: abos_jni::ids::JFieldID = env
 			.get_field_id(jni_str!("java/awt/Point"), jni_str!("x"), jni_sig!("I"))
 			.expect("get field id succeeds");
@@ -76,7 +71,6 @@ pub fn get_public_field_by_id() {
 #[test]
 pub fn set_public_field() {
 	attach_current_thread(|env| {
-		// Create a new Point(5, 10)
 		let point: abos_jni::refs::Auto<'_, JObject<'_>> = unwrap(
 			env.new_object(
 				jni_str!("java/awt/Point"),
@@ -87,11 +81,9 @@ pub fn set_public_field() {
 		)
 		.auto();
 
-		// Set the x field to a new value
 		env.set_field(&point, jni_str!("x"), jni_sig!("I"), JValue::Int(15))
 			.expect("test field can be assigned");
 
-		// Verify the field was set
 		let x_value: i32 = env
 			.get_field(&point, jni_str!("x"), jni_sig!("I"))
 			.expect("test field can be read")
@@ -100,11 +92,9 @@ pub fn set_public_field() {
 
 		assert_eq!(x_value, 15);
 
-		// Set the y field to a new value
 		env.set_field(&point, jni_str!("y"), jni_sig!("I"), JValue::Int(25))
 			.expect("test field can be assigned");
 
-		// Verify the field was set
 		let y_value: i32 = env
 			.get_field(&point, jni_str!("y"), jni_sig!("I"))
 			.expect("test field can be read")
@@ -121,7 +111,6 @@ pub fn set_public_field() {
 #[test]
 pub fn set_public_field_by_id() {
 	attach_current_thread(|env| {
-		// Create a new Point(5, 10)
 		let point: abos_jni::refs::Auto<'_, JObject<'_>> = unwrap(
 			env.new_object(
 				jni_str!("java/awt/Point"),
@@ -132,19 +121,16 @@ pub fn set_public_field_by_id() {
 		)
 		.auto();
 
-		// Get the field ID for x field
 		let field_id: abos_jni::ids::JFieldID = env
 			.get_field_id(jni_str!("java/awt/Point"), jni_str!("x"), jni_sig!("I"))
 			.expect("get field id succeeds");
 
-		// Set the x field using the field ID
 		// Safety: we have just looked up the field ID based on the given field name and type
 		unsafe {
 			env.set_field_unchecked(&point, field_id, JValue::Int(15))
 				.expect("set field unchecked succeeds");
 		}
 
-		// Verify the field was set
 		let x_value: i32 = env
 			.get_field(&point, jni_str!("x"), jni_sig!("I"))
 			.expect("test field can be read")
@@ -161,12 +147,8 @@ pub fn set_public_field_by_id() {
 rusty_fork::rusty_fork_test! {
 	#[test]
 	fn set_array_field() {
-		// This test reproduces an issue where the `set_field` threw an error when
-		// setting an array field. The reason this was happening is that `set_field`
-		// checks that the type of the incoming `JValue` matches the type of the
-		// field, but the type of an array returned by `new_byte_array` is
-		// `JavaType::Object` whilst the type of an array signature is
-		// `JavaType::Array`.
+		// Array values report JavaType::Object, but array signatures report JavaType::Array.
+		// Field assignment must accept this combination.
 		let out_dir = util::setup_test_output("set_array_field");
 
 		let _classes = abos_javac::Build::new()
@@ -178,7 +160,6 @@ rusty_fork::rusty_fork_test! {
 
 			let instance = env.new_object(jni_str!("com/example/TestFields"), jni_sig!("()V"), &[])?;
 
-			// Set the `staticByteArray` field to a new value
 			let arr = env.new_byte_array(1)?;
 			env.set_field(
 				instance,
@@ -194,12 +175,8 @@ rusty_fork::rusty_fork_test! {
 
 	#[test]
 	fn set_static_array_field() {
-		// This test reproduces an issue where the `set_static_field` threw an error when
-		// setting an array field. The reason this was happening is that `set_static_field`
-		// checks that the type of the incoming `JValue` matches the type of the
-		// field, but the type of an array returned by `new_byte_array` is
-		// `JavaType::Object` whilst the type of an array signature is
-		// `JavaType::Array`.
+		// Array values report JavaType::Object, but array signatures report JavaType::Array.
+		// Static field assignment must accept this combination.
 		let out_dir = util::setup_test_output("set_static_array_field");
 
 		let _classes = abos_javac::Build::new()
@@ -210,10 +187,8 @@ rusty_fork::rusty_fork_test! {
 		attach_current_thread(|env| {
 			util::load_test_class(env, &out_dir, "TestFields")?;
 
-			// let instance = env.new_object(jni_str!("com/example/TestFields"), jni_sig!("()V"), &[])?;
 			let class = env.load_class(jni_str!("com/example/TestFields"))?;
 
-			// Set the `staticByteArray` field to a new value
 			let arr = env.new_byte_array(1)?;
 			env.set_static_field(
 				class,
@@ -274,14 +249,12 @@ fn set_static_public_field() {
 	attach_current_thread(|env| {
 		// We'll use System.in which is a mutable static field
 
-		// Get the original System.in value
 		let original_in = env
 			.get_static_field(jni_str!("java/lang/System"), jni_str!("in"), jni_sig!("Ljava/io/InputStream;"))
 			.expect("test static field can be read")
 			.l()
 			.expect("JNI result contains an object");
 
-		// Create a new ByteArrayInputStream as a different InputStream
 		let byte_array = env.new_byte_array(10).expect("new byte array succeeds");
 		let new_input_stream = env
 			.new_object(
@@ -291,7 +264,6 @@ fn set_static_public_field() {
 			)
 			.expect("test object can be allocated");
 
-		// Set System.in to our new ByteArrayInputStream
 		env.set_static_field(
 			jni_str!("java/lang/System"),
 			jni_str!("in"),
@@ -300,17 +272,14 @@ fn set_static_public_field() {
 		)
 		.expect("set static field succeeds");
 
-		// Verify the field was set by getting it again and checking it's no longer null
 		let current_in = env
 			.get_static_field(jni_str!("java/lang/System"), jni_str!("in"), jni_sig!("Ljava/io/InputStream;"))
 			.expect("test static field can be read")
 			.l()
 			.expect("JNI result contains an object");
 
-		// The field should not be null after setting
 		assert!(!current_in.is_null());
 
-		// Restore the original System.in
 		env.set_static_field(
 			jni_str!("java/lang/System"),
 			jni_str!("in"),
@@ -319,7 +288,6 @@ fn set_static_public_field() {
 		)
 		.expect("set static field succeeds");
 
-		// Verify restoration worked - the field should still not be null
 		let restored_in = env
 			.get_static_field(jni_str!("java/lang/System"), jni_str!("in"), jni_sig!("Ljava/io/InputStream;"))
 			.expect("test static field can be read")
@@ -338,20 +306,17 @@ rusty_fork_test! {
 #[test]
 fn set_static_public_field_by_id() {
 	attach_current_thread(|env| {
-		// Get the original System.in value
 		let original_in = env
 			.get_static_field(jni_str!("java/lang/System"), jni_str!("in"), jni_sig!("Ljava/io/InputStream;"))
 			.expect("test static field can be read")
 			.l()
 			.expect("JNI result contains an object");
 
-		// Get the field ID for System.in
 		let field_type = jni_sig!("Ljava/io/InputStream;");
 		let field_id = env
 			.get_static_field_id(jni_str!("java/lang/System"), jni_str!("in"), field_type)
 			.expect("get static field id succeeds");
 
-		// Create a new ByteArrayInputStream as a different InputStream
 		let byte_array = env.new_byte_array(10).expect("new byte array succeeds");
 		let new_input_stream = env
 			.new_object(
@@ -361,7 +326,6 @@ fn set_static_public_field_by_id() {
 			)
 			.expect("test object can be allocated");
 
-		// Set System.in to our new ByteArrayInputStream using the field ID
 		// Safety: we have just looked up the field ID based on the given field name and type
 		unsafe {
 			env.set_static_field_unchecked(
@@ -372,17 +336,14 @@ fn set_static_public_field_by_id() {
 			.expect("set static field unchecked succeeds");
 		}
 
-		// Verify the field was set by getting it again (this ensures the set operation worked)
 		let current_in = env
 			.get_static_field(jni_str!("java/lang/System"), jni_str!("in"), jni_sig!("Ljava/io/InputStream;"))
 			.expect("test static field can be read")
 			.l()
 			.expect("JNI result contains an object");
 
-		// Verify that we can successfully retrieve a non-null input stream
 		assert!(!current_in.is_null());
 
-		// Restore the original System.in using the unchecked method
 		// Safety: we have the correct field ID and value type
 		unsafe {
 			env.set_static_field_unchecked(
@@ -393,14 +354,12 @@ fn set_static_public_field_by_id() {
 			.expect("set static field unchecked succeeds");
 		}
 
-		// Verify restoration worked
 		let restored_in = env
 			.get_static_field(jni_str!("java/lang/System"), jni_str!("in"), jni_sig!("Ljava/io/InputStream;"))
 			.expect("test static field can be read")
 			.l()
 			.expect("JNI result contains an object");
 
-		// The restored value should be the same as original
 		assert!(env.is_same_object(&original_in, &restored_in).expect("is same object succeeds"));
 
 		Ok(())

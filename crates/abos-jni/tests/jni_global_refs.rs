@@ -40,7 +40,6 @@ fn global_ref_works_in_other_threads() {
 
 	let mut join_handlers: Vec<std::thread::JoinHandle<()>> = Vec::new();
 
-	// Test with a different number of threads (from 2 to 8)
 	for thread_num in 2..9 {
 		let barrier: Arc<Barrier> = Arc::new(Barrier::new(thread_num));
 

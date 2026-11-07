@@ -11,12 +11,10 @@ pub(super) fn generate_type_struct(
 	java_class: &str,
 	jni: &syn::Path,
 ) -> TokenStream {
-	// Check if there's a doc attribute in type_attrs
 	let has_doc_attr: bool = type_attrs.iter().any(|attr| attr.path().is_ident("doc"));
 
 	let jni_path_str: String = path_to_string_no_spaces(jni);
 
-	// Generate default doc comment if no doc attribute provided
 	let doc_attr: TokenStream = if has_doc_attr {
 		quote! {}
 	} else {
@@ -117,11 +115,9 @@ pub(super) fn generate_api_get_method(
 	abi_check: AbiCheck,
 	jni: &syn::Path,
 ) -> Result<TokenStream> {
-	// Generate wrapper function names to avoid conflicts
 	let load_class_wrapper_name: Ident = format_ident!("__{}_load_class_wrapper", type_name.to_string().to_lowercase());
 	let init_priv_wrapper_name: Ident = format_ident!("__{}_init_priv_wrapper", type_name.to_string().to_lowercase());
 
-	// Generate wrapper functions (outside the impl block)
 	let load_class_wrapper: TokenStream = if load_class_closure.is_some() {
 		load_class_hook_wrapper(&load_class_wrapper_name, jni)
 	} else {
@@ -133,7 +129,6 @@ pub(super) fn generate_api_get_method(
 		_ => quote! {},
 	};
 
-	// Generate the class loading code
 	let load_class_code: TokenStream = load_class_closure.map_or_else(
 		|| {
 			quote! {
@@ -147,7 +142,6 @@ pub(super) fn generate_api_get_method(
 		},
 	);
 
-	// Generate the priv initialization code
 	let init_priv_code: TokenStream = init_priv_closure.map_or_else(
 		|| quote! {},
 		|closure| {
@@ -157,11 +151,9 @@ pub(super) fn generate_api_get_method(
 		},
 	);
 
-	// Generate IsAssignable checks for all is_instance_of types
 	let is_instance_of_checks: TokenStream =
 		generate_is_instance_of_assignable_checks(type_name, java_class, is_instance_of, type_mappings, jni)?;
 
-	// Generate type mapping assertions
 	let type_mapping_runtime_checks: TokenStream = if abi_check.requires_abi_check() {
 		generate_type_mapping_checks(type_mappings, jni)
 	} else {
@@ -185,35 +177,15 @@ pub(super) fn generate_api_get_method(
 			) -> #jni::errors::Result<&'static Self> {
 				static API: ::std::sync::OnceLock<#api_name> = ::std::sync::OnceLock::new();
 
-				// Fast path: already initialized
 				if let Some(api) = API.get() {
 					return Ok(api);
 				}
 
-				// Slow path: Lookup class
-
-				// The general pattern here is to avoid holding any lock while
-				// performing class lookups and API initialization in case we need
-				// to be re-entrant (e.g. due to class initializers that call back
-				// into Rust).
-				//
-				// This matters for types where we lookup method IDs and field IDs
-				// which may trigger class initialization, and especially for types
-				// that register native methods that may need to be registered
-				// before the class can be initialized and then called during class
-				// initialization.
-
-				// NB: the purpose of the `OnceLock` here is to amortize the cost of
-				// class lookups and API initialization over multiple uses, so we aren't
-				// really concerned about a small amount of redundant work if multiple
-				// threads race here.
+				// Class initialization can call back into Rust, so lookups and API initialization
+				// must run without holding a lock. Concurrent callers may repeat this work.
 
 				let api = env.with_local_frame(4, |env| -> #jni::errors::Result<#api_name> {
-					// We cache the class early to avoid repeat lookups just in case
-					// `::get()` is re-entered by the same thread during class
-					// initialization.
-					//
-					// After `API` is set this `CLASS` cache won't be used again.
+					// Cache the class before initialization can re-enter get().
 					static CLASS: ::std::sync::OnceLock<#jni::objects::Global<#jni::objects::JClass>> = ::std::sync::OnceLock::new();
 
 					let class = if let Some(class) = CLASS.get() {
@@ -228,17 +200,13 @@ pub(super) fn generate_api_get_method(
 					};
 					let class: &#jni::objects::JClass = class.as_ref();
 
-					// Register native methods ASAP, before anything could
-					// trigger class initialization that might itself need to
-					// call native methods.
+					// Register natives before class initialization can call them.
 					#native_registration_code
 
 					#init_priv_code
 
-					// Assert that all declared is_instance_of types are valid
 					#is_instance_of_checks
 
-					// Assert that all type mappings are correct
 					#type_mapping_runtime_checks
 
 					let api = #api_construction;

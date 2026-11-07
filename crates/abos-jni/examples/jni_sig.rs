@@ -19,9 +19,7 @@ use abos_jni::strings::JNIStr;
 use abos_jni_macros::{jni_sig, jni_sig_cstr, jni_sig_jstr, jni_sig_str};
 use std::ffi::CStr;
 
-// ============================================================================
 // Method Signatures
-// ============================================================================
 
 fn method_signatures() {
 	// Methods with Java objects
@@ -94,9 +92,7 @@ fn method_signatures() {
 	assert_eq!(IMPLICIT_VOID.sig().to_bytes(), b"(I)V");
 }
 
-// ============================================================================
 // Field Signatures
-// ============================================================================
 
 fn field_signatures() {
 	const BOOLEAN_FIELD: FieldSignature = jni_sig!(jboolean);
@@ -130,9 +126,7 @@ fn field_signatures() {
 	assert_eq!(INNER_CLASS_FIELD.sig().to_bytes(), b"Ljava/lang/Thread$State;");
 }
 
-// ============================================================================
 // Type Mappings
-// ============================================================================
 
 fn type_mappings() {
 	// Type mappings with arrays
@@ -212,9 +206,7 @@ fn type_mappings() {
 	assert_eq!(UNSAFE_MAPPING.sig().to_bytes(), b"(J)V");
 }
 
-// ============================================================================
 // Output Variants
-// ============================================================================
 
 fn output_variants() {
 	// jni_sig! returns a typed FieldSignature struct
@@ -259,9 +251,7 @@ fn output_variants() {
 	assert_eq!(COMPLEX_JSTR.to_bytes(), b"([Lcom/example/Type;I)[Ljava/lang/String;");
 }
 
-// ============================================================================
 // Raw JNI Signatures
-// ============================================================================
 
 fn raw_jni_signatures() {
 	// Raw JNI field signatures
@@ -293,9 +283,7 @@ fn raw_jni_signatures() {
 	assert_eq!(RAW_INNER.args()[0], JavaType::Object);
 }
 
-// ============================================================================
 // Advanced Features
-// ============================================================================
 
 fn advanced_features() {
 	// String literal with inner class (dollar sign syntax)

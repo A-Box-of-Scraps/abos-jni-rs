@@ -1,7 +1,6 @@
 #![allow(unsafe_code, reason = "Exercise JNI FFI and native method exports.")]
 #![allow(missing_docs, reason = "Executable examples and test fixtures are not library API.")]
 #![cfg(feature = "invocation")]
-// Smoke test that doc attributes for types, methods and fields are accepted
 
 abos_jni_macros::bind_java_type! {
 	/// Bindings for the java.foo.Bar class
@@ -11,12 +10,10 @@ abos_jni_macros::bind_java_type! {
 	FooBar => "java.foo.Bar"
 }
 
-// Test without doc attribute (should get default docs)
 abos_jni_macros::bind_java_type! {
 	Baz => "java.baz.Baz"
 }
 
-// Test with other attributes (like #[allow(dead_code, reason = "Verify that user-supplied attributes are accepted on generated bindings.")])
 abos_jni_macros::bind_java_type! {
 	#[allow(dead_code, reason = "Verify that user-supplied attributes are accepted on generated bindings.")]
 	/// Custom docs with other attributes

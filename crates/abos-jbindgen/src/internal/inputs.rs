@@ -78,7 +78,6 @@ pub fn generate_bindings_from_sources(
 	options: &BindgenOptions,
 	extra_type_map: Vec<(String, String)>,
 ) -> Result<Vec<ModuleBinding>> {
-	// Parse sources using Java parser, passing all patterns
 	let pattern_str: String = if patterns.is_empty() {
 		"*".to_string()
 	} else {

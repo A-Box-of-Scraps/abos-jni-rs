@@ -45,7 +45,6 @@ native_method_test! {
 	test_body: |env| {
 		// The static initializer will have to run before we can call get_static_value
 
-		// Verify that the static value was set correctly by the native method
 		let static_value = TestNativeStaticInit::get_static_value(env)?;
 		assert_eq!(static_value, 42, "Static value should 5 + 10 + 27 = 42");
 

@@ -2,7 +2,6 @@ use super::*;
 
 #[test]
 fn test_create_jni_fn_name() {
-	// Basic namespace and function name tests
 	assert_eq!(
 		create_jni_fn_name("com.example.Foo", "init", None),
 		"Java_com_example_Foo_init"
@@ -41,7 +40,6 @@ fn test_create_jni_fn_name() {
 		create_jni_fn_name("com.example.Test", "complex_method", Some("([[Ljava/lang/String;I)[[I")),
 		"Java_com_example_Test_complex_1method___3_3Ljava_lang_String_2I"
 	);
-	// Test with no arguments (empty parentheses) - should still have __ suffix
 	assert_eq!(
 		create_jni_fn_name("com.example.Foo", "noArgs", Some("()V")),
 		"Java_com_example_Foo_noArgs__"
@@ -90,7 +88,6 @@ fn test_code_generation() {
 
 	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
-	// Note: close_it becomes closeIt (lowerCamelCase)
 	assert_eq!(
 		format!("{expanded}"),
 		format!(
@@ -119,7 +116,6 @@ fn test_unsafe_fn() {
 
 	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
-	// Note: close_it becomes closeIt (lowerCamelCase)
 	assert_eq!(
 		format!("{expanded}"),
 		format!(
@@ -213,7 +209,6 @@ fn test_wrong_abi_generates_error() {
 
 	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
-	// Should generate an error for non-system ABI
 	let expanded_str: String = format!("{expanded}");
 	assert!(expanded_str.contains("compile_error"));
 	assert!(expanded_str.contains("must use `extern \\\"system\\\"` ABI"));
@@ -231,7 +226,6 @@ fn test_system_abi_is_preserved() {
 
 	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
-	// The "system" ABI should be preserved
 	assert_eq!(
 		format!("{expanded}"),
 		format!(
@@ -407,7 +401,6 @@ fn test_snake_case_to_lower_camel_case() {
 
 #[test]
 fn test_snake_case_function_name_conversion() {
-	// Test that snake_case function names are automatically converted to lowerCamelCase
 	let attr: proc_macro2::TokenStream = quote::quote! {
 		"com.example.Bar"
 	};
@@ -436,7 +429,6 @@ fn test_snake_case_function_name_conversion() {
 
 #[test]
 fn test_camel_case_function_name_unchanged() {
-	// Test that lowerCamelCase function names remain unchanged (idempotent)
 	let attr: proc_macro2::TokenStream = quote::quote! {
 		"com.example.Bar"
 	};
@@ -465,7 +457,6 @@ fn test_camel_case_function_name_unchanged() {
 
 #[test]
 fn test_snake_case_with_signature() {
-	// Test that snake_case function names are converted even when signature is present
 	let attr: proc_macro2::TokenStream = quote::quote! {
 		"com.example.Bar", "(I)Z"
 	};
@@ -494,7 +485,6 @@ fn test_snake_case_with_signature() {
 
 #[test]
 fn test_signature_with_no_args() {
-	// Test that signatures with no arguments still add __ suffix (for overloaded methods)
 	let attr: proc_macro2::TokenStream = quote::quote! {
 		"com.example.Bar", "()V"
 	};
@@ -506,7 +496,6 @@ fn test_signature_with_no_args() {
 
 	let expanded: proc_macro2::TokenStream = jni_mangle2(attr, source);
 
-	// Should have __ even with no arguments (indicates overloaded method)
 	assert_eq!(
 		format!("{expanded}"),
 		format!(

@@ -5,20 +5,15 @@ use super::{
 
 impl Parse for SignatureInput {
 	fn parse(input: ParseStream) -> Result<Self> {
-		// Parse properties in the form: prop = value, prop = value, ...
-		// If an argument is unnamed, it's assumed to be the signature.
-		// This allows properties to be specified in any order and makes it easy
-		// for wrapper macros to inject properties like `jni = foo,` without
-		// needing to parse the syntax or worry about positioning.
+		// After the optional jni property, named properties and the signature may appear
+		// in any order, allowing wrapper macros to inject properties without parsing them.
 
 		let mut signature: Option<Signature> = None;
 
 		let jni_path: syn::Path = crate::internal::utils::parse_jni_crate_override(input)?;
 
-		// Initialize TypeMappings unconditionally now that we have jni_crate
 		let mut type_mappings = TypeMappings::new(&jni_path);
 
-		// Parse remaining properties/arguments
 		while !input.is_empty() {
 			parse_input_entry(input, &mut signature, &mut type_mappings)?;
 
@@ -27,7 +22,6 @@ impl Parse for SignatureInput {
 			}
 		}
 
-		// Signature is required
 		let signature: Signature = signature.ok_or_else(|| {
 			syn::Error::new(
 				Span::call_site(),
@@ -47,7 +41,6 @@ fn parse_input_entry(
 	signature: &mut Option<Signature>,
 	type_mappings: &mut TypeMappings,
 ) -> Result<()> {
-	// Check if this looks like a named property ('<ident> = <value>' or '<ident> { ... }')
 	let is_named_property: bool = {
 		let fork: syn::parse::ParseBuffer<'_> = input.fork();
 		if fork.peek(Ident) {
@@ -59,13 +52,11 @@ fn parse_input_entry(
 	};
 
 	if is_named_property {
-		// Parse named property
 		let prop_name: Ident = input.parse::<Ident>()?;
 		let prop_str: String = prop_name.to_string();
 
 		match prop_str.as_str() {
 			"jni" => {
-				// jni can only be the first property
 				return Err(syn::Error::new(
 					prop_name.span(),
 					"jni property must be the first property if specified",
@@ -92,7 +83,6 @@ fn parse_input_entry(
 			}
 		}
 	} else {
-		// Unnamed argument - assume it's the signature
 		if signature.is_some() {
 			return Err(syn::Error::new(
 				input.span(),
@@ -106,12 +96,8 @@ fn parse_input_entry(
 
 /// Parse a signature (method or field) from input
 pub(super) fn parse_signature(input: ParseStream, type_mappings: &TypeMappings) -> Result<Signature> {
-	// If the input starts with a string literal, it could either be a raw JNI signature
-	// or a Java class name for a field signature.
-	//
-	// If the string literal contains dots (.), we'll treat it as a Java class name for a field signature.
+	// A dot distinguishes a Java field type name from a raw JNI signature.
 	if input.peek(syn::LitStr) || input.peek(syn::LitCStr) {
-		// Parse the string literal
 		let raw_sig: String = if input.peek(syn::LitCStr) {
 			let lit: syn::LitCStr = input.parse::<syn::LitCStr>()?;
 			let cstr: std::ffi::CString = lit.value();
@@ -126,11 +112,8 @@ pub(super) fn parse_signature(input: ParseStream, type_mappings: &TypeMappings) 
 		let is_raw_jni_sig: bool = !raw_sig.contains('.');
 
 		if is_raw_jni_sig {
-			// Parse as raw JNI signature
 			parse_raw_jni_signature(&raw_sig)
 		} else {
-			// It contains a dot, so treat it as a Java class name for a field signature
-			// Parse it as a JavaClassName
 			let parts: Vec<&str> = raw_sig.split('.').collect();
 			if parts.is_empty() {
 				return Err(syn::Error::new(
@@ -154,7 +137,6 @@ pub(super) fn parse_signature(input: ParseStream, type_mappings: &TypeMappings) 
 			}))
 		}
 	} else if input.peek(token::Paren) {
-		// Method signature: (args) [-> ret]
 		let args_content;
 		parenthesized!(args_content in input);
 
@@ -176,7 +158,6 @@ pub(super) fn parse_signature(input: ParseStream, type_mappings: &TypeMappings) 
 
 			parse_type(input, type_mappings)?
 		} else {
-			// Default return type is void
 			SigType::Alias("void".to_string())
 		};
 
@@ -185,7 +166,6 @@ pub(super) fn parse_signature(input: ParseStream, type_mappings: &TypeMappings) 
 			return_type,
 		}))
 	} else {
-		// Field signature: just a type
 		let field_type: SigType = parse_type(input, type_mappings)?;
 		Ok(Signature::Field(FieldSignature { field_type }))
 	}
@@ -194,7 +174,6 @@ pub(super) fn parse_signature(input: ParseStream, type_mappings: &TypeMappings) 
 /// Parse a raw JNI signature string into a Signature
 /// This parses strings like "(ILjava/lang/String;)V" or "[I" or "Ljava/lang/String;"
 pub(super) fn parse_raw_jni_signature(sig: &str) -> Result<Signature> {
-	// Check if it's a method signature (starts with '(')
 	if sig.starts_with('(') {
 		parse_raw_jni_method_signature(sig)
 	} else {
@@ -211,7 +190,6 @@ pub(super) fn parse_raw_jni_method_signature(sig: &str) -> Result<Signature> {
 		));
 	}
 
-	// Find the closing ')'
 	let close_paren: usize = sig.find(')').ok_or_else(|| {
 		syn::Error::new(
 			Span::call_site(),
@@ -219,7 +197,6 @@ pub(super) fn parse_raw_jni_method_signature(sig: &str) -> Result<Signature> {
 		)
 	})?;
 
-	// Parse arguments
 	let args_str: &str = &sig[1..close_paren];
 	let mut args: Vec<SigType> = Vec::new();
 	let mut i = 0;
@@ -231,7 +208,6 @@ pub(super) fn parse_raw_jni_method_signature(sig: &str) -> Result<Signature> {
 		i += consumed;
 	}
 
-	// Parse return type
 	let ret_str: &str = &sig[close_paren + 1..];
 	if ret_str.is_empty() {
 		return Err(syn::Error::new(
@@ -248,7 +224,6 @@ pub(super) fn parse_raw_jni_method_signature(sig: &str) -> Result<Signature> {
 		));
 	}
 
-	// Create dummy parameters with generated names
 	let parameters: Vec<Parameter> = args
 		.into_iter()
 		.enumerate()
@@ -274,7 +249,6 @@ pub(super) fn parse_raw_jni_field_signature(sig: &str) -> Result<Signature> {
 		));
 	}
 
-	// Validate that void cannot be used as a field type
 	if matches!(field_type, SigType::Alias(ref name) if name == "void") {
 		return Err(syn::Error::new(
 			Span::call_site(),
@@ -307,10 +281,8 @@ pub(super) fn parse_raw_jni_type(s: &str) -> Result<(SigType, usize)> {
 		'D' => Ok((SigType::Alias("jdouble".to_string()), 1)),
 		'V' => Ok((SigType::Alias("void".to_string()), 1)),
 		'[' => {
-			// Array type - parse element type recursively
 			let (elem_type, elem_consumed) = parse_raw_jni_type(&s[1..])?;
 
-			// Validate that void cannot be used as an array element type
 			if matches!(elem_type, SigType::Alias(ref name) if name == "void") {
 				return Err(syn::Error::new(
 					Span::call_site(),
@@ -321,14 +293,12 @@ pub(super) fn parse_raw_jni_type(s: &str) -> Result<(SigType, usize)> {
 			Ok((SigType::Array(Box::new(elem_type), 1), 1 + elem_consumed))
 		}
 		'L' => {
-			// Object type - find the semicolon
 			let end: usize = s
 				.find(';')
 				.ok_or_else(|| syn::Error::new(Span::call_site(), format!("Object type missing closing ';': '{s}'")))?;
 
 			let class_name: &str = &s[1..end];
 
-			// Validate class name - should not be empty and should not start/end with '/'
 			if class_name.is_empty() {
 				return Err(syn::Error::new(
 					Span::call_site(),
@@ -348,7 +318,6 @@ pub(super) fn parse_raw_jni_type(s: &str) -> Result<(SigType, usize)> {
 				));
 			}
 
-			// Validate that name segments are non-empty
 			if class_name.contains("//") {
 				return Err(syn::Error::new(
 					Span::call_site(),
@@ -356,17 +325,13 @@ pub(super) fn parse_raw_jni_type(s: &str) -> Result<(SigType, usize)> {
 				));
 			}
 
-			// Parse the class name (could be "java/lang/String" or "java/lang/Outer$Inner")
-			// Split by '/' for package segments
 			let parts: Vec<&str> = class_name.split('/').collect();
 
-			// The last part is the class name (may contain '$' for inner classes)
 			let class: String = parts
 				.last()
 				.expect("splitting a class name yields at least one component")
 				.to_string();
 
-			// Everything before the last part is the package
 			let package: Vec<String> = parts[..parts.len() - 1]
 				.iter()
 				.map(std::string::ToString::to_string)

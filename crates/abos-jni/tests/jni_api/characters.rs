@@ -3,7 +3,6 @@ use super::*;
 #[test]
 fn test_java_char_conversion() {
 	attach_current_thread(|env| {
-		// Make a Java `StringBuilder`.
 		let sb: abos_jni::objects::JObject<'_> = unwrap(
 			env.new_object(jni_str!("java/lang/StringBuilder"), jni_sig!("()V"), &[]),
 			env,
@@ -34,7 +33,6 @@ fn test_java_char_conversion() {
 			env,
 		);
 
-		// Finish the `StringBuilder` and get a Java `String`.
 		let s: abos_jni::objects::JObject<'_> = unwrap(
 			env.call_method(&sb, jni_str!("toString"), jni_sig!("()Ljava/lang/String;"), &[]),
 			env,
@@ -47,7 +45,6 @@ fn test_java_char_conversion() {
 		{
 			// The first character in the string is U+1F913, which is not representable in a single UTF-16 unit.
 
-			// Get the first Java `char` and try to unwrap it to a Rust `char`.
 			#[allow(
 				deprecated,
 				reason = "Exercise the deprecated character conversion API for compatibility."
@@ -58,21 +55,18 @@ fn test_java_char_conversion() {
 			)
 			.c_char();
 
-			// That should fail.
 			let c: std::char::DecodeUtf16Error = assert_matches!(
 				c,
 				Err(Error::InvalidUtf16 { source })
 				=> source
 			);
 
-			// The unpaired surrogate should be correct.
 			assert_eq!(c.unpaired_surrogate(), 0xd83e);
 		}
 
 		{
 			// The first character in the string *is* representable in a single UTF-32 unit.
 
-			// Get the UTF-32 unit and unwrap it.
 			let c: char = unwrap(
 				env.call_method(&s, jni_str!("codePointAt"), jni_sig!("(I)I"), &[JValue::Int(0)]),
 				env,
@@ -80,14 +74,12 @@ fn test_java_char_conversion() {
 			.i_char()
 			.expect("JNI result has the expected value");
 
-			// It should be correct.
 			assert_eq!(c, '🤓');
 		}
 
 		{
 			// The second character in the string *is* representable in a single UTF-16 unit.
 
-			// Get it and unwrap it. It should succeed.
 			#[allow(
 				deprecated,
 				reason = "Exercise the deprecated character conversion API for compatibility."
@@ -105,7 +97,6 @@ fn test_java_char_conversion() {
 			.c_char()
 			.expect("JNI result has the expected value");
 
-			// It should be correct.
 			assert_eq!(c, '☃');
 		}
 

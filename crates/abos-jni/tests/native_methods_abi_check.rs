@@ -15,9 +15,7 @@ use abos_jni::sys::jint;
 use abos_jni::{Env, native_method};
 use rusty_fork::rusty_fork_test;
 
-// ====================================================================================
 // Test: Instance method registered as static (Always mode)
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_abi_instance_registered_as_static_wrapped,
@@ -49,9 +47,7 @@ const fn native_method_registered_as_static<'local>(
 	Ok(value * 2)
 }
 
-// ====================================================================================
 // Test: Static method registered as instance (Always mode)
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_abi_static_registered_as_instance_wrapped,
@@ -82,9 +78,7 @@ const fn native_static_method_registered_as_instance<'local>(
 	Ok(value * 3)
 }
 
-// ====================================================================================
 // Test: Correct instance and static methods work (Always mode)
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_abi_correct_registration_wrapped,
@@ -102,12 +96,10 @@ native_method_test! {
 		},
 	],
 	test_body: |env, class| {
-		// Correctly declared instance method
 		let obj = new_object!(env, class)?;
 		let result = call_int_method!(env, &obj, "callMethod", 5)?;
 		assert_eq!(result, 10);
 
-		// Correctly declared static method
 		let result = call_static_int_method!(env, class, "callStaticMethod", 7)?;
 		assert_eq!(result, 21);
 
@@ -139,9 +131,7 @@ const fn native_static_method_correct<'local>(
 	Ok(value * 3)
 }
 
-// ====================================================================================
 // Test: Per-method ABI check override (UnsafeNever disables check)
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_abi_unsafe_never_wrapped,
@@ -163,9 +153,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test: UnsafeDebugOnly mode (checks only in debug builds)
-// ====================================================================================
 
 #[cfg(debug_assertions)]
 native_method_test! {
@@ -208,9 +196,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test: UnsafeDebugOnly mode (checks only in debug builds, raw)
-// ====================================================================================
 
 // This fixture test is designed to abort when run in debug mode
 #[cfg(debug_assertions)]
@@ -231,7 +217,6 @@ native_method_test! {
 		// This will trigger ABI check and abort because it's a raw function
 		let _result = call_int_method!(env, &obj, "callMethod", 42)?;
 
-		// We should never reach here
 		eprintln!("ERROR: Should have aborted!");
 		#[expect(clippy::exit, reason = "Terminate the subprocess fixture without introducing a second panic.")]
 		std::process::exit(1);
@@ -246,7 +231,6 @@ fn test_abi_debug_only_in_debug_mode_raw() {
 	// Run the fixture test that has UnsafeDebugOnly ABI check on a raw function.
 	// The ABI check should detect the mismatch and abort the process in debug builds.
 
-	// Use cargo test to run the specific fixture test
 	let mut cmd = std::process::Command::new(env!("CARGO"));
 	cmd.arg("test")
 		.arg("--features=invocation")
@@ -260,25 +244,21 @@ fn test_abi_debug_only_in_debug_mode_raw() {
 
 	let output: std::process::Output = cmd.output().expect("Failed to execute fixture test");
 
-	// The process should have failed (non-zero exit code)
 	assert!(
 		!output.status.success(),
 		"Expected process to abort/fail due to ABI check"
 	);
 
-	// Check the combined output (stderr and stdout) for the ABI check message
 	let stderr: std::borrow::Cow<'_, str> = String::from_utf8_lossy(&output.stderr);
 	let stdout: std::borrow::Cow<'_, str> = String::from_utf8_lossy(&output.stdout);
 	let combined: String = format!("{stdout}{stderr}");
 
-	// The ABI check assertion message should appear in the output
 	assert!(
 		combined.contains("was registered as static but called as instance method")
 			|| combined.contains("nativeMethod"),
 		"Expected ABI check error message in output, got stdout: {stdout}\nstderr: {stderr}"
 	);
 
-	// The test should have failed
 	assert!(
 		combined.contains("test test_abi_debug_only_in_debug_mode_raw_impl ... FAILED"),
 		"Expected test failure in output, got: {combined}"

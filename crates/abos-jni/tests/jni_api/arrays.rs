@@ -26,23 +26,16 @@ macro_rules! test_auto_array_read_write {
         #[test]
         pub fn $test_name() {
             attach_current_thread(|env| {
-                // Create original Java array
                 let buf: &[$jni_type] = &[$value_a as $jni_type, $value_b as $jni_type];
                 let java_array = env
                     .$new_array(2)
                     .expect(stringify!(Env #$new_array must create a Java $jni_type array with given size));
 
-                // Insert array elements
                 java_array.set_region(env, 0, buf)?;
 
-                // Use a scope to test Drop
                 {
-                    // Redundantly push a new JNI stack frame to verify that AutoElements is not
-                    // tied to the lifetime of the `env` that it's got from (env.get_array_elements()
-                    // doesn't involve creating a new reference, it associates a pointer with
-                    // an existing array reference)
+                    // A nested frame verifies that AutoElements borrows the array, not the Env used to acquire it.
                     let mut auto_ptr = env.with_local_frame(10, |env| -> abos_jni::errors::Result<_> {
-                        // Get byte array elements auto wrapper
                         // SAFETY: The test owns the array and does not allow concurrent access while its element guard is live.
                         let auto_ptr: AutoElements<$jni_type, _> = unsafe {
                             java_array.get_elements(env, ReleaseMode::CopyBack).unwrap()
@@ -50,36 +43,26 @@ macro_rules! test_auto_array_read_write {
                         Ok(auto_ptr)
                     }).unwrap();
 
-                    // Check array size
                     assert_eq!(auto_ptr.len(), 2);
 
-                    // Check pointer access
                     let ptr = auto_ptr.as_ptr();
                     // SAFETY: The live element guard provides both initialized array entries, and no mutable reference is active.
                     assert_eq!(unsafe { *ptr.offset(0) }, $value_a);
                     // SAFETY: The live element guard provides both initialized array entries, and no mutable reference is active.
                     assert_eq!(unsafe { *ptr.offset(1) }, $value_b);
 
-                    // Check pointer From access
                     let ptr: *mut $jni_type = std::convert::From::from(&auto_ptr);
                     // SAFETY: The live element guard provides both initialized array entries, and no mutable reference is active.
                     assert_eq!(unsafe { *ptr.offset(0) }, $value_a);
                     // SAFETY: The live element guard provides both initialized array entries, and no mutable reference is active.
                     assert_eq!(unsafe { *ptr.offset(1) }, $value_b);
 
-                    // Check pointer into() access
                     let ptr: *mut $jni_type = (&auto_ptr).into();
                     // SAFETY: The live element guard provides both initialized array entries, and no mutable reference is active.
                     assert_eq!(unsafe { *ptr.offset(0) }, $value_a);
                     // SAFETY: The live element guard provides both initialized array entries, and no mutable reference is active.
                     assert_eq!(unsafe { *ptr.offset(1) }, $value_b);
 
-                    // Check slice access
-                    //
-                    // # Safety
-                    //
-                    // We make sure that the slice is dropped before also testing access via `Deref`
-                    // (to ensure we don't have aliased references)
                     // SAFETY: The guard retains the initialized elements, and this shared slice is dropped before mutable access.
                     unsafe {
                         let slice = std::slice::from_raw_parts(auto_ptr.as_ptr(), auto_ptr.len());
@@ -87,20 +70,15 @@ macro_rules! test_auto_array_read_write {
                         assert_eq!(slice[1], $value_b);
                     }
 
-                    // Check access via Deref
                     assert_eq!(auto_ptr[0], $value_a);
                     assert_eq!(auto_ptr[1], $value_b);
 
-                    // Modify via DerefMut
                     let tmp = auto_ptr[1];
                     auto_ptr[1] = auto_ptr[0];
                     auto_ptr[0] = tmp;
 
-                    // Commit would be necessary here, if there were no closure
-                    //auto_ptr.commit().unwrap();
                 }
 
-                // Confirm modification of original Java array
                 let mut res: [$jni_type; 2] = [$value_a as $jni_type; 2];
                 java_array.get_region(env, 0, &mut res).unwrap();
                 assert_eq!(res[0], $value_b);
@@ -111,10 +89,8 @@ macro_rules! test_auto_array_read_write {
     };
 }
 
-// Test generic get_array_elements
 test_auto_array_read_write!(get_array_elements, jint, new_int_array, 0, 1);
 
-// Test type-specific array accessors
 test_auto_array_read_write!(get_int_array_elements, jint, new_int_array, 0, 1);
 
 test_auto_array_read_write!(get_long_array_elements, jlong, new_long_array, 0, 1);
@@ -135,16 +111,13 @@ test_auto_array_read_write!(get_double_array_elements, jdouble, new_double_array
 #[ignore = "Disabled until issue #283 is resolved"]
 pub fn get_long_array_elements_commit() {
 	attach_current_thread(|env| {
-		// Create original Java array
 		let buf: &[i64] = &[1, 2, 3];
 		let java_array: abos_jni::objects::JPrimitiveArray<'_, i64> = env
 			.new_long_array(3)
 			.expect("Env#new_long_array must create a java array with given size");
 
-		// Insert array elements
 		java_array.set_region(env, 0, buf)?;
 
-		// Get long array elements auto wrapper
 		// SAFETY: The test owns the array and does not allow concurrent access while its element guard is live.
 		let mut auto_ptr: AutoElements<'_, i64, &abos_jni::objects::JPrimitiveArray<'_, i64>> = unsafe {
 			java_array
@@ -158,10 +131,8 @@ pub fn get_long_array_elements_commit() {
 			return Ok(());
 		}
 
-		// Check pointer access
 		let ptr: *mut i64 = auto_ptr.as_ptr();
 
-		// Modify
 		// SAFETY: The guard owns three writable elements; no slice or other element access overlaps these writes.
 		unsafe {
 			*ptr += 1;
@@ -169,7 +140,6 @@ pub fn get_long_array_elements_commit() {
 			*ptr.add(2) += 1;
 		}
 
-		// Check that original Java array is unmodified
 		let mut res: [i64; 3] = [0; 3];
 		java_array.get_region(env, 0, &mut res).expect("get region succeeds");
 		assert_eq!(res[0], 1);
@@ -178,7 +148,6 @@ pub fn get_long_array_elements_commit() {
 
 		auto_ptr.commit().expect("commit succeeds");
 
-		// Confirm modification of original Java array
 		java_array.get_region(env, 0, &mut res).expect("get region succeeds");
 		assert_eq!(res[0], 2);
 		assert_eq!(res[1], 3);
@@ -192,15 +161,12 @@ pub fn get_long_array_elements_commit() {
 #[test]
 pub fn get_array_elements_critical() {
 	attach_current_thread(|env| {
-		// Create original Java array
 		let buf: &[u8] = &[1, 2, 3];
 		let java_array: abos_jni::objects::JPrimitiveArray<'_, i8> = env
 			.byte_array_from_slice(buf)
 			.expect("Env#byte_array_from_slice must create a java array from slice");
 
-		// Use a scope to test Drop
 		{
-			// Get primitive array elements auto wrapper
 			// SAFETY: The test owns the array and does not allow concurrent access while its element guard is live.
 			let mut auto_ptr: abos_jni::elements::AutoElementsCritical<
 				'_,
@@ -212,15 +178,8 @@ pub fn get_array_elements_critical() {
 					.expect("get elements critical succeeds")
 			};
 
-			// Check array size
 			assert_eq!(auto_ptr.len(), 3);
 
-			// Convert void pointer to a &[i8] slice, without copy
-			//
-			// # Safety
-			//
-			// We make sure that the slice is dropped before also testing access via `Deref`
-			// (to ensure we don't have aliased references)
 			// SAFETY: The guard retains the initialized elements, and this shared slice is dropped before mutable access.
 			unsafe {
 				let slice: &[i8] = std::slice::from_raw_parts(auto_ptr.as_ptr(), auto_ptr.len());
@@ -229,18 +188,15 @@ pub fn get_array_elements_critical() {
 				assert_eq!(slice[2], 3);
 			}
 
-			// Also check access via `Deref`
 			assert_eq!(auto_ptr[0], 1);
 			assert_eq!(auto_ptr[1], 2);
 			assert_eq!(auto_ptr[2], 3);
 
-			// Modify via `DerefMut`
 			auto_ptr[0] += 1;
 			auto_ptr[1] += 1;
 			auto_ptr[2] += 1;
 		}
 
-		// Confirm modification of original Java array
 		let mut res: [i8; 3] = [0; 3];
 		java_array.get_region(env, 0, &mut res).expect("get region succeeds");
 		assert_eq!(res[0], 2);
@@ -294,7 +250,6 @@ pub fn new_primitive_array_ok() {
 	.expect("attached JNI callback succeeds");
 }
 
-// Group test for testing the family of new_PRIMITIVE_array functions with wrong arguments
 #[test]
 pub fn new_primitive_array_bad_size() {
 	attach_current_thread(|env| {

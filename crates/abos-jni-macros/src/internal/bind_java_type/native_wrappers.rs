@@ -63,7 +63,6 @@ pub(super) fn generate_single_native_wrapper(
 
 	let lifetime: TokenStream = quote! { 'local };
 
-	// Build parameter list for extern "system" fn
 	let mut params: Vec<TokenStream> = Vec::new();
 	params.push(quote! { mut unowned_env: #jni::EnvUnowned<#lifetime> });
 
@@ -73,7 +72,6 @@ pub(super) fn generate_single_native_wrapper(
 		params.push(quote! { this: #type_name<#lifetime> });
 	}
 
-	// Add method parameters using parameter names from signature
 	// Use native trait arg type (without AsRef) to match the trait signature
 	for param in &method.signature.parameters {
 		let param_name: &Ident = &param.name;
@@ -81,7 +79,6 @@ pub(super) fn generate_single_native_wrapper(
 		params.push(quote! { #param_name: #rust_type });
 	}
 
-	// Get return type
 	let return_type: TokenStream =
 		sig_type_to_rust_return_type(&method.signature.return_type, &lifetime, type_mappings, jni);
 
@@ -111,7 +108,6 @@ pub(super) fn generate_single_native_wrapper(
 		jni,
 	);
 
-	// Extract cfg attributes to apply to the wrapper function
 	let cfg_attrs: Vec<syn::Attribute> = extract_cfg_attrs(&method.attrs);
 
 	quote! {

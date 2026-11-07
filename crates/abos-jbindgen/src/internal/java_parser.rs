@@ -13,9 +13,6 @@ use std::sync::OnceLock;
 
 use std::io::Read;
 
-// Define JNI bindings for the Java parser and its nested classes
-
-// First define all the nested type bindings
 abos_jni::bind_java_type! {
 	rust_type = TypeDescription,
 	java_type = "com.jbindgen.Parser$TypeDescription",
@@ -103,7 +100,6 @@ abos_jni::bind_java_type! {
 	},
 }
 
-// Now define the wrapper with the static method
 abos_jni::bind_java_type! {
 	rust_type = ParserWrapper,
 	java_type = "com.jbindgen.ParserWrapper",
@@ -125,7 +121,6 @@ fn load_classes_from_jar(env: &mut Env, jar_bytes: &[u8]) -> std::result::Result
 	let mut archive: zip::ZipArchive<std::io::Cursor<&[u8]>> = ZipArchive::new(cursor)
 		.map_err(|e| abos_jni::errors::Error::ParseFailed(format!("Failed to read embedded JAR: {e}")))?;
 
-	// Get the system class loader
 	let class_loader: abos_jni::objects::JClassLoader<'_> =
 		abos_jni::objects::JClassLoader::get_system_class_loader(env)?;
 
@@ -139,7 +134,6 @@ fn load_classes_from_jar(env: &mut Env, jar_bytes: &[u8]) -> std::result::Result
 			.map_err(|e| abos_jni::errors::Error::ParseFailed(format!("Failed to read JAR entry name: {e}")))?
 			.into_owned();
 
-		// Only load .class files, skip META-INF and other resources
 		if std::path::Path::new(&name)
 			.extension()
 			.is_some_and(|ext| ext == "class")
@@ -149,11 +143,9 @@ fn load_classes_from_jar(env: &mut Env, jar_bytes: &[u8]) -> std::result::Result
 			file.read_to_end(&mut class_bytes)
 				.map_err(|e| abos_jni::errors::Error::ParseFailed(format!("Failed to read class bytes: {e}")))?;
 
-			// Convert class file path to JNI class name (e.g., "com/example/Foo.class" -> "com/example/Foo")
 			let class_name_str: &str = name.trim_end_matches(".class");
 			let class_name = abos_jni::strings::JNIString::new(class_name_str);
 
-			// Use define_class to load the class into the JVM
 			let _ = env.define_class(Some(&class_name), &class_loader, &class_bytes)?;
 		}
 	}
@@ -190,22 +182,17 @@ pub fn parse_java_sources(
 	let jvm: &abos_jni::vm::JavaVM = get_parser_jvm()?;
 
 	let result: std::result::Result<Vec<ClassInfo>, abos_jni::errors::Error> = jvm.attach_current_thread(|env| {
-		// Convert source paths to JString array
 		let source_paths_array: abos_jni::objects::JObjectArray<'_, abos_jni::objects::JString<'_>> =
 			create_string_array(env, source_paths)?;
 
-		// Convert classpath entries to JString array
 		let classpath_array: abos_jni::objects::JObjectArray<'_, abos_jni::objects::JString<'_>> =
 			create_string_array(env, class_path_entries)?;
 
-		// Create pattern JString
 		let pattern_jstring: abos_jni::objects::JString<'_> = JString::from_str(env, class_pattern)?;
 
-		// Call the parser using the bind_java_type! generated binding
 		let result_array: abos_jni::objects::JObjectArray<'_, crate::internal::java_parser::ClassDescription<'_>> =
 			ParserWrapper::parse(env, &source_paths_array, &classpath_array, &pattern_jstring)?;
 
-		// Convert Java ClassDescription array to Rust ClassInfo
 		let mut classes: Vec<crate::ClassInfo> = Vec::new();
 		let len: usize = result_array.len(env)?;
 		for i in 0..len {
@@ -253,30 +240,24 @@ fn java_to_class_info(
 		package_name.split('.').map(std::string::ToString::to_string).collect()
 	};
 
-	// Convert constructors
 	let constructors_array: abos_jni::objects::JObjectArray<'_, crate::internal::java_parser::MethodDescription<'_>> =
 		class_desc.constructors(env)?;
 	let constructors: Vec<crate::MethodInfo> = java_array_to_methods(env, &constructors_array)?;
 
-	// Convert methods
 	let methods_array: abos_jni::objects::JObjectArray<'_, crate::internal::java_parser::MethodDescription<'_>> =
 		class_desc.methods(env)?;
 	let methods: Vec<crate::MethodInfo> = java_array_to_methods(env, &methods_array)?;
 
-	// Convert fields
 	let fields_array: abos_jni::objects::JObjectArray<'_, crate::internal::java_parser::FieldDescription<'_>> =
 		class_desc.fields(env)?;
 	let fields: Vec<crate::FieldInfo> = java_array_to_fields(env, &fields_array)?;
 
-	// Convert native methods
 	let native_methods_array: abos_jni::objects::JObjectArray<'_, crate::internal::java_parser::MethodDescription<'_>> =
 		class_desc.native_methods(env)?;
 	let native_methods: Vec<crate::MethodInfo> = java_array_to_methods(env, &native_methods_array)?;
 
-	// Build instance_of list from superclass and interfaces
 	let mut instance_of: Vec<crate::InstanceOfInfo> = Vec::new();
 
-	// Add superclass if it exists and is not java.lang.Object
 	let super_class: String = class_desc.super_class(env)?.to_string();
 	if !super_class.is_empty() && super_class != "java.lang.Object" {
 		instance_of.push(InstanceOfInfo {
@@ -285,7 +266,6 @@ fn java_to_class_info(
 		});
 	}
 
-	// Add interfaces
 	let interfaces_array: abos_jni::objects::JObjectArray<'_, abos_jni::objects::JString<'_>> =
 		class_desc.interfaces(env)?;
 	let len: usize = interfaces_array.len(env)?;
@@ -349,7 +329,6 @@ fn java_to_method_info(
 	let is_deprecated: bool = method_desc.is_deprecated(env)?;
 	let is_public: bool = method_desc.is_public(env)?;
 
-	// Convert parameters
 	let params_array: abos_jni::objects::JObjectArray<'_, crate::internal::java_parser::ParameterDescription<'_>> =
 		method_desc.parameters(env)?;
 	let len: usize = params_array.len(env)?;
@@ -361,7 +340,6 @@ fn java_to_method_info(
 		arguments.push(arg_info);
 	}
 
-	// Convert return type
 	let return_type_desc: crate::internal::java_parser::TypeDescription<'_> = method_desc.return_type(env)?;
 	let return_type: crate::TypeInfo = java_to_type_info(env, &return_type_desc)?;
 
@@ -396,7 +374,6 @@ fn java_to_arg_info(
 		.map_err(|error| abos_jni::errors::Error::ParseFailed(error.to_string()))?;
 	let is_primitive: bool = param_desc.is_primitive(env)?;
 
-	// Extract rust_primitive if present (may be null)
 	let rust_primitive_jstring: abos_jni::objects::JString<'_> = param_desc.rust_primitive(env)?;
 	let rust_primitive: Option<String> = if rust_primitive_jstring.is_null() {
 		None

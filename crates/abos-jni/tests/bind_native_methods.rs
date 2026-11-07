@@ -48,7 +48,6 @@ bind_java_type! {
 	}
 }
 
-// Implement the native methods trait
 impl TestNativeMethodsNativeInterface for TestNativeMethodsAPI {
 	type Error = abos_jni::errors::Error;
 
@@ -223,7 +222,6 @@ native_method_test! {
 		let outer = JObjectArray::<JBooleanArray>::new(env, 2, inner1)?;
 		outer.set_element(env, 1, inner2)?;
 
-		// Invert the array
 		let result = TestNativeMethods::native_2d_array_invert(env, outer)?;
 
 		// Check the result [[false, true], [true, false]]
@@ -248,12 +246,10 @@ native_method_test! {
 	test_body: |env| {
 		let obj = TestNativeMethods::new(env)?;
 
-		// Test native method can call Java setter (via field access)
 		obj.native_set_counter(env, 42)?;
 		let counter = obj.get_counter(env)?;
 		assert_eq!(counter, 42);
 
-		// Test native method can call Java getter (via method call)
 		let message = obj.native_get_message(env)?;
 		assert_eq!(message.to_string(), "initial");
 
@@ -315,7 +311,6 @@ native_method_test! {
 		let arr = JObjectArray::<JObjectArray<JString>>::new(env, 2, &row1)?;
 		arr.set_element(env, 1, &row2)?;
 
-		// Call native method
 		let result = TestNativeMethods::native_2d_string_array_echo(env, arr)?;
 
 		let result_row1 = result.get_element(env, 0)?;
@@ -346,7 +341,6 @@ native_method_test! {
 
 		#[cfg(feature = "_cfg_test")]
 		{
-			// This should compile and run if _cfg_test feature is enabled
 			let result = obj.native_cfg_test(env)?;
 			assert_eq!(result, 123);
 		}

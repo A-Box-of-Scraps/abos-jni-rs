@@ -5,7 +5,6 @@
 
 use abos_jni_macros::bind_java_type;
 
-// Define a private data struct
 #[derive(Debug)]
 struct JTest2Priv {
 	#[allow(

@@ -84,7 +84,6 @@ pub fn parse_method_sig(input: ParseStream, type_mappings: &TypeMappings) -> Res
 		input.parse::<Token![->]>()?;
 		parse_type(input, type_mappings)?
 	} else {
-		// No return type implies void
 		SigType::Alias("void".to_string())
 	};
 
@@ -136,13 +135,11 @@ impl Signature {
 /// If only a type is provided, generates a fallback name like "arg0", "arg1", etc.
 pub fn parse_parameter_with_index(input: ParseStream, index: usize, type_mappings: &TypeMappings) -> Result<Parameter> {
 	if input.peek(Ident) && input.peek2(Token![:]) {
-		// Named parameter
 		let name: Ident = input.parse::<Ident>()?;
 		input.parse::<Token![:]>()?;
 		let ty: SigType = parse_type(input, type_mappings)?;
 		Ok(Parameter { name, ty })
 	} else {
-		// Unnamed parameter - generate fallback name
 		let ty: SigType = parse_type(input, type_mappings)?;
 		let name = Ident::new(&format!("arg{index}"), Span::call_site());
 		Ok(Parameter { name, ty })

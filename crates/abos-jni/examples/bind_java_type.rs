@@ -19,9 +19,7 @@ struct RustThing {
 	pub message: String,
 }
 
-// Sometimes bindings need to pass raw pointers around as Java long values, so
-// we define a simple wrapper type as an example.
-// (this is not a well-considered design for real-world use)
+// Illustrative pointer-as-long handle, not a production ownership design.
 #[repr(transparent)]
 #[derive(Copy, Clone)]
 struct ThingHandle(*const RustThing);
@@ -42,8 +40,6 @@ impl ThingHandle {
 		unsafe { Box::from_raw(self.0.cast_mut()) }
 	}
 }
-// In order to pass ThingHandle values to/from Java as jlong, the macro expects
-// a From<ThingHandle> for jlong implementation
 impl From<ThingHandle> for jlong {
 	fn from(handle: ThingHandle) -> Self {
 		handle.0 as Self
@@ -69,10 +65,7 @@ bind_java_type! {
 		// as a string (and use '$') like "com.example.BindJavaTypeOverview$CustomType"
 		crate::JCustomType => com.example.BindJavaTypeOverview::CustomType,
 
-		// aliases can help with readability when mapping fully qualified types
-		// so signatures can use JCustomType instead of crate::JCustomType
-		// (this is more relevant to wrapper macros since we could have just mapped
-		// JCustomType directly above)
+		// Aliases let signatures use short names for fully qualified Rust types.
 		typealias JCustomType => crate::JCustomType,
 
 		// Unsafe primitive type mappings can be used for handle types
@@ -168,7 +161,6 @@ bind_java_type! {
 	}
 }
 
-// Implement the native methods trait
 impl JBindJavaTypeOverviewNativeInterface for JBindJavaTypeOverviewAPI {
 	type Error = abos_jni::errors::Error;
 
@@ -234,7 +226,6 @@ impl JBindJavaTypeOverviewNativeInterface for JBindJavaTypeOverviewAPI {
 	}
 }
 
-// Direct function implementation for native_with_function
 #[expect(
 	clippy::unnecessary_wraps,
 	reason = "The native-method wrapper requires a Result-returning callback."
@@ -262,7 +253,6 @@ fn main() {
 
 		println!("=== bind_java_type! Overview Example ===\n");
 
-		// Get the API (registers native methods)
 		let _api: &JBindJavaTypeOverviewAPI = JBindJavaTypeOverviewAPI::get(env, &LoaderContext::default())?;
 
 		// Constructors

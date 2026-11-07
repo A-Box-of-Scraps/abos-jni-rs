@@ -155,13 +155,10 @@ macro_rules! jni_call_only_check_null_ret {
 /// a catch-all: its expression is evaluated unconditionally for any exception that
 /// was not claimed by an earlier handler.
 macro_rules! __jni_match_exceptions {
-    // Empty catch block
     ($env:expr, $ex:expr $(,)?) => {
         compile_error!("Missing 'else' expression in catch block")
     };
-    // `else => expr` (with optional trailing comma) - unconditional
-    // fallback. Must be checked before the `$ex_type:path` arms so `else`
-    // isn't just matched as a `:path`
+    // Match the fallback before typed handlers so else is not parsed as a path.
     ($env:expr, $ex:expr, else => $ex_result:expr $(,)?) => {
         $ex_result
     };
@@ -170,9 +167,7 @@ macro_rules! __jni_match_exceptions {
     ($env:expr, $ex:expr, $ex_type:path => $ex_result:expr $(,)?) => {
         compile_error!("Missing 'else' expression in catch block")
     };
-    // Check the next exception type (with an unbound '_' name for the `Cast`
-    // exception) and then recursively check remaining patterns in the `catch
-    // {}` block (terminating at `else`)
+    // Discard this match's Cast value; recurse on the remaining handlers.
     ($env:expr, $ex:expr, $ex_type:path => $ex_result:expr, $($rest:tt)+) => {
         if let Some(_) = <$ex_type>::matches($env, &$ex)? {
             $ex_result
@@ -180,9 +175,7 @@ macro_rules! __jni_match_exceptions {
             __jni_match_exceptions!($env, $ex, $($rest)+)
         }
     };
-    // Check the next exception type (with a given name for the `Cast`
-    // exception) and then recursively check remaining patterns in the `catch
-    // {}` block (terminating at `else`)
+    // Bind this match's Cast value; recurse on the remaining handlers.
     ($env:expr, $ex:expr, $ex_name:ident: $ex_type:path => $ex_result:expr, $($rest:tt)+) => {
         if let Some($ex_name) = <$ex_type>::matches($env, &$ex)? {
             $ex_result
@@ -243,7 +236,6 @@ macro_rules! jni_call_with_catch {
             // there is already a pending exception
             let ret = jni_call_no_post_check_ex!($jnienv, $version, $name $(, $args)*) ?;
             if $jnienv.exception_check() {
-                // Get a `&mut Env` we can use while mapping the exception to a `Result`
                 $jnienv.with_local_frame(
                     $crate::DEFAULT_LOCAL_FRAME_CAPACITY,
                     |$env_mut| -> $crate::errors::Result<_> {
@@ -337,7 +329,6 @@ macro_rules! jni_try {
         // Wrap everything in a closure so any use of '?' can't return from the encompassing function.
         let ret = (|| -> $ret_ty {$($jni_code)*})();
         if $jnienv.exception_check() {
-            // Get a `&mut Env` we can use while mapping the exception to a `Result`
             $jnienv.with_local_frame(
                 $crate::DEFAULT_LOCAL_FRAME_CAPACITY,
                 |$env_mut| -> $ret_ty {

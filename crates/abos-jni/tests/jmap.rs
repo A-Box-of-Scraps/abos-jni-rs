@@ -16,14 +16,13 @@ fn jmap_push_and_iterate() {
 		let data: &[&abos_jni::strings::JNIStr; 4] =
 			&[jni_str!("hello"), jni_str!("world"), jni_str!("from"), jni_str!("test")];
 
-		// Create a new map. Use LinkedHashMap to have predictable iteration order
+		// LinkedHashMap gives predictable iteration order.
 		let map_object: JObject<'_> = unwrap(
 			env.new_object(jni_str!("java/util/LinkedHashMap"), jni_sig!("()V"), &[]),
 			env,
 		);
 		let map: JMap<'_> = unwrap(JMap::cast_local(env, map_object), env);
 
-		// Push all strings
 		unwrap(
 			data.iter().try_for_each(|s| {
 				JString::from_jni_str(env, s)
@@ -33,7 +32,6 @@ fn jmap_push_and_iterate() {
 			env,
 		);
 
-		// Collect the keys using the JMap iterator
 		let mut collected: Vec<abos_jni::strings::JNIString> = Vec::new();
 		unwrap(
 			map.iter(env).and_then(|mut iter| {

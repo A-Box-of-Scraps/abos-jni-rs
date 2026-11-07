@@ -32,7 +32,6 @@ impl TypeMappings {
 			Rc::new(java_class)
 		};
 
-		// Check if this is a core Java class that cannot be remapped
 		if self.core_java.contains(&java_class) {
 			return Err(syn::Error::new(
 				Span::call_site(),
@@ -47,7 +46,6 @@ impl TypeMappings {
 
 		let rust_type: Rc<RustType> = self.rust_reference_type(path, is_builtin);
 
-		// Check if this alias already has a mapping to a different Rust type
 		if let Some(existing) = self.alias_to_rust.get(alias) {
 			if existing != &rust_type {
 				let existing_java_mapping: &Rc<JavaClassName> = self
@@ -71,7 +69,6 @@ impl TypeMappings {
 
 		self.alias_to_rust.insert(alias.to_string(), rust_type.clone());
 
-		// Insert the mappings
 		self.rust_to_java.insert(rust_type.clone(), java_class.clone());
 		self.java_to_rust.insert(java_class, rust_type);
 
@@ -180,7 +177,6 @@ impl TypeMappings {
 	/// }
 	/// ```
 	pub fn parse_mappings(&mut self, input: ParseStream) -> Result<()> {
-		// Optional '=' before block
 		if input.peek(Token![=]) {
 			input.parse::<Token![=]>()?;
 		}
@@ -190,7 +186,6 @@ impl TypeMappings {
 
 		while !mappings_content.is_empty() {
 			self.parse_mapping(&mappings_content)?;
-			// Require comma between entries, but trailing comma is optional.
 			if !mappings_content.is_empty() {
 				mappings_content.parse::<Token![,]>()?;
 			}
@@ -201,19 +196,14 @@ impl TypeMappings {
 
 	fn parse_mapping(&mut self, input: ParseStream) -> Result<()> {
 		if input.peek(typealias) {
-			// Parse alias mapping
 			input.parse::<typealias>()?;
 
-			// Parse new alias name
 			let new_alias: syn::Path = input.parse()?;
 
-			// Parse separator
 			input.parse::<Token![=>]>()?;
 
-			// Parse existing type name
 			let existing_type: syn::Path = input.parse()?;
 
-			// Insert alias
 			let new_alias_str: String = path_to_string_no_spaces(&new_alias);
 			let existing_type_str: String = path_to_string_no_spaces(&existing_type);
 			self.insert_alias(&new_alias_str, &existing_type_str)?;
@@ -225,22 +215,17 @@ impl TypeMappings {
 				false
 			};
 
-			// Parse Rust path
 			let rust_path: syn::Path = input.parse()?;
 
-			// Convert path to string without spaces
 			let rust_path_str: String = path_to_string_no_spaces(&rust_path);
 
-			// Parse separator
 			input.parse::<Token![=>]>()?;
 
 			if is_prim_mapping {
 				self.parse_primitive_mapping(input, &rust_path_str)?;
 			} else {
-				// Parse Java class name
 				let java_class_mapping: JavaClassName = input.parse()?;
 
-				// Insert mapping
 				self.insert_ref_type(&rust_path_str, &rust_path_str, java_class_mapping, false)?;
 			}
 		}
@@ -248,11 +233,9 @@ impl TypeMappings {
 	}
 
 	fn parse_primitive_mapping(&mut self, input: ParseStream, rust_path_str: &str) -> Result<()> {
-		// Parse primitive type name
 		let prim_type_ident: Ident = input.parse()?;
 		let prim_type_name: String = prim_type_ident.to_string();
 
-		// Validate type name by checking that it's a "built-in" primitive type name
 		match self.map_alias(&prim_type_name) {
 			Some(ConcreteType::Primitive {
 				primitive, is_builtin, ..

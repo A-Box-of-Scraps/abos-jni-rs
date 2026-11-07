@@ -6,18 +6,12 @@
 
 use abos_jni::{EnvUnowned, jni_str, objects::JObject};
 
-pub struct Renderer {
-	// fields
-}
+pub struct Renderer {}
 impl Renderer {
-	pub const fn render(&mut self, _surface: &Surface) {
-		// rendering logic
-	}
+	pub const fn render(&mut self, _surface: &Surface) {}
 }
 
-pub struct Surface {
-	// fields
-}
+pub struct Surface {}
 
 #[expect(
 	clippy::significant_drop_tightening,

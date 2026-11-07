@@ -29,7 +29,6 @@ use crate::internal::{
 };
 use crate::internal::{str::lit_cstr_mutf8, types::ConcreteType};
 
-// Custom keywords
 custom_keyword!(jni);
 custom_keyword!(rust_type);
 custom_keyword!(rust_type_vis);
@@ -91,10 +90,7 @@ impl VisibilitySpec {
 			Self::PubInPath(path) => quote! { pub(in #path) },
 		}
 	}
-	// Get back a visibility that is at most as permissive as `other`
-	//
-	// This is used to clamp the visibility of the `*API` struct to the visibility of the binding
-	// type itself.
+	// Keep the API struct no more visible than its binding type.
 	fn clamp_to(&self, other: &Self) -> Self {
 		match (self, other) {
 			(Self::PubCrate, Self::Public) => Self::PubCrate,
@@ -102,11 +98,7 @@ impl VisibilitySpec {
 			(Self::PubSelf, Self::Public | Self::PubCrate | Self::PubSuper) | (Self::PubInPath(_), Self::PubSelf) => {
 				Self::PubSelf
 			}
-			// XXX: it's a bit hand-wavey deciding how we should clamp `pub(in
-			// path)`, but essentially we'll assume that if someone want's their
-			// binding to only be visible for a specific module path then their
-			// API type should also only be visible for the same path, unless
-			// `other` is restricted to `pub(self)`
+			// Module paths cannot be ordered here; retain this restriction unless other is pub(self).
 			(Self::PubInPath(_), _) => self.clone(),
 			(Self::Public | Self::PubCrate | Self::PubSuper | Self::PubSelf, _) => other.clone(),
 		}

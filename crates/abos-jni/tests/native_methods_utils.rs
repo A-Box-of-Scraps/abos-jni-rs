@@ -25,7 +25,6 @@ pub fn compile_test_class(test_name: &str, java_file: &str) -> std::path::PathBu
 		.join("jni_macros_tests")
 		.join(test_name);
 
-	// Clean up any existing output
 	match std::fs::remove_dir_all(&out_dir) {
 		Ok(()) => {}
 		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -131,7 +130,6 @@ pub fn load_test_class<'local>(
 /// ```
 #[macro_export]
 macro_rules! native_method_test {
-    // Variant that expects the test to succeed
     (
         $(#[$attribute:meta])*
         test_name: $test_name:ident,
@@ -160,14 +158,12 @@ macro_rules! native_method_test {
                     #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                     let $class = $crate::native_methods_utils::load_test_class($env, &out_dir, class_name)?;
 
-                    // Register native methods
                     let methods: &[abos_jni::NativeMethod] = $methods;
                     // SAFETY: The fixture class declares the names and JNI signatures supplied by these native-method descriptors.
                     unsafe {
                         $env.register_native_methods(&$class, methods)?;
                     }
 
-                    // Run test body
                     $body
                 })
                 .expect(concat!(stringify!($test_name), " failed"));
@@ -175,7 +171,6 @@ macro_rules! native_method_test {
         }
     };
 
-    // Variant that expects the test to fail with a JavaException
     (
         $(#[$attribute:meta])*
         test_name: $test_name:ident,
@@ -205,14 +200,12 @@ macro_rules! native_method_test {
                     #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                     let $class = $crate::native_methods_utils::load_test_class($env, &out_dir, class_name)?;
 
-                    // Register native methods
                     let methods: &[abos_jni::NativeMethod] = $methods;
                     // SAFETY: The fixture class declares the names and JNI signatures supplied by these native-method descriptors.
                     unsafe {
                         $env.register_native_methods(&$class, methods)?;
                     }
 
-                    // Run test body
                     $body
                 });
 

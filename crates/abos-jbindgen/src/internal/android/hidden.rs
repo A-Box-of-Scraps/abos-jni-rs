@@ -38,12 +38,10 @@ pub fn parse_hiddenapi_flags(path: &Path, filter: &HiddenApiFilter) -> Result<Ha
 
 /// Check if an API should be allowed based on its flags and filter configuration
 pub fn is_api_allowed(flags: &[&str], filter: &HiddenApiFilter) -> bool {
-	// Always allow public-api and sdk
 	if flags.iter().any(|f| *f == "public-api" || *f == "sdk") {
 		return true;
 	}
 
-	// Check for unsupported flag
 	if filter.allow_unsupported && flags.contains(&"unsupported") {
 		return true;
 	}
@@ -59,8 +57,6 @@ pub fn is_api_allowed(flags: &[&str], filter: &HiddenApiFilter) -> bool {
 /// Compare Android target levels (e.g., "o" < "p" < "q")
 /// Returns: -1 if a < b, 0 if a == b, 1 if a > b
 pub fn compare_target_levels(a: &str, b: &str) -> i32 {
-	// Map common Android version codes to numbers for comparison
-	// Note: This is a simplified mapping of Android version codenames
 	let level_map = [
 		("l", 21), // Lollipop
 		("m", 23), // Marshmallow
@@ -86,7 +82,6 @@ pub fn compare_target_levels(a: &str, b: &str) -> i32 {
 				i32::from(a_val > b_val)
 			}
 		}
-		// If we can't parse one of the levels, do string comparison as fallback
 		_ => a.cmp(b) as i32,
 	}
 }

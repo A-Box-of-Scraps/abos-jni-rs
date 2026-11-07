@@ -15,6 +15,5 @@ fn main() {
 		println!("cargo:rustc-cfg=use_tls_attach_guard");
 	}
 
-	// Re-run if the environment variable changes
 	println!("cargo:rerun-if-env-changed=_JNI_WINDOWS_FORCE_USE_TLS");
 }

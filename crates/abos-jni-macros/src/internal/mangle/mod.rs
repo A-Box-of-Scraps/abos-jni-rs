@@ -32,7 +32,6 @@ pub fn jni_mangle2(attr: TokenStream, item: TokenStream) -> TokenStream {
 		}
 	};
 
-	// Parse the attribute arguments
 	let args: syn::punctuated::Punctuated<syn::LitStr, syn::Token![,]> =
 		match syn::parse::Parser::parse2(syn::punctuated::Punctuated::parse_terminated, attr) {
 			Ok(args) => args,
@@ -65,43 +64,28 @@ pub fn jni_mangle2(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 	let orig_fn_name: String = function.sig.ident.to_string();
 
-	// Parse optional method name and signature
 	let (method_name, signature) = match args.len() {
-		1 => {
-			// Just namespace - derive lowerCamelCase from Rust function name
-			(snake_case_to_lower_camel_case(&orig_fn_name), None)
-		}
+		1 => (snake_case_to_lower_camel_case(&orig_fn_name), None),
 		2 => {
-			// Namespace + either method name or signature
 			let second_arg: String = args[1].value();
 			if second_arg.contains('(') {
-				// It's a signature - derive method name from Rust function name
 				(snake_case_to_lower_camel_case(&orig_fn_name), Some(second_arg))
 			} else {
-				// It's a method name
 				(second_arg, None)
 			}
 		}
-		3 => {
-			// Namespace + method name + signature
-			(args[1].value(), Some(args[2].value()))
-		}
+		3 => (args[1].value(), Some(args[2].value())),
 		_ => unreachable!(),
 	};
 
 	let mangled_jni_name: String = create_jni_fn_name(&namespace, &method_name, signature.as_deref());
 
-	// Specify the name of the exported function symbol
-	//
-	// Note: we don't change `function.sig.ident` and use `#[no_mangle]` so that the function can also
-	// continue to be referenced by its Rust name within the crate.
+	// Set the export symbol without changing the function's Rust name, so Rust callers can still use it.
 	if cfg!(has_unsafe_attr) {
-		// Add attributes for Rust 1.82+
 		function
 			.attrs
 			.extend([parse_quote!(#[unsafe(export_name = #mangled_jni_name)])]);
 	} else {
-		// Add attributes for older Rust versions
 		function
 			.attrs
 			.extend([parse_quote!(#[export_name = #mangled_jni_name])]);
@@ -192,12 +176,10 @@ fn valid_namespace(namespace: &str) -> bool {
 		}
 	}
 
-	// Check for leading or trailing dots
 	if namespace.starts_with('.') || namespace.ends_with('.') {
 		return false;
 	}
 
-	// Check for consecutive dots (which would create empty identifiers)
 	if namespace.contains("..") {
 		return false;
 	}
@@ -236,27 +218,21 @@ fn valid_namespace(namespace: &str) -> bool {
 /// - "`array_2d_foo`" -> "array2DFoo" (capitalizes first char after digits)
 /// - "`test_3d`" -> "test3D" (capitalizes first char after digits)
 pub fn snake_case_to_lower_camel_case(s: &str) -> String {
-	// If the string contains any uppercase letters, assume it's intentionally cased
-	// and return it unchanged
+	// Preserve intentional mixed or uppercase naming.
 	if s.chars().any(char::is_uppercase) {
 		return s.to_string();
 	}
 
-	// Find leading underscores
 	let leading_underscores: usize = s.chars().take_while(|&c| c == '_').count();
 
-	// Find trailing underscores
 	let trailing_underscores: usize = s.chars().rev().take_while(|&c| c == '_').count();
 
-	// If the entire string is underscores, return as-is
 	if leading_underscores + trailing_underscores >= s.len() {
 		return s.to_string();
 	}
 
-	// Extract the middle part (without leading/trailing underscores)
 	let middle: &str = &s[leading_underscores..s.len() - trailing_underscores];
 
-	// Convert the middle part
 	let mut result = String::new();
 	let mut capitalize_next = false;
 
@@ -264,11 +240,9 @@ pub fn snake_case_to_lower_camel_case(s: &str) -> String {
 		if c == '_' {
 			capitalize_next = true;
 		} else if capitalize_next {
-			// If this is a digit, just add it and keep looking for the first non-digit to capitalize
 			if c.is_ascii_digit() {
 				result.push(c);
 			} else {
-				// Use Unicode-aware uppercase conversion on the first non-digit character
 				result.extend(c.to_uppercase());
 				capitalize_next = false;
 			}
@@ -277,8 +251,6 @@ pub fn snake_case_to_lower_camel_case(s: &str) -> String {
 		}
 	}
 
-	// Reconstruct with leading and trailing underscores
-	// Remove one leading underscore (if any exist)
 	let adjusted_leading_underscores: usize = if leading_underscores > 0 {
 		leading_underscores - 1
 	} else {
@@ -319,9 +291,7 @@ pub fn create_jni_fn_name(namespace: &str, fn_name: &str, signature: Option<&str
 			match c {
 				'_' => result.push_str("_1"),
 				'.' => result.push('_'),
-				// Handle ASCII alphanumeric and safe characters
 				_ if c.is_ascii_alphanumeric() => result.push(c),
-				// Everything else (including '$' and non-ASCII) gets encoded
 				_ => write!(result, "_0{:04x}", u32::from(c)).expect("writing to String cannot fail"),
 			}
 		}
@@ -338,7 +308,6 @@ pub fn create_jni_fn_name(namespace: &str, fn_name: &str, signature: Option<&str
 				'/' => result.push('_'),
 				_ if c.is_ascii_alphanumeric() => result.push(c),
 				_ => {
-					// Non-ASCII character or other special chars - encode as _0xxxx
 					write!(result, "_0{:04x}", u32::from(c)).expect("writing to String cannot fail");
 				}
 			}
@@ -352,7 +321,6 @@ pub fn create_jni_fn_name(namespace: &str, fn_name: &str, signature: Option<&str
 	let mut result: String = format!("Java_{namespace_underscored}_{fn_name_underscored}");
 
 	if let Some(sig) = signature {
-		// Extract only the argument types (between parentheses), ignoring return type
 		if let Some(start) = sig.find('(')
 			&& let Some(end) = sig.find(')')
 		{

@@ -11,7 +11,6 @@ use rusty_fork::rusty_fork_test;
 
 mod util;
 
-// Create bindings for TestArrays class
 bind_java_type! {
 	rust_type = TestArrays,
 	java_type = "com.example.TestArrays",
@@ -76,17 +75,14 @@ fn test_static_array_fields() {
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
 
-		// Test reading static int array field
 		let int_array = TestArrays::static_int_array(env)?;
 		let int_values = read_int_array(env, &int_array)?;
 		assert_eq!(int_values, vec![1, 2, 3, 4, 5]);
 
-		// Test reading static string array field
 		let string_array = TestArrays::static_string_array(env)?;
 		let string_values = read_string_array(env, &string_array)?;
 		assert_eq!(string_values, vec!["hello", "world"]);
 
-		// Test reading static 2D array field
 		let int_2d_array = TestArrays::static_int_2d_array(env)?;
 		let first_row = int_2d_array.get_element(env, 0)?;
 		let first_row_values = read_int_array(env, &first_row)?;
@@ -113,17 +109,14 @@ fn test_instance_array_fields() {
 
 		let obj = TestArrays::new(env)?;
 
-		// Test reading instance int array field
 		let int_array = obj.int_array(env)?;
 		let int_values = read_int_array(env, &int_array)?;
 		assert_eq!(int_values, vec![10, 20, 30]);
 
-		// Test reading instance long array field
 		let long_array = obj.long_array(env)?;
 		let long_values = read_long_array(env, &long_array)?;
 		assert_eq!(long_values, vec![100, 200, 300]);
 
-		// Test reading instance string array field
 		let string_array = obj.string_array(env)?;
 		let string_values = read_string_array(env, &string_array)?;
 		assert_eq!(string_values, vec!["foo", "bar", "baz"]);
@@ -149,12 +142,10 @@ fn test_array_field_write() {
 
 		let obj = TestArrays::new(env)?;
 
-		// Create and set a new int array
 		let new_int_array = env.new_int_array(4)?;
 		new_int_array.set_region(env, 0, &[100, 200, 300, 400])?;
 		obj.set_int_array(env, &new_int_array)?;
 
-		// Read back and verify
 		let read_array = obj.int_array(env)?;
 		let values = read_int_array(env, &read_array)?;
 		assert_eq!(values, vec![100, 200, 300, 400]);
@@ -178,7 +169,6 @@ fn test_static_method_with_array_param() {
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
 
-		// Test sum_array method
 		let int_array = env.new_int_array(5)?;
 		int_array.set_region(env, 0, &[10, 20, 30, 40, 50])?;
 
@@ -204,7 +194,6 @@ fn test_static_method_returning_array() {
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
 
-		// Test create_int_array method
 		let result_array = TestArrays::create_int_array(env, 5, 42)?;
 		let values = read_int_array(env, &result_array)?;
 		assert_eq!(values, vec![42, 42, 42, 42, 42]);
@@ -228,7 +217,6 @@ fn test_static_method_string_arrays() {
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
 
-		// Test concatenate_arrays method
 		let arr1 = create_string_array(env, &["hello", "world"])?;
 		let arr2 = create_string_array(env, &["foo", "bar"])?;
 
@@ -266,12 +254,10 @@ fn test_static_method_2d_array() {
 		// Transpose it (should become 3x2)
 		let transposed = TestArrays::transpose(env, &matrix)?;
 
-		// Verify first row of transposed matrix
 		let first_row = transposed.get_element(env, 0)?;
 		let first_row_values = read_int_array(env, &first_row)?;
 		assert_eq!(first_row_values, vec![1, 4]);
 
-		// Verify second row
 		let second_row = transposed.get_element(env, 1)?;
 		let second_row_values = read_int_array(env, &second_row)?;
 		assert_eq!(second_row_values, vec![2, 5]);
@@ -297,12 +283,10 @@ fn test_instance_method_with_array_param() {
 
 		let obj = TestArrays::new(env)?;
 
-		// Create and set array using method
 		let new_array = env.new_int_array(3)?;
 		new_array.set_region(env, 0, &[7, 8, 9])?;
 		obj.update_int_array(env, &new_array)?;
 
-		// Verify using getter method
 		let result = obj.get_int_array(env)?;
 		let values = read_int_array(env, &result)?;
 		assert_eq!(values, vec![7, 8, 9]);
@@ -328,7 +312,6 @@ fn test_instance_method_array_processing() {
 
 		let obj = TestArrays::new(env)?;
 
-		// Test double_values method
 		let input = env.new_int_array(4)?;
 		input.set_region(env, 0, &[1, 2, 3, 4])?;
 
@@ -357,7 +340,6 @@ fn test_instance_method_string_array_processing() {
 
 		let obj = TestArrays::new(env)?;
 
-		// Test to_upper_case method
 		let input = create_string_array(env, &["hello", "world"])?;
 
 		let result = obj.to_upper_case(env, &input)?;
@@ -383,16 +365,13 @@ fn test_constructor_with_arrays() {
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
 
-		// Create arrays
 		let int_array = env.new_int_array(3)?;
 		int_array.set_region(env, 0, &[99, 88, 77])?;
 
 		let string_array = create_string_array(env, &["test", "array"])?;
 
-		// Create object with constructor
 		let obj = TestArrays::new_with_arrays(env, &int_array, &string_array)?;
 
-		// Verify arrays were set correctly
 		let result_int = obj.get_int_array(env)?;
 		let int_values = read_int_array(env, &result_int)?;
 		assert_eq!(int_values, vec![99, 88, 77]);
@@ -420,7 +399,6 @@ fn test_create_string_array_static_method() {
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
 
-		// Test create_string_array method
 		let prefix = JString::from_str(env, "item_")?;
 		let result = TestArrays::create_string_array(env, 3, &prefix)?;
 		let values = read_string_array(env, &result)?;
@@ -431,8 +409,6 @@ fn test_create_string_array_static_method() {
 	.expect("Create string array static method test failed");
 }
 }
-
-// Helper functions
 
 fn load_test_arrays_class(env: &mut Env, out_dir: &Path) -> abos_jni::errors::Result<()> {
 	let class_path: PathBuf = out_dir.join("com/example/TestArrays.class");

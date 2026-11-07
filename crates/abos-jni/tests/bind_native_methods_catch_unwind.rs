@@ -27,9 +27,7 @@ use abos_jni::{Env, EnvUnowned, bind_java_type};
 use rusty_fork::rusty_fork_test;
 use std::panic;
 
-// ====================================================================================
 // Test: catch_unwind = false (panics are NOT caught by error policy)
-// ====================================================================================
 
 bind_java_type! {
 	rust_type = TestCatchUnwindFalse,
@@ -71,7 +69,6 @@ native_method_test! {
 			let _ret = Java_com_example_TestNativeCatchUnwind_methodThatPanics0__(unowned, obj);
 		}
 
-		// We should never reach here
 		eprintln!("ERROR: Should have aborted!");
 		#[expect(clippy::exit, reason = "Terminate the subprocess fixture without introducing a second panic.")]
 		std::process::exit(1);
@@ -86,7 +83,6 @@ fn test_catch_unwind_false_causes_abort() {
 	// The panic should cause the process to abort because it tries to
 	// escape through an extern "system" FFI boundary that cannot unwind.
 
-	// Use cargo test to run the specific fixture test
 	let mut cmd = std::process::Command::new(env!("CARGO"));
 	cmd.arg("test")
 		.arg("--features=invocation")
@@ -108,10 +104,8 @@ fn test_catch_unwind_false_causes_abort() {
 		eprintln!("Stderr: {}", String::from_utf8_lossy(&output.stderr));
 		eprintln!("------------------");
 	}
-	// The process should have failed (non-zero exit code)
 	assert!(!output.status.success(), "Expected process to abort/fail");
 
-	// Check the combined output (stderr and stdout) for the panic message
 	let stderr: std::borrow::Cow<'_, str> = String::from_utf8_lossy(&output.stderr);
 	let stdout: std::borrow::Cow<'_, str> = String::from_utf8_lossy(&output.stdout);
 	let combined: String = format!("{stdout}{stderr}");
@@ -121,16 +115,13 @@ fn test_catch_unwind_false_causes_abort() {
 		"Expected panic message in output, got stdout: {stdout}\nstderr: {stderr}"
 	);
 
-	// The test should have failed
 	assert!(
 		combined.contains("test test_catch_unwind_false_causes_abort_impl ... FAILED"),
 		"Expected test failure in output, got: {combined}"
 	);
 }
 
-// ====================================================================================
 // Test: catch_unwind = true (default - panics ARE caught by error policy)
-// ====================================================================================
 
 bind_java_type! {
 	rust_type = TestCatchUnwindTrue,
@@ -163,19 +154,13 @@ native_method_test! {
 	test_body: |env| {
 		let obj = TestCatchUnwindTrue::new(env)?;
 
-		// Call the exported symbol directly from Rust with our own catch_unwind.
-		// With catch_unwind = true (default), the panic should be caught by the
-		// error policy inside the native method wrapper and converted to a Java exception.
-		// Since we're calling from Rust (not Java), we won't see the Java exception,
-		// but the important thing is that it doesn't panic.
+		// The wrapper must translate the panic to a Java exception before it reaches Rust callers.
 		// SAFETY: This thread owns the Env, and the live arguments match the fixture's exported JNI signature.
 		let result = panic::catch_unwind(panic::AssertUnwindSafe(|| unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
 			Java_com_example_TestNativeCatchUnwind_methodThatPanics1__(unowned, obj)
 		}));
 
-		// The panic should have been caught by the error policy, so our catch_unwind
-		// should NOT catch a panic (result should be Ok)
 		assert!(result.is_ok(), "Expected panic to be caught by error policy when catch_unwind = true");
 
 		Ok(())

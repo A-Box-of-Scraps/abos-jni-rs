@@ -54,9 +54,7 @@ unsafe extern "system" {
 	fn Java_com_example_TestNativeExports_manualExport<'local>(env: EnvUnowned<'local>, this: JObject<'local>);
 }
 
-// ====================================================================================
 // Test: No arguments with extern keyword (implicit export)
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_export_no_args,
@@ -96,9 +94,7 @@ const fn no_args_impl<'local>(_env: &mut Env<'local>, _this: JObject<'local>) ->
 	Ok(1234)
 }
 
-// ====================================================================================
 // Test: Primitive arguments with explicit export = true
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_export_primitive_args,
@@ -141,9 +137,7 @@ fn primitive_args_impl<'local>(
 	Ok(a + jint::try_from(b).expect("test long argument fits in jint") + jint::from(c))
 }
 
-// ====================================================================================
 // Test: Object arguments
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_export_object_args,
@@ -187,9 +181,7 @@ const fn object_args_impl<'local>(
 	Ok(str)
 }
 
-// ====================================================================================
 // Test: Overloaded methods with different signatures
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_export_overloaded_no_args,
@@ -304,9 +296,7 @@ const fn overloaded_string_impl<'local>(
 	Ok(5)
 }
 
-// ====================================================================================
 // Test: Underscore in method name (needs mangling)
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_export_underscore_method_name,
@@ -344,9 +334,7 @@ const fn method_with_underscore_impl<'local>(
 	Ok(())
 }
 
-// ====================================================================================
 // Test: Manual export symbol
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_export_manual_symbol,

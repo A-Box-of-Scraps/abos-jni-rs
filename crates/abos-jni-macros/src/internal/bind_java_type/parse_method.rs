@@ -12,7 +12,6 @@ pub(super) fn parse_visibility(input: ParseStream) -> Result<Option<VisibilitySp
 	if input.peek(Token![pub]) {
 		input.parse::<Token![pub]>()?;
 
-		// Check for pub(...)
 		if input.peek(syn::token::Paren) {
 			let content;
 			parenthesized!(content in input);

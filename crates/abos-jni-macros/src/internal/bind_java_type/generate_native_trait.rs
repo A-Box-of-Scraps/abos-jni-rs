@@ -25,17 +25,14 @@ pub(super) fn generate_native_methods_code(
 	native_methods_error_policy: Option<&syn::Path>,
 	jni: &syn::Path,
 ) -> Result<(TokenStream, TokenStream)> {
-	// If there are no native methods, return empty
 	if native_methods.is_empty() {
 		return Ok((quote! {}, quote! {}));
 	}
 
-	// Generate default names if not provided
 	let default_trait_name: Ident = format_ident!("{}NativeInterface", type_name);
 
 	let trait_name: &Ident = native_trait_name.unwrap_or(&default_trait_name);
 
-	// Generate the native trait
 	let native_trait: TokenStream = generate_native_trait(
 		trait_name,
 		type_name,
@@ -45,7 +42,6 @@ pub(super) fn generate_native_methods_code(
 		jni,
 	);
 
-	// Generate wrapper methods (to be added to impl API block)
 	let wrapper_methods: TokenStream = generate_native_wrappers(
 		type_name,
 		api_name,
@@ -59,18 +55,15 @@ pub(super) fn generate_native_methods_code(
 		jni,
 	);
 
-	// Wrap the wrappers in an impl block for the API struct
 	let wrapper_impl: TokenStream = quote! {
 		impl #api_name {
 			#wrapper_methods
 		}
 	};
 
-	// Generate registration code (to be added to API::get())
 	let registration_code: TokenStream =
 		generate_native_registration_code(api_name, native_methods, type_mappings, jni)?;
 
-	// Generate exported native method functions for methods marked with export = true
 	let native_exports: TokenStream = generate_native_exports(
 		type_name,
 		api_name,
@@ -81,7 +74,6 @@ pub(super) fn generate_native_methods_code(
 		jni,
 	)?;
 
-	// Combine trait, impl struct, wrapper impl, and exports for top-level output
 	let trait_and_impl: TokenStream = quote! {
 		#native_trait
 		#wrapper_impl
@@ -106,7 +98,6 @@ pub(super) fn generate_native_trait(
 		method_sigs.push(generate_trait_signature(type_name, method, type_mappings, jni));
 	}
 
-	// If there are no methods that need trait implementations, don't generate the trait
 	if method_sigs.is_empty() {
 		return quote! {};
 	}
@@ -132,7 +123,6 @@ fn generate_trait_signature(
 
 	let mut params: Vec<TokenStream> = Vec::new();
 
-	// Raw methods take EnvUnowned directly, regular methods take &mut Env
 	if method.is_raw {
 		params.push(quote! { unowned_env: #jni::EnvUnowned<'local> });
 	} else {
@@ -147,7 +137,6 @@ fn generate_trait_signature(
 
 	for param in &method.signature.parameters {
 		let param_name: &Ident = &param.name;
-		// Use the native trait arg type (without AsRef)
 		let rust_type: TokenStream = sig_type_to_rust_native_trait_arg_type(&param.ty, &lifetime, type_mappings, jni);
 		params.push(quote! { #param_name: #rust_type });
 	}
@@ -158,7 +147,6 @@ fn generate_trait_signature(
 	// Only emit cfg attributes on trait methods (not doc or other attributes)
 	let cfg_attrs: Vec<syn::Attribute> = extract_cfg_attrs(&method.attrs);
 
-	// Raw methods return the value directly, regular methods return Result
 	if method.is_raw {
 		quote! {
 			#(#cfg_attrs)*

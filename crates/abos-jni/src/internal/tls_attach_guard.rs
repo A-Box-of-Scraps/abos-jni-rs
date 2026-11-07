@@ -82,16 +82,12 @@ pub unsafe fn tls_attach_current_thread<'local>(
 ) -> Result<AttachGuard<'local>> {
 	let thread: Thread = current();
 
-	// Store in TLS for automatic detachment when thread terminates
 	let env: *mut *const abos_jni_sys::JNINativeInterface_ =
 		TLS_ATTACH_GUARD.with(move |f| -> abos_jni::errors::Result<*mut abos_jni::sys::JNIEnv> {
-			// Although it's unlikely, it's possible that the thread was already permanently attached
-			// but some external code manually detached it (this is allowed as long as there are no
-			// active AttachGuards). In this case we don't want to double-increment the attached
-			// threads counter.
+			// External code may have detached the thread while leaving its TLS guard.
+			// Reuse the counter entry when reattaching.
 			let inc_attached_count: bool = f.borrow_mut().take().is_none_or(|guard| {
-				// We use `std::mem::forget` to ensure we don't drop the existing guard and
-				// call detach again.
+				// Do not let the old guard detach the thread again.
 				std::mem::forget(guard);
 				false
 			});

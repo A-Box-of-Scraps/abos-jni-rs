@@ -10,7 +10,6 @@ use rusty_fork::rusty_fork_test;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-// Create bindings for TestFields class
 bind_java_type! {
 	rust_type = TestFields,
 	java_type = "com.example.TestFields",
@@ -38,7 +37,6 @@ bind_java_type! {
 		char_field: jchar,
 		string_field: JString,
 
-		// Fields for testing non_null validation
 		nullable_string_field: JString,  // Can be null
 		non_null required_string_field: JString,  // Shorthand syntax - must not be null
 		validated_string_field {  // Block syntax with explicit non_null
@@ -46,7 +44,6 @@ bind_java_type! {
 			non_null = true,
 		},
 
-		// Fields for testing cfg attribute support
 		// These are guarded by _cfg_test which is never enabled in tests
 		#[cfg(feature = "_cfg_test")]
 		static static_cfg_test_field: jint,
@@ -74,7 +71,6 @@ fn test_static_primitive_fields() {
 	util::attach_current_thread(|env| {
 		load_test_fields_class(env, &out_dir)?;
 
-		// Test reading static primitive fields
 		let int_val = TestFields::static_int_field(env)?;
 		assert_eq!(int_val, 42);
 
@@ -118,7 +114,6 @@ fn test_static_string_field() {
 	util::attach_current_thread(|env| {
 		load_test_fields_class(env, &out_dir)?;
 
-		// Test reading static string field
 		let string_val = TestFields::static_string_field(env)?;
 		assert_eq!(string_val.to_string(), "static string value");
 
@@ -141,14 +136,11 @@ fn test_static_field_write() {
 	util::attach_current_thread(|env| {
 		load_test_fields_class(env, &out_dir)?;
 
-		// Read initial value
 		let initial_val = TestFields::static_int_field(env)?;
 		assert_eq!(initial_val, 42);
 
-		// Write new value
 		TestFields::set_static_int_field(env, 100)?;
 
-		// Read updated value
 		let updated_val = TestFields::static_int_field(env)?;
 		assert_eq!(updated_val, 100);
 
@@ -171,13 +163,10 @@ fn test_instance_primitive_fields() {
 	util::attach_current_thread(|env| {
 		load_test_fields_class(env, &out_dir)?;
 
-		// First, check attempts to get/set instances fields with a null reference
-
 		assert_null_field_errors(env);
 
 		let obj = TestFields::new(env)?;
 
-		// Test getting/setting instance primitive fields
 		let int_val = obj.int_field(env)?;
 		assert_eq!(int_val, 10);
 		obj.set_int_field(env, 20)?;
@@ -237,7 +226,6 @@ fn test_instance_string_field() {
 
 		let obj = TestFields::new(env)?;
 
-		// Test reading instance string field
 		let string_val = obj.string_field(env)?;
 		assert_eq!(string_val.to_string(), "instance string");
 
@@ -263,7 +251,6 @@ fn test_constructor_with_values() {
 		let string_val = JString::from_str(env, "custom string")?;
 		let obj = TestFields::new_with_values(env, 50, &string_val)?;
 
-		// Verify fields were set correctly by constructor
 		let int_val = obj.int_field(env)?;
 		assert_eq!(int_val, 50);
 
@@ -295,14 +282,7 @@ fn test_cfg_guarded_fields() {
 	util::attach_current_thread(|env| {
 		load_test_fields_class(env, &out_dir)?;
 
-		// The TestFields binding includes fields guarded by both:
-		// - invocation feature (always enabled in tests) - we test these
-		// - _cfg_test feature (never enabled in tests) - these are not available
-
-		// The following would fail to compile if uncommented:
-		// TestFields::static_cfg_test_field(env)?;
-		// obj.instance_cfg_test_field(env)?;
-		// Note: we have a separate ui / trybuild test to check this
+		// The invocation members are available here; trybuild tests cover exclusion of _cfg_test members.
 
 		let val = TestFields::static_invocation_field(env)?;
 		assert_eq!(val, 55);
@@ -321,7 +301,6 @@ fn test_cfg_guarded_fields() {
 
 		#[cfg(feature = "_cfg_test")]
 		{
-			// These should compile and run if _cfg_test feature is enabled
 			let val = TestFields::static_cfg_test_field(env)?;
 			assert_eq!(val, 99);
 
@@ -336,7 +315,6 @@ fn test_cfg_guarded_fields() {
 }
 }
 
-// Helper function to load the TestFields class
 fn load_test_fields_class(env: &mut Env, out_dir: &Path) -> abos_jni::errors::Result<()> {
 	let class_path: PathBuf = out_dir.join("com/example/TestFields.class");
 	assert!(class_path.exists(), "TestFields.class not found");
@@ -351,13 +329,11 @@ fn load_test_fields_class(env: &mut Env, out_dir: &Path) -> abos_jni::errors::Re
 	Ok(())
 }
 
-// Helper function to set up test output directory
 fn setup_test_output(test_name: &str) -> PathBuf {
 	let out_dir: PathBuf = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
 		.join("jni_macros_tests")
 		.join(test_name);
 
-	// Clean up any existing output
 	match fs::remove_dir_all(&out_dir) {
 		Ok(()) => {}
 		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -383,12 +359,10 @@ fn test_non_null_field_validation() {
 
 		let obj = TestFields::new(env)?;
 
-		// Test nullable field - should allow null without error
 		// We know from TestFields constructor that this field is initialized to null
 		let nullable = obj.nullable_string_field(env)?;
 		assert!(nullable.is_null(), "Expected nullable field to initially be null");
 
-		// Test getter with non_null (shorthand syntax)
 		// We know this field is initialized to null, so getting it should fail
 		let result = obj.required_string_field(env);
 		assert!(
@@ -396,7 +370,6 @@ fn test_non_null_field_validation() {
 			"Expected Error::NullPtr when getting non_null field that is null"
 		);
 
-		// Test getter with non_null (block syntax)
 		// We know this field is initialized to null, so getting it should fail
 		let result = obj.validated_string_field(env);
 		assert!(
@@ -404,7 +377,6 @@ fn test_non_null_field_validation() {
 			"Expected Error::NullPtr when getting non_null field that is null"
 		);
 
-		// Test setting a non_null field to null should also fail
 		let null_string = JString::null();
 		let result = obj.set_required_string_field(env, &null_string);
 		assert!(
@@ -412,32 +384,26 @@ fn test_non_null_field_validation() {
 			"Setting non_null field to null should return NullPtr error"
 		);
 
-		// Test setting a non_null field to a non-null value should succeed
 		let valid_string = JString::from_str(env, "valid value")?;
 		obj.set_required_string_field(env, &valid_string)?;
 
-		// Now getting the field should succeed
 		let result = obj.required_string_field(env)?;
 		assert!(!result.is_null());
 		assert_eq!(result.to_string(), "valid value");
 
-		// Test setting validated_string_field (block syntax) to null should also fail
 		let result = obj.set_validated_string_field(env, &null_string);
 		assert!(
 			matches!(result, Err(abos_jni::errors::Error::NullPtr(_))),
 			"Setting non_null field to null should return NullPtr error"
 		);
 
-		// Test setting validated_string_field to a non-null value should succeed
 		let another_valid = JString::from_str(env, "another valid")?;
 		obj.set_validated_string_field(env, &another_valid)?;
 
-		// Now getting the field should succeed
 		let result = obj.validated_string_field(env)?;
 		assert!(!result.is_null());
 		assert_eq!(result.to_string(), "another valid");
 
-		// Test that nullable field allows setting null (doesn't fail)
 		obj.set_nullable_string_field(env, &null_string)?;
 		let result = obj.nullable_string_field(env)?;
 		assert!(result.is_null(), "Expected nullable field to be null after setting to null");

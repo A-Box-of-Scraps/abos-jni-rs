@@ -57,28 +57,19 @@ pub fn sig_type_to_rust_type_core(
 				unreachable!("Unknown type: {}", alias);
 			}
 		},
-		SigType::Object(class_name) => {
-			// Check if there's a type mapping for this Java class
-			type_mappings.map_java_class_to_rust_type(class_name).map_or_else(
-				|| quote! { #jni::objects::JObject<#lifetime> },
-				|rust_type| {
-					// Parse the rust path and generate the type
-					let path_str: &str = rust_type.path();
-					let path: syn::Path =
-						syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
-					quote! { #path<#lifetime> }
-				},
-			)
-		}
+		SigType::Object(class_name) => type_mappings.map_java_class_to_rust_type(class_name).map_or_else(
+			|| quote! { #jni::objects::JObject<#lifetime> },
+			|rust_type| {
+				let path_str: &str = rust_type.path();
+				let path: syn::Path =
+					syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
+				quote! { #path<#lifetime> }
+			},
+		),
 		SigType::Array(element_type, dimensions) => {
-			// First, resolve the innermost array dimension (the actual array of elements)
-			// This will be either:
-			// - JPrimitiveArray<prim_type> for primitive arrays
-			// - JObjectArray<RustType> for arrays of mapped types
-			// - JObjectArray (defaulting to JObjectArray<JObject>) for unmapped object arrays
+			// Resolve the innermost array before wrapping additional dimensions in JObjectArray.
 			let innermost_array: TokenStream = array_element_type(element_type, lifetime, type_mappings, jni);
 
-			// Now wrap with JObjectArray for each additional dimension beyond the first
 			let mut result: TokenStream = innermost_array;
 			for _ in 0..(*dimensions - 1) {
 				result = quote! { #jni::objects::JObjectArray<#lifetime, #result> };
@@ -120,18 +111,15 @@ fn array_element_type(
 				}
 			}
 		}
-		SigType::Object(class_name) => {
-			// Check for type mapping for array element type
-			type_mappings.map_java_class_to_rust_type(class_name).map_or_else(
-				|| quote! { #jni::objects::JObjectArray<#lifetime> },
-				|rust_type| {
-					let path_str: &str = rust_type.path();
-					let path: syn::Path =
-						syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
-					quote! { #jni::objects::JObjectArray<#lifetime, #path<#lifetime>> }
-				},
-			)
-		}
+		SigType::Object(class_name) => type_mappings.map_java_class_to_rust_type(class_name).map_or_else(
+			|| quote! { #jni::objects::JObjectArray<#lifetime> },
+			|rust_type| {
+				let path_str: &str = rust_type.path();
+				let path: syn::Path =
+					syn::parse_str(path_str).unwrap_or_else(|_| panic!("Invalid Rust type path: {path_str}"));
+				quote! { #jni::objects::JObjectArray<#lifetime, #path<#lifetime>> }
+			},
+		),
 		SigType::Array(_inner_element_type, _dimensions) => {
 			// An array of arrays should be represented via `Array(_, dimensions > 1)`, not by nesting
 			// ArgType::Array as the element type.
@@ -151,7 +139,6 @@ fn array_element_type(
 pub fn generate_type_mapping_checks(type_mappings: &TypeMappings, jni: &syn::Path) -> TokenStream {
 	let mut type_checks: Vec<TokenStream> = Vec::new();
 
-	// Generate runtime checks for all type mappings
 	for (rust_type, java_class) in type_mappings
 		.rust_to_java_iter()
 		.filter(|(rust_type, _)| !rust_type.is_builtin())
@@ -181,7 +168,6 @@ pub fn generate_type_mapping_checks(type_mappings: &TypeMappings, jni: &syn::Pat
 		});
 	}
 
-	// Generate compile-time size and alignment checks for primitive type mappings
 	for rust_type in type_mappings
 		.rust_types()
 		.filter(|rt| rt.primitive().is_some())

@@ -19,16 +19,13 @@ pub(super) fn generate_id_fields_and_inits(
 		let lookup_fn: Ident = lookup.lookup_fn;
 		let cfg_attrs: &Vec<syn::Attribute> = &lookup.cfg_attrs;
 
-		// Create CStr literals for both the name and signature
 		let name_cstr: syn::LitCStr = lit_cstr_mutf8(java_name);
 
-		// Add field to API struct with cfg guards
 		fields.push(quote! {
 			#(#cfg_attrs)*
 			#field_name: #field_type,
 		});
 
-		// Add initialization with cfg guards
 		inits.push(quote! {
             #(#cfg_attrs)*
             #field_name: env.#lookup_fn(class, #jni::strings::JNIStr::from_cstr_unchecked(#name_cstr), #jni::jni_sig!(jni=#jni, #signature))?,
@@ -50,7 +47,6 @@ pub(super) fn generate_constructor_method_ids(
 		let name: &Ident = &constructor.name;
 		let method_id_field: Ident = format_ident!("{}_method_id", name);
 
-		// Use the MethodSignature to generate JNI signature
 		let jni_sig_str: String = constructor.signature.to_jni_signature(type_mappings).map_err(|e| {
 			syn::Error::new(
 				name.span(),
@@ -93,14 +89,12 @@ pub(super) fn sig_type_to_rust_arg_type(
 	type_mappings: &TypeMappings,
 	jni: &syn::Path,
 ) -> TokenStream {
-	// For primitives and void, return the type as-is (no AsRef needed)
 	if let SigType::Alias(alias_name) = sig_type
 		&& let Some(ConcreteType::Primitive { .. }) = type_mappings.map_alias(alias_name)
 	{
 		return sig_type_to_rust_type_core(sig_type, lifetime, type_mappings, jni);
 	}
 
-	// For objects, arrays, and rust references, wrap in impl AsRef
 	let concrete_type: TokenStream = sig_type_to_rust_type_core(sig_type, lifetime, type_mappings, jni);
 	quote! { impl AsRef<#concrete_type> }
 }
@@ -112,7 +106,6 @@ pub(super) fn sig_type_to_rust_return_type(
 	type_mappings: &TypeMappings,
 	jni: &syn::Path,
 ) -> TokenStream {
-	// Return types are identical to the core type representation
 	sig_type_to_rust_type_core(sig_type, lifetime, type_mappings, jni)
 }
 
@@ -144,7 +137,6 @@ fn generate_constructor(
 	let name: &Ident = &constructor.name;
 	let method_id_field: Ident = format_ident!("{}_method_id", name);
 
-	// Generate JNI call arguments data
 	let args: crate::internal::bind_java_type::JniCallArgs =
 		generate_jni_call_args(&constructor.signature.parameters, type_mappings, jni);
 
@@ -153,21 +145,19 @@ fn generate_constructor(
 	let decls: &Vec<TokenStream> = &args.decls;
 	let jvalue_conversions: &Vec<TokenStream> = &args.jvalue_conversions;
 
-	// Add lifetime declarations for the function
 	let lifetime_decls: TokenStream = if lifetimes.is_empty() {
 		quote! { <'env_local> }
 	} else {
 		quote! { <'env_local, #(#lifetimes),*> }
 	};
 
-	// Generate explicit type annotation for jni_args array to handle empty case
+	// Empty argument arrays need an explicit element type.
 	let jni_args_type: TokenStream = if jvalue_conversions.is_empty() {
 		quote! { : [#jni::sys::jvalue; 0] }
 	} else {
 		quote! {}
 	};
 
-	// Apply attributes to the constructor
 	let attrs: &Vec<syn::Attribute> = &constructor.attrs;
 
 	quote! {
@@ -183,19 +173,16 @@ fn generate_constructor(
 			unsafe {
 				use #jni::refs::Reference as _;
 
-				// NewObjectA is not exception safe, so we can't go ahead with the JNI call if
-				// there's currently a pending exception.
+				// NewObjectA must not run with a pending exception.
 				if env.exception_check() {
 					return Err(#jni::errors::Error::JavaException);
 				}
 
-				// Since we're returning a new local reference we need to assert that the
-				// lifetime we have is associated with the top local reference frame
+				// The new local reference must belong to the top frame.
 				env.assert_top();
 
 				let class: &#jni::objects::JClass = api.class.as_ref();
 
-				// Call NewObjectA
 				let env_ptr: *mut #jni::sys::JNIEnv = env.get_raw();
 				let interface: *const #jni::sys::JNINativeInterface_ = *env_ptr;
 				let ret_obj: #jni::sys::jobject = ((*interface).v1_1.NewObjectA)(
@@ -205,7 +192,6 @@ fn generate_constructor(
 					jni_args.as_ptr()
 				);
 
-				// Check for exception
 				if env.exception_check() {
 					return Err(#jni::errors::Error::JavaException);
 				}

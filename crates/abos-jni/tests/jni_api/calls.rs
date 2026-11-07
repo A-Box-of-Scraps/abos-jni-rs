@@ -75,7 +75,6 @@ pub fn with_local_frame_pending_exception() {
 			env.throw_new(RUNTIME_EXCEPTION_CLASS, jni_str!("Test Exception"));
 		assert!(matches!(res, Err(Error::JavaException)));
 
-		// Try to allocate a frame of locals
 		env.with_local_frame(16, |_| -> Result<_, Error> { Ok(()) })
 			.expect("Env#with_local_frame must work in case of pending exception");
 

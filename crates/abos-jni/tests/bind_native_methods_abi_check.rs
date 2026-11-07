@@ -20,9 +20,7 @@ use abos_jni::sys::jint;
 use abos_jni::{Env, bind_java_type};
 use rusty_fork::rusty_fork_test;
 
-// ====================================================================================
 // Test: Instance method registered as static (Always mode)
-// ====================================================================================
 
 bind_java_type! {
 	rust_type = TestAbiInstanceAsStatic,
@@ -57,9 +55,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test: Static method registered as instance (Always mode)
-// ====================================================================================
 
 bind_java_type! {
 	rust_type = TestAbiStaticAsInstance,
@@ -96,9 +92,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test: Correct instance and static methods work (Always mode)
-// ====================================================================================
 
 bind_java_type! {
 	rust_type = TestAbiCorrect,
@@ -143,11 +137,9 @@ native_method_test! {
 	test_body: |env| {
 		let obj = TestAbiCorrect::new(env)?;
 
-		// Correctly declared instance method
 		let result = obj.call_method(env, 5)?;
 		assert_eq!(result, 50);
 
-		// Correctly declared static method
 		let result = TestAbiCorrect::call_static_method(env, 7)?;
 		assert_eq!(result, 140);
 
@@ -155,9 +147,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test: Per-method ABI check override (Always overrides UnsafeNever default)
-// ====================================================================================
 
 bind_java_type! {
 	rust_type = TestAbiPerMethodAlways,
@@ -191,15 +181,12 @@ native_method_test! {
 	expect_exception: "Rust panic: Native method '\"nativeMethod\"' was registered as static but called as instance method",
 	test_body: |env| {
 		let obj = TestAbiPerMethodAlways::new(env)?;
-		// Should panic because we set abi_check = Always for this method
 		let _result = obj.call_method(env, 42)?;
 		Ok(())
 	}
 }
 
-// ====================================================================================
 // Test: Per-method ABI check override (UnsafeNever disables check)
-// ====================================================================================
 
 bind_java_type! {
 	rust_type = TestAbiPerMethodNever,
@@ -238,9 +225,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test: UnsafeDebugOnly mode (checks only in debug builds)
-// ====================================================================================
 
 bind_java_type! {
 	rust_type = TestAbiDebugOnly,
@@ -271,7 +256,6 @@ native_method_test! {
 	expect_exception: "Rust panic: Native method '\"nativeMethod\"' was registered as static but called as instance method",
 	test_body: |env| {
 		let obj = TestAbiDebugOnly::new(env)?;
-		// In debug mode, this should panic
 		let _result = obj.call_method(env, 42)?;
 		Ok(())
 	}
@@ -284,7 +268,6 @@ native_method_test! {
 	api: TestAbiDebugOnlyAPI,
 	test_body: |env| {
 		let obj = TestAbiDebugOnly::new(env)?;
-		// In release mode, this should NOT panic (check is disabled)
 		let result = obj.call_method(env, 42)?;
 		assert_eq!(result, 84);
 		Ok(())

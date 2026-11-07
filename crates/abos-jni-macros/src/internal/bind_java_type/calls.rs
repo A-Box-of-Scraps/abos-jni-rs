@@ -10,7 +10,6 @@ pub(super) fn generate_jni_call_args(
 	type_mappings: &TypeMappings,
 	jni: &syn::Path,
 ) -> JniCallArgs {
-	// Generate unique lifetime for each argument
 	let lifetimes: Vec<TokenStream> = (0..parameters.len())
 		.map(|i| {
 			let lt_name: String = format!("local_{i}");
@@ -19,7 +18,6 @@ pub(super) fn generate_jni_call_args(
 		})
 		.collect();
 
-	// Use parameter names from the signature
 	let names: Vec<Ident> = parameters.iter().map(|param| param.name.clone()).collect();
 
 	let types: Vec<TokenStream> = parameters
@@ -28,7 +26,6 @@ pub(super) fn generate_jni_call_args(
 		.map(|(param, lt)| sig_type_to_rust_arg_type(&param.ty, lt, type_mappings, jni))
 		.collect();
 
-	// Generate jvalue conversion for each argument
 	let jvalue_conversions: Vec<TokenStream> = parameters
 		.iter()
 		.zip(names.iter())
@@ -108,10 +105,8 @@ pub(super) fn generate_jni_call_for_return_type(
 ) -> TokenStream {
 	let call_prefix: &str = if is_static { "CallStatic" } else { "Call" };
 
-	// Determine the JNI function name and return value handling based on the return type
 	let (top_check, call_fn, return_tokens) = return_type.try_as_primitive(type_mappings).map_or_else(
 		|| {
-			// For objects, arrays, and rust references, we call CallObjectMethodA
 			let call_fn: Ident = format_ident!("{}ObjectMethodA", call_prefix);
 			let return_type_tokens: TokenStream =
 				sig_type_to_rust_return_type(return_type, &quote! { 'env_local }, type_mappings, jni);
@@ -145,11 +140,9 @@ pub(super) fn generate_jni_call_for_return_type(
 		}
 	};
 
-	// Generate the JNI call
 	quote! {
 		{
-			// None of the call functions are exception safe, so we can't go ahead with the JNI call
-			// if there's currently a pending exception.
+			// JNI method calls must not run with a pending exception.
 			if env.exception_check() {
 				return Err(#jni::errors::Error::JavaException);
 			}
@@ -192,8 +185,7 @@ pub(super) fn generate_methods(
 		method_impls.push(generate_method(api_name, method, type_mappings, jni));
 	}
 
-	// Return just the method implementations without the impl block wrapper
-	// The impl block will be created by the caller
+	// The caller supplies the enclosing impl block.
 	quote! {
 		#(#method_impls)*
 	}
@@ -205,21 +197,18 @@ fn generate_method(api_name: &Ident, method: &Method, type_mappings: &TypeMappin
 	let visibility: TokenStream = method.visibility.to_tokens();
 	let is_static: bool = method.is_static;
 
-	// Generate JNI call arguments data
 	let args: JniCallArgs = generate_jni_call_args(&method.signature.parameters, type_mappings, jni);
 
 	let validation: TokenStream = args.reference_validation(&method_id_field, is_static);
 	let decls: &Vec<TokenStream> = &args.decls;
 	let jvalue_conversions: &Vec<TokenStream> = &args.jvalue_conversions;
 
-	// Determine environment type based on return type (primitives use &Env, objects use &mut Env)
 	let env_type: TokenStream = if method.signature.return_type.try_as_primitive(type_mappings).is_some() {
 		quote! { &#jni::Env<'env_local> }
 	} else {
 		quote! { &mut #jni::Env<'env_local> }
 	};
 
-	// Generate return type
 	let return_type: TokenStream = sig_type_to_rust_return_type(
 		&method.signature.return_type,
 		&quote! { 'env_local },
@@ -227,7 +216,6 @@ fn generate_method(api_name: &Ident, method: &Method, type_mappings: &TypeMappin
 		jni,
 	);
 
-	// Add lifetime declarations for the function
 	let lifetime_decls: TokenStream = args.lifetime_declarations();
 
 	let self_param: TokenStream = if is_static {
@@ -236,17 +224,15 @@ fn generate_method(api_name: &Ident, method: &Method, type_mappings: &TypeMappin
 		quote! { &self, }
 	};
 
-	// Generate explicit type annotation for jni_args array to handle empty case
+	// Empty argument arrays need an explicit element type.
 	let jni_args_type: TokenStream = args.array_annotation(jni);
 
-	// Generate the this_or_class expression
 	let this_or_class: TokenStream = if is_static {
 		quote! { class }
 	} else {
 		quote! { self }
 	};
 
-	// Generate the method body with JNI call
 	let jni_call: TokenStream = generate_jni_call_for_return_type(
 		&method.java_name,
 		&method.signature.return_type,
@@ -267,10 +253,8 @@ fn generate_method(api_name: &Ident, method: &Method, type_mappings: &TypeMappin
 		quote! {}
 	};
 
-	// Apply attributes to the method
 	let attrs: &Vec<syn::Attribute> = &method.attrs;
 
-	// Generate null check if non_null is true
 	let null_check_and_return: TokenStream = checked_return(&jni_call, method.non_null, jni);
 
 	quote! {

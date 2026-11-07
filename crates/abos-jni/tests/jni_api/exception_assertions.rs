@@ -1,13 +1,9 @@
 use super::*;
 
-// Shortcut to `assert_pending_java_exception_detailed()` without checking for expected  type and
-// message of exception.
 pub fn assert_pending_java_exception(env: &mut Env) {
 	assert_pending_java_exception_detailed(env, None, None);
 }
 
-// Helper method that asserts there is a pending Java exception of `expected_type` with
-// `expected_message` and clears it if any.
 pub fn assert_pending_java_exception_detailed(
 	env: &mut Env,
 	expected_type: Option<&JNIStr>,
@@ -26,7 +22,6 @@ pub fn assert_pending_java_exception_detailed(
 	}
 }
 
-// Asserts that exception is of `expected_type` type.
 pub fn assert_exception_type(env: &mut Env, exception: &JThrowable, expected_type: &JNIStr) {
 	assert!(
 		env.is_instance_of(exception, expected_type)
@@ -34,7 +29,6 @@ pub fn assert_exception_type(env: &mut Env, exception: &JThrowable, expected_typ
 	);
 }
 
-// Asserts that exception's message is `expected_message`.
 pub fn assert_exception_message(env: &mut Env, exception: &JThrowable, expected_message: &JNIStr) {
 	let message: abos_jni::objects::JString<'_> = exception.get_message(env).expect("get message succeeds");
 	let msg_rust: JNIString = message

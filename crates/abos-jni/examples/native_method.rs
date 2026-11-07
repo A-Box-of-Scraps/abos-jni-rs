@@ -20,9 +20,7 @@ struct RustThing {
 	pub message: String,
 }
 
-// Sometimes bindings need to pass raw pointers around as Java long values, so
-// we define a simple wrapper type as an example.
-// (this is not a well-considered design for real-world use)
+// Illustrative pointer-as-long handle, not a production ownership design.
 #[repr(transparent)]
 #[derive(Copy, Clone)]
 struct ThingHandle(*const RustThing);
@@ -43,21 +41,14 @@ impl ThingHandle {
 		unsafe { Box::from_raw(self.0.cast_mut()) }
 	}
 }
-// In order to pass ThingHandle values to/from Java as jlong, we need From<ThingHandle> for jlong
 impl From<ThingHandle> for abos_jni::sys::jlong {
 	fn from(handle: ThingHandle) -> Self {
 		handle.0 as Self
 	}
 }
 
-// Create an array of native methods using the native_method! macro
-//
-// Note: the use of `extern` (and with the provision of a `java_type` name) here means there will
-// also be an `extern "system"` ABI function exported with a mangled JNI name that the JVM could
-// resolve within a shared library without necessarily registering the methods explicitly.
-//
-// Since this example isn't linked as a shared library loaded by the JVM, it registers the methods
-// explicitly with `env.register_native_methods()`.
+// extern with java_type exports a mangled JNI symbol for JVM lookup.
+// This executable is not a JVM-loaded shared library, so it registers the methods explicitly.
 const NATIVE_METHODS: &[NativeMethod] = &[
 	// Instance methods - shorthand syntax
 	// Without a `rust_type` the binding will use `JObject` for 'this'
@@ -81,20 +72,17 @@ const NATIVE_METHODS: &[NativeMethod] = &[
 		java_type = "com.example.NativeMethodOverview",
 		raw extern fn native_raw(value: jint) -> jint,
 	},
-	// Native method with direct function implementation
 	native_method! {
 		java_type = "com.example.NativeMethodOverview",
 		extern fn native_with_function(value: jint) -> jint,
 		fn = native_with_function_impl,
 	},
-	// Native method with catch_unwind disabled
 	native_method! {
 		java_type = "com.example.NativeMethodOverview",
 		extern fn native_no_unwind(value: jint) -> jint,
 		fn = native_no_unwind,
 		catch_unwind = false,
 	},
-	// Native method with custom error policy
 	native_method! {
 		java_type = "com.example.NativeMethodOverview",
 		extern fn native_custom_error_policy(value: jint) -> jint,
@@ -111,8 +99,6 @@ const NATIVE_METHODS: &[NativeMethod] = &[
 		static extern fn native_echo_int_array(arr: jint[]) -> jint[],
 	},
 ];
-
-// Implementation functions for native methods
 
 #[expect(
 	clippy::unnecessary_wraps,
@@ -224,7 +210,6 @@ fn main() {
 
 		println!("=== native_method! Overview Example ===\n");
 
-		// Register native methods
 		println!("--- Registering Native Methods ---");
 		let class: JClass<'_> = env.find_class(jni_str!("com/example/NativeMethodOverview"))?;
 		// SAFETY: The fixture class declares the names and JNI signatures supplied by these native-method descriptors.
@@ -233,12 +218,10 @@ fn main() {
 		}
 		println!("Registered {} native methods", NATIVE_METHODS.len());
 
-		// Create an instance
 		println!("\n--- Creating Instance ---");
 		let obj: JObject<'_> = env.new_object(&class, &jni_sig!(()->void), &[])?;
 		println!("Created NativeMethodOverview instance");
 
-		// Call the test method that exercises all native methods
 		println!("\n--- Testing Native Methods ---");
 		let test_method: abos_jni::ids::JMethodID =
 			env.get_method_id(&class, jni_str!("testAllNativeMethods"), &jni_sig!(()->JString))?;
@@ -250,14 +233,12 @@ fn main() {
 		let result: JString<'_> = env.cast_local::<JString>(result)?;
 		println!("Test results: {}", result.try_to_string(env)?);
 
-		// Test the handle method separately
 		println!("\n--- Testing Handle Method ---");
 		let thing = RustThing {
 			message: "Hello from Rust!".to_string(),
 		};
 		let handle = ThingHandle::new(thing);
 
-		// Call native_process_handle via Java
 		let handle_value = abos_jni::sys::jvalue { j: handle.into() };
 		let handle_method: abos_jni::ids::JMethodID =
 			env.get_method_id(&class, jni_str!("nativeProcessHandle"), &jni_sig!((jlong)->JString))?;

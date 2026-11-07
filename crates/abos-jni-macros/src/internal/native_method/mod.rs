@@ -86,8 +86,7 @@ pub fn generate_native_method_abi_check(
 		return quote! {};
 	}
 
-	// Check at runtime that the method was correctly registered as static or instance
-	// We assume this can't change dynamically so we use Once to only check once
+	// The static/instance registration is assumed not to change after a successful check.
 	let abi_check_ensure_env: TokenStream = if is_raw {
 		quote! {
 			let mut _guard = unsafe {
@@ -116,34 +115,20 @@ pub fn generate_native_method_abi_check(
 	);
 
 	quote! {
-		// Use atomic try_update to guard the ABI check. The closure runs without holding
-		// any lock, so multiple threads may race and perform the check concurrently on first
-		// invocation. This is acceptable since the check should always succeed or fail consistently.
-		//
-		// Critically: we only set the flag to true if the checks succeed. If a check fails and
-		// panics, the flag remains false, forcing subsequent threads to retry the check (in case
-		// the program doesn't abort).
-		//
-		// This approach avoids locks that could cause deadlocks if the check triggers class
-		// initialization which calls back into native methods.
+		// Avoid locks: class initialization may call back into native methods.
+		// Concurrent checks are harmless; a panic leaves the flag unset so later calls retry.
 		static _ABI_CHECK_DONE: ::std::sync::atomic::AtomicBool = ::std::sync::atomic::AtomicBool::new(false);
 
-		// The closure returns Some(true) only after the check succeeds.
-		// If the check panics, the flag stays false and other attempts to call this method will
-		// retry the check (in case the program doesn't abort).
 		let _ = _ABI_CHECK_DONE.try_update(
 			::std::sync::atomic::Ordering::AcqRel,   // set ordering
 			::std::sync::atomic::Ordering::Acquire,   // fetch ordering
 			|done| {
 				if done {
-					// The checks have already been completed successfully
 					None
 				} else {
-					// Perform the ABI check (runs outside any lock)
 					#abi_check_ensure_env
 
-					// Note: The `jni` crate has a MSRV that lets us assume it's safe to panic and unwind
-					// up to a JNI boundary and then abort. Therefore we can use expect + assertions here.
+					// A failed check may unwind to the JNI boundary, where an uncaught panic aborts.
 					let lang_class_class = <#jni::objects::JClass as #jni::refs::Reference>::lookup_class(
 						env,
 						&#jni::refs::LoaderContext::None,
@@ -152,14 +137,10 @@ pub fn generate_native_method_abi_check(
 					#abi_assertion
 					#type_mapping_runtime_checks
 
-					// Check succeeded - set flag to true
 					Some(true)
 				}
 			}
 		);
-		// If try_update returned Ok, we successfully set the flag (check passed)
-		// If it returned Err, another thread beat us to it (also check passed)
-		// If the check failed, we panicked and never reached here
 	}
 }
 

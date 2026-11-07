@@ -61,7 +61,6 @@ fn literal_to_string(lit: &Lit) -> Result<String> {
 			Ok(b.value().to_string())
 		}
 		Lit::CStr(c) => {
-			// CStr must be valid UTF-8 for our purposes
 			let cstr: std::ffi::CString = c.value();
 			cstr.to_str()
 				.map(std::string::ToString::to_string)
@@ -75,7 +74,6 @@ fn literal_to_string(lit: &Lit) -> Result<String> {
 			lit,
 			"verbatim literals are not supported in jni_str!/jni_cstr! macros",
 		)),
-		// Lit is marked as non_exhaustive, so we need a wildcard pattern
 		_ => Err(syn::Error::new_spanned(
 			lit,
 			"unsupported literal type in jni_str!/jni_cstr! macros",
@@ -96,7 +94,6 @@ impl Parse for JniStrInput {
 	fn parse(input: syn::parse::ParseStream) -> Result<Self> {
 		let jni_crate: syn::Path = crate::internal::utils::parse_jni_crate_override(input)?;
 
-		// Parse comma-separated literals (like concat!)
 		let mut concatenated = String::new();
 
 		if input.is_empty() {
@@ -134,7 +131,6 @@ impl Parse for JniStrInput {
 pub fn jni_cstr_impl(input: TokenStream) -> Result<TokenStream> {
 	let JniStrInput { string, .. } = syn::parse2(input)?;
 
-	// Create a C string literal with MUTF-8 encoding
 	let cstr: LitCStr = lit_cstr_mutf8(&string);
 
 	Ok(quote! {
@@ -150,7 +146,6 @@ pub fn jni_cstr_impl(input: TokenStream) -> Result<TokenStream> {
 pub fn jni_str_impl(input: TokenStream) -> Result<TokenStream> {
 	let JniStrInput { jni_crate, string } = syn::parse2(input)?;
 
-	// Create a C string literal with MUTF-8 encoding
 	let cstr: LitCStr = lit_cstr_mutf8(&string);
 
 	Ok(quote! {

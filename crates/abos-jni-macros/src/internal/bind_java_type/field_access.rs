@@ -12,7 +12,6 @@ pub(super) fn generate_jni_get_field_call(
 ) -> TokenStream {
 	let call_prefix: &str = if is_static { "GetStatic" } else { "Get" };
 
-	// Determine the JNI function name and return value handling based on the field type
 	let (top_check, call_fn, return_tokens) = if let Some(prim) = field_type.try_as_primitive(type_mappings) {
 		if prim == PrimitiveType::Void {
 			return quote! { Ok(()) };
@@ -20,7 +19,6 @@ pub(super) fn generate_jni_get_field_call(
 		let call_fn: proc_macro2::Ident = format_ident!("{}{}Field", call_prefix, prim.jni_name());
 		(quote! {}, call_fn, quote! { ret })
 	} else {
-		// For objects, arrays, and rust references, we call GetObjectField
 		let call_fn: proc_macro2::Ident = format_ident!("{}ObjectField", call_prefix);
 		let return_type_tokens: TokenStream =
 			sig_type_to_rust_return_type(field_type, &quote! { 'env_local }, type_mappings, jni);
@@ -46,8 +44,7 @@ pub(super) fn generate_jni_get_field_call(
 
 	quote! {
 		{
-			// None of these getter functions are exception safe, so we can't go ahead with the JNI
-			// call if there's currently a pending exception.
+			// JNI field getters must not run with a pending exception.
 			if env.exception_check() {
 				return Err(#jni::errors::Error::JavaException);
 			}
@@ -93,7 +90,6 @@ pub(super) fn generate_jni_set_field_call(
 ) -> TokenStream {
 	let call_prefix: &str = if is_static { "SetStatic" } else { "Set" };
 
-	// Determine the JNI function name and value cast type based on the field type
 	let (call_fn, val_cast) = if let Some(prim) = field_type.try_as_primitive(type_mappings) {
 		match prim {
 			PrimitiveType::Void => {
@@ -134,7 +130,6 @@ pub(super) fn generate_jni_set_field_call(
 			}
 		}
 	} else {
-		// For objects, arrays, and rust references, we call SetObjectField
 		let call_fn: proc_macro2::Ident = format_ident!("{}ObjectField", call_prefix);
 		(call_fn, quote! { #val.as_raw() })
 	};
@@ -152,11 +147,9 @@ pub(super) fn generate_jni_set_field_call(
 		}
 	};
 
-	// Generate the JNI field setter call
 	quote! {
 		{
-			// None of these setter functions are exception safe, so we can't go ahead with the JNI
-			// call if there's currently a pending exception.
+			// JNI field setters must not run with a pending exception.
 			if env.exception_check() {
 				return Err(#jni::errors::Error::JavaException);
 			}

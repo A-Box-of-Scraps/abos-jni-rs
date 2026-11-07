@@ -12,9 +12,7 @@ use abos_jni::refs::IntoAuto as _;
 use abos_jni::sys::{jboolean, jint};
 use rusty_fork::rusty_fork_test;
 
-// ====================================================================================
 // Native method implementations
-// ====================================================================================
 
 #[expect(
 	clippy::unnecessary_wraps,
@@ -106,7 +104,6 @@ fn native_get_message_impl<'local>(
 	use abos_jni::{jni_sig, jni_str};
 	let result: abos_jni::JValueOwned<'_> =
 		env.call_method(this, jni_str!("getMessage"), jni_sig!("()Ljava/lang/String;"), &[])?;
-	// Use cast_local to safely convert JObject to JString
 	let result: JString<'_> = JString::cast_local(env, result.l()?)?;
 	Ok(result)
 }
@@ -146,9 +143,7 @@ const fn native_2d_string_array_echo_impl<'local>(
 	Ok(arr)
 }
 
-// ====================================================================================
 // Test: Instance native method with primitive args and return
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_instance_primitive_args_and_return,
@@ -160,7 +155,6 @@ native_method_test! {
 		},
 	],
 	test_body: |env, class| {
-		// Call via Java wrapper method
 		use abos_jni::{jni_sig, jni_str};
 
 		let obj = new_object!(env, class)?;
@@ -185,9 +179,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test: Instance native method with void return and String arg
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_instance_void_return_string_arg,
@@ -216,9 +208,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test: Instance native method with primitive array arg and return
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_instance_primitive_array_arg_and_return,
@@ -244,7 +234,6 @@ native_method_test! {
 			jni_sig!("([II)[I"),
 			&[abos_jni::objects::JValue::Object(&arr), abos_jni::objects::JValue::Int(10)],
 		)?.l()?;
-		// Use cast_local to safely convert JObject to JPrimitiveArray
 		let result = JPrimitiveArray::<jint>::cast_local(env, result)?;
 
 		let mut result_data = [0; 5];
@@ -255,9 +244,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test: Instance native method with 2D primitive array
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_instance_2d_primitive_array,
@@ -269,7 +256,6 @@ native_method_test! {
 		},
 	],
 	test_body: |env, class| {
-		// Invert the array
 		use abos_jni::{jni_sig, jni_str};
 
 		// Create a 2D boolean array [[true, false], [false, true]]
@@ -287,7 +273,6 @@ native_method_test! {
 			jni_sig!("([[Z)[[Z"),
 			&[abos_jni::objects::JValue::Object(&outer)],
 		)?.l()?;
-		// Use cast_local to safely convert JObject to JObjectArray
 		let result = JObjectArray::<JBooleanArray>::cast_local(env, result)?;
 
 		// Check the result [[false, true], [true, false]]
@@ -305,9 +290,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test: Instance native method can call Java methods
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_instance_call_java_methods,
@@ -323,7 +306,6 @@ native_method_test! {
 		},
 	],
 	test_body: |env, class| {
-		// Test native method can call Java setter (via method call)
 		use abos_jni::{jni_sig, jni_str};
 
 		let obj = new_object!(env, class)?;
@@ -338,14 +320,12 @@ native_method_test! {
 		let counter = env.call_method(&obj, jni_str!("getCounter"), jni_sig!("()I"), &[])?.i()?;
 		assert_eq!(counter, 42);
 
-		// Test native method can call Java getter (via method call)
 		let message = env.call_method(
 			&obj,
 			jni_str!("nativeGetMessage"),
 			jni_sig!("()Ljava/lang/String;"),
 			&[],
 		)?.l()?;
-		// Use cast_local to safely convert JObject to JString
 		let message = JString::cast_local(env, message)?;
 		assert_eq!(message.to_string(), "initial");
 
@@ -353,9 +333,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test: Static native method with no args and primitive return
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_static_no_args_primitive_return,
@@ -380,9 +358,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test: Static native method with String array arg and return
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_static_string_array_arg_and_return,
@@ -408,7 +384,6 @@ native_method_test! {
 			jni_sig!("([Ljava/lang/String;)[Ljava/lang/String;"),
 			&[abos_jni::objects::JValue::Object(&arr)],
 		)?.l()?;
-		// Use cast_local to safely convert JObject to JObjectArray
 		let result = JObjectArray::<JString>::cast_local(env, result)?;
 
 		let result1: JString = result.get_element(env, 0)?;
@@ -421,9 +396,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test: Static native method with 2D String array
-// ====================================================================================
 
 native_method_test! {
 	test_name: test_static_2d_string_array,
@@ -435,7 +408,6 @@ native_method_test! {
 		},
 	],
 	test_body: |env, class| {
-		// Call native method
 		use abos_jni::{jni_sig, jni_str};
 
 		let str1 = JString::from_str(env, "foo")?;

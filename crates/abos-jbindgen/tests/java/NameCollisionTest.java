@@ -39,11 +39,7 @@ public class NameCollisionTest {
     }
 
     // Static method collision
-    public static void setID(int id) {
-        // do nothing
-    }
+    public static void setID(int id) {}
 
-    public static void setId(int id) {
-        // do nothing
-    }
+    public static void setId(int id) {}
 }

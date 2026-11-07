@@ -1,10 +1,8 @@
 use super::*;
 use quote::quote;
 
-// Test parsing error: single identifier without dot should fail
 #[test]
 fn test_single_ident_fails_as_java_class() {
-	// This should be parsed as a Rust type reference, not a Java class
 	let input: proc_macro2::TokenStream = quote! {
 		String
 	};
@@ -15,31 +13,22 @@ fn test_single_ident_fails_as_java_class() {
 	assert!(result.is_err());
 }
 
-// Test that slash-separated package names fail with helpful error
-// (Users should use dot-separated Java format, not JNI internal format)
 #[test]
 fn test_slash_separated_package_fails() {
-	// This should fail because we expect Java dotted format (java.lang.String)
-	// not JNI internal format (java/lang/String)
 	let input: proc_macro2::TokenStream = quote! {
 		java/lang/String
 	};
 
 	let result: Result<proc_macro2::TokenStream> = jni_sig_impl(input);
-	// The parser will treat this as a division operation and fail to parse
 	assert!(result.is_err());
 
-	// Verify the error is about parsing, not about finding the type
 	let err: syn::Error = result.expect_err("invalid test input is rejected");
 	let err_msg: String = err.to_string();
-	// The error should be a parse error, not a "type not found" error
 	assert!(!err_msg.contains("No type mapping found"));
 }
 
-// Test that string literals don't support slash separators either
 #[test]
 fn test_string_literal_with_slashes_in_type_mapping() {
-	// Even in string literals, we expect Java dotted format
 	let input: proc_macro2::TokenStream = quote! {
 		MyCustomType,
 		type_map = {
@@ -47,35 +36,27 @@ fn test_string_literal_with_slashes_in_type_mapping() {
 		}
 	};
 
-	// This should fail during parsing of the type mapping
-	// String literals with slashes should be rejected
 	let result: Result<proc_macro2::TokenStream> = jni_sig_impl(input);
 	assert!(result.is_err());
 
-	// The error should mention that dots are required
 	let err: syn::Error = result.expect_err("invalid test input is rejected");
 	let err_msg: String = err.to_string();
 	assert!(err_msg.contains("must contain at least one dot"));
 }
 
-// Test that the parser requires at least one dot to differentiate from Rust types
 #[test]
 fn test_no_dots_fails_for_java_class() {
-	// Without dots, this should be treated as a Rust type reference
 	let input: proc_macro2::TokenStream = quote! {
 		(arg: SomeType) -> void
 	};
 
 	let result: Result<proc_macro2::TokenStream> = jni_sig_impl(input);
-	// Should fail with "Unknown type" after attempting to resolve SomeType
-	// via type mappings
 	assert!(result.is_err());
 	let err: syn::Error = result.expect_err("invalid test input is rejected");
 	let err_msg: String = err.to_string();
 	assert!(err_msg.contains("Unknown type"));
 }
 
-// Test that string literal in JavaClassName::parse requires dots
 #[test]
 fn test_string_literal_without_dots_fails() {
 	let input: proc_macro2::TokenStream = quote! { "String" };
@@ -87,10 +68,8 @@ fn test_string_literal_without_dots_fails() {
 	assert!(err_msg.contains("must contain at least one dot"));
 }
 
-// Test that JavaClassName::parse rejects single identifiers without consuming them
 #[test]
 fn test_parse_java_class_name_rejects_single_ident() {
-	// A single identifier without a dot should fail to parse as a Java class name
 	let input: proc_macro2::TokenStream = quote! { SomeType };
 	let result: Result<JavaClassName> = syn::parse2::<JavaClassName>(input);
 
@@ -100,13 +79,8 @@ fn test_parse_java_class_name_rejects_single_ident() {
 	assert!(err_msg.contains("Expected Java class name"));
 }
 
-// ============================================================================
-// Raw JNI signature tests
-// ============================================================================
-
 #[test]
 fn test_raw_jni_field_primitives() {
-	// Test all primitive types
 	let primitives = [
 		("Z", "Z", "Boolean"),
 		("B", "B", "Byte"),
@@ -160,7 +134,6 @@ fn test_raw_jni_errors_void_field() {
 
 #[test]
 fn test_raw_jni_errors_void_array_in_method_arguments() {
-	// Void arrays are invalid in method arguments
 	let input: proc_macro2::TokenStream = quote! { "([V)V" };
 	let result: Result<proc_macro2::TokenStream> = jni_sig_impl(input);
 	assert!(result.is_err());
@@ -176,7 +149,6 @@ fn test_raw_jni_errors_void_array_in_method_arguments() {
 
 #[test]
 fn test_raw_jni_errors_void_array_as_return_type() {
-	// Void arrays are invalid as return types
 	let input: proc_macro2::TokenStream = quote! { "()[V" };
 	let result: Result<proc_macro2::TokenStream> = jni_sig_impl(input);
 	assert!(result.is_err());
@@ -188,7 +160,6 @@ fn test_raw_jni_errors_void_array_as_return_type() {
 
 #[test]
 fn test_raw_jni_errors_void_array_field() {
-	// Void arrays are invalid as field types
 	let input: proc_macro2::TokenStream = quote! { "[V" };
 	let result: Result<proc_macro2::TokenStream> = jni_sig_impl(input);
 	assert!(result.is_err());
@@ -245,7 +216,6 @@ fn test_raw_jni_errors_leading_slash() {
 
 #[test]
 fn test_raw_jni_string_with_dots_as_field() {
-	// String literal with dots should be treated as Java class name for field
 	let input: proc_macro2::TokenStream = quote! { "java.lang.String" };
 	let result: proc_macro2::TokenStream = jni_sig_impl(input).expect("test signature expands");
 	let result_str: String = result.to_string();
@@ -255,7 +225,6 @@ fn test_raw_jni_string_with_dots_as_field() {
 
 #[test]
 fn test_raw_jni_inner_classes() {
-	// Test inner classes with $ separator
 	let input: proc_macro2::TokenStream = quote! { "Ljava/lang/Outer$Inner;" };
 	let result: proc_macro2::TokenStream = jni_sig_impl(input).expect("test signature expands");
 	let result_str: String = result.to_string();
@@ -272,7 +241,6 @@ fn test_raw_jni_method_with_inner_class() {
 
 #[test]
 fn test_raw_jni_default_package_class() {
-	// Default package class (no package)
 	let input: proc_macro2::TokenStream = quote! { "LNoPackage;" };
 	let result: proc_macro2::TokenStream = jni_sig_impl(input).expect("test signature expands");
 	let result_str: String = result.to_string();
@@ -297,7 +265,6 @@ fn test_raw_jni_method_returns_array() {
 
 #[test]
 fn test_non_raw_void_array_prefix_syntax() {
-	// Test void array with prefix syntax [void]
 	let input: proc_macro2::TokenStream = quote! { [void] };
 	let result: Result<proc_macro2::TokenStream> = jni_sig_impl(input);
 	assert!(result.is_err());
@@ -305,7 +272,6 @@ fn test_non_raw_void_array_prefix_syntax() {
 
 #[test]
 fn test_non_raw_void_array_suffix_syntax() {
-	// Test void array with suffix syntax void[]
 	let input: proc_macro2::TokenStream = quote! { void[] };
 	let result: Result<proc_macro2::TokenStream> = jni_sig_impl(input);
 	assert!(result.is_err());
@@ -313,7 +279,6 @@ fn test_non_raw_void_array_suffix_syntax() {
 
 #[test]
 fn test_non_raw_void_array_in_method_args() {
-	// Test void array in method arguments
 	let input: proc_macro2::TokenStream = quote! { (arg: [void]) -> void };
 	let result: Result<proc_macro2::TokenStream> = jni_sig_impl(input);
 	assert!(result.is_err());
@@ -325,7 +290,6 @@ fn test_non_raw_void_array_in_method_args() {
 
 #[test]
 fn test_non_raw_void_array_as_return_type() {
-	// Test void array as return type
 	let input: proc_macro2::TokenStream = quote! { () -> [void] };
 	let result: Result<proc_macro2::TokenStream> = jni_sig_impl(input);
 	assert!(result.is_err());
@@ -337,16 +301,11 @@ fn test_non_raw_void_array_as_return_type() {
 
 #[test]
 fn test_cstr_literal_invalid_utf8() {
-	// CStr literals can contain byte escapes that create invalid UTF-8 sequences
-	// For example, \xFF is not valid UTF-8
-	// This tests that our code properly rejects such literals with a clear error message
+	// C string literals allow byte escapes that are not valid UTF-8.
 
-	// Create a CStr literal with invalid UTF-8 using byte escapes
-	// \xFF is not a valid UTF-8 byte sequence
 	let input: proc_macro2::TokenStream = quote! { c"(\xFF)V" };
 	let result: Result<proc_macro2::TokenStream> = jni_sig_impl(input);
 
-	// Should fail with a UTF-8 validation error
 	assert!(result.is_err(), "CStr literal with invalid UTF-8 should be rejected");
 
 	let err: syn::Error = result.expect_err("invalid test input is rejected");
@@ -356,7 +315,6 @@ fn test_cstr_literal_invalid_utf8() {
 		"Error message should mention UTF-8 validation, got: {err_msg}"
 	);
 
-	// Also test that valid UTF-8 in CStr literals works correctly
 	let input: proc_macro2::TokenStream = quote! { c"(I)V" };
 	let result: Result<proc_macro2::TokenStream> = jni_sig_impl(input);
 	assert!(result.is_ok(), "Valid UTF-8 CStr literal should parse successfully");

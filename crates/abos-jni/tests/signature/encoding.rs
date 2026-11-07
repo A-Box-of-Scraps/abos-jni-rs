@@ -5,7 +5,6 @@ use abos_jni::strings::JNIStr;
 fn test_mutf8_encoding_basic_ascii() {
 	use abos_jni_macros::{jni_sig_cstr, jni_sig_jstr};
 
-	// Basic ASCII should be the same in MUTF-8
 	let sig: abos_jni::signature::MethodSignature<'_, '_> = jni_sig!((a: java.lang.String) -> void);
 	assert_eq!(sig.sig().to_bytes(), b"(Ljava/lang/String;)V");
 
@@ -20,7 +19,6 @@ fn test_mutf8_encoding_basic_ascii() {
 fn test_mutf8_encoding_unicode_emoji() {
 	use abos_jni_macros::{jni_sig_cstr, jni_sig_jstr};
 
-	// Test Unicode emoji in class name - requires MUTF-8 encoding
 	// The emoji 😀 (U+1F600) in MUTF-8 is encoded as surrogate pairs:
 	// U+1F600 -> UTF-16 surrogate pair: D83D DE00
 	// In MUTF-8: ED A0 BD ED B8 80
@@ -39,7 +37,6 @@ fn test_mutf8_encoding_unicode_emoji() {
 fn test_mutf8_encoding_unicode_field() {
 	use abos_jni_macros::{jni_sig_cstr, jni_sig_jstr};
 
-	// Test Unicode emoji in field signature
 	let sig: abos_jni::signature::FieldSignature<'_> = jni_sig!("unicode.Field😀");
 	let expected = b"Lunicode/Field\xed\xa0\xbd\xed\xb8\x80;";
 	assert_eq!(sig.sig().to_bytes(), expected);
@@ -55,7 +52,6 @@ fn test_mutf8_encoding_unicode_field() {
 fn test_mutf8_encoding_unicode_various_chars() {
 	use abos_jni_macros::jni_sig_cstr;
 
-	// Test various Unicode characters
 	// Japanese: こんにちは (Konnichiwa)
 	let sig_jp = jni_sig_cstr!("jp.こんにちは");
 	// こ (U+3053) -> E3 81 93
@@ -79,7 +75,6 @@ fn test_mutf8_encoding_unicode_various_chars() {
 fn test_all_three_macros_produce_same_encoding() {
 	use abos_jni_macros::{jni_sig_cstr, jni_sig_jstr};
 
-	// All three macros should produce the same byte sequence for the signature
 	let sig: abos_jni::signature::MethodSignature<'_, '_> =
 		jni_sig!((a: jint, b: java.lang.String) -> java.lang.Object);
 	let cstr_sig = jni_sig_cstr!((a: jint, b: java.lang.String) -> java.lang.Object);
@@ -96,7 +91,6 @@ fn test_const_evaluation_all_macros() {
 	use abos_jni_macros::{jni_sig_cstr, jni_sig_jstr, jni_sig_str};
 	use std::ffi::CStr;
 
-	// Test that all macros work in const contexts
 	const STR_SIG: &str = jni_sig_str!((a: jint) -> void);
 	const CSTR_SIG: &CStr = jni_sig_cstr!((a: jint) -> void);
 	const JSTR_SIG: &JNIStr = jni_sig_jstr!((a: jint) -> void);
@@ -105,8 +99,6 @@ fn test_const_evaluation_all_macros() {
 	assert_eq!(CSTR_SIG.to_bytes(), b"(I)V");
 	assert_eq!(JSTR_SIG.to_bytes(), b"(I)V");
 }
-
-// Tests for jni_sig_str! macro
 
 #[test]
 fn test_jni_sig_str_basic() {
@@ -153,8 +145,6 @@ fn test_jni_sig_str_with_type_map() {
 	assert_eq!(SIG, "(Ljava/lang/Custom;)V");
 }
 
-// Tests for jni_sig_cstr! macro
-
 #[test]
 fn test_jni_sig_cstr_basic() {
 	use abos_jni_macros::jni_sig_cstr;
@@ -190,8 +180,6 @@ fn test_jni_sig_cstr_array() {
 	const SIG: &CStr = jni_sig_cstr!(([jint], [java.lang.String]) -> [[jint]]);
 	assert_eq!(SIG.to_bytes(), b"([I[Ljava/lang/String;)[[I");
 }
-
-// Tests for jni_sig_jstr! macro
 
 #[test]
 fn test_jni_sig_jstr_basic() {
@@ -247,7 +235,6 @@ fn test_jni_sig_jstr_with_type_map() {
 fn test_jni_sig_str_produces_utf8_string() {
 	use abos_jni_macros::jni_sig_str;
 
-	// jni_sig_str! should produce a regular UTF-8 string
 	const SIG: &str = jni_sig_str!((a: jint, b: java.lang.String) -> void);
 	assert_eq!(SIG, "(ILjava/lang/String;)V");
 	assert_eq!(SIG.as_bytes(), b"(ILjava/lang/String;)V");
@@ -259,7 +246,6 @@ fn test_field_signatures_all_variants() {
 
 	use abos_jni_macros::{jni_sig_cstr, jni_sig_jstr, jni_sig_str};
 
-	// Test that field signatures work with all macro variants
 	let field_sig: abos_jni::signature::FieldSignature<'_> = jni_sig!(java.util.List);
 	assert_eq!(field_sig.sig().to_bytes(), b"Ljava/util/List;");
 
@@ -278,7 +264,6 @@ fn test_raw_signature_all_variants() {
 
 	use abos_jni_macros::{jni_sig_cstr, jni_sig_jstr, jni_sig_str};
 
-	// Test raw signatures with all macro variants
 	let sig: abos_jni::signature::MethodSignature<'_, '_> = jni_sig!("(ILjava/lang/String;)V");
 	assert_eq!(sig.sig().to_bytes(), b"(ILjava/lang/String;)V");
 
@@ -290,5 +275,3 @@ fn test_raw_signature_all_variants() {
 
 	assert_eq!(STR_SIG, "(ILjava/lang/String;)V");
 }
-
-// Tests for jni_cstr! and jni_str! macros

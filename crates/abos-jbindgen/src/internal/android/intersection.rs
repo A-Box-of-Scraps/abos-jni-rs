@@ -7,7 +7,6 @@ pub fn intersect_classes(
 	let mut result: Vec<crate::ClassInfo> = Vec::new();
 
 	for (class_name, jar_class) in jar_classes {
-		// Only keep classes that exist in both sources
 		if let Some(stub_class) = stub_classes.get(&class_name) {
 			let intersected: crate::ClassInfo = intersect_class_members(&jar_class, stub_class);
 			result.push(intersected);
@@ -19,8 +18,6 @@ pub fn intersect_classes(
 
 /// Intersect members of two `ClassInfo` instances
 pub fn intersect_class_members(jar_class: &ClassInfo, stub_class: &ClassInfo) -> ClassInfo {
-	// Create signature sets from JAR for fast lookup
-	// We'll keep stub members that exist in JAR to preserve documentation
 	let jar_constructor_sigs: HashSet<String> = jar_class.constructors.iter().map(method_signature_key).collect();
 
 	let jar_method_sigs: HashSet<String> = jar_class.methods.iter().map(method_signature_key).collect();
@@ -29,8 +26,7 @@ pub fn intersect_class_members(jar_class: &ClassInfo, stub_class: &ClassInfo) ->
 
 	let jar_field_sigs: HashSet<String> = jar_class.fields.iter().map(field_signature_key).collect();
 
-	// Filter stub class members to only those that exist in JAR
-	// This preserves documentation and deprecation info from stubs
+	// Keep stub metadata to preserve documentation and deprecation information.
 	let constructors: Vec<crate::MethodInfo> = stub_class
 		.constructors
 		.iter()

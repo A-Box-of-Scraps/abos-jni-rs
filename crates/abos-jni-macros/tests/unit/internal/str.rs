@@ -7,7 +7,6 @@ fn test_jni_cstr_single_literal() {
 	let result: TokenStream = jni_cstr_impl(input).expect("test C string expands");
 	let result_str: String = result.to_string();
 
-	// Should produce a CStr literal
 	assert!(result_str.contains("c\"hello\"") || result_str.contains("\"hello\""));
 }
 
@@ -17,7 +16,6 @@ fn test_jni_cstr_multiple_literals() {
 	let result: TokenStream = jni_cstr_impl(input).expect("test C string expands");
 	let result_str: String = result.to_string();
 
-	// Should concatenate to "hello world"
 	assert!(result_str.contains("hello world"));
 }
 
@@ -27,7 +25,7 @@ fn test_jni_cstr_with_jni_override() {
 	let result: TokenStream = jni_cstr_impl(input).expect("test C string expands");
 	let result_str: String = result.to_string();
 
-	// Should produce a CStr literal (jni override doesn't affect jni_cstr! output)
+	// The jni override does not affect jni_cstr! output.
 	assert!(result_str.contains("test"));
 }
 
@@ -37,7 +35,6 @@ fn test_jni_str_single_literal() {
 	let result: TokenStream = jni_str_impl(input).expect("test JNI string expands");
 	let result_str: String = result.to_string();
 
-	// Should produce JNIStr::from_cstr_unchecked call
 	assert!(result_str.contains("JNIStr"));
 	assert!(result_str.contains("from_cstr_unchecked"));
 	assert!(result_str.contains("hello"));
@@ -49,7 +46,6 @@ fn test_jni_str_multiple_literals() {
 	let result: TokenStream = jni_str_impl(input).expect("test JNI string expands");
 	let result_str: String = result.to_string();
 
-	// Should concatenate to "java.lang.String"
 	assert!(result_str.contains("java.lang.String"));
 }
 
@@ -59,7 +55,6 @@ fn test_jni_str_with_jni_override() {
 	let result: TokenStream = jni_str_impl(input).expect("test JNI string expands");
 	let result_str: String = result.to_string();
 
-	// Should use the custom jni crate path
 	assert!(result_str.contains(":: my_custom_jni :: strings :: JNIStr"));
 	assert!(result_str.contains("test"));
 }
@@ -70,7 +65,6 @@ fn test_jni_str_with_jni_override_and_multiple_literals() {
 	let result: TokenStream = jni_str_impl(input).expect("test JNI string expands");
 	let result_str: String = result.to_string();
 
-	// Should use crate:: and concatenate literals
 	assert!(result_str.contains("crate :: strings :: JNIStr"));
 	assert!(result_str.contains("part1part2"));
 }
@@ -91,14 +85,12 @@ fn test_jni_cstr_trailing_comma() {
 	let result: TokenStream = jni_cstr_impl(input).expect("test C string expands");
 	let result_str: String = result.to_string();
 
-	// Should handle trailing comma and concatenate
 	assert!(result_str.contains("helloworld"));
 }
 
 #[test]
 fn test_jni_str_jni_property_must_be_first() {
-	// jni property after string literal should fail during parsing
-	// because it will try to parse "test" as a string literal, then fail on the identifier "jni"
+	// The jni property must precede the literals.
 	let input: TokenStream = quote! { "test", jni = crate };
 	let result: Result<TokenStream> = jni_str_impl(input);
 	assert!(result.is_err());
@@ -106,13 +98,10 @@ fn test_jni_str_jni_property_must_be_first() {
 
 #[test]
 fn test_mutf8_encoding() {
-	// Test that emoji is properly encoded using MUTF-8
 	let input: TokenStream = quote! { "😀" };
 	let result: TokenStream = jni_cstr_impl(input).expect("test C string expands");
 	let result_str: String = result.to_string();
 
-	// Emoji should be encoded as surrogate pairs in MUTF-8
-	// The exact encoding will be in the c"..." literal
 	assert!(result_str.contains("c\"") || result_str.contains('"'));
 }
 
@@ -197,7 +186,6 @@ fn test_jni_str_mixed_literals() {
 
 #[test]
 fn test_literal_byte_str_fails() {
-	// Byte string literals should not be supported
 	let input: TokenStream = quote! { b"hello" };
 	let result: Result<TokenStream> = jni_cstr_impl(input);
 	assert!(result.is_err());

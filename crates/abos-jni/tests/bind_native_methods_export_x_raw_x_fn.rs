@@ -37,9 +37,7 @@ use abos_jni::sys::jint;
 use abos_jni::{Env, EnvUnowned, bind_java_type};
 use rusty_fork::rusty_fork_test;
 
-// ====================================================================================
 // Test 1: Trait + Raw (property syntax) + Export (property syntax)
-// ====================================================================================
 
 bind_java_type! {
 	rust_type = TestCombo1,
@@ -75,9 +73,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 2: Trait + Raw (qualifier syntax) + Export (qualifier syntax)
-// ====================================================================================
 
 bind_java_type! {
 	rust_type = TestCombo2,
@@ -109,9 +105,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 3: fn= + Raw (property syntax) + Export (property syntax)
-// ====================================================================================
 
 const extern "system" fn method3_impl<'local>(
 	_env: EnvUnowned<'local>,
@@ -148,9 +142,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 4: fn= + Not Raw + Export (property syntax)
-// ====================================================================================
 
 #[expect(
 	clippy::unnecessary_wraps,
@@ -161,7 +153,6 @@ const fn method4_impl<'local>(
 	_this: TestCombo4<'local>,
 	value: jint,
 ) -> Result<jint, abos_jni::errors::Error> {
-	// Non-raw with fn= takes &mut Env and returns Result
 	Ok(value * 5)
 }
 
@@ -191,9 +182,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 5: Static Trait + Raw + Export (mixed syntax)
-// ====================================================================================
 
 bind_java_type! {
 	rust_type = TestCombo5,
@@ -227,9 +216,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 6: Static fn= + Raw (qualifier) + Export (qualifier)
-// ====================================================================================
 
 const extern "system" fn static_method2_impl<'local>(
 	_env: EnvUnowned<'local>,
@@ -262,9 +249,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 7: Trait + Not Raw + Export (qualifier syntax)
-// ====================================================================================
 
 bind_java_type! {
 	rust_type = TestCombo7,
@@ -298,9 +283,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 8: fn= + Not Raw + Not Exported
-// ====================================================================================
 
 #[expect(
 	clippy::unnecessary_wraps,
@@ -311,7 +294,6 @@ const fn static_method_non_exported_impl<'local>(
 	_class: JClass<'local>,
 	value: jint,
 ) -> Result<jint, abos_jni::errors::Error> {
-	// Non-raw with fn= takes &mut Env and returns Result
 	Ok(value * 40)
 }
 
@@ -338,9 +320,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 9: Instance Trait + Not Raw + Not Exported
-// ====================================================================================
 
 bind_java_type! {
 	rust_type = TestCombo10,
@@ -376,9 +356,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 10: Static Trait + Not Raw + Not Exported
-// ====================================================================================
 
 bind_java_type! {
 	rust_type = TestCombo11,
@@ -412,9 +390,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 11: Mixed - fn= (not raw) + Trait (not raw) in one binding
-// ====================================================================================
 
 #[expect(
 	clippy::unnecessary_wraps,
@@ -434,12 +410,10 @@ bind_java_type! {
 	native_methods_export = false,
 	constructors { fn new() },
 	native_methods {
-		// fn= implementation
 		pub fn method_non_exported {
 			sig = (value: jint) -> jint,
 			fn = method_non_exported_fn_impl,
 		},
-		// Trait implementation
 		pub fn method_non_exported2(value: jint) -> jint,
 	}
 }
@@ -464,11 +438,9 @@ native_method_test! {
 	test_body: |env| {
 		let obj = TestCombo12::new(env)?;
 
-		// Test fn= method
 		let result = obj.method_non_exported(env, 10)?;
 		assert_eq!(result, 700);
 
-		// Test trait method
 		let result = obj.method_non_exported2(env, 10)?;
 		assert_eq!(result, 800);
 
@@ -476,9 +448,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 12: Mixed - fn= (raw) + Trait (raw) in one binding
-// ====================================================================================
 
 const fn static_method_non_exported_fn_impl<'local>(
 	_env: EnvUnowned<'local>,
@@ -493,13 +463,11 @@ bind_java_type! {
 	java_type = "com.example.TestNativeCombinations",
 	native_methods_export = false,
 	native_methods {
-		// fn= implementation with raw
 		pub static fn static_method_non_exported {
 			sig = (value: jint) -> jint,
 			fn = static_method_non_exported_fn_impl,
 			raw = true,
 		},
-		// Trait implementation with raw
 		pub static raw fn static_method_non_exported2(value: jint) -> jint,
 	}
 }
@@ -518,11 +486,9 @@ native_method_test! {
 	java_class: "com/example/TestNativeCombinations.java",
 	api: TestCombo13API,
 	test_body: |env| {
-		// Test fn= raw method
 		let result = TestCombo13::static_method_non_exported(env, 10)?;
 		assert_eq!(result, 900);
 
-		// Test trait raw method
 		let result = TestCombo13::static_method_non_exported2(env, 10)?;
 		assert_eq!(result, 1000);
 
@@ -530,9 +496,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 13: Verify exported symbols exist
-// ====================================================================================
 
 #[test]
 fn test_exported_symbols_exist() {

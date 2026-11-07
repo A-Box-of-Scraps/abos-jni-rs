@@ -137,21 +137,17 @@ unsafe extern "system" fn fls_callback(data: *const core::ffi::c_void) {
 ///
 /// Returns the FLS index, allocating it if necessary.
 fn get_or_init_fls_index() -> Result<u32> {
-	// Try to get existing index first
 	if let Some(&index) = FLS_INDEX.get() {
 		return Ok(index);
 	}
 
-	// Need to initialize - allocate a new FLS index with our callback
 	// Safety: fls_callback is a valid callback function
 	let new_index: u32 = unsafe { FlsAlloc(Some(fls_callback)) };
 
 	if new_index == u32::MAX {
-		// FLS_OUT_OF_INDEXES
 		return Err(Error::JniCall(JniError::Unknown));
 	}
 
-	// Try to store it, or use the value another thread stored
 	Ok(*FLS_INDEX.get_or_init(|| new_index))
 }
 
@@ -201,13 +197,10 @@ pub unsafe fn fls_attach_current_thread<'local>(
 
 	let fls_index: u32 = get_or_init_fls_index()?;
 
-	// Check if already attached via FLS for THIS fiber
 	// Safety: fls_index is valid
 	let existing: *mut std::ffi::c_void = unsafe { FlsGetValue(fls_index) };
-	// Although it's unlikely, it's possible that the thread was already permanently attached
-	// but some external code manually detached it (this is allowed as long as there are no
-	// active `AttachGuards`). In this case we don't want to double-increment the attached
-	// threads counter.
+	// External code may have detached the thread while leaving its FLS data.
+	// Reuse the counter entry when reattaching.
 	let inc_attached_count: bool = existing.is_null();
 
 	let thread: Thread = current();
@@ -215,14 +208,11 @@ pub unsafe fn fls_attach_current_thread<'local>(
 	let env: *mut *const abos_jni_sys::JNINativeInterface_ =
 		unsafe { sys_attach_current_thread(java_vm, config, &thread, inc_attached_count)? };
 
-	// Create attachment data for this fiber
-	// Note: We don't store the env pointer to avoid holding stale pointers when
-	// multiple fibers share the same thread attachment
+	// Do not retain env pointers: fibers sharing an attachment can leave them stale.
 	let attach_data: Box<FlsAttachData> = Box::new(FlsAttachData { thread: current() });
 
 	let data_ptr: *mut std::ffi::c_void = Box::into_raw(attach_data).cast::<core::ffi::c_void>();
 
-	// Store in FLS for this fiber
 	// Safety: fls_index is valid, data_ptr is a valid pointer
 	let result: i32 = unsafe { FlsSetValue(fls_index, data_ptr) };
 
@@ -263,11 +253,9 @@ pub fn fls_detach_current_thread() -> Result<()> {
 		return Ok(()); // FLS never initialized, so not attached
 	};
 
-	// Get the current FLS value
 	// Safety: fls_index is valid
 	let data_ptr: *mut std::ffi::c_void = unsafe { FlsGetValue(fls_index) };
 	if data_ptr.is_null() {
-		// Not attached via FLS for this fiber
 		return Ok(());
 	}
 
@@ -280,7 +268,6 @@ pub fn fls_detach_current_thread() -> Result<()> {
 	// Returning an error here would lead to a double-decrement of the attached threads counter
 	assert_ne!(result, 0, "FATAL: Failed to clear FLS slot during detach");
 
-	// Clean up the FLS data and detach
 	// Safety: data_ptr came from FlsGetValue and we stored Box<FlsAttachData>
 	let attach_data: Box<FlsAttachData> = unsafe { Box::from_raw(data_ptr.cast::<FlsAttachData>()) };
 

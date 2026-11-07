@@ -22,7 +22,6 @@ public class AnnotationTest {
     @RustName("new_with_value")
     public AnnotationTest(String value) {}
 
-    // Constructor without annotation
     public AnnotationTest(int number) {}
 
     @RustName("custom_static_method")
@@ -35,7 +34,6 @@ public class AnnotationTest {
         return "instance";
     }
 
-    // Method without annotation
     public String normalMethod() {
         return "normal";
     }
@@ -43,6 +41,5 @@ public class AnnotationTest {
     @RustName("custom_native_method")
     public native void nativeMethod();
 
-    // Native method without annotation
     public native void normalNativeMethod();
 }

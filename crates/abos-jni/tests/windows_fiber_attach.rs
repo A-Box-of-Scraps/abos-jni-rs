@@ -27,7 +27,6 @@ use rusty_fork::rusty_fork_test;
 
 use crate::util::sys_detach_current_thread;
 
-// Track fiber execution
 static mut FIBER1_EXECUTED: bool = false;
 static mut FIBER1_PART2_EXECUTED: bool = false;
 static mut FIBER2_EXECUTED: bool = false;
@@ -67,7 +66,6 @@ unsafe extern "system" fn fiber1_proc(param: *mut std::ffi::c_void) {
 		SwitchToFiber(MAIN_FIBER);
 	}
 
-	//panic!("DEBUG: Back in fiber 1 part 1 after switching to main fiber");
 	eprintln!("Running fiber 1, part 2");
 	// At this point, all the other fibers have been deleted and we should be left with
 	// a count of 1 from the FLS attachment we got earlier
@@ -222,13 +220,11 @@ fn test_attached_threads_counter_with_actual_fibers() {
 	// SAFETY: This subprocess runs the fibers cooperatively on one thread. The JVM outlives
 	// their callbacks, and switching/deletion occurs only after all JNI guards have dropped.
 	unsafe {
-		// Convert the current thread to a fiber (main fiber)
 		let main_fiber = ConvertThreadToFiber(ptr::null_mut());
 		assert!(!main_fiber.is_null(), "Failed to convert thread to fiber");
 
 		MAIN_FIBER = main_fiber;
 
-		// Create four fibers on the same OS thread
 		let jvm_ptr = ptr::from_ref(jvm).cast_mut().cast::<std::ffi::c_void>();
 
 		eprintln!("Creating fibers");
@@ -245,7 +241,6 @@ fn test_attached_threads_counter_with_actual_fibers() {
 		let fiber4 = CreateFiber(0, Some(fiber4_proc), jvm_ptr);
 		assert!(!fiber4.is_null(), "Failed to create fiber 4");
 
-		// Execute all four fibers on the same OS thread
 		SwitchToFiber(fiber1);
 		assert!(FIBER1_EXECUTED, "Fiber 1 did not execute");
 
@@ -289,7 +284,6 @@ fn test_attached_threads_counter_with_actual_fibers() {
 		assert!(jvm.is_thread_attached().expect("attachment state is available"));
 		assert_eq!(jvm.threads_attached(), 1);
 
-		//panic!("DEBUG: Before deleting fiber 1");
 		eprintln!("Deleting fiber 1");
 		DeleteFiber(fiber1);
 		assert!(!jvm.is_thread_attached().expect("attachment state is available"));

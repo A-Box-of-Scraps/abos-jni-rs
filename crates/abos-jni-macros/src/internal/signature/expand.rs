@@ -51,26 +51,20 @@ pub fn jni_sig_impl(input: TokenStream) -> Result<TokenStream> {
 		type_mappings,
 	} = syn::parse2(input)?;
 
-	// Get the jni crate path
 	let jni: &syn::Path = type_mappings.jni_crate();
 
-	// Generate the JNI signature string
 	let jni_sig: String = signature.to_jni_signature(&type_mappings)?;
 
-	// Create a C string literal for the signature with MUTF-8 encoding
 	let sig_cstr: syn::LitCStr = lit_cstr_mutf8(&jni_sig);
 
-	// Generate the appropriate abos_jni::signature type
 	match signature {
 		Signature::Method(method_sig) => {
-			// Generate the arguments array
 			let args_tokens: Vec<TokenStream> = method_sig
 				.parameters
 				.iter()
 				.map(|param| java_type_to_tokens(&param.ty, &type_mappings))
 				.collect::<Result<Vec<_>>>()?;
 
-			// Generate the return type
 			let ret_token: TokenStream = java_type_to_tokens(&method_sig.return_type, &type_mappings)?;
 
 			Ok(quote! {
@@ -87,7 +81,6 @@ pub fn jni_sig_impl(input: TokenStream) -> Result<TokenStream> {
 			})
 		}
 		Signature::Field(field_sig) => {
-			// Generate the field type
 			let ty_token: TokenStream = java_type_to_tokens(&field_sig.field_type, &type_mappings)?;
 
 			Ok(quote! {
@@ -113,7 +106,6 @@ pub fn jni_sig_str_impl(input: TokenStream) -> Result<TokenStream> {
 		type_mappings,
 	} = syn::parse2(input)?;
 
-	// Generate the JNI signature string
 	let jni_sig: String = signature.to_jni_signature(&type_mappings)?;
 
 	Ok(quote! {
@@ -129,10 +121,8 @@ pub fn jni_sig_cstr_impl(input: TokenStream) -> Result<TokenStream> {
 		type_mappings,
 	} = syn::parse2(input)?;
 
-	// Generate the JNI signature string
 	let jni_sig: String = signature.to_jni_signature(&type_mappings)?;
 
-	// Create a C string literal with MUTF-8 encoding
 	let sig_cstr: syn::LitCStr = lit_cstr_mutf8(&jni_sig);
 
 	Ok(quote! {
@@ -148,13 +138,10 @@ pub fn jni_sig_jstr_impl(input: TokenStream) -> Result<TokenStream> {
 		type_mappings,
 	} = syn::parse2(input)?;
 
-	// Get the jni crate path
 	let jni: &syn::Path = type_mappings.jni_crate();
 
-	// Generate the JNI signature string
 	let jni_sig: String = signature.to_jni_signature(&type_mappings)?;
 
-	// Create a C string literal with MUTF-8 encoding
 	let sig_cstr: syn::LitCStr = lit_cstr_mutf8(&jni_sig);
 
 	Ok(quote! {

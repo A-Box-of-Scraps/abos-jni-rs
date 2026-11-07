@@ -118,7 +118,6 @@ pub fn unwrap<T>(res: Result<T>, env: &Env) -> T {
 	})
 }
 
-// Generic helper function to load any test class
 #[allow(
 	dead_code,
 	reason = "Shared test and example helpers are used by different subsets of binaries."
@@ -145,7 +144,6 @@ pub fn load_test_class(env: &mut Env, out_dir: &std::path::Path, class_name: &st
 	Ok(())
 }
 
-// Helper function to set up test output directory
 #[allow(
 	dead_code,
 	reason = "Shared test and example helpers are used by different subsets of binaries."
@@ -163,7 +161,6 @@ pub fn setup_test_output(test_name: &str) -> std::path::PathBuf {
 	.join("jni_macros_tests")
 	.join(test_name);
 
-	// Clean up any existing output
 	match std::fs::remove_dir_all(&out_dir) {
 		Ok(()) => {}
 		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}

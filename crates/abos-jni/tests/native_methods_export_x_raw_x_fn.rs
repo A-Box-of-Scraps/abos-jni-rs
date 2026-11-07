@@ -37,9 +37,7 @@ use abos_jni::sys::jint;
 use abos_jni::{Env, EnvUnowned, native_method};
 use rusty_fork::rusty_fork_test;
 
-// ====================================================================================
 // Test 1: fn= + Raw (property syntax) + Export (property syntax)
-// ====================================================================================
 
 const fn method1_impl<'local>(
 	_env: EnvUnowned<'local>,
@@ -67,9 +65,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 2: fn= + Raw (qualifier syntax) + Export (qualifier syntax)
-// ====================================================================================
 
 const fn method2_impl<'local>(
 	_env: EnvUnowned<'local>,
@@ -97,9 +93,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 3: fn= + Raw (property syntax) + Export (property syntax)
-// ====================================================================================
 
 const fn method3_impl<'local>(
 	_env: EnvUnowned<'local>,
@@ -127,9 +121,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 4: fn= + Not Raw + Export (property syntax)
-// ====================================================================================
 
 #[expect(
 	clippy::unnecessary_wraps,
@@ -140,7 +132,6 @@ const fn method4_impl<'local>(
 	_this: abos_jni::objects::JObject<'local>,
 	value: jint,
 ) -> Result<jint, Error> {
-	// Non-raw with fn= takes &mut Env and returns Result
 	Ok(value * 5)
 }
 
@@ -162,9 +153,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 5: Static fn= + Raw + Export (mixed syntax)
-// ====================================================================================
 
 const fn static_method1_impl<'local>(_env: EnvUnowned<'local>, _class: JClass<'local>, value: jint) -> jint {
 	value * 10
@@ -187,9 +176,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 6: Static fn= + Raw (qualifier) + Export (qualifier)
-// ====================================================================================
 
 const fn static_method2_impl<'local>(_env: EnvUnowned<'local>, _class: JClass<'local>, value: jint) -> jint {
 	value * 20
@@ -212,9 +199,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 7: fn= + Not Raw + Export (qualifier syntax)
-// ====================================================================================
 
 #[expect(
 	clippy::unnecessary_wraps,
@@ -245,9 +230,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 8: fn= + Not Raw + Not Exported
-// ====================================================================================
 
 #[expect(
 	clippy::unnecessary_wraps,
@@ -258,7 +241,6 @@ const fn static_method_non_exported_impl<'local>(
 	_class: JClass<'local>,
 	value: jint,
 ) -> Result<jint, Error> {
-	// Non-raw with fn= takes &mut Env and returns Result
 	Ok(value * 40)
 }
 
@@ -278,9 +260,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 9: Instance fn= + Not Raw + Not Exported
-// ====================================================================================
 
 #[expect(
 	clippy::unnecessary_wraps,
@@ -311,9 +291,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 10: Static fn= + Not Raw + Not Exported
-// ====================================================================================
 
 #[expect(
 	clippy::unnecessary_wraps,
@@ -343,9 +321,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 11: Mixed - fn= (not raw) + fn= (not raw) in one test
-// ====================================================================================
 
 #[expect(
 	clippy::unnecessary_wraps,
@@ -375,12 +351,10 @@ native_method_test! {
 	test_name: test_mixed_fn_not_raw,
 	java_class: "com/example/TestNativeCombinations.java",
 	methods: |class| &[
-		// First fn= implementation
 		native_method! {
 			fn methodNonExported(value: jint) -> jint,
 			fn = method_non_exported_fn_impl,
 		},
-		// Second fn= implementation
 		native_method! {
 			fn methodNonExported2(value: jint) -> jint,
 			fn = method_non_exported2_impl,
@@ -389,11 +363,9 @@ native_method_test! {
 	test_body: |env, class| {
 		let obj = new_object!(env, class)?;
 
-		// Test first fn= method
 		let result = call_int_method!(env, &obj, "methodNonExported", 10)?;
 		assert_eq!(result, 700);
 
-		// Test second fn= method
 		let result = call_int_method!(env, &obj, "methodNonExported2", 10)?;
 		assert_eq!(result, 800);
 
@@ -401,9 +373,7 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 12: Mixed - fn= (raw) + fn= (raw) in one test
-// ====================================================================================
 
 const fn static_method_non_exported_fn_impl<'local>(
 	_env: EnvUnowned<'local>,
@@ -425,24 +395,20 @@ native_method_test! {
 	test_name: test_mixed_fn_raw,
 	java_class: "com/example/TestNativeCombinations.java",
 	methods: |class| &[
-		// fn= implementation with raw
 		native_method! {
 			static fn staticMethodNonExported(value: jint) -> jint,
 			fn = static_method_non_exported_fn_impl,
 			raw = true,
 		},
-		// fn= implementation with raw
 		native_method! {
 			static raw fn staticMethodNonExported2(value: jint) -> jint,
 			fn = static_method_non_exported2_fn_impl,
 		},
 	],
 	test_body: |env, class| {
-		// Test first fn= raw method
 		let result = call_static_int_method!(env, &class, "staticMethodNonExported", 10)?;
 		assert_eq!(result, 900);
 
-		// Test second fn= raw method
 		let result = call_static_int_method!(env, &class, "staticMethodNonExported2", 10)?;
 		assert_eq!(result, 1000);
 
@@ -450,11 +416,8 @@ native_method_test! {
 	}
 }
 
-// ====================================================================================
 // Test 13: Verify exported symbols exist
-// ====================================================================================
 
-// Declare the exported symbols so we can verify they exist
 unsafe extern "system" {
 	fn Java_com_example_TestNativeCombinations_method1__I(
 		env: EnvUnowned,

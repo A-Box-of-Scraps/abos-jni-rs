@@ -21,7 +21,6 @@ use jni2::refs::LoaderContext;
 #[path = "utils/lib.rs"]
 mod utils;
 
-// First, define some simple bindings for types we'll reference in the example type_maps
 bind_java_type! {
 	JBuiltinType => "com.example.CommonBuiltinType",
 	constructors { fn new() }
@@ -81,7 +80,6 @@ fn main() {
 		let instance: JBindJavaTypeWrapper<'_> = JBindJavaTypeWrapper::new(env)?;
 		println!("Instantiated JBindJavaTypeWrapper (based on merged type_map)");
 
-		// Test mix_types method
 		println!("\n--- Testing mix_types method ---");
 		let builtin_obj: JBuiltinType<'_> = JBuiltinType::new(env)?;
 		let custom_obj: JCustomType<'_> = JCustomType::new(env)?;

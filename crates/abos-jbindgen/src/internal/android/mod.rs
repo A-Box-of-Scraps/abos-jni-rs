@@ -29,10 +29,8 @@ pub fn generate_android_bindings(
 	let stub_classes: std::collections::HashMap<String, crate::ClassInfo> =
 		parse_source_stubs(&stubs_jar, &classpath, patterns)?;
 
-	// Intersect the two sets
 	let mut filtered_classes: Vec<crate::ClassInfo> = intersect_classes(jar_classes, &stub_classes);
 
-	// Apply hidden API filtering if provided
 	if let Some(flags_path) = hiddenapi_flags_path {
 		let hidden_apis: std::collections::HashSet<String> = parse_hiddenapi_flags(flags_path, hiddenapi_filter)?;
 		filtered_classes = filter_hidden_apis(filtered_classes, &hidden_apis);
@@ -40,7 +38,6 @@ pub fn generate_android_bindings(
 
 	filtered_classes.sort_by(|left, right| left.class_name.cmp(&right.class_name));
 
-	// Generate bindings from filtered classes
 	let mut type_map: crate::TypeMap = TypeMap::from_classes(filtered_classes.iter(), options)?;
 	type_map.merge(extra_type_map);
 
@@ -92,7 +89,6 @@ pub(super) fn parse_source_stubs(
 
 	let mut result: std::collections::HashMap<String, crate::ClassInfo> = HashMap::new();
 	for class_info in classes {
-		// Use fully qualified class name as key (e.g., "android.app.Activity")
 		let key: String = class_info.class_name.replace('/', ".");
 		result.insert(key, class_info);
 	}

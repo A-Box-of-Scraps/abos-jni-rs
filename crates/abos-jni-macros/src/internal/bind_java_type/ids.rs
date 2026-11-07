@@ -17,7 +17,6 @@ pub(super) fn generate_method_ids(
 		let method_id_field: proc_macro2::Ident = format_ident!("{}_method_id", rust_name);
 		let is_static: bool = method.is_static;
 
-		// Use the MethodSignature to generate JNI signature
 		let jni_sig_str: String = method.signature.to_jni_signature(type_mappings).map_err(|e| {
 			syn::Error::new(
 				rust_name.span(),
@@ -65,7 +64,6 @@ pub(super) fn generate_field_ids(
 		let java_name: &String = &field.java_name;
 		let field_id_field: proc_macro2::Ident = format_ident!("{}_field_id", rust_name);
 
-		// Use the FieldSignature to generate JNI signature
 		let field_sig: String = field.signature.to_jni_signature(type_mappings).map_err(|e| {
 			syn::Error::new(
 				rust_name.span(),

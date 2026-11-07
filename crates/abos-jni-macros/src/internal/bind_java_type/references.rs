@@ -38,12 +38,10 @@ pub(super) fn generate_is_instance_of_assignable_checks(
 							let is_instance_of_class = <#to_type_path as #jni::refs::Reference>::lookup_class(env, loader)?;
 							let is_instance_of_class: &#jni::objects::JClass = unsafe { is_instance_of_class.as_ref() };
 
-							// IsAssignableFrom is not exception safe, so we can't go ahead with the JNI call if
-							// there's currently a pending exception.
+							// IsAssignableFrom must not run with a pending exception.
 							if env.exception_check() {
 								return Err(#jni::errors::Error::JavaException);
 							}
-							// Call IsAssignableFrom to check if is_instance_of_class is assignable from our class
 							let is_assignable = unsafe {
 								use #jni::refs::Reference as _;
 								let env_ptr: *mut #jni::sys::JNIEnv = env.get_raw();
@@ -91,7 +89,6 @@ pub(super) fn generate_reference_impl(
 	java_class: &str,
 	jni: &syn::Path,
 ) -> TokenStream {
-	// Create a CStr literal for the Java class name
 	let java_class_cstr: syn::LitCStr = lit_cstr_mutf8(java_class);
 
 	quote! {
@@ -139,10 +136,8 @@ pub(super) fn generate_reference_impl(
 
 /// Generate base methods (`from_raw`, null, `into_raw`)
 pub(super) fn generate_base_methods(type_name: &Ident, sys_type: Option<&Ident>, jni: &syn::Path) -> TokenStream {
-	// Use the provided sys_type or default to jobject
 	let sys_type_ident: TokenStream = sys_type.map_or_else(|| quote! { jobject }, |ident| quote! { #ident });
 
-	// Generate the full path to the sys type
 	let sys_type_path: TokenStream = quote! { #jni::sys::#sys_type_ident };
 
 	let jni_path_str: String = path_to_string_no_spaces(jni);
@@ -266,7 +261,6 @@ This does not require a runtime type check since any `"#, stringify!(#type_name)
                     });
 				}
 
-				// Only generate From impl if the type is not JObject
 				if type_alias != "JObject" && type_alias != "abos_jni::objects::JObject" {
 					trait_impls.push(quote! {
 						impl<'local> ::core::convert::From<#type_name<'local>> for #type_path<'local> {
@@ -276,9 +270,6 @@ This does not require a runtime type check since any `"#, stringify!(#type_name)
 							}
 						}
 
-						// Assuming #type_name<'local> is a transparent wrapper around JObject
-						// (asserted) we can implement `AsRef` by casting `&self` to
-						// `&#type_path<'local>`.
 						impl<'local> ::core::convert::AsRef<#type_path<'local>> for #type_name<'local> {
 							fn as_ref(&self) -> &#type_path<'local> {
 								const fn assert_is_instance_of_type_is_ffi_safe<T: #jni::refs::TransparentReference>() {}

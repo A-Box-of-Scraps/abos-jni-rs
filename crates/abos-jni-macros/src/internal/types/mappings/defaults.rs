@@ -15,12 +15,10 @@ impl TypeMappings {
 			jni_crate: jni_crate.clone(),
 		};
 
-		// Convert the jni crate path to a string
 		let jni_crate_str: String = path_to_string_no_spaces(jni_crate);
 
 		type_mappings.add_reference_defaults(&jni_crate_str);
 
-		// Insert Void as a special case
 		type_mappings
 			.insert_prim_type("void", PrimitiveType::Void, "()", true)
 			.expect("Failed to insert 'void' primitive type mapping");
@@ -80,7 +78,6 @@ impl TypeMappings {
 	}
 
 	fn add_reference_defaults(&mut self, jni_crate_str: &str) {
-		// Helper function to parse a Java class name from a dotted string
 		let parse_java_class_dotted = |class_str: &str| -> JavaClassName {
 			let parts: Vec<&str> = class_str.split('.').collect();
 			assert!(!parts.is_empty(), "Invalid Java class name: {class_str}");
@@ -96,7 +93,6 @@ impl TypeMappings {
 
 			JavaClassName { package, class }
 		};
-		// Add default type mappings for built-in jni crate types
 		let builtins = [
 			("JByteBuffer", "java.nio.ByteBuffer", "objects::JByteBuffer", false),
 			(
@@ -141,7 +137,6 @@ impl TypeMappings {
 		}
 	}
 
-	// Lookup the canonical RustType for a Reference type path
 	pub(super) fn rust_reference_type(&mut self, path: &str, is_builtin: bool) -> Rc<RustType> {
 		let candidate = RustType {
 			target: RustTypeTarget::Reference {
@@ -164,7 +159,6 @@ impl TypeMappings {
 		rust_type
 	}
 
-	// Lookup the canonical RustType for a Primitive type path
 	pub(super) fn rust_prim_type(&mut self, primitive: PrimitiveType, path: String, is_builtin: bool) -> Rc<RustType> {
 		let candidate = RustType {
 			target: RustTypeTarget::Primitive {

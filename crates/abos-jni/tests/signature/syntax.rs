@@ -79,11 +79,8 @@ fn test_raw_field_default_package() {
 	assert_eq!(sig.ty(), JavaType::Object);
 }
 
-// Tests for new named property syntax
-
 #[test]
 fn test_named_sig_property() {
-	// Signature can be named with sig =
 	let sig: abos_jni::signature::MethodSignature<'_, '_> = jni_sig!(sig = (a: jint) -> void);
 	assert_eq!(sig.sig().to_bytes(), b"(I)V");
 	assert_eq!(sig.args().len(), 1);
@@ -92,7 +89,6 @@ fn test_named_sig_property() {
 
 #[test]
 fn test_named_sig_property_field() {
-	// Field signature can also be named
 	let sig: abos_jni::signature::FieldSignature<'_> = jni_sig!(sig = jint);
 	assert_eq!(sig.sig().to_bytes(), b"I");
 	assert_eq!(sig.ty(), JavaType::Primitive(Primitive::Int));
@@ -100,7 +96,6 @@ fn test_named_sig_property_field() {
 
 #[test]
 fn test_type_map_with_named_sig() {
-	// type_map can be used with named sig in any order
 	let sig1: abos_jni::signature::MethodSignature<'_, '_> = jni_sig!(
 		sig = (a: RustType) -> void,
 		type_map = {
@@ -121,8 +116,6 @@ fn test_type_map_with_named_sig() {
 
 #[test]
 fn test_jni_crate_override() {
-	// Test that jni crate path can be overridden
-	// This should work even though we're specifying a custom path
 	let sig: abos_jni::signature::MethodSignature<'_, '_> = jni_sig!(
 		jni = ::abos_jni,
 		(a: jint) -> void
@@ -132,7 +125,6 @@ fn test_jni_crate_override() {
 
 #[test]
 fn test_all_properties_together() {
-	// Test all properties together
 	let sig: abos_jni::signature::MethodSignature<'_, '_> = jni_sig!(
 		jni = ::abos_jni,
 		type_map = {
@@ -145,7 +137,6 @@ fn test_all_properties_together() {
 
 #[test]
 fn test_unnamed_sig_with_other_props() {
-	// Unnamed signature can be anywhere (after jni property)
 	let sig: abos_jni::signature::MethodSignature<'_, '_> = jni_sig!(
 		jni = ::abos_jni,
 		(a: CustomType) -> void,
@@ -158,7 +149,6 @@ fn test_unnamed_sig_with_other_props() {
 
 #[test]
 fn test_unnamed_sig_in_middle() {
-	// Unnamed signature in the middle of named properties (after jni)
 	let sig: abos_jni::signature::MethodSignature<'_, '_> = jni_sig!(
 		jni = ::abos_jni,
 		type_map = {
@@ -171,7 +161,6 @@ fn test_unnamed_sig_in_middle() {
 
 #[test]
 fn test_unnamed_sig_at_end() {
-	// Unnamed signature at the end
 	let sig: abos_jni::signature::MethodSignature<'_, '_> = jni_sig!(
 		jni = ::abos_jni,
 		type_map = {
@@ -184,7 +173,6 @@ fn test_unnamed_sig_at_end() {
 
 #[test]
 fn test_unnamed_sig_with_trailing_comma() {
-	// Unnamed signature at end with trailing comma
 	let sig: abos_jni::signature::MethodSignature<'_, '_> = jni_sig!(
 		jni = ::abos_jni,
 		type_map = {
@@ -197,7 +185,6 @@ fn test_unnamed_sig_with_trailing_comma() {
 
 #[test]
 fn test_type_map_prefix_required() {
-	// This should compile - type_map = is now required
 	let sig: abos_jni::signature::FieldSignature<'_> = jni_sig!(
 		CustomType,
 		type_map = {
@@ -206,5 +193,3 @@ fn test_type_map_prefix_required() {
 	);
 	assert_eq!(sig.sig().to_bytes(), b"Ljava/lang/Custom;");
 }
-
-// Tests for MUTF-8 encoding

@@ -57,10 +57,7 @@ pub fn throw_new_non_throwable_class() {
 #[test]
 pub fn throw_new_fail() {
 	attach_current_thread(|env| {
-		// Note: this isn't a great test because it's really just testing
-		// what error we get from `Desc<JClass>::lookup` when looking up
-		// an invalid class - it doesn't really have anything to do with
-		// making a `ThrowNew` JNI call.
+		// This exercises class lookup failure, not the ThrowNew JNI call.
 		let result: std::result::Result<(), abos_jni::errors::Error> =
 			env.throw_new(jni_str!("java/lang/NonexistentException"), jni_str!("Test Exception"));
 		assert!(result.is_err());
@@ -188,7 +185,6 @@ fn test_throwable_get_stack_trace() {
 			exception.get_stack_trace(env).expect("get stack trace succeeds");
 		let _len: usize = stack_trace.len(env).expect("array length is available");
 
-		// Test conversion to JObjectArray<JObject> and back
 		let obj_arr: JObjectArray<'_> = env
 			.cast_local::<JObjectArray>(stack_trace)
 			.expect("test operation succeeds");
@@ -211,8 +207,6 @@ fn test_throwable_get_stack_trace() {
 			let _s: JString<'_> = element
 				.try_to_string(env)
 				.expect("test Java string can be converted to Rust");
-
-			// Do something with the stack trace element
 		}
 
 		Ok(())

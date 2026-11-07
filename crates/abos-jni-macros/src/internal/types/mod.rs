@@ -80,7 +80,6 @@ impl JavaClassName {
 	pub fn to_jni_internal(&self) -> String {
 		let mut result = String::new();
 
-		// Add package
 		for (i, segment) in self.package.iter().enumerate() {
 			if i > 0 {
 				result.push('/');
@@ -88,7 +87,6 @@ impl JavaClassName {
 			result.push_str(segment);
 		}
 
-		// Add class name
 		if !self.package.is_empty() {
 			result.push('/');
 		}
@@ -101,7 +99,6 @@ impl JavaClassName {
 	pub fn to_java_dotted(&self) -> String {
 		let mut result = String::new();
 
-		// Add package
 		for (i, segment) in self.package.iter().enumerate() {
 			if i > 0 {
 				result.push('.');
@@ -109,7 +106,6 @@ impl JavaClassName {
 			result.push_str(segment);
 		}
 
-		// Add class name
 		if !self.package.is_empty() {
 			result.push('.');
 		}
@@ -135,12 +131,10 @@ impl Parse for JavaClassName {
 	/// The parser requires at least one dot in the input to differentiate from Rust types,
 	/// except for the special default-package case which starts with a `.`
 	fn parse(input: ParseStream) -> Result<Self> {
-		// Check if it's a string literal
 		if input.peek(syn::LitStr) {
 			let lit: syn::LitStr = input.parse::<syn::LitStr>()?;
 			let class_str: String = lit.value();
 
-			// Split by dots
 			let parts: Vec<&str> = class_str.split('.').collect();
 			if parts.is_empty() || (parts.len() == 1 && !class_str.starts_with('.')) {
 				return Err(syn::Error::new(
@@ -154,7 +148,6 @@ impl Parse for JavaClassName {
 				.expect("splitting a class name yields at least one component")
 				.to_string();
 			let package: Vec<String> = if class_str.starts_with('.') {
-				// Default package case
 				Vec::new()
 			} else {
 				parts[..parts.len() - 1]
@@ -166,12 +159,10 @@ impl Parse for JavaClassName {
 			return Ok(Self { package, class });
 		}
 
-		// Check for dot-prefixed default package class (e.g., .NoPackage)
 		if input.peek(Token![.]) {
 			input.parse::<Token![.]>()?;
 			let mut class_name: String = input.parse::<Ident>()?.to_string();
 
-			// Parse inner classes if any and concatenate with $
 			while input.peek(Token![::]) {
 				input.parse::<Token![::]>()?;
 				let inner: Ident = input.parse::<Ident>()?;
@@ -185,22 +176,18 @@ impl Parse for JavaClassName {
 			});
 		}
 
-		// Check if we have an ident followed by a dot (using lookahead to avoid consuming the ident)
-		// This ensures we don't consume a token that might be a primitive type or Rust type
+		// Look ahead without consuming a possible primitive or Rust type.
 		if input.peek(Ident) && input.peek2(Token![.]) {
-			// Parse as ident-based syntax: package.Class
 			let mut segments: Vec<String> = Vec::new();
 			let first: Ident = input.parse::<Ident>()?;
 			segments.push(first.to_string());
 
-			// Parse dot-separated package/class segments
 			while input.peek(Token![.]) {
 				input.parse::<Token![.]>()?;
 				let segment: Ident = input.parse::<Ident>()?;
 				segments.push(segment.to_string());
 			}
 
-			// Parse inner classes (separated by ::) and concatenate with $
 			let mut inner_class_parts: Vec<String> = Vec::new();
 			while input.peek(Token![::]) {
 				input.parse::<Token![::]>()?;
@@ -208,7 +195,6 @@ impl Parse for JavaClassName {
 				inner_class_parts.push(inner.to_string());
 			}
 
-			// Build the class name: last segment + any inner classes joined with $
 			let mut class: String = segments.pop().expect("the class path contains a name");
 			if !inner_class_parts.is_empty() {
 				class.push('$');
@@ -221,7 +207,6 @@ impl Parse for JavaClassName {
 			});
 		}
 
-		// None of the valid patterns matched
 		Err(syn::Error::new(
 			input.span(),
 			"Expected Java class name: either a string literal with dots (e.g., \"java.lang.String\"), a dotted identifier (e.g., java.lang.String), or a dot-prefixed class for default package (e.g., .NoPackage)",
@@ -275,34 +260,28 @@ impl SigType {
 
 /// Parse a type (can be primitive, object, rust reference, or array)
 pub fn parse_type(input: ParseStream, type_mappings: &TypeMappings) -> Result<SigType> {
-	// Check for leading reference operator (ignore it)
 	if input.peek(Token![&]) {
 		input.parse::<Token![&]>()?;
 	}
 
-	// Check for array syntax [...]
 	if input.peek(token::Bracket) {
 		let content;
 		let bracket_span: Span = input.span();
 		syn::bracketed!(content in input);
 		let elem_type: SigType = parse_type(&content, type_mappings)?;
 
-		// Validate that the element type can be used in an array
 		validate_array_element_type(&elem_type, type_mappings, bracket_span)?;
 
-		// Count array dimensions
 		let mut dims = 1;
 		while input.peek(token::Bracket) {
 			let _content;
 			syn::bracketed!(_content in input);
-			// Nested array - increment dimensions
 			dims += 1;
 		}
 
 		return Ok(SigType::Array(Box::new(elem_type), dims));
 	}
 
-	// Check for unit type ()
 	if input.peek(token::Paren) {
 		let content;
 		parenthesized!(content in input);
@@ -315,21 +294,16 @@ pub fn parse_type(input: ParseStream, type_mappings: &TypeMappings) -> Result<Si
 		));
 	}
 
-	// Try to parse as Java class name first (handles string literals, .NoPackage, and package.Class)
-	// This is done speculatively - if it fails, we'll try other interpretations
+	// Parse speculatively so non-Java names can fall back to type mappings.
 	let base_type: SigType = if let Ok(java_class) = input.parse::<JavaClassName>() {
 		SigType::Object(java_class)
 	} else {
-		// Not a Java class name, so it must be a TypeMappings type (could be
-		// primitive lie jint/i32 or Reference like
-		// JString/abos_jni::objects::JString)
 		let path: syn::Path = input.parse::<syn::Path>()?;
 		let path_str: String = path_to_string_no_spaces(&path);
 
 		SigType::Alias(path_str)
 	};
 
-	// Check for suffix array syntax (applies to all base types)
 	let mut dims = 0;
 	let mut first_bracket_span: Option<Span> = None;
 	while input.peek(token::Bracket) {
@@ -348,9 +322,7 @@ pub fn parse_type(input: ParseStream, type_mappings: &TypeMappings) -> Result<Si
 		dims += 1;
 	}
 
-	// If we have array dimensions, validate and wrap in Array type
 	if dims > 0 {
-		// Validate that the element type can be used in an array (void cannot)
 		validate_array_element_type(
 			&base_type,
 			type_mappings,

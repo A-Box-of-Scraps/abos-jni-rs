@@ -35,13 +35,10 @@ enum MyError {
 #[path = "utils/lib.rs"]
 mod utils;
 
-// First, define some simple bindings for types we'll reference in the example type_maps
-// (macro from utils/lib.rs)
 define_stub_type!(JNativeMethodWrapper, "com.example.NativeMethodWrapper");
 define_stub_type!(JBuiltinType, "com.example.CommonBuiltinType");
 define_stub_type!(JCustomType, "com.example.CustomType");
 
-// Define an FFI handle type that can be added to a common type_map
 #[repr(transparent)]
 #[derive(Copy, Clone)]
 struct CommonHandle(*const c_char);
@@ -91,7 +88,6 @@ macro_rules! my_jni_str {
     };
 }
 
-// Create an array of native methods using the wrapper macro
 const NATIVE_METHODS: &[NativeMethod] = &[
 	// Method using a handle type from the wrapper's type_map
 	my_native_method! {
@@ -106,8 +102,6 @@ const NATIVE_METHODS: &[NativeMethod] = &[
 		static fn JNativeMethodWrapper::mix_types(builtin: JBuiltinType, custom: JCustomType) -> JString,
 	},
 ];
-
-// Implementation functions for native methods
 
 impl JNativeMethodWrapper<'_> {
 	fn process_resource<'local>(
@@ -138,7 +132,6 @@ fn main() {
 
 		println!("=== native_method! Wrapper Example ===\n");
 
-		// Register native methods
 		println!("--- Registering Native Methods (via wrapper macro) ---");
 		let class = JNativeMethodWrapper::lookup_class(env, &LoaderContext::default())?;
 		let class: &JClass = &class;
@@ -148,12 +141,10 @@ fn main() {
 		}
 		println!("Registered {} native methods", NATIVE_METHODS.len());
 
-		// Create an instance
 		println!("\n--- Creating Instance ---");
 		let obj: JNativeMethodWrapper<'_> = JNativeMethodWrapper::new(env)?;
 		println!("Created NativeMethodWrapper instance");
 
-		// Test process_resource with a CStr handle
 		println!("\n--- Testing process_resource ---");
 		let resource_data = c"my_resource_data";
 		let resource_handle: CommonHandle = CommonHandle(resource_data.as_ptr());
@@ -168,9 +159,7 @@ fn main() {
 		let s: JString<'_> = JString::cast_local(env, obj)?;
 		println!("Result: {}", s.try_to_string(env)?);
 
-		// Test mix_types with JCommonBuiltinType and JCustomType
-		// Note: we refer to CustomType via the full Java type name here so we
-		// don't need to pass a type_map for just one usage
+		// A fully qualified Java name avoids a one-off type_map entry.
 		println!("\n--- Testing mix_types ---");
 		let builtin_obj: JBuiltinType<'_> = JBuiltinType::new(env)?;
 		let custom_obj: JCustomType<'_> = JCustomType::new(env)?;

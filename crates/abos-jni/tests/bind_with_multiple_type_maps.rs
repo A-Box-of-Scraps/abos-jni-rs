@@ -1,11 +1,9 @@
 #![allow(unsafe_code, reason = "Exercise JNI FFI and native method exports.")]
 #![allow(missing_docs, reason = "Executable examples and test fixtures are not library API.")]
 #![cfg(feature = "invocation")]
-// Test that multiple type_map blocks can be specified
 
 use abos_jni_macros::bind_java_type;
 
-// Forward declare custom types using minimal bind_java_type syntax
 bind_java_type! { CustomType1 => com.example.CustomType1 }
 bind_java_type! { CustomType2 => com.example.CustomType2 }
 bind_java_type! { CustomType3 => com.example.CustomType3 }
@@ -16,24 +14,20 @@ bind_java_type! {
 	rust_type = TestClass,
 	java_type = com.example.TestClass,
 
-	// First type_map block
 	type_map {
 		CustomType1 => com.example.CustomType1,
 		CustomType2 => com.example.CustomType2,
 	},
 
-	// Second type_map block - should merge with first
 	type_map {
 		CustomType3 => com.example.CustomType3,
 		CustomType4 => com.example.CustomType4,
 	},
 
-	// Third type_map block - should merge with first two
 	type_map {
 		CustomType5 => com.example.CustomType5,
 	},
 
-	// Use the custom types in methods to verify they're properly mapped
 	methods {
 		fn test_method1(arg1: CustomType1) -> CustomType2,
 		fn test_method2(arg2: CustomType2, arg3: CustomType3) -> CustomType4,

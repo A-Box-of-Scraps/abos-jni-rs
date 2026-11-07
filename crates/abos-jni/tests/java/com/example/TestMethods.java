@@ -72,22 +72,18 @@ public class TestMethods {
         return prefix + message + suffix;
     }
 
-    // Method with boolean return
     public boolean isPositive() {
         return counter > 0;
     }
 
-    // Method with multiple primitive types
     public double calculate(int a, long b, float c, double d) {
         return a + b + c + d;
     }
 
-    // Method that returns an object
     public String toStringCustom() {
         return "TestMethods{message='" + message + "', counter=" + counter + "}";
     }
 
-    // Void method with no parameters
     public void reset() {
         message = "default";
         counter = 0;
@@ -95,17 +91,14 @@ public class TestMethods {
 
     // Methods for testing non_null validation
     public String getNullableMessage() {
-        // This method returns null to test nullable (default) behavior
         return null;
     }
 
     public String getRequiredMessage() {
-        // This method returns null to test that non_null validation catches it
         return null;
     }
 
     public String getValidatedMessage() {
-        // This method returns null to test that non_null validation (block syntax) catches it
         return null;
     }
 

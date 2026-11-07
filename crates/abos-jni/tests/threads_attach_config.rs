@@ -9,7 +9,6 @@ use abos_jni::{AttachConfig, jni_sig, jni_str, objects::JString};
 mod util;
 use util::jvm;
 
-// Tests that an `AttachConfig` can be used to configure the name of the JVM `Thread`
 #[test]
 fn attach_config() {
 	let jvm: &std::sync::Arc<abos_jni::JavaVM> = jvm();
@@ -20,7 +19,6 @@ fn attach_config() {
 				|| AttachConfig::new().thread_name(jni_str!("test-thread")),
 				None,
 				|env| -> abos_jni::errors::Result<_> {
-					// Get the current Thread and query the name
 					let thread: abos_jni::objects::JObject<'_> = env
 						.call_static_method(
 							jni_str!("java/lang/Thread"),

@@ -15,7 +15,6 @@ use abos_jni::strings::JNIStr;
 use abos_jni_macros::{jni_cstr, jni_str};
 use std::ffi::CStr;
 
-// Helper function to verify MUTF-8 roundtrip encoding
 fn verify_roundtrip(original: &str, mutf8_bytes: &[u8]) {
 	match simd_cesu8::mutf8::decode(mutf8_bytes) {
 		Ok(decoded) => {
@@ -144,15 +143,12 @@ fn test_unicode_emoji_surrogate_pairs() {
 	let bytes: &[u8] = EMOJI.to_bytes();
 	let jbytes: &[u8] = JEMOJI.to_bytes();
 
-	// Both should produce same bytes
 	assert_eq!(bytes, jbytes);
 
-	// MUTF-8 should be longer than UTF-8 for emoji
 	let utf8_bytes: &[u8] = "😀".as_bytes();
 	assert_eq!(utf8_bytes.len(), 4); // UTF-8: 4 bytes
 	assert_eq!(bytes.len(), 6); // MUTF-8: 6 bytes (surrogate pair)
 
-	// Verify roundtrip
 	verify_roundtrip("😀", bytes);
 }
 
@@ -179,13 +175,11 @@ fn test_unicode_in_class_name() {
 
 #[test]
 fn test_const_context() {
-	// Test in const fn
 	const fn get_class_name() -> &'static CStr {
 		jni_cstr!("const.fn.Test")
 	}
 	const CLASS: &CStr = get_class_name();
 
-	// Verify macros work in const contexts
 	const CONST_CSTR: &CStr = jni_cstr!("const.test");
 	const CONST_JSTR: &JNIStr = jni_str!("const.test");
 
@@ -205,7 +199,6 @@ fn test_static_context() {
 
 #[test]
 fn test_empty_package() {
-	// Classes in default package (no package)
 	const DEFAULT_PKG: &CStr = jni_cstr!(".DefaultClass");
 
 	assert_eq!(
@@ -217,7 +210,6 @@ fn test_empty_package() {
 
 #[test]
 fn test_inner_class_notation() {
-	// Inner classes use $ in JNI
 	const INNER: &CStr = jni_cstr!("com.example.Outer$Inner");
 
 	assert_eq!(
@@ -256,7 +248,6 @@ fn test_field_name() {
 
 #[test]
 fn test_special_characters() {
-	// Test various special characters that might appear in class names
 	const SPECIAL: &CStr = jni_cstr!("test_class-name.v2");
 
 	assert_eq!(
