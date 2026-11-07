@@ -1,7 +1,7 @@
 # Tests outside src
 
-`tests_outside_src` keeps test implementations in each package's `tests/` directory. Production source can declare a
-path-included child module to retain access to private members:
+`tests_outside_src` keeps test implementations outside each package's `src/` directory. Production source can
+declare a path-included child module to retain access to private members:
 
 ```rust
 #[cfg(test)]
@@ -9,8 +9,10 @@ path-included child module to retain access to private members:
 mod tests;
 ```
 
-Keep these files in a subdirectory such as `tests/unit/`, rather than directly in `tests/`, so Cargo does not also
-compile them as standalone integration tests.
+When placing path-included test modules under `tests/`, use a subdirectory such as `tests/unit/`, rather than placing
+them directly in `tests/`, so Cargo does not also compile them as standalone integration tests. This is a Cargo layout
+consideration, not a requirement to use `tests/`; a path such as `../ui/unit.rs` also keeps the implementation outside
+`src/`.
 
 ## Rules
 
@@ -21,7 +23,7 @@ Inside a package's `src/`, the lint rejects:
 - Compound test-only predicates such as `#[cfg(all(test, windows))]`.
 - Test attributes introduced through `#[cfg_attr(...)]`.
 
-Out-of-line module declarations with a direct `#[path]` resolving into the package's `tests/` are allowed. Source
+Out-of-line module declarations with a direct `#[path]` resolving outside the package's `src/` are allowed. Source
 locations and resolved paths are checked, not module names. The nearest ancestor `Cargo.toml` defines the package
 boundary. Documentation examples, `#[cfg(not(test))]`, code shared with production through `#[cfg(any(test, ...))]`, and
 files outside `src/` are not rejected.
