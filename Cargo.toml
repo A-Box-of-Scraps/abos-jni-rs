@@ -10,6 +10,7 @@ exclude = [
 ]
 
 [workspace.package]
+repository = "https://github.com/A-Box-of-Scraps/abos-jni-rs"
 edition = "2024"
 license = "MIT"
 rust-version = "1.99.1"
