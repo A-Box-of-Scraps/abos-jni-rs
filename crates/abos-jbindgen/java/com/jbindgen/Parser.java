@@ -494,7 +494,7 @@ public class Parser implements AutoCloseable {
                 String binaryName = getBinaryName(element);
                 return "L" + binaryName.replace('.', '/') + ";";
             case TYPEVAR:
-                return "Ljava/lang/Object;";
+                return getTypeDescriptor(types.erasure(type), types);
             default:
                 return "Ljava/lang/Object;";
         }
@@ -504,6 +504,8 @@ public class Parser implements AutoCloseable {
      * Create a TypeDescription with proper array dimension tracking.
      */
     private TypeDescription createTypeDescription(TypeMirror type, Types types) {
+        // JNI uses erased JVM types, including bounds and components of generic arrays.
+        type = types.erasure(type);
         TypeDescription desc = new TypeDescription();
 
         int dimensions = 0;
@@ -552,7 +554,7 @@ public class Parser implements AutoCloseable {
                 TypeElement element = (TypeElement) declaredType.asElement();
                 return getBinaryName(element);
             case TYPEVAR:
-                return type.toString();
+                return getTypeName(types.erasure(type), types);
             default:
                 return type.toString();
         }

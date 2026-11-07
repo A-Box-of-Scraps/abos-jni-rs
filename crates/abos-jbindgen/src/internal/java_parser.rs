@@ -462,3 +462,7 @@ fn java_to_field_info(
 		is_deprecated,
 	})
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/internal/java_parser.rs"]
+mod tests;

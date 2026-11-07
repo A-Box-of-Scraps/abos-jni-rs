@@ -52,6 +52,8 @@ default-feature JNI tests, and strict workspace Clippy passed.
 
 ## 3. P1: Generic Java source produces nonexistent JNI signatures
 
+**status:fixed**
+
 **Location:** `crates/abos-jbindgen/java/com/jbindgen/Parser.java:494–497,554–555`
 
 Type variables retain names such as `T` instead of their erased JVM types. The descriptor helper also incorrectly assumes
@@ -63,6 +65,17 @@ correctly uses `java.lang.Number`.
 
 **Fix:** apply `Types.erasure` consistently when constructing runtime type metadata, including fields and arrays. Test
 source/bytecode signature parity.
+
+**Resolution:** confirmed by a failing source/bytecode metadata comparison. Runtime type descriptions now use
+`Types.erasure` before extracting element names and array dimensions. Type-variable name and descriptor helpers also
+resolve erased bounds rather than retaining variable names or assuming `Object`.
+
+**Verification:** a compiled generic fixture has explicit expected constructor, method, and field signatures, compared
+against normalized source and bytecode metadata (including static/final flags). Coverage includes unbounded, dependent,
+intersection, recursive, and shadowed bounds, generic methods, arrays, and parameterized types. Java descriptor fields
+are checked separately. Both generated binding sets compile, initialize, and exercise constructors, methods, fields, and
+arrays against the same fixture under `-Xcheck:jni`. Workspace all-feature tests and strict Clippy checks for both the
+workspace and standalone runtime crate passed.
 
 ## 4. P2: Non-static inner-class constructors omit the enclosing instance
 

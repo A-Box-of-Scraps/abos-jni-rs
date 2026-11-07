@@ -11,6 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let classes = output.join("classes");
 	let names = [
 		"SimpleClass",
+		"GenericTypes",
 		"Calculator",
 		"NoPackage",
 		"DefaultType",
@@ -106,6 +107,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.generate_jni_init(false)
 		.generate()?
 		.write_to_file(output.join("helper_no_init.rs"))?;
+	abos_jbindgen::Builder::new()
+		.input_class(classes.join("com/example/GenericTypes.class"))
+		.root_path("crate::generic_bytecode")
+		.generate()?
+		.write_to_file(output.join("generic_bytecode.rs"))?;
 	archive_bindings(&output)?;
 	Ok(())
 }

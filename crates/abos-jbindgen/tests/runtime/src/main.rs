@@ -69,14 +69,20 @@ mod generated_natives {
 mod helper_no_init {
 	include!(concat!(env!("OUT_DIR"), "/helper_no_init.rs"));
 }
+#[allow(dead_code, non_snake_case)]
+mod generic_bytecode {
+	include!(concat!(env!("OUT_DIR"), "/generic_bytecode.rs"));
+}
 mod collisions;
 mod default_package;
 mod generated_collisions;
+mod generics;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	use bindings::com::example::SimpleClass;
 	let args = abos_jni::InitArgsBuilder::new()
 		.version(abos_jni::JNIVersion::V1_8)
+		.option("-Xcheck:jni")
 		.option(format!("-Djava.class.path={}", env!("FIXTURE_CLASSES")))
 		.build()?;
 	let vm = abos_jni::JavaVM::new(args)?;
@@ -125,6 +131,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		collisions::check(env)?;
 		generated_collisions::check(env)?;
 		default_package::check(env)?;
+		generics::check(env)?;
 		assert_eq!(modular_jar::fixture::archive::ModularExample::answer(env)?, 42);
 		// Binding generation uses base classes; the JVM still selects its runtime variant.
 		assert_eq!(multi_release_jar::fixture::archive::VersionedExample::version(env)?, 17);
