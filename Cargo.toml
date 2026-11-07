@@ -50,7 +50,11 @@ windows-sys = "0.61"
 zip = { version = "9", default-features = false, features = ["deflate"] }
 
 [workspace.metadata.dylint]
-libraries = [{ path = "lints/explicit_binding_types" }, { path = "lints/tests_outside_src" }]
+libraries = [
+  { path = "lints/explicit_binding_types" },
+  { path = "lints/file_length" },
+  { path = "lints/tests_outside_src" },
+]
 
 [workspace.lints.rust]
 missing_docs = "warn"

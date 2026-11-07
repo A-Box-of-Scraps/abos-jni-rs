@@ -20,19 +20,16 @@ task.quiet = true
 run = "cargo bench --package abos-jni --features invocation --bench api_calls"
 
 [tasks.check]
-depends = ["fmt", "lint", "check:duplicates", "check:file-length"]
+depends = ["fmt", "lint", "check:duplicates"]
 
 [tasks."check:android-env"]
 run = "python tests/android-test-activity/tests/android_env.py check"
 
 [tasks."check:ci"]
-depends = ["fmt:check", "lint", "check:duplicates", "check:file-length"]
+depends = ["fmt:check", "lint", "check:duplicates"]
 
 [tasks."check:duplicates"]
 run = "jscpd --fail-on-empty --no-tips"
-
-[tasks."check:file-length"]
-run = "python scripts/check-file-length.py"
 
 [tasks."clone:all"]
 depends = ["clone:javac", "clone:jbindgen", "clone:jni-rs", "clone:jni-sys"]
