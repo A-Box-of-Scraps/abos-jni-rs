@@ -360,11 +360,11 @@ unsafe impl<'local, E: Reference + 'local> Reference for JObjectArray<'local, E>
 	fn class_name() -> Cow<'static, JNIStr> {
 		let inner: Cow<'_, JNIStr> = E::class_name();
 		let inner: Cow<'_, str> = inner.to_str();
-		let name: String = if inner.len() == 1 || inner.starts_with('[') {
-			// inner = primitive OR array
+		let name: String = if inner.starts_with('[') {
+			// Array references already use descriptors, including primitive arrays.
 			format!("[{inner}")
 		} else {
-			// inner = object
+			// Other references use object binary names, even single letters such as I.
 			format!("[L{inner};")
 		};
 		let name: JNIString = name.into();

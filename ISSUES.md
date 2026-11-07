@@ -28,6 +28,8 @@ safe `AsRef` implementation. Workspace all-feature tests and strict workspace Cl
 
 ## 2. P1: Single-letter class names can make primitive arrays pass object-array casts
 
+**status:fixed**
+
 **Location:** `crates/abos-jni/src/api/objects/jobject_array.rs:360–368`
 
 `class_name()` assumes every one-character element name is a primitive descriptor.
@@ -38,6 +40,15 @@ safe `AsRef` implementation. Workspace all-feature tests and strict workspace Cl
 
 **Fix:** distinguish array descriptors from object binary names without the one-character heuristic. Test default-package
 names that overlap primitive descriptor letters.
+
+**Resolution:** confirmed by regressions showing incorrect class names and an accepted `int[]` to `JObjectArray<I>`
+cast. Only names beginning with `[` are now treated as array descriptors; all other reference names are wrapped as
+object element types, including single-letter binary names.
+
+**Verification:** class-name checks cover all primitive descriptor letters, `V`, and `A`. An isolated `-Xcheck:jni`
+test rejects primitive-array casts and their nested equivalents, then exercises valid single-letter object arrays through
+typed casts, reads, method calls, and nested arrays. Nested primitive arrays remain usable. Workspace all-feature tests,
+default-feature JNI tests, and strict workspace Clippy passed.
 
 ## 3. P1: Generic Java source produces nonexistent JNI signatures
 
