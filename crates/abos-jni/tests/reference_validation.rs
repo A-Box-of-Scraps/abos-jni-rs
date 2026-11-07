@@ -4,6 +4,9 @@
 
 mod util;
 
+#[path = "reference_validation/roundtrips.rs"]
+mod roundtrips;
+
 use abos_jni::{
 	Env, JValue, bind_java_type,
 	errors::{Error, Result},
@@ -26,8 +29,13 @@ bind_java_type! {
 		fn accept_comparable(value: "java.lang.Comparable") -> jint,
 		fn accept_comparables(value: "java.lang.Comparable"[]) -> jint,
 		static fn accept_static(value: "java.lang.Comparable") -> jint,
+		fn echo_string(value: JString) -> JString,
+		fn echo_strings(value: JString[]) -> JString[],
+		fn echo_comparable(value: "java.lang.Comparable") -> "java.lang.Comparable",
 	},
 	fields {
+		text: JString,
+		strings: JString[],
 		comparable: "java.lang.Comparable",
 		static static_comparable: "java.lang.Comparable",
 		comparables: "java.lang.Comparable"[],
@@ -54,8 +62,8 @@ fn assert_wrong_type<T: std::fmt::Debug>(result: Result<T>, env: &Env<'_>) {
 
 // A safe AsRef implementation may return a different object on each call.
 struct AlternatingObject<'a> {
-	valid: &'a JObject<'a>,
-	invalid: &'a JObject<'a>,
+	first: &'a JObject<'a>,
+	second: &'a JObject<'a>,
 	calls: std::cell::Cell<usize>,
 }
 
@@ -63,7 +71,7 @@ impl<'a> AsRef<JObject<'a>> for AlternatingObject<'a> {
 	fn as_ref(&self) -> &JObject<'a> {
 		let calls: usize = self.calls.get();
 		self.calls.set(calls + 1);
-		if calls == 0 { self.valid } else { self.invalid }
+		if calls == 0 { self.first } else { self.second }
 	}
 }
 
@@ -119,17 +127,25 @@ fn object_array_uses_the_validated_initializer() {
 	util::attach_current_thread(|env| {
 		let string = env.new_string("initial")?;
 		let object = env.new_object(jni_str!("java/lang/Object"), jni_sig!("()V"), &[])?;
-		let value = AlternatingObject {
-			valid: string.as_ref(),
-			invalid: &object,
-			calls: std::cell::Cell::new(0),
-		};
-		let array = env.new_object_array(2, jni_str!("java/lang/String"), &value)?;
-		assert_eq!(value.calls.get(), 1);
-		let array = env.cast_local::<JObjectArray<JString>>(array)?;
-		for index in 0..2 {
-			assert_eq!(array.get_element(env, index)?.try_to_string(env)?, "initial");
+		for valid_first in [true, false] {
+			let (first, second) = if valid_first {
+				(string.as_ref(), &object)
+			} else {
+				(&object, string.as_ref())
+			};
+			let value = AlternatingObject { first, second, calls: std::cell::Cell::new(0) };
+			let result = env.new_object_array(2, jni_str!("java/lang/String"), &value);
+			assert_eq!(value.calls.get(), 1);
+			if valid_first {
+				let array = env.cast_local::<JObjectArray<JString>>(result?)?;
+				for index in 0..2 {
+					assert_eq!(array.get_element(env, index)?.try_to_string(env)?, "initial");
+				}
+			} else {
+				assert_wrong_type(result, env);
+			}
 		}
+		assert_eq!(string.try_to_string(env)?, "initial");
 		Ok(())
 	})
 	.expect("array allocation uses the checked reference");
@@ -287,8 +303,14 @@ fn fields_validate_before_writing() {
 			.l()?;
 		assert!(env.is_same_object(&original, &current)?);
 		assert!(env.is_same_object(&original_static, &current_static)?);
+		for value in [current, current_static] {
+			assert_eq!(env.cast_local::<JString>(value)?.try_to_string(env)?, "original");
+		}
 
-		let strings = env.new_object_array(0, jni_str!("java/lang/String"), JObject::null())?;
+		let string = env.new_string("array original")?;
+		let strings = env.new_object_array(1, jni_str!("java/lang/String"), &string)?;
+		env.set_field(&receiver, jni_str!("strings"), jni_sig!("[Ljava/lang/String;"), JValue::Object(&strings))?;
+		env.set_static_field(&class, jni_str!("staticStrings"), jni_sig!("[Ljava/lang/String;"), JValue::Object(&strings))?;
 		let objects = env.new_object_array(0, jni_str!("java/lang/Object"), JObject::null())?;
 		assert_wrong_type(
 			env.set_field(
@@ -308,6 +330,13 @@ fn fields_validate_before_writing() {
 			),
 			env,
 		);
+		let current = env.get_field(&receiver, jni_str!("strings"), jni_sig!("[Ljava/lang/String;"))?.l()?;
+		let current_static = env.get_static_field(&class, jni_str!("staticStrings"), jni_sig!("[Ljava/lang/String;"))?.l()?;
+		for value in [current, current_static] {
+			assert!(env.is_same_object(&strings, &value)?);
+			let array = env.cast_local::<JObjectArray<JString>>(value)?;
+			assert_eq!(array.get_element(env, 0)?.try_to_string(env)?, "array original");
+		}
 		for value in [strings.as_ref(), &JObject::null()] {
 			env.set_field(
 				&receiver,
@@ -390,27 +419,45 @@ fn generated_bindings_use_the_validated_reference() {
 		let receiver = ReferenceTypes::new(env)?;
 		let valid = env.new_string("valid")?;
 		let invalid = env.new_object(jni_str!("java/lang/Object"), jni_sig!("()V"), &[])?;
-		let value = AlternatingObject {
-			valid: valid.as_ref(),
-			invalid: &invalid,
-			calls: std::cell::Cell::new(0),
-		};
-		for operation in 0..5 {
-			value.calls.set(0);
-			match operation {
-				0 => {
-					receiver.accept_comparable(env, &value)?;
+		receiver.set_comparable(env, &valid)?;
+		ReferenceTypes::set_static_comparable(env, &valid)?;
+		for valid_first in [true, false] {
+			let (first, second) = if valid_first {
+				(valid.as_ref(), &invalid)
+			} else {
+				(&invalid, valid.as_ref())
+			};
+			let value = AlternatingObject { first, second, calls: std::cell::Cell::new(0) };
+			for operation in 0..6 {
+				value.calls.set(0);
+				let result = match operation {
+					0 => receiver.accept_comparable(env, &value).map(|_| ()),
+					1 => ReferenceTypes::accept_static(env, &value).map(|_| ()),
+					2 => ReferenceTypes::with_comparable(env, &value).and_then(|created| {
+						let stored = created.comparable(env)?;
+						assert_eq!(env.cast_local::<JString>(stored)?.try_to_string(env)?, "valid");
+						Ok(())
+					}),
+					3 => receiver.set_comparable(env, &value),
+					4 => ReferenceTypes::set_static_comparable(env, &value),
+					_ => receiver.echo_comparable(env, &value).and_then(|returned| {
+						assert_eq!(env.cast_local::<JString>(returned)?.try_to_string(env)?, "valid");
+						Ok(())
+					}),
+				};
+				assert_eq!(value.calls.get(), 1);
+				if valid_first {
+					result?;
+				} else {
+					assert_wrong_type(result, env);
 				}
-				1 => {
-					ReferenceTypes::accept_static(env, &value)?;
+				for stored in [receiver.comparable(env)?, ReferenceTypes::static_comparable(env)?] {
+					assert!(env.is_same_object(&valid, &stored)?);
+					assert_eq!(env.cast_local::<JString>(stored)?.try_to_string(env)?, "valid");
 				}
-				2 => {
-					ReferenceTypes::with_comparable(env, &value)?;
-				}
-				3 => receiver.set_comparable(env, &value)?,
-				_ => ReferenceTypes::set_static_comparable(env, &value)?,
 			}
-			assert_eq!(value.calls.get(), 1);
+			// Only the valid-first calls and constructor may execute Java bodies.
+			assert_eq!(env.get_static_field(jni_str!("com/example/ReferenceTypes"), jni_str!("calls"), jni_sig!("I"))?.i()?, 4);
 		}
 		Ok(())
 	})

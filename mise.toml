@@ -175,6 +175,7 @@ depends = [
   "test:abos-jbindgen",
   "test:abos-jbindgen-annotations",
   "test:abos-jni",
+  "test:abos-jni:jvm",
   "test:abos-jni-macros",
   "test:abos-jni-sys",
   "test:abos-jni-sys-macros",

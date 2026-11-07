@@ -51,5 +51,18 @@ public class ReferenceTypes {
         return value;
     }
 
+    public String echoString(String value) {
+        return value;
+    }
+
+    public String[] echoStrings(String[] value) {
+        return value;
+    }
+
+    public Comparable echoComparable(Comparable value) {
+        calls++;
+        return value;
+    }
+
     public static class Child extends ReferenceTypes {}
 }

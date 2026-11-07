@@ -1,0 +1,8 @@
+error: lifetime may not live long enough
+ --> tests/ui/fail/local-reference-escapes-frame.rs:4:47
+  |
+4 |     let string = env.with_local_frame(1, |inner| inner.new_string("local"))?;
+  |                                           ------ ^^^^^^^^^^^^^^^^^^^^^^^^^ returning this value requires that `'1` must outlive `'2`
+  |                                           |    |
+  |                                           |    return type of closure is Result<JString<'2>, abos_jni::errors::Error>
+  |                                           has type `&mut Env<'1>`

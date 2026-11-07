@@ -79,12 +79,18 @@ impl LoaderContext<'_, '_> {
 	/// # Errors
 	///
 	/// Returns an error if the class cannot be found, linked or initialized, or a JNI operation fails during loading.
+	/// Returns [`Error::JavaException`] without clearing an already pending exception.
 	pub fn load_class<'env_local>(
 		&self,
 		env: &mut crate::api::env::Env<'env_local>,
 		name: impl AsRef<JNIStr>,
 		initialize: bool,
 	) -> crate::errors::Result<JClass<'env_local>> {
+		// Fallback handlers may catch lookup failures, but must not consume an exception
+		// that was already pending before this lookup started.
+		if env.exception_check() {
+			return Err(Error::JavaException);
+		}
 		let name: &JNIStr = name.as_ref();
 		match self {
 			LoaderContext::None => env.with_local_frame_returning_local::<_, JClass, _>(5, |env| {
@@ -108,6 +114,7 @@ impl LoaderContext<'_, '_> {
 	/// # Errors
 	///
 	/// Returns an error if the class cannot be found, linked or initialized, or a JNI operation fails during loading.
+	/// Returns [`Error::JavaException`] without clearing an already pending exception.
 	pub fn find_class<'env_local>(
 		&self,
 		env: &mut crate::api::env::Env<'env_local>,
@@ -131,6 +138,7 @@ impl LoaderContext<'_, '_> {
 	/// # Errors
 	///
 	/// Returns an error if the class cannot be found, linked or initialized, or a JNI operation fails during loading.
+	/// Returns [`Error::JavaException`] without clearing an already pending exception.
 	pub fn load_class_for_type<'env_local, T: Reference>(
 		&self,
 		env: &mut crate::api::env::Env<'env_local>,

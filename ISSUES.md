@@ -12,15 +12,15 @@ regression test, followed by broader adversarial safe-API testing and source-ver
 The function passes the initializer to JNI without checking whether it belongs to the requested element class.
 
 **Reproduced:** creating a `String[]` initialized with a plain `Object` succeeds. Safely casting it to
-`JObjectArray<JString>` and reading an element produces a `JString` wrapping that plain object. Calling
-`try_to_string` aborts under `-Xcheck:jni` with “JNI string operation received a non-string”.
+`JObjectArray<JString>` and reading an element produces a `JString` wrapping that plain object. Calling `try_to_string`
+aborts under `-Xcheck:jni` with “JNI string operation received a non-string”.
 
 **Fix:** evaluate the initializer's `AsRef` once and validate non-null values against the resolved element class before
 allocation. Test the subsequent typed cast as well as array creation.
 
-**Resolution:** confirmed by a failing regression test. Non-null initializers are now checked against the resolved
-class before allocation, returning `Error::WrongObjectType` for incompatible values. The initializer and resolved
-class references are evaluated once and reused for validation and allocation.
+**Resolution:** confirmed by a failing regression test. Non-null initializers are now checked against the resolved class
+before allocation, returning `Error::WrongObjectType` for incompatible values. The initializer and resolved class
+references are evaluated once and reused for validation and allocation.
 
 **Verification:** isolated `-Xcheck:jni` regressions cover incompatible initializers (including primitive arrays),
 zero-length arrays, nulls, subclass/interface assignability, subsequent typed casts and string reads, and an alternating
@@ -38,15 +38,15 @@ safe `AsRef` implementation. Workspace all-feature tests and strict workspace Cl
 `[LI;`. Safely casting an `int[]` to `JObjectArray<I>` succeeds. Reading an element aborts under `-Xcheck:jni` with
 “Object array expected but not received for JNI array operation”.
 
-**Fix:** distinguish array descriptors from object binary names without the one-character heuristic. Test default-package
-names that overlap primitive descriptor letters.
+**Fix:** distinguish array descriptors from object binary names without the one-character heuristic. Test
+default-package names that overlap primitive descriptor letters.
 
 **Resolution:** confirmed by regressions showing incorrect class names and an accepted `int[]` to `JObjectArray<I>`
 cast. Only names beginning with `[` are now treated as array descriptors; all other reference names are wrapped as
 object element types, including single-letter binary names.
 
-**Verification:** class-name checks cover all primitive descriptor letters, `V`, and `A`. An isolated `-Xcheck:jni`
-test rejects primitive-array casts and their nested equivalents, then exercises valid single-letter object arrays through
+**Verification:** class-name checks cover all primitive descriptor letters, `V`, and `A`. An isolated `-Xcheck:jni` test
+rejects primitive-array casts and their nested equivalents, then exercises valid single-letter object arrays through
 typed casts, reads, method calls, and nested arrays. Nested primitive arrays remain usable. Workspace all-feature tests,
 default-feature JNI tests, and strict workspace Clippy passed.
 
@@ -56,11 +56,11 @@ default-feature JNI tests, and strict workspace Clippy passed.
 
 **Location:** `crates/abos-jbindgen/java/com/jbindgen/Parser.java:494–497,554–555`
 
-Type variables retain names such as `T` instead of their erased JVM types. The descriptor helper also incorrectly assumes
-every type variable erases to `Object`.
+Type variables retain names such as `T` instead of their erased JVM types. The descriptor helper also incorrectly
+assumes every type variable erases to `Object`.
 
-**Reproduced:** for `Generic<T extends Number>` with `public T echo(T value)`, source generation emits `.T` arguments and
-returns. Binding initialization fails with `MethodNotFound { name: "echo", sig: "(LT;)LT;" }`. Bytecode generation
+**Reproduced:** for `Generic<T extends Number>` with `public T echo(T value)`, source generation emits `.T` arguments
+and returns. Binding initialization fails with `MethodNotFound { name: "echo", sig: "(LT;)LT;" }`. Bytecode generation
 correctly uses `java.lang.Number`.
 
 **Fix:** apply `Types.erasure` consistently when constructing runtime type metadata, including fields and arrays. Test
@@ -92,15 +92,15 @@ fails with `MethodNotFound`, preventing ordinary methods on that wrapper from wo
 **Fix:** include the enclosing-instance parameter for non-static member classes. Explicitly reject unsupported
 captured/local-class cases rather than generating incorrect signatures.
 
-**Resolution:** confirmed by a failing source/bytecode constructor comparison. Non-static member-class constructors
-now prepend the erased type of their immediate enclosing class, including implicit default constructors. Static nested
+**Resolution:** confirmed by a failing source/bytecode constructor comparison. Non-static member-class constructors now
+prepend the erased type of their immediate enclosing class, including implicit default constructors. Static nested
 classes are unchanged. Selected local classes and their members are rejected with a diagnostic recommending class-file
 input; selection uses compiler binary names, and parser exception messages are preserved in Rust errors.
 
 **Verification:** explicit expected constructor descriptors and source/bytecode API parity cover generic enclosing
-classes, deep nesting, default constructors, inheritance, static nested classes, and implicitly static interface members.
-Only bytecode fields marked synthetic are excluded from this comparison. Both generated binding sets initialize and
-execute constructors and methods against the same compiled fixture under `-Xcheck:jni`, including a parameter-name
+classes, deep nesting, default constructors, inheritance, static nested classes, and implicitly static interface
+members. Only bytecode fields marked synthetic are excluded from this comparison. Both generated binding sets initialize
+and execute constructors and methods against the same compiled fixture under `-Xcheck:jni`, including a parameter-name
 collision. Tests also cover captured and uncaptured local classes, local-class members, and successful generation after
 excluding unsupported classes. Workspace all-feature tests and strict Clippy checks for the workspace and standalone
 runtime crate passed.
@@ -113,8 +113,8 @@ runtime crate passed.
 
 The handwritten binary-name builder recognizes only classes, interfaces, and enums.
 
-**Reproduced:** both `audit.Point`, a record, and `audit.Marker`, an annotation type, generate
-`pub java => "audit.",` instead of their actual class names.
+**Reproduced:** both `audit.Point`, a record, and `audit.Marker`, an annotation type, generate `pub java => "audit.",`
+instead of their actual class names.
 
 **Fix:** use `Elements.getBinaryName` instead of reconstructing binary names manually. Include nested records and
 annotations in tests.
@@ -124,10 +124,11 @@ runtime type metadata now use `Elements.getBinaryName`, including descriptors, a
 metadata. Package names use `Elements.getPackageOf`; the handwritten binary-name builder was removed.
 
 **Verification:** explicit expected names and member signatures cover top-level records and annotations, nested records
-and annotations, and classes nested inside records. Full normalized source/bytecode APIs match without member exclusions,
-and Java descriptor fields are checked separately. Both generated binding sets compile, initialize, and exercise record
-constructors, accessors, annotation values, and typed arrays against the same fixtures under `-Xcheck:jni`. Workspace
-all-feature tests and strict Clippy checks for the workspace and standalone runtime crate passed.
+and annotations, and classes nested inside records. Full normalized source/bytecode APIs match without member
+exclusions, and Java descriptor fields are checked separately. Both generated binding sets compile, initialize, and
+exercise record constructors, accessors, annotation values, and typed arrays against the same fixtures under
+`-Xcheck:jni`. Workspace all-feature tests and strict Clippy checks for the workspace and standalone runtime crate
+passed.
 
 ## 6. P2: Source generation silently omits enum constants
 
@@ -146,10 +147,10 @@ emits both accessors.
 collection now processes `ElementKind.ENUM_CONSTANT` through the existing field pipeline, preserving type metadata,
 static/final flags, annotations, and skip handling.
 
-**Verification:** explicit expected runtime APIs cover top-level, nested, and empty enums, ordinary instance fields,
-and a constant-specific subclass. Source and bytecode metadata match without member exclusions for the named enums;
-the anonymous constant body is not treated as a separately named source API. Java descriptor fields are also checked.
-Both generated binding sets initialize and read constants, invoke overridden methods, access fields, and verify identity
+**Verification:** explicit expected runtime APIs cover top-level, nested, and empty enums, ordinary instance fields, and
+a constant-specific subclass. Source and bytecode metadata match without member exclusions for the named enums; the
+anonymous constant body is not treated as a separately named source API. Java descriptor fields are also checked. Both
+generated binding sets initialize and read constants, invoke overridden methods, access fields, and verify identity
 through `values()` and `valueOf()` under `-Xcheck:jni`. Workspace all-feature tests and strict Clippy checks for the
 workspace and standalone runtime crate passed.
 
@@ -166,32 +167,54 @@ Source locations refer to the audited revision and may shift as fixes are applie
 
 ## Adversarial safe-API testing gap
 
-The passing suite did not catch the two cases where safe public calls produce invalid typed references. Regression tests
-for those cases are necessary, but broader coverage should exercise combinations of safe operations, not just individual
-methods with valid inputs.
+**status:fixed**
 
-**Coverage to add:**
+The original passing suite missed two cases where safe public calls produced invalid typed references. The suite now
+covers composed operations and recovery after failures, in addition to the original regressions.
 
-- Incompatible array initializers, method arguments, and field values; distinguish accepted nulls from invalid references.
-- Primitive arrays, object arrays, nested arrays, and casts between incompatible element types.
+**Coverage:**
+
+- Incompatible array initializers, method arguments, and field values; accepted nulls and assignable references.
+- Primitive, object, widened, and nested arrays; incompatible casts and writes followed by typed reads of unchanged
+  values.
 - Default-package and single-letter class names, including names that overlap primitive descriptors.
-- Safe `AsRef` implementations that return different valid references on successive calls, to catch validation/use
-  mismatches.
-- Pending Java exceptions, invalid indexes, and boundary lengths, checking that failures leave the environment usable
-  after the exception is handled.
-- Compile-fail tests for local references escaping their frame or crossing threads.
+- Safe `AsRef` implementations that change references between calls, tested in both valid-first and invalid-first order.
+- Method-return and field round trips through direct `Env` calls and generated bindings, followed by array reads, typed
+  casts, string conversion, and method calls.
+- Pending Java exceptions, invalid indexes, empty arrays, negative lengths, and lengths outside JNI's integer range.
+  Failures check the specific error or exception, preserved values, and successful operations after recovery. Oversized
+  lengths are rejected before allocation rather than tested by exhausting the JVM heap.
+- Compile-fail tests for local references escaping a frame or being moved/shared across scoped threads. Runtime positive
+  controls exercise explicit frame promotion and global-reference transfers.
 
-**Test approach:** keep runtime reproductions entirely within safe public Rust APIs. Run potentially fatal JNI cases in
-isolated child processes with `-Xcheck:jni`, and have the parent assert successful completion and the expected result.
-Exercise returned references through subsequent casts, reads, and calls so invalid wrappers cannot pass unnoticed.
+**Resolution:** extended `reference_validation.rs` (with `reference_validation/roundtrips.rs`) and
+`object_array_casts.rs`, added `adversarial_recovery.rs` and three `ui/fail/local-reference-*` cases with reviewed
+diagnostics. Existing initializer, class-name, assignability, and class-loader identity regressions remain in place. The
+standard `mise run test` task now includes `test:abos-jni:jvm`, so invocation-gated runtime and compile-fail tests are
+not skipped by default-feature testing.
+
+**Additional defect found:** the pending-exception regression initially failed because class-loader fallback handling
+consumed an existing exception, allowing `new_object_array` to succeed. `LoaderContext::load_class` now returns
+`Error::JavaException` before lookup when an exception is pending. Tests verify the original exception's identity and
+message across every loader context, then successfully load classes and use references after handling it.
+
+**Test approach:** runtime scenarios use safe public Rust APIs and run in isolated `rusty_fork_test!` child processes
+with `-Xcheck:jni`. Child assertions check results and subsequent reference use; the parent requires successful
+completion. Compile-fail cases use the existing `trybuild` runner.
 
 **Acceptance:** invalid inputs are rejected through the documented error or exception behavior, without invalid typed
 references or JVM aborts. Valid edge cases continue to work.
 
+**Verification:** `cargo test --workspace --all-features --locked -q` passed with 654 tests and 7 ignored.
+Default-feature JNI tests, strict workspace Clippy, and package-scoped JNI Dylint checks passed on Linux with JDK 25.
+Full `mise run lint` remains blocked by existing explicit-binding-type errors in
+`crates/abos-jbindgen/tests/unit/internal/java_parser.rs`. This deterministic suite is not an exhaustive soundness
+review; Windows and Android execution remain unverified.
+
 ## Source-versus-bytecode parity suites
 
-The source-generation failures show that generated text alone is not enough to validate bindings. Both input paths should
-agree on the runtime API represented by the same compiled Java fixture.
+The source-generation failures show that generated text alone is not enough to validate bindings. Both input paths
+should agree on the runtime API represented by the same compiled Java fixture.
 
 **Coverage to add:**
 
@@ -201,9 +224,9 @@ agree on the runtime API represented by the same compiled Java fixture.
 - Overloads, inheritance, covariant returns, visibility, and static/final members.
 - Default-package classes and unusual but valid Java identifiers.
 
-**Test approach:** compile each fixture once, then generate bindings independently from its source and resulting
-class files or JAR. Compare normalized class names and member signatures, including descriptors and static flags, rather
-than requiring identical Rust text. Parameter names, documentation, source-only annotations, and compiler-generated
+**Test approach:** compile each fixture once, then generate bindings independently from its source and resulting class
+files or JAR. Compare normalized class names and member signatures, including descriptors and static flags, rather than
+requiring identical Rust text. Parameter names, documentation, source-only annotations, and compiler-generated
 synthetic/bridge members need explicit comparison rules; differences must not be silently ignored.
 
 Compile both generated binding sets in separate Rust modules or test crates, initialize them against the same compiled

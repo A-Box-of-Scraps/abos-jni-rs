@@ -1,0 +1,14 @@
+error[E0521]: borrowed data escapes outside of function
+ --> tests/ui/fail/local-reference-crosses-thread.rs:6:3
+  |
+3 | fn move_to_thread(env: &mut Env<'_>) -> Result<()> {
+  |                   ---
+  |                   |
+  |                   `env` is a reference that is only valid in the function body
+  |                   has type `&mut Env<'1>`
+...
+6 |         scope.spawn(move || drop(string));
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |         |
+  |         `env` escapes the function body here
+  |         argument requires that `'1` must outlive `'static`
