@@ -8,7 +8,7 @@ use abos_jni::{
 	Env, JValue, bind_java_type,
 	errors::{Error, Result},
 	jni_sig, jni_str,
-	objects::{JClassLoader, JObject},
+	objects::{JClassLoader, JObject, JObjectArray, JString},
 	refs::Reference,
 	signature::RuntimeMethodSignature,
 	strings::JNIString,
@@ -68,6 +68,73 @@ impl<'a> AsRef<JObject<'a>> for AlternatingObject<'a> {
 }
 
 rusty_fork_test! {
+#[test]
+fn object_array_rejects_incompatible_initializers() {
+	util::attach_current_thread(|env| {
+		let object = env.new_object(jni_str!("java/lang/Object"), jni_sig!("()V"), &[])?;
+		let ints = env.new_int_array(1)?;
+		for length in [2, 0] {
+			for invalid in [&object, ints.as_ref()] {
+				assert_wrong_type(env.new_object_array(length, jni_str!("java/lang/String"), invalid), env);
+			}
+		}
+		let string = env.new_string("still usable")?;
+		assert_eq!(string.try_to_string(env)?, "still usable");
+		Ok(())
+	})
+	.expect("incompatible array initializers are rejected");
+}
+
+#[test]
+fn object_array_accepts_assignable_and_null_initializers() {
+	util::attach_current_thread(|env| {
+		let string = env.new_string("initial")?;
+		for class in [jni_str!("java/lang/String"), jni_str!("java/lang/Object"), jni_str!("java/lang/Comparable")] {
+			let array = env.new_object_array(2, class, &string)?;
+			for index in 0..2 {
+				let element = array.get_element(env, index)?;
+				let element = env.cast_local::<JString>(element)?;
+				assert_eq!(element.try_to_string(env)?, "initial");
+			}
+		}
+		for value in [string.as_ref(), &JObject::null()] {
+			let array = env.new_object_array(2, jni_str!("java/lang/String"), value)?;
+			let array = env.cast_local::<JObjectArray<JString>>(array)?;
+			for index in 0..2 {
+				let element = array.get_element(env, index)?;
+				if value.is_null() {
+					assert!(element.is_null());
+				} else {
+					assert_eq!(element.try_to_string(env)?, "initial");
+				}
+			}
+		}
+		Ok(())
+	})
+	.expect("valid array initializers preserve typed reads");
+}
+
+#[test]
+fn object_array_uses_the_validated_initializer() {
+	util::attach_current_thread(|env| {
+		let string = env.new_string("initial")?;
+		let object = env.new_object(jni_str!("java/lang/Object"), jni_sig!("()V"), &[])?;
+		let value = AlternatingObject {
+			valid: string.as_ref(),
+			invalid: &object,
+			calls: std::cell::Cell::new(0),
+		};
+		let array = env.new_object_array(2, jni_str!("java/lang/String"), &value)?;
+		assert_eq!(value.calls.get(), 1);
+		let array = env.cast_local::<JObjectArray<JString>>(array)?;
+		for index in 0..2 {
+			assert_eq!(array.get_element(env, index)?.try_to_string(env)?, "initial");
+		}
+		Ok(())
+	})
+	.expect("array allocation uses the checked reference");
+}
+
 #[test]
 fn calls_validate_reference_assignability() {
 	let output = compile_fixture("reference_calls");

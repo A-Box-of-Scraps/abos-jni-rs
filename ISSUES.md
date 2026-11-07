@@ -5,6 +5,8 @@ regression test, followed by broader adversarial safe-API testing and source-ver
 
 ## 1. P1: `new_object_array` allows incompatible initial values
 
+**status:fixed**
+
 **Location:** `crates/abos-jni/src/api/env/arrays.rs:54–66`
 
 The function passes the initializer to JNI without checking whether it belongs to the requested element class.
@@ -15,6 +17,14 @@ The function passes the initializer to JNI without checking whether it belongs t
 
 **Fix:** evaluate the initializer's `AsRef` once and validate non-null values against the resolved element class before
 allocation. Test the subsequent typed cast as well as array creation.
+
+**Resolution:** confirmed by a failing regression test. Non-null initializers are now checked against the resolved
+class before allocation, returning `Error::WrongObjectType` for incompatible values. The initializer and resolved
+class references are evaluated once and reused for validation and allocation.
+
+**Verification:** isolated `-Xcheck:jni` regressions cover incompatible initializers (including primitive arrays),
+zero-length arrays, nulls, subclass/interface assignability, subsequent typed casts and string reads, and an alternating
+safe `AsRef` implementation. Workspace all-feature tests and strict workspace Clippy passed.
 
 ## 2. P1: Single-letter class names can make primitive arrays pass object-array casts
 
