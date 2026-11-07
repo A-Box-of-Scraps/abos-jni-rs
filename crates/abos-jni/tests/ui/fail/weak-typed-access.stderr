@@ -1,0 +1,31 @@
+error[E0308]: mismatched types
+ --> tests/ui/fail/weak-typed-access.rs:4:20
+  |
+4 |     let _: &JString = weak;
+  |            --------   ^^^^ expected `&JString<'_>`, found `&Weak<JString<'_>>`
+  |            |
+  |            expected due to this
+  |
+  = note: expected reference `&JString<'_>`
+             found reference `&abos_jni::refs::Weak<JString<'static>>`
+
+error[E0599]: the method `as_ref` exists for reference `&abos_jni::refs::Weak<JString<'static>>`, but its trait bounds were not satisfied
+ --> tests/ui/fail/weak-typed-access.rs:5:25
+  |
+5 |     let _: &JString = weak.as_ref();
+  |                            ^^^^^^
+  |
+ ::: src/api/refs/weak.rs
+  |
+  | pub struct Weak<T>
+  | ------------------ doesn't satisfy `abos_jni::refs::Weak<JString<'_>>: AsRef<_>`
+  |
+  = note: the following trait bounds were not satisfied:
+          `abos_jni::refs::Weak<JString<'_>>: AsRef<_>`
+          which is required by `&abos_jni::refs::Weak<JString<'_>>: AsRef<_>`
+
+error[E0599]: no method named `mutf8_chars` found for reference `&abos_jni::refs::Weak<JString<'static>>` in the current scope
+ --> tests/ui/fail/weak-typed-access.rs:6:15
+  |
+6 |     let _ = weak.mutf8_chars(env);
+  |                  ^^^^^^^^^^^ method not found in `&abos_jni::refs::Weak<JString<'static>>`

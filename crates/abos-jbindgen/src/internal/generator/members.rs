@@ -1,6 +1,7 @@
 use super::{
 	Context,
 	documentation::format_javadoc_as_rustdoc,
+	identifiers::rust_identifier,
 	names::{java_name_to_rust, resolve_type_with_deps},
 	overloads::{generate_unique_overload_names, group_methods_by_name, is_snake_case, resolve_name_collision},
 	signatures::{
@@ -54,11 +55,13 @@ pub(super) fn constructors(context: &mut Context<'_>) -> Result<()> {
 	context.body.push_str("    constructors {\n");
 	for (method, generated) in methods.iter().zip(&names) {
 		let dex: String = generate_dex_signature(&context.class.class_name, method);
-		let name: &str = method
-			.rust_name_override
-			.as_deref()
-			.or_else(|| context.options.name_overrides.get(&dex).map(String::as_str))
-			.unwrap_or(generated);
+		let (name, _) = member_name(
+			context,
+			&method.name,
+			&dex,
+			method.rust_name_override.as_deref(),
+			Some(generated),
+		);
 		let sig: String = generate_method_signature_with_deps(
 			method,
 			context.types,
@@ -70,7 +73,7 @@ pub(super) fn constructors(context: &mut Context<'_>) -> Result<()> {
 			&mut context.body,
 			method.documentation.as_deref(),
 			method.is_deprecated,
-			name,
+			&name,
 		);
 		writeln!(context.body, "        fn {name}{sig},").expect("writing to String");
 	}
@@ -97,17 +100,13 @@ pub(super) fn fields(context: &mut Context<'_>) {
 	for field in fields {
 		let dex: String = generate_field_dex_signature(&context.class.class_name, field);
 		let (name, reversible) = member_name(context, &field.name, &dex, field.rust_name_override.as_deref(), None);
-		context.member_names.remove(&(name.clone(), field.name.clone()));
-		context
-			.member_names
-			.insert((name.clone(), format!("field:{}", field.name)));
 		let setter: Option<String> = if field.is_final {
 			None
 		} else {
 			Some(
 				resolve_name_collision(
 					format!("set_{name}"),
-					&format!("field-setter:{}", field.name),
+					&format!("setter:{dex}"),
 					&mut context.member_names,
 				)
 				.0,
@@ -121,7 +120,9 @@ pub(super) fn fields(context: &mut Context<'_>) {
 			&name,
 		);
 		let modifier: &str = if field.is_static { "static " } else { "" };
-		if reversible && setter.as_deref() == Some(format!("set_{name}").as_str()) {
+		// The macro puts leading underscores before "set_" in shorthand syntax.
+		// Explicit setters keep the emitted API consistent with the name we reserved.
+		if reversible && !name.starts_with('_') && setter.as_deref() == Some(format!("set_{name}").as_str()) {
 			writeln!(context.body, "        {modifier}{name}: {ty},").expect("writing to String");
 		} else {
 			writeln!(context.body, "        {modifier}{name} {{").expect("writing to String");
@@ -153,10 +154,11 @@ fn member_name(
 		.map(String::as_str)
 		.or(annotation)
 		.or(overload);
-	let (name, reversible) = override_name.map_or_else(|| java_name_to_rust(java), |name| (name.to_owned(), false));
-	let (resolved, collision, previous) = resolve_name_collision(name, java, &mut context.member_names);
+	let (name, reversible) =
+		override_name.map_or_else(|| java_name_to_rust(java), |name| (rust_identifier(name), false));
+	let (resolved, collision, previous) = resolve_name_collision(name, dex, &mut context.member_names);
 	if collision {
-		log::warn!("Java member {java} conflicts with {previous:?}; using {resolved}");
+		log::warn!("Java member {dex} conflicts with {previous:?}; using {resolved}");
 	}
 	(resolved, reversible && !collision)
 }

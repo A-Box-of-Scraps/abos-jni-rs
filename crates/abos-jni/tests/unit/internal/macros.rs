@@ -1,0 +1,129 @@
+use crate::{
+	errors::{Error, JniError},
+	objects::JThrowable,
+};
+
+/// Smoke test that some example usage of `jni_call_with_catch_and_null_check!` compiles.
+///
+/// `name` and `sig` represent the method/field name and descriptor that would be in scope when
+/// calling a lookup JNI function.
+///
+/// This tries to test plausible mappings for all the exception types we have bindings for.
+fn _compile_test_jni_call_with_catch_and_null_check(
+	env: &mut crate::Env<'_>,
+	name: &crate::strings::JNIStr,
+	sig: &crate::strings::JNIStr,
+) -> crate::errors::Result<crate::sys::jclass> {
+	// SAFETY: The caller guarantees valid class bytes and JNI references; the call checks exceptions and null returns.
+	unsafe {
+		jni_call_with_catch_and_null_check!(
+			catch |env| {
+				crate::exceptions::JOutOfMemoryError =>
+					Err(Error::JniCall(JniError::NoMemory)),
+
+				crate::exceptions::JClassFormatError =>
+					Err(Error::ClassFormatError),
+
+				crate::exceptions::JClassCircularityError =>
+					Err(Error::ClassCircularityError),
+
+				e: crate::exceptions::JClassNotFoundException => {
+					let cause: &JThrowable = &e.as_throwable();
+					let cause: Option<crate::refs::Global<JThrowable<'_>>> = env.new_global_ref(cause).ok();
+					Err(Error::NoClassDefFound {
+						requested: name.to_string(),
+						cause
+					})
+				},
+				e: crate::exceptions::JNoClassDefFoundError => {
+					let cause: &JThrowable = &e.as_throwable();
+					let cause: Option<crate::refs::Global<JThrowable<'_>>> = env.new_global_ref(cause).ok();
+					Err(Error::NoClassDefFound {
+						requested: name.to_string(),
+						cause
+					})
+				},
+
+				e: crate::exceptions::JExceptionInInitializerError => {
+					let exception: std::result::Result<JThrowable<'_>, crate::errors::Error> = e.get_exception(env);
+					let exception: Option<crate::refs::Global<JThrowable<'_>>> = exception.map_or_else(|_| None, |exception| env.new_global_ref(exception).ok());
+					Err(Error::ExceptionInInitializer { exception })
+				},
+
+				crate::exceptions::JNoSuchMethodError =>
+					Err(Error::MethodNotFound {
+						name: name.to_string(),
+						sig: sig.to_string(),
+					}),
+
+				crate::exceptions::JNoSuchFieldError =>
+					Err(Error::FieldNotFound {
+						name: name.to_string(),
+						sig: sig.to_string(),
+					}),
+
+				crate::exceptions::JArrayStoreException =>
+					Err(Error::WrongObjectType),
+
+				crate::exceptions::JIllegalArgumentException =>
+					Err(Error::JniCall(JniError::InvalidArguments)),
+
+				crate::exceptions::JIllegalMonitorStateException =>
+					Err(Error::IllegalMonitorState),
+
+				e: crate::exceptions::JLinkageError => {
+					let cause: &JThrowable = &e.as_throwable();
+					let cause: Option<crate::refs::Global<JThrowable<'_>>> = env.new_global_ref(cause).ok();
+					Err(Error::LinkageError {
+						requested: name.to_string(),
+						cause
+					})
+				},
+
+				crate::exceptions::JSecurityException =>
+					Err(Error::SecurityViolation),
+
+				crate::exceptions::JArrayIndexOutOfBoundsException =>
+					Err(Error::IndexOutOfBounds),
+
+				crate::exceptions::JStringIndexOutOfBoundsException =>
+					Err(Error::IndexOutOfBounds),
+
+				crate::exceptions::JInstantiationException =>
+					Err(Error::Instantiation),
+
+				crate::exceptions::JNumberFormatException =>
+					Err(Error::ParseFailed(String::new())),
+
+				else => Err(Error::NullPtr("Unexpected Exception"))
+				//else => Err(Error::JniCall(JniError::Unknown))
+			},
+			env,
+			v1_1,
+			FindClass,
+			core::ptr::null()
+		)
+	}
+}
+
+fn _compile_test_jni_try(env: &mut crate::Env<'_>) -> crate::errors::Result<()> {
+	let _res: crate::objects::JString<'_> = jni_try! {
+		(env) -> crate::errors::Result<crate::objects::JString> {
+			let s: crate::objects::JString<'_> = env.new_string("String")?;
+
+			{
+				let msg: crate::objects::JString<'_> = env.new_string("Test")?;
+				let e: crate::api::exceptions::JNumberFormatException<'_> = crate::exceptions::JNumberFormatException::new(env, msg)?;
+				let e: crate::objects::JThrowable = e.into();
+				env.throw(e)?;
+			}
+
+			Ok(s)
+		} catch |env| {
+			crate::exceptions::JNumberFormatException => Err(Error::ParseFailed(String::new())),
+			else => Err(Error::NullPtr("Test"))
+		}
+	}?;
+
+	Ok(())
+}

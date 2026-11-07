@@ -1,3 +1,4 @@
+use super::generator::names::macro_java_name;
 use crate::{BindingInfo, Bindings, Module, ModuleBinding, ModuleEvent, Result, TypeMap};
 use std::{collections::BTreeMap, fmt::Write as _, fs, path::Path};
 
@@ -64,7 +65,7 @@ pub fn walk<F: FnMut(&Module, ModuleEvent)>(module: &Module, callback: &mut F) {
 
 fn initialization(bindings: &[BindingInfo], children: impl Iterator<Item = impl AsRef<str>>) -> String {
 	let mut output: String = String::from(
-		"/// Initialize the Java bindings in this module.\npub fn jni_init(env: &::jni::Env, loader: &::jni::refs::LoaderContext) -> ::jni::errors::Result<()> {\n",
+		"/// Initialize the Java bindings in this module.\npub fn jni_init(env: &::abos_jni::Env, loader: &::abos_jni::refs::LoaderContext) -> ::abos_jni::errors::Result<()> {\n",
 	);
 	for binding in bindings {
 		writeln!(output, "    let _ = {}::get(env, loader)?;", binding.rust_api_type_name).expect("writing to String");
@@ -187,6 +188,7 @@ pub fn write_type_map(map: &TypeMap, path: &Path) -> Result<()> {
 	entries.sort_by_key(|(java, _)| *java);
 	let mut output = String::new();
 	for (java, rust) in entries {
+		let java: String = macro_java_name(java);
 		writeln!(output, "{rust} => \"{java}\"").expect("writing to String");
 	}
 	fs::write(path, output)?;

@@ -1,0 +1,209 @@
+use log::error;
+use std::marker::PhantomData;
+use std::ptr::NonNull;
+
+use crate::JavaVM;
+use crate::objects::{JPrimitiveArray, ReleaseMode, TypeArray};
+use crate::sys::jboolean;
+use crate::{
+	Env,
+	errors::{Error, JniError, Result},
+	sys,
+};
+
+#[cfg(doc)]
+use crate::objects::JByteArray;
+
+/// Auto-release wrapper for a mutable pointer to the elements of a [`JPrimitiveArray`]
+/// (such as [`JByteArray`])
+///
+/// This type is used to wrap pointers returned by `GetPrimitiveArrayCritical`
+/// and ensure the pointer is released via `ReleasePrimitiveArrayCritical` when dropped.
+#[derive(Debug)]
+pub struct AutoElementsCritical<'array_local, T: TypeArray, TArrayRef>
+where
+	TArrayRef: AsRef<JPrimitiveArray<'array_local, T>>,
+{
+	array: TArrayRef,
+	len: usize,
+	ptr: NonNull<T>,
+	mode: ReleaseMode,
+	is_copy: bool,
+	_lifetime: PhantomData<&'array_local ()>,
+}
+
+impl<'array_local, T: TypeArray, TArrayRef> AutoElementsCritical<'array_local, T, TArrayRef>
+where
+	TArrayRef: AsRef<JPrimitiveArray<'array_local, T>>,
+{
+	/// # Safety
+	///
+	/// `len` must be the correct length (number of elements) of the given `array`
+	pub(crate) unsafe fn new_with_len(env: &Env<'_>, array: TArrayRef, len: usize, mode: ReleaseMode) -> Result<Self> {
+		let mut is_copy: jboolean = true;
+
+		// We use jni_call_no_post_check_ex! (not jni_call_with_catch_and_null_check!)
+		// because once GetPrimitiveArrayCritical succeeds we're immediately in a
+		// critical section where no other JNI calls are allowed (including
+		// exception_check or exception_clear).
+		//
+		// jni_call_no_post_check_ex! only does a pre-check for pending exceptions,
+		// then calls GetPrimitiveArrayCritical without any post-call exception
+		// checking.
+		//
+		// GetPrimitiveArrayCritical can return NULL on OutOfMemory and may throw
+		// OutOfMemoryError. If it returns NULL, no critical section has been
+		// created, so it's safe to make JNI calls to check/clear exceptions.
+		// SAFETY: The typed array is valid, the copy flag is writable, and the guard will delimit the critical section.
+		let ptr: *mut T = unsafe {
+			jni_call_no_post_check_ex!(
+				env,
+				v1_2,
+				GetPrimitiveArrayCritical,
+				array.as_ref().as_raw(),
+				&raw mut is_copy
+			)?
+			.cast::<T>()
+		};
+
+		// Check for NULL return (indicates OutOfMemory)
+		// If we got NULL, no critical section was created, so we can safely
+		// make JNI calls to clear any pending exception.
+		let Some(ptr) = NonNull::new(ptr) else {
+			// Clear any pending OutOfMemoryError before returning
+			env.exception_clear();
+			return Err(Error::JniCall(JniError::NoMemory));
+		};
+
+		Ok(AutoElementsCritical {
+			array,
+			len,
+			ptr,
+			mode,
+			is_copy: is_copy == sys::JNI_TRUE,
+			_lifetime: PhantomData,
+		})
+	}
+
+	pub(crate) fn new(env: &Env<'_>, array: TArrayRef, mode: ReleaseMode) -> Result<Self> {
+		let len: usize = array.as_ref().len(env)?;
+		// SAFETY: The length was obtained from the same typed array retained by the returned guard.
+		unsafe { Self::new_with_len(env, array, len, mode) }
+	}
+
+	/// Get a reference to the wrapped pointer
+	pub const fn as_ptr(&self) -> *mut T {
+		self.ptr.as_ptr()
+	}
+
+	/// Calls `ReleasePrimitiveArrayCritical`.
+	///
+	/// # Safety
+	///
+	/// `mode` must be a valid parameter to the JNI `ReleasePrimitiveArrayCritical` `mode`
+	/// parameter.
+	///
+	/// If `mode` is not [`sys::JNI_COMMIT`], then `self.ptr` must not have already been released.
+	unsafe fn release_primitive_array_critical(&mut self, mode: i32) -> Result<()> {
+		// Safety/Errors:
+		// - Since we can't construct `AutoElementsCritical` without a valid `Env` reference we know
+		//   we can call `JavaVM::singleton()` without an error.
+		// - Since `self` is associated with a local reference frame lifetime we know that the
+		//   thread is attached and so `with_top_local_frame()` can't return an error.
+		// - ReleasePrimitiveArrayCritical can be called while there is a pending exception
+		// SAFETY: The pointer belongs to this retained array, mode is valid, and this call releases the critical section.
+		JavaVM::singleton()?.with_top_local_frame(|env| unsafe {
+			ex_safe_jni_call_no_post_check_ex!(
+				env,
+				v1_2,
+				ReleasePrimitiveArrayCritical,
+				self.array.as_ref().as_raw(),
+				self.ptr.as_ptr().cast(),
+				mode
+			);
+			Ok(())
+		})
+	}
+
+	/// Don't copy back the changes to the array on release (if it is a copy).
+	///
+	/// This has no effect if the array is not a copy.
+	///
+	/// This method is useful to change the release mode of an array originally created
+	/// with `ReleaseMode::CopyBack`.
+	pub fn discard(mut self) {
+		self.mode = ReleaseMode::NoCopyBack;
+		// drop
+	}
+
+	/// Indicates if the array is a copy or not
+	pub const fn is_copy(&self) -> bool {
+		self.is_copy
+	}
+
+	/// Returns the array length (number of elements)
+	pub const fn len(&self) -> usize {
+		self.len
+	}
+
+	/// Returns true if the vector contains no elements.
+	pub const fn is_empty(&self) -> bool {
+		self.len == 0
+	}
+}
+
+impl<'array_local, T: TypeArray, TArrayRef> AsRef<Self> for AutoElementsCritical<'array_local, T, TArrayRef>
+where
+	TArrayRef: AsRef<JPrimitiveArray<'array_local, T>>,
+{
+	fn as_ref(&self) -> &Self {
+		self
+	}
+}
+
+impl<'array_local, T: TypeArray, TArrayRef> Drop for AutoElementsCritical<'array_local, T, TArrayRef>
+where
+	TArrayRef: AsRef<JPrimitiveArray<'array_local, T>>,
+{
+	fn drop(&mut self) {
+		// Safety: `self.mode` is valid and the array has not yet been released.
+		let res: std::result::Result<(), crate::errors::Error> =
+			unsafe { self.release_primitive_array_critical(self.mode as i32) };
+
+		match res {
+			Ok(()) => {}
+			Err(e) => error!("error releasing primitive array: {e:#?}"),
+		}
+	}
+}
+
+impl<'array_local, T: TypeArray, TArrayRef> From<&AutoElementsCritical<'array_local, T, TArrayRef>> for *mut T
+where
+	TArrayRef: AsRef<JPrimitiveArray<'array_local, T>>,
+{
+	fn from(other: &AutoElementsCritical<'array_local, T, TArrayRef>) -> *mut T {
+		other.as_ptr()
+	}
+}
+
+impl<'array_local, T: TypeArray, TArrayRef> std::ops::Deref for AutoElementsCritical<'array_local, T, TArrayRef>
+where
+	TArrayRef: AsRef<JPrimitiveArray<'array_local, T>>,
+{
+	type Target = [T];
+
+	fn deref(&self) -> &Self::Target {
+		// SAFETY: The guard keeps len initialized elements pinned, and the shared borrow prevents mutation through it.
+		unsafe { std::slice::from_raw_parts(self.ptr.as_ptr(), self.len) }
+	}
+}
+
+impl<'array_local, T: TypeArray, TArrayRef> std::ops::DerefMut for AutoElementsCritical<'array_local, T, TArrayRef>
+where
+	TArrayRef: AsRef<JPrimitiveArray<'array_local, T>>,
+{
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		// SAFETY: The guard pins len initialized elements and the mutable borrow grants exclusive access.
+		unsafe { std::slice::from_raw_parts_mut(self.ptr.as_mut(), self.len) }
+	}
+}

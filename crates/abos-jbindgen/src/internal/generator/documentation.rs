@@ -14,7 +14,6 @@ pub fn format_javadoc_as_rustdoc(javadoc: &str) -> String {
 	for line in javadoc.lines() {
 		let trimmed: &str = line.trim();
 
-		// Skip empty lines in special sections
 		if trimmed.is_empty() {
 			if !in_param_section && !in_return_section {
 				output.push_str("///\n");
@@ -22,26 +21,22 @@ pub fn format_javadoc_as_rustdoc(javadoc: &str) -> String {
 			continue;
 		}
 
-		// Handle @param tags
 		if trimmed.starts_with("@param") {
 			if !in_param_section {
 				output.push_str("///\n");
 				output.push_str("/// # Parameters\n");
 				in_param_section = true;
 			}
-			// Extract parameter name and description
 			if let Some((param_name, desc)) = trimmed
 				.strip_prefix("@param")
 				.and_then(|rest| rest.trim().split_once(char::is_whitespace))
 			{
-				// Convert parameter name to snake_case
 				let rust_param_name: String = java_name_to_rust(param_name.trim()).0;
 				writeln!(output, "/// * `{}` - {}", rust_param_name, desc.trim()).expect("writing to String");
 			}
 			continue;
 		}
 
-		// Handle @return tags
 		if trimmed.starts_with("@return") {
 			in_param_section = false;
 			in_return_section = true;
@@ -53,25 +48,21 @@ pub fn format_javadoc_as_rustdoc(javadoc: &str) -> String {
 			continue;
 		}
 
-		// Handle @throws/@exception tags
 		if trimmed.starts_with("@throws") || trimmed.starts_with("@exception") {
 			in_param_section = false;
 			in_return_section = false;
 			continue; // Skip for now, could add Errors section
 		}
 
-		// Handle other @ tags by skipping them
 		if trimmed.starts_with('@') {
 			in_param_section = false;
 			in_return_section = false;
 			continue;
 		}
 
-		// Regular documentation line
 		in_param_section = false;
 		in_return_section = false;
 
-		// Basic HTML tag stripping (simple version)
 		let cleaned: String = trimmed
 			.replace("<p>", "")
 			.replace("</p>", "")

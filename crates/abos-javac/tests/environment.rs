@@ -62,14 +62,17 @@ fn environment_probe() -> TestResult {
 				assert_eq!(args[index + 1], expected);
 			}
 		}
-		"metadata" | "no-metadata" => {
-			let compiler: JavaCompiler = Build::new()
+		"metadata" | "no-metadata" | "no-source-metadata" => {
+			let mut build = Build::new();
+			build
 				.file("Foo.java")
 				.source_dir(env::var_os("OUT_DIR").expect("OUT_DIR"))
 				.classpath("dependency.jar")
-				.emit_rerun_if_changed(true)
-				.cargo_metadata(case == "metadata")
-				.try_get_compiler()?;
+				.cargo_metadata(case != "no-metadata");
+			if case == "no-source-metadata" {
+				build.emit_rerun_if_changed(false);
+			}
+			let compiler: JavaCompiler = build.try_get_compiler()?;
 			// The missing input deliberately fails; metadata must still precede execution.
 			assert!(compiler.try_compile().is_err());
 		}
@@ -145,5 +148,18 @@ fn prefers_java_home_over_path() -> TestResult {
 		.env("OUT_DIR", root.path())
 		.env("PATH", "");
 	assert_success(&mut command)?;
+	Ok(())
+}
+
+#[test]
+fn source_tracking_can_be_disabled_without_disabling_environment_tracking() -> TestResult {
+	let root: TempDir = tempfile::tempdir()?;
+	let mut command: Command = probe("no-source-metadata")?;
+	command.env("OUT_DIR", root.path());
+	let output: Output = assert_success(&mut command)?;
+	let stdout: String = String::from_utf8(output.stdout)?;
+	assert!(stdout.contains("cargo:rerun-if-env-changed=JAVA_HOME"));
+	assert!(stdout.contains("cargo:rerun-if-env-changed=PATH"));
+	assert!(!stdout.contains("cargo:rerun-if-changed="));
 	Ok(())
 }

@@ -1,6 +1,6 @@
 //! Source parsing can reuse a JVM initialized by the embedding application.
 use abos_jbindgen::{Bindings, Builder};
-use jni::{InitArgs, InitArgsBuilder, JNIVersion, JavaVM};
+use abos_jni::{InitArgs, InitArgsBuilder, JNIVersion, JavaVM};
 use std::path::PathBuf;
 
 #[test]

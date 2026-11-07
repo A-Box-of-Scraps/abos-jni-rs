@@ -1,5 +1,26 @@
+use super::identifiers::rust_identifier;
 use crate::TypeMap;
-use std::collections::HashSet;
+use std::{borrow::Cow, collections::HashSet};
+/// Use dot-separated binary names internally, without the macro's default-package marker.
+pub fn canonical_java_name(name: &str) -> Cow<'_, str> {
+	let name: &str = name.strip_prefix('.').unwrap_or(name);
+	if name.contains('/') {
+		Cow::Owned(name.replace('/', "."))
+	} else {
+		Cow::Borrowed(name)
+	}
+}
+
+/// The binding macro requires a leading dot for a class in the default package.
+pub fn macro_java_name(name: &str) -> String {
+	let name: Cow<'_, str> = canonical_java_name(name);
+	if name.contains('.') {
+		name.into_owned()
+	} else {
+		format!(".{name}")
+	}
+}
+
 /// Builtin JNI type information
 pub struct BuiltinType {
 	/// Simple Rust type name (e.g., "`JString`")
@@ -10,7 +31,7 @@ pub struct BuiltinType {
 	pub(crate) is_core: bool,
 }
 
-/// Get the list of builtin JNI types from the jni crate
+/// Get the list of builtin JNI types from the `abos-jni` crate
 pub const fn builtin_jni_types() -> &'static [BuiltinType] {
 	&[
 		BuiltinType {
@@ -92,46 +113,32 @@ pub const fn builtin_jni_types() -> &'static [BuiltinType] {
 /// - Strips '$' characters used for inner classes (e.g., "ColorSpace$Rgb" -> "`ColorSpaceRgb`")
 /// - Applies optional name prefix
 pub fn derive_rust_type_name(class_name: &str, rust_type_override: Option<&str>, name_prefix: Option<&str>) -> String {
-	// Extract the class portion from class_name (strip package)
-	// For "android/os/Build$Partition" -> "Build$Partition"
 	let class_part: &str = class_name.split('/').next_back().unwrap_or(class_name);
 
 	let base_name: &str = rust_type_override.unwrap_or(class_part);
 
-	// Strip '$' characters used for inner classes (e.g., "Build$Partition" -> "BuildPartition")
 	let base_name_cleaned: String = base_name.replace('$', "");
 
-	// Apply name prefix if specified
-	if let Some(prefix) = name_prefix {
-		format!("{prefix}{base_name_cleaned}")
-	} else {
-		base_name_cleaned
-	}
+	rust_identifier(&format!("{}{base_name_cleaned}", name_prefix.unwrap_or_default()))
 }
 
-// Match jni-macros naming rules so shorthand bindings resolve the original Java name.
+// Match abos-jni-macros naming rules so shorthand bindings resolve the original Java name.
 pub fn jni_macros_snake_case_to_lower_camel_case(s: &str) -> String {
-	// If the string contains any uppercase letters, assume it's intentionally cased
-	// and return it unchanged
+	// Preserve intentional mixed or uppercase naming.
 	if s.chars().any(char::is_uppercase) {
 		return s.to_string();
 	}
 
-	// Find leading underscores
 	let leading_underscores: usize = s.chars().take_while(|&c| c == '_').count();
 
-	// Find trailing underscores
 	let trailing_underscores: usize = s.chars().rev().take_while(|&c| c == '_').count();
 
-	// If the entire string is underscores, return as-is
 	if leading_underscores + trailing_underscores >= s.len() {
 		return s.to_string();
 	}
 
-	// Extract the middle part (without leading/trailing underscores)
 	let middle: &str = &s[leading_underscores..s.len() - trailing_underscores];
 
-	// Convert the middle part
 	let mut result = String::new();
 	let mut capitalize_next = false;
 
@@ -146,8 +153,6 @@ pub fn jni_macros_snake_case_to_lower_camel_case(s: &str) -> String {
 		}
 	}
 
-	// Reconstruct with leading and trailing underscores
-	// Remove one leading underscore (if any exist)
 	let adjusted_leading_underscores: usize = if leading_underscores > 0 {
 		leading_underscores - 1
 	} else {
@@ -171,11 +176,6 @@ pub fn jni_macros_snake_case_to_lower_camel_case(s: &str) -> String {
 /// Returns (`rust_name`, `is_reversible`) where `is_reversible` indicates whether
 /// `jni_macros` can automatically derive the Java name from the Rust name
 pub fn java_name_to_rust(java_name: &str) -> (String, bool) {
-	// Check if the name is already in UPPER_SNAKE_CASE (constant style)
-	// UPPER_SNAKE_CASE is detected when:
-	// - All letters are uppercase
-	// - May contain underscores and digits
-	// - Has at least one letter
 	let has_letter: bool = java_name.chars().any(char::is_alphabetic);
 	let is_upper_snake_case: bool = has_letter
 		&& java_name
@@ -183,13 +183,12 @@ pub fn java_name_to_rust(java_name: &str) -> (String, bool) {
 			.all(|c| c.is_uppercase() || c == '_' || c.is_numeric());
 
 	if is_upper_snake_case {
-		// Keep UPPER_SNAKE_CASE names as-is (e.g., DEFAULT_KEYS_DIALER, RESULT_OK)
-		// These are reversible since jni_macros leaves them unchanged
-		return (java_name.to_string(), true);
+		// The macro preserves uppercase names, so unchanged identifiers are reversible.
+		let name: String = rust_identifier(java_name);
+		let reversible: bool = name == java_name;
+		return (name, reversible);
 	}
 
-	// Simple conversion: insert underscores before uppercase letters
-	// and convert to lowercase
 	let mut result = String::new();
 	let mut prev_was_lower = false;
 
@@ -206,7 +205,8 @@ pub fn java_name_to_rust(java_name: &str) -> (String, bool) {
 		}
 	}
 
-	// Check if the transformation is reversible by applying jni_macros algorithm
+	let result: String = rust_identifier(&result);
+	// Check reversibility after normalization so renamed members use explicit Java names.
 	let back_converted: String = jni_macros_snake_case_to_lower_camel_case(&result);
 	let is_reversible: bool = back_converted == java_name;
 
@@ -219,19 +219,16 @@ pub fn resolve_type_with_deps(
 	type_map: &TypeMap,
 	used_types: &mut HashSet<String>,
 ) -> String {
-	// Get the base/element type first
-	let base_type: String = type_map.get_rust_type(&type_info.name).map_or_else(
-		|| qualified_name_to_jni_type(&type_info.name).unwrap_or_else(|| format!("\"{}\"", type_info.name)),
+	let java_name: Cow<'_, str> = canonical_java_name(&type_info.name);
+	let base_type: String = type_map.get_rust_type(&java_name).map_or_else(
+		|| qualified_name_to_jni_type(&java_name).unwrap_or_else(|| format!("\"{}\"", macro_java_name(&java_name))),
 		|rust| {
-			used_types.insert(type_info.name.clone());
+			used_types.insert(java_name.to_string());
 			rust.to_owned()
 		},
 	);
 
-	// Add array brackets if needed
 	if type_info.array_dimensions > 0 {
-		// For builtin types like JString, format as JString[]
-		// For quoted types like "android.os.Build", format as "android.os.Build"[]
 		format!("{}{}", base_type, "[]".repeat(type_info.array_dimensions))
 	} else {
 		base_type
@@ -240,14 +237,12 @@ pub fn resolve_type_with_deps(
 
 /// Convert a Java qualified name to a JNI Rust type if it's a known built-in
 pub fn qualified_name_to_jni_type(qualified_name: &str) -> Option<String> {
-	// Check builtin JNI types
 	for builtin in builtin_jni_types() {
 		if builtin.java_name == qualified_name {
 			return Some(builtin.rust_name.to_string());
 		}
 	}
 
-	// Java primitive types (for qualified names from source)
 	match qualified_name {
 		"boolean" => Some("jboolean".to_string()),
 		"byte" => Some("jbyte".to_string()),

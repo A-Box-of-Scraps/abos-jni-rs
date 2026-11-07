@@ -6,14 +6,18 @@ license.workspace = true
 rust-version.workspace = true
 description = "Generate Rust JNI bindings from Java source, bytecode, and Android SDKs."
 
+[features]
+# Internal parser access for the isolated fuzz workspace.
+_fuzzing = []
+
 [lints]
 workspace = true
 
 [dependencies]
 abos-cafebabe.workspace = true
 abos-jbindgen-annotations.workspace = true
+abos-jni = { workspace = true, features = ["invocation"] }
 clap.workspace = true
-jni.workspace = true
 log.workspace = true
 thiserror.workspace = true
 zip.workspace = true
@@ -24,4 +28,5 @@ zip.workspace = true
 
 [dev-dependencies]
 abos-javac.workspace = true
+indoc.workspace = true
 tempfile.workspace = true

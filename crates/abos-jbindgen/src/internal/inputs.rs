@@ -38,7 +38,7 @@ pub fn generate_bindings_from_bytes(
 ) -> Result<ModuleBinding> {
 	let class_info: crate::ClassInfo = bytecode::parse_class(bytes)?;
 
-	let mut type_map: crate::TypeMap = crate::TypeMap::from_classes(std::iter::once(&class_info), options);
+	let mut type_map: crate::TypeMap = crate::TypeMap::from_classes(std::iter::once(&class_info), options)?;
 	type_map.merge(extra_type_map);
 
 	generator::generate_with_type_map(&class_info, options, &type_map)
@@ -58,7 +58,7 @@ pub fn generate_bindings_from_jar(
 		Ok(())
 	})?;
 
-	let mut type_map: crate::TypeMap = crate::TypeMap::from_classes(classes.iter().map(|(_, c)| c), options);
+	let mut type_map: crate::TypeMap = crate::TypeMap::from_classes(classes.iter().map(|(_, c)| c), options)?;
 	type_map.merge(extra_type_map);
 
 	let mut results: Vec<crate::ModuleBinding> = Vec::new();
@@ -78,7 +78,6 @@ pub fn generate_bindings_from_sources(
 	options: &BindgenOptions,
 	extra_type_map: Vec<(String, String)>,
 ) -> Result<Vec<ModuleBinding>> {
-	// Parse sources using Java parser, passing all patterns
 	let pattern_str: String = if patterns.is_empty() {
 		"*".to_string()
 	} else {
@@ -87,7 +86,7 @@ pub fn generate_bindings_from_sources(
 	let classes: Vec<crate::ClassInfo> =
 		java_parser::parse_java_sources(source_paths, class_path_entries, &pattern_str)?;
 
-	let mut type_map: crate::TypeMap = crate::TypeMap::from_classes(classes.iter(), options);
+	let mut type_map: crate::TypeMap = crate::TypeMap::from_classes(classes.iter(), options)?;
 	type_map.merge(extra_type_map);
 
 	let mut results: Vec<crate::ModuleBinding> = Vec::new();
@@ -109,21 +108,39 @@ pub fn visit_jar_classes(
 	mut visitor: impl FnMut(&str, &[u8]) -> Result<()>,
 ) -> Result<()> {
 	let mut archive: zip::ZipArchive<fs::File> = zip::ZipArchive::new(fs::File::open(path)?)?;
-	for index in 0..archive.len() {
-		let mut file: zip::read::ZipFile<'_, fs::File> = archive.by_index(index)?;
-		let name: String = file.name().to_owned();
-		if Path::new(&name)
-			.extension()
-			.is_none_or(|extension| extension != "class")
-		{
-			continue;
+	// Select from the central-directory names before reading class data. Metadata and
+	// versioned entries are never parsed, and host JVM versions do not affect selection.
+	let mut names: Vec<String> = Vec::new();
+	for name in archive.file_names() {
+		let name: std::borrow::Cow<'_, str> = name?;
+		if is_binding_class_entry(&name) && (patterns.is_empty() || matches_any_pattern(&name, patterns)) {
+			names.push(name.into_owned());
 		}
-		if !patterns.is_empty() && !matches_any_pattern(&name, patterns) {
-			continue;
-		}
+	}
+	names.sort();
+	for name in names {
+		let mut file: zip::read::ZipFile<'_, fs::File> = archive.by_name(&name)?;
 		let mut bytes: Vec<u8> = Vec::new();
 		file.read_to_end(&mut bytes)?;
 		visitor(&name, &bytes)?;
 	}
 	Ok(())
 }
+
+#[expect(
+	clippy::case_sensitive_file_extension_comparisons,
+	reason = "JAR class entry names are case-sensitive and use forward slashes on every host."
+)]
+fn is_binding_class_entry(name: &str) -> bool {
+	// JAR paths use '/', independently of the host operating system.
+	name.ends_with(".class")
+		&& !name.starts_with("META-INF/")
+		&& !matches!(
+			name.rsplit('/').next(),
+			Some("module-info.class" | "package-info.class")
+		)
+}
+
+#[cfg(test)]
+#[path = "../../tests/unit/internal/inputs.rs"]
+mod tests;

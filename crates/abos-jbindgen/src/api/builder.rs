@@ -90,6 +90,12 @@ impl Builder {
 	}
 
 	/// Set the input to a JAR file.
+	///
+	/// Generates bindings from base class entries, in archive-name order. Ignores
+	/// `module-info.class`, `package-info.class`, and everything under `META-INF/`,
+	/// including multi-release variants. Selection never depends on the host JVM.
+	/// Version-only classes and members are not included, even with explicit patterns.
+	/// The JVM still chooses its runtime variant, which must retain the generated base members.
 	pub fn input_jar<P: AsRef<Path>>(mut self, path: P) -> Self {
 		self.input = Some(InputSource::JarFile {
 			path: path.as_ref().to_path_buf(),
@@ -99,6 +105,12 @@ impl Builder {
 	}
 
 	/// Set the input to Java source files.
+	///
+	/// Source and bytecode inputs include non-private constructors, ordinary methods, and fields.
+	/// Native methods, including private ones, are retained for registration bindings.
+	/// Non-static member-class constructors include the enclosing-instance parameter.
+	/// Selected local classes and their members are rejected because captured constructor
+	/// parameters are not exposed by the source model; use class-file input for those classes.
 	pub fn input_sources(mut self, source_paths: Vec<PathBuf>, classpath: Vec<PathBuf>, patterns: Vec<String>) -> Self {
 		self.input = Some(InputSource::Sources {
 			source_paths,
@@ -109,6 +121,10 @@ impl Builder {
 	}
 
 	/// Set the input to Android SDK APIs.
+	///
+	/// Generation fails on the first selected-class parsing or code-generation error;
+	/// it never returns partial bindings after silently dropping a failing class.
+	/// Class failures preserve the class/archive context and underlying error.
 	pub fn input_android_sdk(mut self, api_level: u32, patterns: Vec<String>) -> Self {
 		self.input = Some(InputSource::AndroidSdk {
 			api_level,
@@ -130,6 +146,7 @@ impl Builder {
 	}
 
 	/// Allow "unsupported" APIs when filtering with hiddenapi-flags.csv.
+	/// This affects hidden-API eligibility only; parsing and generation errors still fail.
 	pub const fn allow_unsupported(mut self, allow: bool) -> Self {
 		self.hidden_api_filter.allow_unsupported = allow;
 		self
@@ -232,7 +249,10 @@ impl Builder {
 		self
 	}
 
-	/// Override the Rust name for a method or field matching the given DEX signature.
+	/// Override the Rust name for a constructor, method, or field matching the given DEX signature.
+	///
+	/// Takes precedence over `@RustName`. Names are normalized to Rust identifiers and
+	/// gain trailing underscores when needed to avoid other constructors, methods, or field accessors.
 	pub fn name_override<S1: Into<String>, S2: Into<String>>(mut self, signature: S1, name: S2) -> Self {
 		self.name_overrides.insert(signature.into(), name.into());
 		self

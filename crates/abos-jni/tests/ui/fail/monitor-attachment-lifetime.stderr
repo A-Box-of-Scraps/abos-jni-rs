@@ -1,0 +1,8 @@
+error: lifetime may not live long enough
+ --> tests/ui/fail/monitor-attachment-lifetime.rs:4:55
+  |
+4 |     let guard = vm.attach_current_thread_for_scope(|env| env.lock_obj(object))?;
+  |                                                     ---- ^^^^^^^^^^^^^^^^^^^^ returning this value requires that `'1` must outlive `'2`
+  |                                                     |  |
+  |                                                     |  return type of closure is Result<MonitorGuard<'2>, abos_jni::errors::Error>
+  |                                                     has type `&mut Env<'1>`

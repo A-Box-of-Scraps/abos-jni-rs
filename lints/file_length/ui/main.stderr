@@ -1,0 +1,27 @@
+warning: Rust source file has 601 lines (max 600)
+  --> $DIR/auxiliary/too_long.rs:601:1
+   |
+LL | // padding
+   | ^
+   |
+   = help: split this file into smaller modules
+   = note: `#[warn(file_length)]` on by default
+
+warning: Rust source file has 601 lines (max 600)
+  --> $DIR/auxiliary/blank.rs:601:1
+   |
+LL |
+   | ^
+   |
+   = help: split this file into smaller modules
+
+warning: Rust source file has 601 lines (max 600)
+  --> $DIR/auxiliary/included.rs:601:1
+   |
+LL | // padding
+   | ^
+   |
+   = help: split this file into smaller modules
+
+warning: 3 warnings emitted
+

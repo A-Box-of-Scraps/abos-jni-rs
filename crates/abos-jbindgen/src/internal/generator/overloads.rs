@@ -1,11 +1,8 @@
 use super::names::java_name_to_rust;
 use super::signatures::generate_jni_signature_for_sorting;
 use crate::MethodInfo;
-use std::collections::HashSet;
-use std::sync::LazyLock;
+use std::collections::{HashMap, HashSet};
 pub fn group_methods_by_name(methods: &[MethodInfo]) -> Vec<(&str, Vec<&MethodInfo>)> {
-	use std::collections::HashMap;
-
 	let mut groups: HashMap<&str, Vec<&MethodInfo>> = HashMap::new();
 	for method in methods {
 		groups.entry(method.name.as_str()).or_default().push(method);
@@ -15,16 +12,13 @@ pub fn group_methods_by_name(methods: &[MethodInfo]) -> Vec<(&str, Vec<&MethodIn
 	// Sort by name for deterministic output
 	result.sort_by_key(|(name, _)| *name);
 
-	// Sort methods within each group by argument count, then by JNI signature
 	for (_, methods) in &mut result {
 		methods.sort_by(|a, b| {
 			let a_arg_count: usize = a.signature.arguments.len();
 			let b_arg_count: usize = b.signature.arguments.len();
 
-			// First, sort by argument count
 			match a_arg_count.cmp(&b_arg_count) {
 				std::cmp::Ordering::Equal => {
-					// If argument counts are equal, sort by JNI signature
 					let a_sig: String = generate_jni_signature_for_sorting(a);
 					let b_sig: String = generate_jni_signature_for_sorting(b);
 					a_sig.cmp(&b_sig)
@@ -37,49 +31,31 @@ pub fn group_methods_by_name(methods: &[MethodInfo]) -> Vec<(&str, Vec<&MethodIn
 	result
 }
 
-/// Detect and resolve Rust name collisions by appending underscores
-///
-/// Returns (`final_name`, `had_collision`, `java_name_for_warning`)
-/// where `had_collision` indicates if a collision was detected and resolved
+/// Reserve a Rust callable name for a full Java member signature or accessor key.
+/// Repeated reservations for the same member are stable; other members gain underscores.
+/// Returns the name, whether it changed, and the first conflicting member for diagnostics.
 pub fn resolve_name_collision(
 	rust_name: String,
-	java_name: &str,
-	used_names: &mut HashSet<(String, String)>,
+	member: &str,
+	used_names: &mut HashMap<String, String>,
 ) -> (String, bool, Option<String>) {
 	let mut candidate: String = rust_name;
-	let mut had_collision = false;
-	let mut conflicting_java_name: Option<String> = None;
-
-	// Check if this rust_name is already used by a different Java name
-	loop {
-		// Find if there's an existing entry with this rust name
-		let existing: Option<&(String, String)> = used_names.iter().find(|(rust, _java)| rust == &candidate);
-
-		if let Some((_existing_rust, existing_java)) = existing {
-			// If the Java names are different, we have a collision
-			if existing_java == java_name {
-				// Same Java name - this is the same entry, no collision
-				break;
-			}
-			had_collision = true;
-			if conflicting_java_name.is_none() {
-				conflicting_java_name = Some(existing_java.clone());
-			}
-			// Append underscore and try again
-			candidate.push('_');
-		} else {
-			// No existing entry with this rust name - we're good
+	let mut previous: Option<String> = None;
+	while let Some(owner) = used_names.get(&candidate) {
+		if owner == member {
 			break;
 		}
+		if previous.is_none() {
+			previous = Some(owner.clone());
+		}
+		candidate.push('_');
 	}
-
-	used_names.insert((candidate.clone(), java_name.to_string()));
-	(candidate, had_collision, conflicting_java_name)
+	used_names.insert(candidate.clone(), member.to_owned());
+	(candidate, previous.is_some(), previous)
 }
 
 /// Convert a Java type name to a `snake_case` suffix for method naming
 pub fn java_type_to_snake_case_suffix(type_info: &crate::api::types::TypeInfo) -> String {
-	// Handle primitive types
 	let base_name: String = if type_info.is_primitive {
 		match type_info.name.as_str() {
 			"boolean" => "bool",
@@ -87,19 +63,13 @@ pub fn java_type_to_snake_case_suffix(type_info: &crate::api::types::TypeInfo) -
 		}
 		.to_string()
 	} else {
-		// For object types, extract the simple class name and convert to snake_case
-		// e.g., "java.lang.String" -> "string"
-		// e.g., "com.example.MyType$Inner" -> "my_type_inner"
 		let simple_name: &str = type_info.name.split('.').next_back().unwrap_or(&type_info.name);
 
-		// Remove '$' characters used for inner classes
 		let without_dollar: String = simple_name.replace('$', "");
 
-		// Convert to snake_case
 		java_name_to_rust(&without_dollar).0
 	};
 
-	// Add array dimension suffix
 	if type_info.array_dimensions > 0 {
 		format!("{}_{}d", base_name, type_info.array_dimensions)
 	} else {
@@ -189,25 +159,11 @@ fn overload_name(base: &str, method: &MethodInfo, arity: usize, varying: &[usize
 	name
 }
 
-/// Rust keywords that need to be escaped when used as identifiers
-static RUST_KEYWORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
-	HashSet::from([
-		"as", "break", "const", "continue", "crate", "else", "enum", "extern", "false", "fn", "for", "if", "impl",
-		"in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return", "self", "Self", "static", "struct",
-		"super", "trait", "true", "type", "unsafe", "use", "where", "while", "async", "await", "dyn", "abstract",
-		"become", "box", "do", "final", "macro", "override", "priv", "typeof", "unsized", "virtual", "yield", "try",
-	])
-});
-
-/// Sanitize parameter names that are Rust keywords by appending an underscore
-pub fn sanitize_rust_keyword(name: &str) -> String {
-	if RUST_KEYWORDS.contains(name) {
-		format!("{name}_")
-	} else {
-		name.to_string()
-	}
-}
-
 pub fn is_snake_case(name: &str) -> bool {
-	name.chars().all(|c| c.is_lowercase() || c == '_')
+	name.chars()
+		.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/internal/generator/overloads.rs"]
+mod tests;

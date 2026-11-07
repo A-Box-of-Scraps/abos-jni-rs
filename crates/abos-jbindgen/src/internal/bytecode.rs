@@ -37,6 +37,10 @@ fn type_prefix(descriptor: &str, allow_void: bool) -> Result<(TypeInfo, &str)> {
 	))
 }
 
+/// Parse a complete non-void JVM type descriptor.
+///
+/// # Errors
+/// Returns an error for an unsupported or incomplete descriptor, or trailing input.
 pub fn parse_type_descriptor(descriptor: &str) -> Result<TypeInfo> {
 	let (ty, rest) = type_prefix(descriptor, false)?;
 	if !rest.is_empty() {
@@ -45,6 +49,10 @@ pub fn parse_type_descriptor(descriptor: &str) -> Result<TypeInfo> {
 	Ok(ty)
 }
 
+/// Parse argument and return types from a complete JVM method descriptor.
+///
+/// # Errors
+/// Returns an error for invalid arguments, return types, delimiters, or trailing input.
 pub fn parse_method_descriptor(descriptor: &str) -> Result<(Vec<ArgInfo>, TypeInfo)> {
 	let mut remaining: &str = descriptor
 		.strip_prefix('(')
@@ -66,6 +74,10 @@ pub fn parse_method_descriptor(descriptor: &str) -> Result<(Vec<ArgInfo>, TypeIn
 	Ok((arguments, return_type))
 }
 
+/// Extract binding metadata from a complete class file.
+///
+/// # Errors
+/// Returns an error if class-file metadata or a selected member descriptor cannot be parsed.
 pub fn parse_class(bytes: &[u8]) -> Result<ClassInfo> {
 	let class: ClassFile = abos_cafebabe::parse_class(bytes)?;
 	let name: String = class.this_class.clone();

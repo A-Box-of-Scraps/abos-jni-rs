@@ -1,11 +1,9 @@
 package com.example;
 
 public class WithFields {
-    // Static fields
     public static final int CONSTANT = 42;
     public static String staticField = "static";
 
-    // Instance fields
     public int publicField;
     private String privateField;
     protected double protectedField;

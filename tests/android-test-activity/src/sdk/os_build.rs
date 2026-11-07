@@ -3,7 +3,7 @@ include!(concat!(env!("OUT_DIR"), "/os_build_bindings.rs"));
 use crate::test_error::{TestResult, require};
 use android::os::AndroidBuild;
 
-pub fn test_os_build<'local>(env: &mut jni::Env<'local>) -> TestResult {
+pub fn test_os_build<'local>(env: &mut abos_jni::Env<'local>) -> TestResult {
 	// Use the generated AndroidBuild bindings to access static fields
 	let brand = AndroidBuild::BRAND(env)?;
 	let brand_str = brand.to_string();

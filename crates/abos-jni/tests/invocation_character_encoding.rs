@@ -1,0 +1,51 @@
+#![allow(unsafe_code, reason = "Exercise JNI FFI and native method exports.")]
+#![allow(missing_docs, reason = "Executable examples and test fixtures are not library API.")]
+// This is a separate test program because it has to start a JVM with a specific option.
+#![cfg(feature = "invocation")]
+
+use std::borrow::Cow;
+
+use abos_jni::{InitArgsBuilder, JavaVM, jni_sig, jni_str, objects::JString};
+
+#[test]
+fn invocation_character_encoding() {
+	let jvm_args: abos_jni::InitArgs<'_> = InitArgsBuilder::new()
+		.version(abos_jni::JNIVersion::V1_8)
+		.option("-Xcheck:jni")
+		// U+00A0 NO-BREAK SPACE is the only non-ASCII character that's present in all parts of
+		// ISO 8859. This minimizes the chance of this test failing as a result of the character
+		// not being present in the platform default character encoding. This test will still fail
+		// on platforms where the default character encoding cannot represent a no-break space,
+		// such as GBK.
+		.option("-Dnbsp=\u{00a0}")
+		.build()
+		.unwrap_or_else(|e| panic!("{e:#?}"));
+
+	let jvm: JavaVM = JavaVM::new(jvm_args).unwrap_or_else(|e| panic!("{e:#?}"));
+
+	jvm.attach_current_thread(|env| -> abos_jni::errors::Result<()> {
+		println!("creating new_string, env = {:?}", env.get_raw());
+		let prop_name: JString<'_> = env.new_string("nbsp").expect("test string can be allocated");
+
+		println!("calling getProperty");
+		let prop_value: abos_jni::objects::JObject<'_> = env
+			.call_static_method(
+				jni_str!("java/lang/System"),
+				jni_str!("getProperty"),
+				jni_sig!("(Ljava/lang/String;)Ljava/lang/String;"),
+				&[(&prop_name).into()],
+			)
+			.expect("static method call succeeds")
+			.l()
+			.expect("JNI result contains an object");
+		let prop_value: JString<'_> = env.cast_local::<JString>(prop_value)?;
+		let prop_value_str: abos_jni::strings::MUTF8Chars<'_, &JString<'_>> = prop_value
+			.mutf8_chars(env)
+			.expect("modified UTF-8 characters are accessible");
+		let prop_value_str: Cow<str> = prop_value_str.to_str();
+
+		assert_eq!("\u{00a0}", prop_value_str);
+		Ok(())
+	})
+	.expect("attached JNI callback succeeds");
+}

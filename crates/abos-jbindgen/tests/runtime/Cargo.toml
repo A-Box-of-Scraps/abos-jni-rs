@@ -7,8 +7,9 @@ publish = false
 [workspace]
 
 [dependencies]
-jni = { version = "=0.22.4", features = ["invocation"] }
+abos-jni = { path = "../../../abos-jni", features = ["invocation"] }
 
 [build-dependencies]
 abos-jbindgen = { path = "../.." }
 abos-javac = { path = "../../../abos-javac" }
+zip = { version = "9", default-features = false, features = ["deflate"] }

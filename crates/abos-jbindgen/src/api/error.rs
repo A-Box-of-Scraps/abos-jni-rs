@@ -1,6 +1,6 @@
 //! Error types for jbindgen
 
-use std::io;
+use std::{io, path::PathBuf};
 
 /// Result type alias for jbindgen operations
 pub type Result<T> = std::result::Result<T, Error>;
@@ -27,6 +27,28 @@ pub enum Error {
 	/// Android SDK related error
 	#[error("Android SDK error: {0}")]
 	AndroidSdk(String),
+
+	/// A selected Android class could not be parsed from the platform archive.
+	#[error("Failed to parse Android class {entry} in {archive}: {source}", archive = .archive.display())]
+	AndroidClassParse {
+		/// Platform JAR containing the class.
+		archive: PathBuf,
+		/// Archive entry name, including the `.class` suffix.
+		entry: String,
+		/// Underlying class-file or descriptor parsing error.
+		#[source]
+		source: Box<Self>,
+	},
+
+	/// Binding generation failed for a selected Android class.
+	#[error("Failed to generate Android bindings for {class_name}: {source}")]
+	AndroidClassGeneration {
+		/// Dot-separated Java binary name.
+		class_name: String,
+		/// Underlying binding-generation error.
+		#[source]
+		source: Box<Self>,
+	},
 
 	/// Unsupported class feature
 	#[error("Unsupported feature: {0}")]

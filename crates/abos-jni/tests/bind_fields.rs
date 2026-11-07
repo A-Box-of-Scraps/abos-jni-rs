@@ -1,0 +1,438 @@
+#![allow(unsafe_code, reason = "Exercise JNI FFI and native method exports.")]
+#![allow(missing_docs, reason = "Executable examples and test fixtures are not library API.")]
+#![cfg(feature = "invocation")]
+mod util;
+
+use abos_jni::Env;
+use abos_jni::objects::JString;
+use abos_jni::{bind_java_type, jni_str};
+use rusty_fork::rusty_fork_test;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+bind_java_type! {
+	rust_type = TestFields,
+	java_type = "com.example.TestFields",
+	constructors {
+		fn new(),
+		fn new_with_values(int_value: jint, string_value: JString),
+	},
+	fields {
+		static static_int_field: jint,
+		static static_long_field: jlong,
+		static static_boolean_field: jboolean,
+		static static_byte_field: jbyte,
+		static static_short_field: jshort,
+		static static_float_field: jfloat,
+		static static_double_field: jdouble,
+		static static_char_field: jchar,
+		static static_string_field: JString,
+		int_field: jint,
+		long_field: jlong,
+		boolean_field: jboolean,
+		byte_field: jbyte,
+		short_field: jshort,
+		float_field: jfloat,
+		double_field: jdouble,
+		char_field: jchar,
+		string_field: JString,
+
+		nullable_string_field: JString,  // Can be null
+		non_null required_string_field: JString,  // Shorthand syntax - must not be null
+		validated_string_field {  // Block syntax with explicit non_null
+			sig = JString,
+			non_null = true,
+		},
+
+		// These are guarded by _cfg_test which is never enabled in tests
+		#[cfg(feature = "_cfg_test")]
+		static static_cfg_test_field: jint,
+		#[cfg(feature = "_cfg_test")]
+		instance_cfg_test_field: jint,
+
+		// These are guarded by invocation which is always enabled in tests
+		#[cfg(feature = "invocation")]
+		static static_invocation_field: jint,
+		#[cfg(feature = "invocation")]
+		instance_invocation_field: jint,
+	}
+}
+
+rusty_fork_test! {
+#[test]
+fn test_static_primitive_fields() {
+	let out_dir = setup_test_output("bind_fields_static_primitives");
+
+	let _classes = abos_javac::Build::new()
+		.file("tests/java/com/example/TestFields.java")
+		.output_dir(&out_dir)
+		.compile();
+
+	util::attach_current_thread(|env| {
+		load_test_fields_class(env, &out_dir)?;
+
+		let int_val = TestFields::static_int_field(env)?;
+		assert_eq!(int_val, 42);
+
+		let long_val = TestFields::static_long_field(env)?;
+		assert_eq!(long_val, 9_876_543_210);
+
+		let bool_val = TestFields::static_boolean_field(env)?;
+		assert!(bool_val);
+
+		let byte_val = TestFields::static_byte_field(env)?;
+		assert_eq!(byte_val, 127);
+
+		let short_val = TestFields::static_short_field(env)?;
+		assert_eq!(short_val, 32000);
+
+		let float_val = TestFields::static_float_field(env)?;
+		assert!((float_val - std::f32::consts::PI).abs() < 0.01);
+
+		let double_val = TestFields::static_double_field(env)?;
+		assert!((double_val - std::f64::consts::E).abs() < 0.00001);
+
+		let char_val = TestFields::static_char_field(env)?;
+		assert_eq!(char_val, 'X' as u16);
+
+		Ok(())
+	})
+	.expect("Static primitive fields test failed");
+}
+}
+
+rusty_fork_test! {
+#[test]
+fn test_static_string_field() {
+	let out_dir = setup_test_output("bind_fields_static_string");
+
+	let _classes = abos_javac::Build::new()
+		.file("tests/java/com/example/TestFields.java")
+		.output_dir(&out_dir)
+		.compile();
+
+	util::attach_current_thread(|env| {
+		load_test_fields_class(env, &out_dir)?;
+
+		let string_val = TestFields::static_string_field(env)?;
+		assert_eq!(string_val.to_string(), "static string value");
+
+		Ok(())
+	})
+	.expect("Static string field test failed");
+}
+}
+
+rusty_fork_test! {
+#[test]
+fn test_static_field_write() {
+	let out_dir = setup_test_output("bind_fields_static_write");
+
+	let _classes = abos_javac::Build::new()
+		.file("tests/java/com/example/TestFields.java")
+		.output_dir(&out_dir)
+		.compile();
+
+	util::attach_current_thread(|env| {
+		load_test_fields_class(env, &out_dir)?;
+
+		let initial_val = TestFields::static_int_field(env)?;
+		assert_eq!(initial_val, 42);
+
+		TestFields::set_static_int_field(env, 100)?;
+
+		let updated_val = TestFields::static_int_field(env)?;
+		assert_eq!(updated_val, 100);
+
+		Ok(())
+	})
+	.expect("Static field write test failed");
+}
+}
+
+rusty_fork_test! {
+#[test]
+fn test_instance_primitive_fields() {
+	let out_dir = setup_test_output("bind_fields_instance_primitives");
+
+	let _classes = abos_javac::Build::new()
+		.file("tests/java/com/example/TestFields.java")
+		.output_dir(&out_dir)
+		.compile();
+
+	util::attach_current_thread(|env| {
+		load_test_fields_class(env, &out_dir)?;
+
+		assert_null_field_errors(env);
+
+		let obj = TestFields::new(env)?;
+
+		let int_val = obj.int_field(env)?;
+		assert_eq!(int_val, 10);
+		obj.set_int_field(env, 20)?;
+		let int_val = obj.int_field(env)?;
+		assert_eq!(int_val, 20);
+
+		let long_val = obj.long_field(env)?;
+		assert_eq!(long_val, 100);
+		obj.set_long_field(env, 200)?;
+		let long_val = obj.long_field(env)?;
+		assert_eq!(long_val, 200);
+
+		let bool_val = obj.boolean_field(env)?;
+		assert!(!bool_val);
+		obj.set_boolean_field(env, true)?;
+		let bool_val = obj.boolean_field(env)?;
+		assert!(bool_val);
+
+		let byte_val = obj.byte_field(env)?;
+		assert_eq!(byte_val, 1);
+		obj.set_byte_field(env, 2)?;
+		let byte_val = obj.byte_field(env)?;
+		assert_eq!(byte_val, 2);
+
+		let short_val = obj.short_field(env)?;
+		assert_eq!(short_val, 200);
+		obj.set_short_field(env, 300)?;
+		let short_val = obj.short_field(env)?;
+		assert_eq!(short_val, 300);
+
+		check_floating_fields(env, &obj)?;
+
+		let char_val = obj.char_field(env)?;
+		assert_eq!(char_val, 'A' as u16);
+		obj.set_char_field(env, 'B' as u16)?;
+		let char_val = obj.char_field(env)?;
+		assert_eq!(char_val, 'B' as u16);
+
+		Ok(())
+	})
+	.expect("Instance primitive fields test failed");
+}
+}
+
+rusty_fork_test! {
+#[test]
+fn test_instance_string_field() {
+	let out_dir = setup_test_output("bind_fields_instance_string");
+
+	let _classes = abos_javac::Build::new()
+		.file("tests/java/com/example/TestFields.java")
+		.output_dir(&out_dir)
+		.compile();
+
+	util::attach_current_thread(|env| {
+		load_test_fields_class(env, &out_dir)?;
+
+		let obj = TestFields::new(env)?;
+
+		let string_val = obj.string_field(env)?;
+		assert_eq!(string_val.to_string(), "instance string");
+
+		Ok(())
+	})
+	.expect("Instance string field test failed");
+}
+}
+
+rusty_fork_test! {
+#[test]
+fn test_constructor_with_values() {
+	let out_dir = setup_test_output("bind_fields_constructor");
+
+	let _classes = abos_javac::Build::new()
+		.file("tests/java/com/example/TestFields.java")
+		.output_dir(&out_dir)
+		.compile();
+
+	util::attach_current_thread(|env| {
+		load_test_fields_class(env, &out_dir)?;
+
+		let string_val = JString::from_str(env, "custom string")?;
+		let obj = TestFields::new_with_values(env, 50, &string_val)?;
+
+		let int_val = obj.int_field(env)?;
+		assert_eq!(int_val, 50);
+
+		let long_val = obj.long_field(env)?;
+		assert_eq!(long_val, 500); // intValue * 10
+
+		let string_field = obj.string_field(env)?;
+		assert_eq!(string_field.to_string(), "custom string");
+
+		let bool_val = obj.boolean_field(env)?;
+		assert!(bool_val); // true because intValue > 0
+
+		Ok(())
+	})
+	.expect("Constructor with values test failed");
+}
+}
+
+rusty_fork_test! {
+#[test]
+fn test_cfg_guarded_fields() {
+	let out_dir = setup_test_output("bind_fields_cfg");
+
+	let _classes = abos_javac::Build::new()
+		.file("tests/java/com/example/TestFields.java")
+		.output_dir(&out_dir)
+		.compile();
+
+	util::attach_current_thread(|env| {
+		load_test_fields_class(env, &out_dir)?;
+
+		// The invocation members are available here; trybuild tests cover exclusion of _cfg_test members.
+
+		let val = TestFields::static_invocation_field(env)?;
+		assert_eq!(val, 55);
+
+		TestFields::set_static_invocation_field(env, 111)?;
+		let val = TestFields::static_invocation_field(env)?;
+		assert_eq!(val, 111);
+
+		let obj = TestFields::new(env)?;
+		let val = obj.instance_invocation_field(env)?;
+		assert_eq!(val, 88);
+
+		obj.set_instance_invocation_field(env, 222)?;
+		let val = obj.instance_invocation_field(env)?;
+		assert_eq!(val, 222);
+
+		#[cfg(feature = "_cfg_test")]
+		{
+			let val = TestFields::static_cfg_test_field(env)?;
+			assert_eq!(val, 99);
+
+			let obj = TestFields::new(env)?;
+			let val = obj.instance_cfg_test_field(env)?;
+			assert_eq!(val, 77);
+		}
+
+		Ok(())
+	})
+	.expect("Cfg-guarded fields test failed");
+}
+}
+
+fn load_test_fields_class(env: &mut Env, out_dir: &Path) -> abos_jni::errors::Result<()> {
+	let class_path: PathBuf = out_dir.join("com/example/TestFields.class");
+	assert!(class_path.exists(), "TestFields.class not found");
+
+	let class_bytes: Vec<u8> = fs::read(&class_path).expect("Failed to read TestFields.class");
+
+	let class_loader: abos_jni::objects::JClassLoader<'_> =
+		abos_jni::objects::JClassLoader::get_system_class_loader(env).expect("Failed to get system class loader");
+
+	env.define_class(Some(jni_str!("com/example/TestFields")), &class_loader, &class_bytes)?;
+
+	Ok(())
+}
+
+fn setup_test_output(test_name: &str) -> PathBuf {
+	let out_dir: PathBuf = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+		.join("jni_macros_tests")
+		.join(test_name);
+
+	match fs::remove_dir_all(&out_dir) {
+		Ok(()) => {}
+		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+		Err(error) => panic!("Failed to remove previous test output: {error}"),
+	}
+	fs::create_dir_all(&out_dir).expect("Failed to create test output directory");
+
+	out_dir
+}
+
+rusty_fork_test! {
+#[test]
+fn test_non_null_field_validation() {
+	let out_dir = setup_test_output("bind_fields_non_null");
+
+	let _classes = abos_javac::Build::new()
+		.file("tests/java/com/example/TestFields.java")
+		.output_dir(&out_dir)
+		.compile();
+
+	util::attach_current_thread(|env| {
+		load_test_fields_class(env, &out_dir)?;
+
+		let obj = TestFields::new(env)?;
+
+		// We know from TestFields constructor that this field is initialized to null
+		let nullable = obj.nullable_string_field(env)?;
+		assert!(nullable.is_null(), "Expected nullable field to initially be null");
+
+		// We know this field is initialized to null, so getting it should fail
+		let result = obj.required_string_field(env);
+		assert!(
+			matches!(result, Err(abos_jni::errors::Error::NullPtr(_))),
+			"Expected Error::NullPtr when getting non_null field that is null"
+		);
+
+		// We know this field is initialized to null, so getting it should fail
+		let result = obj.validated_string_field(env);
+		assert!(
+			matches!(result, Err(abos_jni::errors::Error::NullPtr(_))),
+			"Expected Error::NullPtr when getting non_null field that is null"
+		);
+
+		let null_string = JString::null();
+		let result = obj.set_required_string_field(env, &null_string);
+		assert!(
+			matches!(result, Err(abos_jni::errors::Error::NullPtr(_))),
+			"Setting non_null field to null should return NullPtr error"
+		);
+
+		let valid_string = JString::from_str(env, "valid value")?;
+		obj.set_required_string_field(env, &valid_string)?;
+
+		let result = obj.required_string_field(env)?;
+		assert!(!result.is_null());
+		assert_eq!(result.to_string(), "valid value");
+
+		let result = obj.set_validated_string_field(env, &null_string);
+		assert!(
+			matches!(result, Err(abos_jni::errors::Error::NullPtr(_))),
+			"Setting non_null field to null should return NullPtr error"
+		);
+
+		let another_valid = JString::from_str(env, "another valid")?;
+		obj.set_validated_string_field(env, &another_valid)?;
+
+		let result = obj.validated_string_field(env)?;
+		assert!(!result.is_null());
+		assert_eq!(result.to_string(), "another valid");
+
+		obj.set_nullable_string_field(env, &null_string)?;
+		let result = obj.nullable_string_field(env)?;
+		assert!(result.is_null(), "Expected nullable field to be null after setting to null");
+
+		Ok(())
+	})
+	.expect("Non-null field validation test failed");
+}
+}
+
+fn check_floating_fields(env: &abos_jni::Env, obj: &TestFields) -> abos_jni::errors::Result<()> {
+	let float_val: f32 = obj.float_field(env)?;
+	assert!((float_val - 1.5).abs() < 0.01);
+	obj.set_float_field(env, 3.5)?;
+	let float_val: f32 = obj.float_field(env)?;
+	assert!((float_val - 3.5).abs() < 0.01);
+
+	let double_val: f64 = obj.double_field(env)?;
+	assert!((double_val - 2.5).abs() < 0.01);
+	obj.set_double_field(env, 4.5)?;
+	let double_val: f64 = obj.double_field(env)?;
+	assert!((double_val - 4.5).abs() < 0.01);
+
+	Ok(())
+}
+
+fn assert_null_field_errors(env: &abos_jni::Env) {
+	let res: std::result::Result<i32, abos_jni::errors::Error> = TestFields::null().int_field(env);
+	assert!(matches!(res, Err(abos_jni::errors::Error::NullPtr(_))));
+	let res: std::result::Result<(), abos_jni::errors::Error> = TestFields::null().set_int_field(env, 0);
+	assert!(matches!(res, Err(abos_jni::errors::Error::NullPtr(_))));
+}

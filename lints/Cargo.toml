@@ -1,0 +1,12 @@
+[workspace]
+resolver = "3"
+members = ["explicit_binding_types", "file_length", "tests_outside_src"]
+
+[workspace.package]
+edition = "2024"
+publish = false
+
+[workspace.dependencies]
+dylint_linting = "=6.3.2"
+dylint_testing = "=6.3.2"
+tempfile = "3"

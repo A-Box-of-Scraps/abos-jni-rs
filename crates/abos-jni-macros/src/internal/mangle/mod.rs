@@ -1,0 +1,340 @@
+//! JNI-compatible method signature generator for Rust libraries.
+//!
+//! This crate was designed for use with the [`jni`](https://crates.io/crates/jni) crate, which
+//! exposes JNI-compatible type bindings. Although it's possible to use `jni` without `jni_fn`, the
+//! procedural macro defined here will make it easier to write the method signatures correctly.
+//!
+//! See the `jni_fn` attribute macro documentation below for more info and usage examples.
+
+#![deny(missing_docs)]
+#![deny(unsafe_code)]
+
+use proc_macro2::TokenStream;
+use quote::ToTokens;
+use std::fmt::Write as _;
+use syn::parse_quote;
+use syn::spanned::Spanned;
+
+/// Deals exclusively with `proc_macro2::TokenStream` instead of `proc_macro::TokenStream`,
+/// allowing it and all interior functionality to be unit tested.
+pub fn jni_mangle2(attr: TokenStream, item: TokenStream) -> TokenStream {
+	let attr_span: proc_macro2::Span = attr.span();
+	let item_span: proc_macro2::Span = item.span();
+
+	let mut function: syn::ItemFn = match syn::parse2(item) {
+		Ok(f) => f,
+		Err(_e) => {
+			return syn::Error::new(
+				item_span,
+				"The `jni_mangle` attribute can only be applied to `fn` items",
+			)
+			.to_compile_error();
+		}
+	};
+
+	let args: syn::punctuated::Punctuated<syn::LitStr, syn::Token![,]> =
+		match syn::parse::Parser::parse2(syn::punctuated::Punctuated::parse_terminated, attr) {
+			Ok(args) => args,
+			Err(_e) => {
+				return syn::Error::new(
+					attr_span,
+					"The `jni_mangle` attribute must have string literal arguments",
+				)
+				.to_compile_error();
+			}
+		};
+
+	if args.is_empty() || args.len() > 3 {
+		return syn::Error::new(
+			attr_span,
+			"The `jni_mangle` attribute must have 1-3 string literal arguments",
+		)
+		.to_compile_error();
+	}
+
+	let namespace: String = args[0].value();
+
+	if !valid_namespace(&namespace) {
+		return syn::Error::new(
+			attr_span,
+			"Invalid package namespace supplied to `jni_mangle` attribute",
+		)
+		.to_compile_error();
+	}
+
+	let orig_fn_name: String = function.sig.ident.to_string();
+
+	let (method_name, signature) = match args.len() {
+		1 => (snake_case_to_lower_camel_case(&orig_fn_name), None),
+		2 => {
+			let second_arg: String = args[1].value();
+			if second_arg.contains('(') {
+				(snake_case_to_lower_camel_case(&orig_fn_name), Some(second_arg))
+			} else {
+				(second_arg, None)
+			}
+		}
+		3 => (args[1].value(), Some(args[2].value())),
+		_ => unreachable!(),
+	};
+
+	let mangled_jni_name: String = create_jni_fn_name(&namespace, &method_name, signature.as_deref());
+
+	// Set the export symbol without changing the function's Rust name, so Rust callers can still use it.
+	if cfg!(has_unsafe_attr) {
+		function
+			.attrs
+			.extend([parse_quote!(#[unsafe(export_name = #mangled_jni_name)])]);
+	} else {
+		function
+			.attrs
+			.extend([parse_quote!(#[export_name = #mangled_jni_name])]);
+	}
+
+	function.attrs.extend([parse_quote!(#[allow(non_snake_case)])]);
+
+	if let Err(error) = set_system_abi(&mut function) {
+		return error.to_compile_error();
+	}
+
+	if !matches!(function.vis, syn::Visibility::Public(_)) {
+		return syn::Error::new(
+			function.vis.span(),
+			"`jni_mangle` attributed functions must have public visibility (`pub`)",
+		)
+		.to_compile_error();
+	}
+
+	function.into_token_stream()
+}
+
+fn set_system_abi(function: &mut syn::ItemFn) -> syn::Result<()> {
+	if let Some(abi) = &function.sig.abi
+		&& let Some(name) = &abi.name
+	{
+		if name.value() != "system" {
+			return Err(syn::Error::new(
+				name.span(),
+				format!(
+					"`jni_mangle` attributed functions must use `extern \"system\"` ABI, found `extern \"{}\"`",
+					name.value()
+				),
+			));
+		}
+		return Ok(());
+	}
+	let extern_token: syn::token::Extern = function
+		.sig
+		.abi
+		.as_ref()
+		.map_or_else(syn::token::Extern::default, |abi| abi.extern_token);
+	function.sig.abi = Some(syn::Abi {
+		extern_token,
+		name: Some(syn::LitStr::new("system", function.sig.ident.span())),
+	});
+	Ok(())
+}
+
+/// Ensures that `namespace` appears roughly like a valid package name.
+///
+/// A package name is a '.'-separated identifier list.
+///
+/// Identifiers are described in section 3.8 of the Java language specification, although some
+/// JVM-compatible languages have slightly different restrictions on what is considered a valid
+/// identifier. This function attempts to catch obviously incorrect strings.
+///
+/// Please submit an issue report or patch to make this more permissive if it's required for
+/// valid JVM code! Otherwise, making it more restrictive is appreciated as long as it's confirmed
+/// to work with multiple JVM-compatible languages.
+fn valid_namespace(namespace: &str) -> bool {
+	fn is_valid_ident(ident: &str) -> bool {
+		/// These shouldn't occur as the first character of an identifier.
+		const FORBIDDEN_START_CHARS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+		if ident.is_empty() {
+			return false;
+		}
+
+		for c in FORBIDDEN_START_CHARS {
+			if ident.starts_with(*c) {
+				return false;
+			}
+		}
+
+		true
+	}
+
+	/// These shouldn't occur _anywhere_ in the package name.
+	const FORBIDDEN_CHARS: &[char] = &[
+		' ', ',', ':', ';', '|', '\\', '/', '!', '@', '#', '%', '^', '&', '*', '(', ')', '{', '}', '[', ']', '-', '`',
+		'~', '\t', '\n', '\r',
+	];
+
+	for c in FORBIDDEN_CHARS {
+		if namespace.contains(*c) {
+			return false;
+		}
+	}
+
+	if namespace.starts_with('.') || namespace.ends_with('.') {
+		return false;
+	}
+
+	if namespace.contains("..") {
+		return false;
+	}
+
+	for ident in namespace.split('.') {
+		if !is_valid_ident(ident) {
+			return false;
+		}
+	}
+
+	true
+}
+
+/// Converts a `snake_case` identifier to lowerCamelCase.
+/// This transformation is idempotent - if the input is already in lowerCamelCase, it returns unchanged.
+/// If the input contains any uppercase letters, it's returned unchanged to preserve intentional casing.
+/// Leading underscores are preserved except for one underscore that is removed.
+/// Trailing underscores are preserved.
+///
+/// When capitalizing segments after underscores, the first non-numeric character is capitalized.
+/// This ensures that segments with numeric prefixes are properly capitalized.
+///
+/// Examples:
+/// - "`say_hello`" -> "sayHello"
+/// - "`get_user_name`" -> "getUserName"
+/// - "_`private_method`" -> "privateMethod" (one leading underscore removed)
+/// - "__dunder__" -> "_dunder__" (one leading underscore removed)
+/// - "___priv" -> "__priv" (one leading underscore removed)
+/// - "trailing_" -> "trailing_"
+/// - "sayHello" -> "sayHello" (unchanged)
+/// - "getUserName" -> "getUserName" (unchanged)
+/// - "`Foo_Bar`" -> "`Foo_Bar`" (unchanged - contains uppercase)
+/// - "`XMLParser`" -> "`XMLParser`" (unchanged - contains uppercase)
+/// - "init" -> "init" (unchanged - no underscores)
+/// - "`test_αλφα`" -> "testΑλφα" (Unicode-aware)
+/// - "`array_2d_foo`" -> "array2DFoo" (capitalizes first char after digits)
+/// - "`test_3d`" -> "test3D" (capitalizes first char after digits)
+pub fn snake_case_to_lower_camel_case(s: &str) -> String {
+	// Preserve intentional mixed or uppercase naming.
+	if s.chars().any(char::is_uppercase) {
+		return s.to_string();
+	}
+
+	let leading_underscores: usize = s.chars().take_while(|&c| c == '_').count();
+
+	let trailing_underscores: usize = s.chars().rev().take_while(|&c| c == '_').count();
+
+	if leading_underscores + trailing_underscores >= s.len() {
+		return s.to_string();
+	}
+
+	let middle: &str = &s[leading_underscores..s.len() - trailing_underscores];
+
+	let mut result = String::new();
+	let mut capitalize_next = false;
+
+	for c in middle.chars() {
+		if c == '_' {
+			capitalize_next = true;
+		} else if capitalize_next {
+			if c.is_ascii_digit() {
+				result.push(c);
+			} else {
+				result.extend(c.to_uppercase());
+				capitalize_next = false;
+			}
+		} else {
+			result.push(c);
+		}
+	}
+
+	let adjusted_leading_underscores: usize = if leading_underscores > 0 {
+		leading_underscores - 1
+	} else {
+		0
+	};
+
+	let mut final_result: String = String::with_capacity(s.len());
+	for _ in 0..adjusted_leading_underscores {
+		final_result.push('_');
+	}
+	final_result.push_str(&result);
+	for _ in 0..trailing_underscores {
+		final_result.push('_');
+	}
+
+	final_result
+}
+
+/// Creates a JNI-compatible function name from the given namespace, function name, and optional signature.
+/// This does _not_ transform the provided function name into `snakeCase` if it's not already; but
+/// `#[allow(non_snake_case)]` should be added to prevent errors.
+///
+/// Any underscores in the original namespace or function name need to be replaced by "_1", and
+/// then dot separators need to be turned into underscores.
+///
+/// For signatures (if provided), only the argument types (between parentheses) are encoded:
+/// - '_' -> "_1"
+/// - ';' -> "_2"
+/// - '[' -> "_3"
+/// - '/' -> "_"
+/// - Non-ASCII characters (including '$') -> "_0xxxx" where xxxx is the lowercase hex Unicode codepoint
+///
+/// The return type is ignored, and parentheses are not included in the mangled name.
+pub fn create_jni_fn_name(namespace: &str, fn_name: &str, signature: Option<&str>) -> String {
+	fn mangle_identifier(s: &str) -> String {
+		let mut result = String::new();
+		for c in s.chars() {
+			match c {
+				'_' => result.push_str("_1"),
+				'.' => result.push('_'),
+				_ if c.is_ascii_alphanumeric() => result.push(c),
+				_ => write!(result, "_0{:04x}", u32::from(c)).expect("writing to String cannot fail"),
+			}
+		}
+		result
+	}
+
+	fn mangle_signature_args(s: &str) -> String {
+		let mut result = String::new();
+		for c in s.chars() {
+			match c {
+				'_' => result.push_str("_1"),
+				';' => result.push_str("_2"),
+				'[' => result.push_str("_3"),
+				'/' => result.push('_'),
+				_ if c.is_ascii_alphanumeric() => result.push(c),
+				_ => {
+					write!(result, "_0{:04x}", u32::from(c)).expect("writing to String cannot fail");
+				}
+			}
+		}
+		result
+	}
+
+	let namespace_underscored: String = mangle_identifier(namespace);
+	let fn_name_underscored: String = mangle_identifier(fn_name);
+
+	let mut result: String = format!("Java_{namespace_underscored}_{fn_name_underscored}");
+
+	if let Some(sig) = signature
+		&& let Some(start) = sig.find('(')
+		&& let Some(end) = sig.find(')')
+	{
+		let args: &str = &sig[start + 1..end];
+		// Always add __ when signature is provided (indicates overloaded method)
+		result.push_str("__");
+		if !args.is_empty() {
+			result.push_str(&mangle_signature_args(args));
+		}
+	}
+
+	result
+}
+
+#[cfg(test)]
+#[path = "../../../tests/unit/internal/mangle.rs"]
+mod tests;

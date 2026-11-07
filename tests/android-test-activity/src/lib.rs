@@ -12,7 +12,7 @@ use io::github::jni_rs::jbindgen::testactivity::{TestActivity, TestActivityAPI, 
 
 struct SdkTest {
 	name: &'static str,
-	runner: for<'local> fn(&mut jni::Env<'local>) -> TestResult,
+	runner: for<'local> fn(&mut abos_jni::Env<'local>) -> TestResult,
 }
 
 const SDK_TESTS: &[SdkTest] = &[
@@ -51,50 +51,53 @@ const SDK_TESTS: &[SdkTest] = &[
 impl TestActivityNativeInterface for TestActivityAPI {
 	type Error = TestError;
 
-	fn native_on_create<'local>(env: &mut jni::Env<'local>, this: TestActivity<'local>) -> Result<(), Self::Error> {
-		let message = jni::objects::JString::from_str(env, "Hello from Rust native onCreate!")?;
+	fn native_on_create<'local>(
+		env: &mut abos_jni::Env<'local>,
+		this: TestActivity<'local>,
+	) -> Result<(), Self::Error> {
+		let message = abos_jni::objects::JString::from_str(env, "Hello from Rust native onCreate!")?;
 		this.update_ui(env, message)?;
 
 		Ok(())
 	}
 
 	fn native_get_message<'local>(
-		env: &mut jni::Env<'local>,
+		env: &mut abos_jni::Env<'local>,
 		_this: TestActivity<'local>,
-	) -> Result<jni::objects::JString<'local>, Self::Error> {
-		Ok(jni::objects::JString::from_str(env, "Message from Rust!")?)
+	) -> Result<abos_jni::objects::JString<'local>, Self::Error> {
+		Ok(abos_jni::objects::JString::from_str(env, "Message from Rust!")?)
 	}
 
 	fn native_process_data<'local>(
-		_env: &mut jni::Env<'local>,
+		_env: &mut abos_jni::Env<'local>,
 		_this: TestActivity<'local>,
-		value: jni::sys::jint,
-	) -> Result<jni::sys::jint, Self::Error> {
+		value: abos_jni::sys::jint,
+	) -> Result<abos_jni::sys::jint, Self::Error> {
 		Ok(value * 2)
 	}
 
 	fn native_get_test_count<'local>(
-		_env: &mut jni::Env<'local>,
+		_env: &mut abos_jni::Env<'local>,
 		_this: TestActivity<'local>,
-	) -> Result<jni::sys::jint, Self::Error> {
+	) -> Result<abos_jni::sys::jint, Self::Error> {
 		Ok(i32::try_from(SDK_TESTS.len()).expect("test registry fits in a Java int"))
 	}
 
 	fn native_get_test_name<'local>(
-		env: &mut jni::Env<'local>,
+		env: &mut abos_jni::Env<'local>,
 		_this: TestActivity<'local>,
-		index: jni::sys::jint,
-	) -> Result<jni::objects::JString<'local>, Self::Error> {
-		Ok(jni::objects::JString::from_str(env, test_at(index)?.name)?)
+		index: abos_jni::sys::jint,
+	) -> Result<abos_jni::objects::JString<'local>, Self::Error> {
+		Ok(abos_jni::objects::JString::from_str(env, test_at(index)?.name)?)
 	}
 
 	fn native_run_test<'local>(
-		env: &mut jni::Env<'local>,
+		env: &mut abos_jni::Env<'local>,
 		_this: TestActivity<'local>,
-		index: jni::sys::jint,
-	) -> Result<jni::objects::JString<'local>, Self::Error> {
+		index: abos_jni::sys::jint,
+	) -> Result<abos_jni::objects::JString<'local>, Self::Error> {
 		let message = (test_at(index)?.runner)(env)?;
-		Ok(jni::objects::JString::from_str(env, message)?)
+		Ok(abos_jni::objects::JString::from_str(env, message)?)
 	}
 }
 

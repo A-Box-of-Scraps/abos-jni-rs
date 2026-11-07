@@ -1,0 +1,125 @@
+//! Thread Local Storage (TLS) implementation for thread attachment tracking on non-Windows platforms.
+//!
+//! This module provides the default thread attachment mechanism using Rust's standard thread-local
+//! storage. On non-Windows platforms, TLS destructors are safe to use for automatic thread detachment
+//! without the loader lock issues that affect Windows.
+
+use std::{
+	cell::RefCell,
+	thread::{Thread, current},
+};
+
+use log::error;
+
+use crate::{
+	JavaVM,
+	errors::{Error, Result},
+	vm::{AttachConfig, AttachGuard, sys_attach_current_thread, sys_detach_current_thread},
+};
+
+thread_local! {
+	// There's a false-positive Clippy bug: https://github.com/rust-lang/rust-clippy/issues/13422
+	#[cfg_attr(target_os = "android", allow(clippy::missing_const_for_thread_local))]
+	static TLS_ATTACH_GUARD: RefCell<Option<TLSAttachGuard>> = const { RefCell::new(None) }
+}
+
+/// Data stored in TLS for automatic thread detachment.
+///
+/// Note: We don't store the env pointer because we consider the possibility that external code
+/// may manually detach the thread so long as there are no active `AttachGuards`. In that case,
+/// the env pointer can become invalid before the TLS destructor runs.
+#[derive(Debug)]
+struct TLSAttachGuard {
+	/// A call `std::thread::current()` function can panic in case the local data has been destroyed
+	/// before the thread local variables. The possibility of this happening depends on the platform
+	/// implementation of the `sys_common::thread_local_dtor::register_dtor_fallback`.
+	///
+	/// Since this struct will be saved as a thread-local variable, we capture the thread meta-data
+	/// during creation
+	thread: Thread,
+}
+
+impl TLSAttachGuard {
+	/// Detach the current thread after checking there are no active [`AttachGuard`]s
+	///
+	/// # Safety
+	/// Since this is used in the implementation of `Drop` you must make sure
+	/// to not let `Drop` run if this is called explicitly.
+	unsafe fn detach_impl(&self) -> Result<()> {
+		// SAFETY: The caller prevents a second detach, and this thread-local guard belongs to the current thread.
+		unsafe { sys_detach_current_thread(None, &self.thread) }
+	}
+}
+
+impl Drop for TLSAttachGuard {
+	fn drop(&mut self) {
+		// SAFETY: Drop runs once on the thread that owns this TLS guard.
+		if let Err(e) = unsafe { self.detach_impl() } {
+			error!(
+				"Error detaching current thread: {:#?}\nThread {} id={:?}",
+				e,
+				self.thread.name().unwrap_or_default(),
+				self.thread.id(),
+			);
+		}
+	}
+}
+
+/// Attach the current thread to the Java VM using TLS for automatic cleanup.
+///
+/// This function stores attachment information in thread-local storage so that when the thread
+/// terminates, the TLS destructor will automatically detach the thread from the JVM.
+///
+/// Note: This function assumes that the caller has already used `GetEnv` to check if the thread
+/// is already attached, and only calls this function if it is not attached.
+///
+/// # Panics
+///
+/// This function will panic if called while there are active `AttachGuard`s.
+pub unsafe fn tls_attach_current_thread<'local>(
+	java_vm: &JavaVM,
+	config: &AttachConfig,
+) -> Result<AttachGuard<'local>> {
+	let thread: Thread = current();
+
+	let env: *mut *const abos_jni_sys::JNINativeInterface_ =
+		TLS_ATTACH_GUARD.with(move |f| -> abos_jni::errors::Result<*mut abos_jni::sys::JNIEnv> {
+			// External code may have detached the thread while leaving its TLS guard.
+			// Reuse the counter entry when reattaching.
+			let inc_attached_count: bool = f.borrow_mut().take().is_none_or(|guard| {
+				// Do not let the old guard detach the thread again.
+				std::mem::forget(guard);
+				false
+			});
+			// SAFETY: The caller upholds the attachment contract; the config and thread remain live during attachment.
+			let env: *mut *const abos_jni_sys::JNINativeInterface_ =
+				unsafe { sys_attach_current_thread(java_vm, config, &thread, inc_attached_count)? };
+			*f.borrow_mut() = Some(TLSAttachGuard { thread: current() });
+			Ok(env)
+		})?;
+
+	// SAFETY: The JNI environment was obtained for this thread and the returned guard tracks its scope.
+	Ok(unsafe { AttachGuard::from_unowned(env) })
+}
+
+/// Detach a thread before the thread terminates **IFF** it was previously attached via
+/// [`JavaVM::attach_current_thread`] **AND** there is no active [`AttachGuard`] in use
+/// for this thread.
+pub fn tls_detach_current_thread() -> Result<()> {
+	if JavaVM::thread_attach_guard_level() != 0 {
+		return Err(Error::ThreadAttachmentGuarded);
+	}
+
+	TLS_ATTACH_GUARD.with(move |f| {
+		f.borrow_mut().take().map_or_else(
+			|| Ok(()),
+			|guard| {
+				// Safety: we use `std::mem::forget` to ensure we don't also
+				// run the `Drop` implementation
+				let res: std::result::Result<(), crate::errors::Error> = unsafe { guard.detach_impl() };
+				std::mem::forget(guard);
+				res
+			},
+		)
+	})
+}

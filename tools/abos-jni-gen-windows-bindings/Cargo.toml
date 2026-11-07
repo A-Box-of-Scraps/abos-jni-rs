@@ -1,0 +1,11 @@
+[package]
+name = "abos-jni-gen-windows-bindings"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]
+windows-bindgen = "0.65"
+
+[workspace]

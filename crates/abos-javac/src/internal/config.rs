@@ -40,7 +40,7 @@ impl Default for Config {
 			debug: false,
 			warnings: true,
 			werror: false,
-			emit_rerun_if_changed: false,
+			emit_rerun_if_changed: true,
 			cargo_metadata: true,
 			extra_args: Vec::new(),
 		}

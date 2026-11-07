@@ -11,7 +11,7 @@ pub struct Build {
 }
 
 impl Build {
-	/// Create a builder with warnings and Cargo metadata enabled.
+	/// Create a builder with warnings, Cargo metadata, and input-change tracking enabled.
 	#[must_use]
 	pub fn new() -> Self {
 		Self::default()
@@ -103,7 +103,11 @@ impl Build {
 		self
 	}
 
-	/// Emit Cargo source-change directives; defaults to false and requires Cargo metadata.
+	/// Emit Cargo change directives for sources, source directories, and classpath entries.
+	///
+	/// Enabled by default; requires Cargo metadata. Disable only when the calling build
+	/// script emits its own input-change directives. Environment-change directives are
+	/// still emitted when this option is disabled.
 	pub const fn emit_rerun_if_changed(&mut self, enable: bool) -> &mut Self {
 		self.config.emit_rerun_if_changed = enable;
 		self

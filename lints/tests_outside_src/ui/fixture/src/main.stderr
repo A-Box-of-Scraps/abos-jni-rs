@@ -1,0 +1,123 @@
+warning: test implementation in src/
+  --> $DIR/main.rs:4:1
+   |
+LL | #[test]
+   | ^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+   = note: `#[warn(tests_outside_src)]` on by default
+
+warning: test implementation in src/
+  --> $DIR/main.rs:7:1
+   |
+LL | #[cfg(test)]
+   | ^^^^^^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+
+warning: test implementation in src/
+  --> $DIR/main.rs:13:1
+   |
+LL | #[cfg(all(test, windows))]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+
+warning: test implementation in src/
+  --> $DIR/main.rs:18:1
+   |
+LL | #[cfg(test)]
+   | ^^^^^^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+
+warning: test implementation in src/
+  --> $DIR/main.rs:24:1
+   |
+LL | #[cfg(test)]
+   | ^^^^^^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+
+warning: test implementation in src/
+  --> $DIR/main.rs:29:5
+   |
+LL |     #[cfg(test)]
+   |     ^^^^^^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+
+warning: test implementation in src/
+  --> $DIR/main.rs:33:1
+   |
+LL | #[cfg_attr(test, test)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+
+warning: test implementation in src/
+  --> $DIR/main.rs:46:1
+   |
+LL | #[cfg(test)]
+   | ^^^^^^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+
+warning: test implementation in src/
+  --> $DIR/main.rs:58:1
+   |
+LL | #[cfg(test)]
+   | ^^^^^^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+
+warning: test implementation in src/
+  --> $DIR/main.rs:62:1
+   |
+LL | #[cfg(not(not(test)))]
+   | ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+
+warning: test implementation in src/
+  --> $DIR/main.rs:65:1
+   |
+LL | #[cfg_attr(test, cfg(test))]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+
+warning: test implementation in src/
+  --> $DIR/main.rs:68:1
+   |
+LL | #[cfg(all(test, any(unix, windows)))]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+
+warning: test implementation in src/
+  --> $DIR/main.rs:73:1
+   |
+LL | #[example_framework::test]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+
+warning: test implementation in src/
+  --> $DIR/misplaced.rs:2:1
+   |
+LL | #[test]
+   | ^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+
+warning: test implementation in src/
+  --> $DIR/../tests/../src/misplaced.rs:2:1
+   |
+LL | #[test]
+   | ^^^^^^^
+   |
+   = help: move this test-only code into tests/; for private access, use a #[cfg(test)] #[path = "..."] child module pointing there
+
+warning: 15 warnings emitted
+

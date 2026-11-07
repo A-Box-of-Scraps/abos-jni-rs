@@ -1,0 +1,84 @@
+[package]
+name = "abos-jni"
+version = "0.1.0"
+edition.workspace = true
+license = "MIT AND Apache-2.0"
+rust-version.workspace = true
+description = "Rust bindings and utilities for the Java Native Interface."
+
+[lints]
+workspace = true
+
+[dependencies]
+abos-jni-macros.workspace = true
+abos-jni-sys.workspace = true
+cfg-if.workspace = true
+indoc.workspace = true
+log.workspace = true
+simd_cesu8.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-link.workspace = true
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+libloading = { workspace = true, optional = true }
+
+[dev-dependencies]
+abos-javac.workspace = true
+assert_matches.workspace = true
+criterion.workspace = true
+rusty-fork.workspace = true
+static_assertions.workspace = true
+tempfile.workspace = true
+trybuild.workspace = true
+
+[target.'cfg(windows)'.dev-dependencies]
+bytemuck.workspace = true
+windows-sys = { workspace = true, features = ["Win32_System_Threading", "Win32_Foundation"] }
+
+[features]
+default = []
+invocation = ["dep:libloading"]
+_cfg_test = []
+
+[[bench]]
+name = "api_calls"
+harness = false
+required-features = ["invocation"]
+
+[[example]]
+name = "bind_java_type"
+required-features = ["invocation"]
+
+[[example]]
+name = "bind_java_type_hooks"
+required-features = ["invocation"]
+
+[[example]]
+name = "bind_java_type_is_instance_of"
+required-features = ["invocation"]
+
+[[example]]
+name = "bind_java_type_wrapper"
+required-features = ["invocation"]
+
+[[example]]
+name = "jni_sig"
+required-features = ["invocation"]
+
+[[example]]
+name = "jni_sig_wrapper"
+required-features = ["invocation"]
+
+[[example]]
+name = "jni_str"
+required-features = ["invocation"]
+
+[[example]]
+name = "native_method"
+required-features = ["invocation"]
+
+[[example]]
+name = "native_method_wrapper"
+required-features = ["invocation"]

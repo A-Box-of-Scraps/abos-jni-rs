@@ -1,6 +1,6 @@
 use super::{
+	identifiers::unique_identifier,
 	names::{java_name_to_rust, resolve_type_with_deps},
-	overloads::sanitize_rust_keyword,
 };
 use crate::{BindgenOptions, Error, MethodInfo, Result, TypeMap};
 use std::collections::HashSet;
@@ -36,14 +36,11 @@ pub fn format_type_for_sorting(type_info: &crate::api::types::TypeInfo) -> Strin
 pub fn type_to_dex_signature(type_info: &crate::api::types::TypeInfo) -> String {
 	let mut sig = String::new();
 
-	// Add array dimensions
 	for _ in 0..type_info.array_dimensions {
 		sig.push('[');
 	}
 
-	// Add the base type
 	if type_info.is_primitive {
-		// Primitive types use single character codes
 		let code: &str = match type_info.name.as_str() {
 			"boolean" => "Z",
 			"byte" => "B",
@@ -58,7 +55,6 @@ pub fn type_to_dex_signature(type_info: &crate::api::types::TypeInfo) -> String 
 		};
 		sig.push_str(code);
 	} else {
-		// Object types use L<class_path>;
 		sig.push('L');
 		sig.push_str(&type_info.name.replace('.', "/"));
 		sig.push(';');
@@ -72,22 +68,18 @@ pub fn type_to_dex_signature(type_info: &crate::api::types::TypeInfo) -> String 
 pub fn generate_dex_signature(class_name: &str, method: &MethodInfo) -> String {
 	let mut sig = String::new();
 
-	// Add class name in DEX format
 	sig.push('L');
 	sig.push_str(&class_name.replace('.', "/"));
 	sig.push_str(";->");
 
-	// Add method name
 	sig.push_str(&method.name);
 
-	// Add parameter signatures
 	sig.push('(');
 	for arg in &method.signature.arguments {
 		sig.push_str(&type_to_dex_signature(&arg.type_info));
 	}
 	sig.push(')');
 
-	// Add return type signature
 	sig.push_str(&type_to_dex_signature(&method.signature.return_type));
 
 	sig
@@ -98,15 +90,12 @@ pub fn generate_dex_signature(class_name: &str, method: &MethodInfo) -> String {
 pub fn generate_field_dex_signature(class_name: &str, field: &crate::api::types::FieldInfo) -> String {
 	let mut sig = String::new();
 
-	// Add class name in DEX format
 	sig.push('L');
 	sig.push_str(&class_name.replace('.', "/"));
 	sig.push_str(";->");
 
-	// Add field name
 	sig.push_str(&field.name);
 
-	// Add field type
 	sig.push(':');
 	sig.push_str(&type_to_dex_signature(&field.type_info));
 
@@ -122,16 +111,22 @@ pub fn generate_method_signature_with_deps(
 	used_primitive_types: &mut HashSet<String>,
 ) -> Result<String> {
 	let mut sig: String = String::from("(");
+	// These names are parameters or locals emitted by bind_java_type! itself.
+	let mut names: HashSet<String> = ["env", "api", "jni_args", "class", "this", "unowned_env"]
+		.into_iter()
+		.map(str::to_owned)
+		.collect();
 
 	for (i, arg) in method.signature.arguments.iter().enumerate() {
 		if i > 0 {
 			sig.push_str(", ");
 		}
 
-		let arg_name: String = arg.name.as_deref().map_or_else(
-			|| format!("arg{i}"),
-			|name| sanitize_rust_keyword(&java_name_to_rust(name).0),
-		);
+		let arg_name: String = arg
+			.name
+			.as_deref()
+			.map_or_else(|| format!("arg{i}"), |name| java_name_to_rust(name).0);
+		let arg_name: String = unique_identifier(&arg_name, &mut names);
 		write!(sig, "{arg_name}: ").expect("writing to String");
 
 		if let Some(rust_prim) = &arg.rust_primitive {
@@ -145,7 +140,6 @@ pub fn generate_method_signature_with_deps(
 
 	sig.push(')');
 
-	// Add return type if not void
 	if method.signature.return_type.name != "void" {
 		sig.push_str(" -> ");
 		sig.push_str(&resolve_type_with_deps(

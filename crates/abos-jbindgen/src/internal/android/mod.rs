@@ -1,6 +1,6 @@
 pub mod sdk;
 use crate::internal::{bytecode, generator, java_parser};
-use crate::{AndroidSdk, BindgenOptions, ClassInfo, HiddenApiFilter, ModuleBinding, Result, TypeMap};
+use crate::{AndroidSdk, BindgenOptions, ClassInfo, Error, HiddenApiFilter, ModuleBinding, Result, TypeMap};
 use std::{
 	collections::HashMap,
 	path::{Path, PathBuf},
@@ -29,10 +29,8 @@ pub fn generate_android_bindings(
 	let stub_classes: std::collections::HashMap<String, crate::ClassInfo> =
 		parse_source_stubs(&stubs_jar, &classpath, patterns)?;
 
-	// Intersect the two sets
 	let mut filtered_classes: Vec<crate::ClassInfo> = intersect_classes(jar_classes, &stub_classes);
 
-	// Apply hidden API filtering if provided
 	if let Some(flags_path) = hiddenapi_flags_path {
 		let hidden_apis: std::collections::HashSet<String> = parse_hiddenapi_flags(flags_path, hiddenapi_filter)?;
 		filtered_classes = filter_hidden_apis(filtered_classes, &hidden_apis);
@@ -40,21 +38,19 @@ pub fn generate_android_bindings(
 
 	filtered_classes.sort_by(|left, right| left.class_name.cmp(&right.class_name));
 
-	// Generate bindings from filtered classes
-	let mut type_map: crate::TypeMap = TypeMap::from_classes(filtered_classes.iter(), options);
+	let mut type_map: crate::TypeMap = TypeMap::from_classes(filtered_classes.iter(), options)?;
 	type_map.merge(extra_type_map);
 
 	let mut results: Vec<crate::ModuleBinding> = Vec::new();
 	for class_info in filtered_classes {
-		let class_name: String = class_info.class_name.clone();
-		match generator::generate_with_type_map(&class_info, options, &type_map) {
-			Ok(binding) => {
-				results.push(binding);
-			}
-			Err(e) => {
-				eprintln!("Warning: Failed to generate bindings for {class_name}: {e}");
-			}
-		}
+		let binding: ModuleBinding =
+			generator::generate_with_type_map(&class_info, options, &type_map).map_err(|source| {
+				Error::AndroidClassGeneration {
+					class_name: class_info.class_name.replace('/', "."),
+					source: Box::new(source),
+				}
+			})?;
+		results.push(binding);
 	}
 
 	Ok(results)
@@ -64,14 +60,12 @@ pub fn generate_android_bindings(
 pub(super) fn parse_jar_classes(jar_path: &Path, patterns: &[String]) -> Result<HashMap<String, ClassInfo>> {
 	let mut classes: HashMap<String, ClassInfo> = HashMap::new();
 	crate::internal::inputs::visit_jar_classes(jar_path, patterns, |name, bytes| {
-		match bytecode::parse_class(bytes) {
-			Ok(class) => {
-				classes.insert(class.class_name.replace('/', "."), class);
-			}
-			Err(error) => {
-				log::warn!("Failed to parse {name}: {error}");
-			}
-		}
+		let class: ClassInfo = bytecode::parse_class(bytes).map_err(|source| Error::AndroidClassParse {
+			archive: jar_path.to_owned(),
+			entry: name.to_owned(),
+			source: Box::new(source),
+		})?;
+		classes.insert(class.class_name.replace('/', "."), class);
 		Ok(())
 	})?;
 
@@ -95,7 +89,6 @@ pub(super) fn parse_source_stubs(
 
 	let mut result: std::collections::HashMap<String, crate::ClassInfo> = HashMap::new();
 	for class_info in classes {
-		// Use fully qualified class name as key (e.g., "android.app.Activity")
 		let key: String = class_info.class_name.replace('/', ".");
 		result.insert(key, class_info);
 	}

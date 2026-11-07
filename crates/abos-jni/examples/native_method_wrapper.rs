@@ -1,0 +1,180 @@
+#![allow(unsafe_code, reason = "Exercise JNI FFI and native method exports.")]
+#![allow(missing_docs, reason = "Executable examples and test fixtures are not library API.")]
+#![cfg(feature = "invocation")]
+//! Example demonstrating a wrapper macro that can inject the jni crate path and
+//! a `type_map` into `native_method`! invocations.
+//!
+//! Notably the wrapper doesn't need to know anything about the syntax of
+//! `native_method`! and it doesn't stop you from adding additional `type_map`
+//! entries.
+//!
+//! This could be useful in a workspace with:
+//! - Multiple jni version dependencies
+//! - Common Reference types used across many native methods
+//! - Custom handle types that are used across many native methods
+
+extern crate abos_jni as jni2;
+
+use jni2::JValue;
+use jni2::objects::{JClass, JObject, JString};
+use jni2::refs::LoaderContext;
+use jni2::refs::Reference;
+use jni2::{Env, NativeMethod};
+use std::ffi::{CStr, c_char};
+
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+enum MyError {
+	#[error("Invalid UTF-8 in handle: {0}")]
+	InvalidUtf8(#[from] std::str::Utf8Error),
+	#[error("JNI call failed")]
+	Jni(#[from] jni2::errors::Error),
+}
+
+#[path = "utils/lib.rs"]
+mod utils;
+
+define_stub_type!(JNativeMethodWrapper, "com.example.NativeMethodWrapper");
+define_stub_type!(JBuiltinType, "com.example.CommonBuiltinType");
+define_stub_type!(JCustomType, "com.example.CustomType");
+
+#[repr(transparent)]
+#[derive(Copy, Clone)]
+struct CommonHandle(*const c_char);
+impl From<CommonHandle> for abos_jni::sys::jlong {
+	fn from(handle: CommonHandle) -> Self {
+		handle.0.cast::<u8>() as Self
+	}
+}
+
+/// Example wrapper macro that always uses a custom jni path and provides common type mappings
+macro_rules! my_native_method {
+    ($($tt:tt)*) => {
+        ::jni2::native_method! {
+            jni = ::jni2,
+            type_map = {
+                // Common types shared across all native methods
+                // These must be defined before the wrapper is used
+                crate::JBuiltinType => "com.example.CommonBuiltinType",
+                typealias JBuiltinType => crate::JBuiltinType,
+                // Common handle types shared across all native methods
+                unsafe CommonHandle => long,
+            },
+            $($tt)*
+        }
+    };
+}
+// For consistency, do the same for jni_sig! macro which we'll use to call the methods
+macro_rules! my_jni_sig {
+    ($($tt:tt)*) => {
+        ::jni2::jni_sig!(
+            jni = ::jni2,
+            type_map = {
+                crate::JBuiltinType => "com.example.CommonBuiltinType",
+                typealias JBuiltinType => crate::JBuiltinType,
+            },
+            $($tt)*
+        )
+    };
+}
+// and, for consistency, also rename the jni crate for the jni_str macro
+macro_rules! my_jni_str {
+    ($($tt:tt)*) => {
+        ::jni2::jni_str!(
+            jni = ::jni2,
+            $($tt)*
+        )
+    };
+}
+
+const NATIVE_METHODS: &[NativeMethod] = &[
+	// Method using a handle type from the wrapper's type_map
+	my_native_method! {
+		fn JNativeMethodWrapper::process_resource(handle: CommonHandle) -> JString,
+	},
+	// Static method using a builtin type from the wrapper's type_map and an additional type_map entry
+	my_native_method! {
+		type_map = {
+			// Additional type mapping specific to this method
+			JCustomType => com.example.CustomType,
+		},
+		static fn JNativeMethodWrapper::mix_types(builtin: JBuiltinType, custom: JCustomType) -> JString,
+	},
+];
+
+impl JNativeMethodWrapper<'_> {
+	fn process_resource<'local>(
+		env: &mut Env<'local>,
+		_this: JNativeMethodWrapper<'local>,
+		handle: CommonHandle,
+	) -> Result<JString<'local>, MyError> {
+		// SAFETY: The example caller passes the live, terminated C string allocated for this handle.
+		let c_str: &CStr = unsafe { CStr::from_ptr(handle.0) };
+		let str_slice: &str = c_str.to_str().map_err(MyError::InvalidUtf8)?;
+		let response: String = format!("Processed resource: {str_slice}");
+		Ok(JString::from_str(env, response)?)
+	}
+
+	fn mix_types<'local>(
+		env: &mut Env<'local>,
+		_class: JClass<'local>,
+		_builtin: JBuiltinType<'local>,
+		_custom: JCustomType<'local>,
+	) -> Result<JString<'local>, jni2::errors::Error> {
+		JString::new(env, "Mixed types successfully")
+	}
+}
+
+fn main() {
+	utils::attach_current_thread(|env| {
+		utils::load_class(env, "NativeMethodWrapper")?;
+
+		println!("=== native_method! Wrapper Example ===\n");
+
+		println!("--- Registering Native Methods (via wrapper macro) ---");
+		let class = JNativeMethodWrapper::lookup_class(env, &LoaderContext::default())?;
+		let class: &JClass = &class;
+		// SAFETY: The fixture class declares the names and JNI signatures supplied by these native-method descriptors.
+		unsafe {
+			env.register_native_methods(class, NATIVE_METHODS)?;
+		}
+		println!("Registered {} native methods", NATIVE_METHODS.len());
+
+		println!("\n--- Creating Instance ---");
+		let obj: JNativeMethodWrapper<'_> = JNativeMethodWrapper::new(env)?;
+		println!("Created NativeMethodWrapper instance");
+
+		println!("\n--- Testing process_resource ---");
+		let resource_data = c"my_resource_data";
+		let resource_handle: CommonHandle = CommonHandle(resource_data.as_ptr());
+		let obj: JObject<'_> = env
+			.call_method(
+				&obj,
+				my_jni_str!("processResource"),
+				my_jni_sig!((jlong)->JString),
+				&[JValue::Long(resource_handle.into())],
+			)?
+			.l()?;
+		let s: JString<'_> = JString::cast_local(env, obj)?;
+		println!("Result: {}", s.try_to_string(env)?);
+
+		// A fully qualified Java name avoids a one-off type_map entry.
+		println!("\n--- Testing mix_types ---");
+		let builtin_obj: JBuiltinType<'_> = JBuiltinType::new(env)?;
+		let custom_obj: JCustomType<'_> = JCustomType::new(env)?;
+		let result: JObject<'_> = env
+			.call_static_method(
+				class,
+				my_jni_str!("mixTypes"),
+				my_jni_sig!((builtin: JBuiltinType, custom: com.example.CustomType)->JString),
+				&[JValue::Object(&builtin_obj.into()), JValue::Object(&custom_obj.into())],
+			)?
+			.l()?;
+		println!("Result: {}", JString::cast_local(env, result)?.try_to_string(env)?);
+
+		println!("\n=== Example completed successfully ===");
+		Ok(())
+	})
+	.expect("Failed to run example");
+}
