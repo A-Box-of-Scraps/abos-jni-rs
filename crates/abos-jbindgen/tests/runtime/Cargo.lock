@@ -50,6 +50,7 @@ dependencies = [
  "abos-jni-macros",
  "abos-jni-sys",
  "cfg-if",
+ "indoc",
  "libloading",
  "log",
  "simd_cesu8",
@@ -61,6 +62,7 @@ dependencies = [
 name = "abos-jni-macros"
 version = "0.1.0"
 dependencies = [
+ "indoc",
  "proc-macro2",
  "quote",
  "rustc_version",
@@ -277,6 +279,15 @@ checksum = "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855"
 dependencies = [
  "equivalent",
  "hashbrown",
+]
+
+[[package]]
+name = "indoc"
+version = "2.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a37b2691796cffeb8a8cd305ac66e65841559f147f4e63231d0eafa4db5384d1"
+dependencies = [
+ "rustversion",
 ]
 
 [[package]]

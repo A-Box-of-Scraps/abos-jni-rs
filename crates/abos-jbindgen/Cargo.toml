@@ -28,4 +28,5 @@ zip.workspace = true
 
 [dev-dependencies]
 abos-javac.workspace = true
+indoc.workspace = true
 tempfile.workspace = true

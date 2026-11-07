@@ -111,11 +111,12 @@ fn normalizes_annotation_overrides() -> TestResult {
 	let source: PathBuf = root.path().join("Annotated.java");
 	fs::write(
 		&source,
-		"import io.github.jni_rs.jbindgen.RustName;
-		@RustName(\"type\") public class Annotated {
-			@RustName(\"gen\") public Annotated() {}
-			@RustName(\"with-dash\") public int answer() { return 42; }
-		}",
+		indoc::indoc! {r#"
+			import io.github.jni_rs.jbindgen.RustName;
+			@RustName("type") public class Annotated {
+				@RustName("gen") public Annotated() {}
+				@RustName("with-dash") public int answer() { return 42; }
+			}"#},
 	)?;
 	let bindings: Bindings = Builder::new()
 		.input_sources(vec![source], vec![annotations.path().to_owned()], Vec::new())

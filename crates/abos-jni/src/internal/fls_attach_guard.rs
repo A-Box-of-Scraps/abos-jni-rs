@@ -111,9 +111,11 @@ unsafe extern "system" fn fls_callback(data: *const core::ffi::c_void) {
 	let guard_level: usize = crate::JavaVM::thread_attach_guard_level();
 	assert!(
 		guard_level == 0,
-		"FATAL: FLS callback invoked with active AttachGuard (nest_level={}). \
-         Fiber switching must not occur while an AttachGuard is in scope. \
-         Thread: {} ({:?})",
+		indoc::indoc! {
+			"FATAL: FLS callback invoked with active AttachGuard (nest_level={}). \
+			Fiber switching must not occur while an AttachGuard is in scope. \
+			Thread: {} ({:?})"
+		},
 		guard_level,
 		attach_data.thread.name().unwrap_or_default(),
 		attach_data.thread.id()
@@ -187,9 +189,11 @@ pub unsafe fn fls_attach_current_thread<'local>(
 	let guard_level: usize = JavaVM::thread_attach_guard_level();
 	assert!(
 		guard_level == 0,
-		"FATAL: fls_attach_current_thread called with active AttachGuard (nest_level={}). \
-         Fiber attachment/switching must not occur while an AttachGuard is in scope. \
-         Thread: {} ({:?})",
+		indoc::indoc! {
+			"FATAL: fls_attach_current_thread called with active AttachGuard (nest_level={}). \
+			Fiber attachment/switching must not occur while an AttachGuard is in scope. \
+			Thread: {} ({:?})"
+		},
 		guard_level,
 		current().name().unwrap_or_default(),
 		current().id()

@@ -17,6 +17,7 @@ doctest = false
 rustc_version.workspace = true
 
 [dependencies]
+indoc.workspace = true
 proc-macro2.workspace = true
 quote.workspace = true
 simd_cesu8.workspace = true

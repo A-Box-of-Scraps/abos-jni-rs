@@ -35,8 +35,9 @@ fn sdk(failure: Failure) -> TestResult<TempDir> {
 		// Missing primitive mappings remain generation errors even when dollar names are supported.
 		source = source.replacen(
 			"public class UnsupportedNames {",
-			"public class UnsupportedNames {
-			public void unsupported(@io.github.jni_rs.jbindgen.RustPrimitive(\"Missing\") int value) {}",
+			indoc::indoc! {r#"
+				public class UnsupportedNames {
+					public void unsupported(@io.github.jni_rs.jbindgen.RustPrimitive("Missing") int value) {}"#},
 			1,
 		);
 	}

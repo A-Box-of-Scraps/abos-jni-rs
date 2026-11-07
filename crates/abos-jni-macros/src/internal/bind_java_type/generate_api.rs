@@ -18,17 +18,15 @@ pub(super) fn generate_type_struct(
 	let doc_attr: TokenStream = if has_doc_attr {
 		quote! {}
 	} else {
-		quote! {
-			#[doc = concat!(
-				r#"A `"#, #java_class, r#"` reference, tied to a JNI local reference frame.
+		let doc: String = indoc::formatdoc! {"
+			A `{java_class}` reference, tied to a JNI local reference frame.
 
-See the [`JObject`] documentation for more information about object references,
-how to cast them, and local reference frame lifetimes.
+			See the [`JObject`] documentation for more information about object references,
+			how to cast them, and local reference frame lifetimes.
 
-[`JObject`]: "#, #jni_path_str, r#"::objects::JObject
-"#
-			)]
-		}
+			[`JObject`]: {jni_path_str}::objects::JObject
+		"};
+		quote! { #[doc = #doc] }
 	};
 
 	let type_visibility: TokenStream = type_visibility.to_tokens();

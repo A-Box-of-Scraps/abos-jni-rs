@@ -25,6 +25,7 @@ abos-jni-sys = { path = "crates/abos-jni-sys", version = "0.1.0" }
 abos-jni-sys-macros = { path = "crates/abos-jni-sys-macros", version = "0.1.0" }
 
 # Shared external dependencies
+indoc = "2"
 tempfile = "3"
 thiserror = "2"
 

@@ -142,24 +142,50 @@ pub(super) fn generate_base_methods(type_name: &Ident, sys_type: Option<&Ident>,
 
 	let jni_path_str: String = path_to_string_no_spaces(jni);
 
+	let from_raw_doc: String = indoc::formatdoc! {"
+		Creates a [`{type_name}`] that wraps the given `raw` [jobject]
+
+		# Safety
+
+		- `raw` must be a valid raw JNI local reference (or `null`).
+		- `raw` must be an instance of the correct Java class.
+		- There must not be any other owning [Reference] wrapper for the same reference.
+		- The local reference must belong to the current thread and not outlive the
+		  JNI stack frame associated with the [Env] `'local` lifetime.
+
+		[jobject]: {jni_path_str}::sys::jobject
+		[Reference]: {jni_path_str}::refs::Reference
+		[Env]: {jni_path_str}::Env
+	"};
+
+	let null_doc: String = indoc::formatdoc! {"
+		Creates a new null reference.
+
+		Null references are always valid and do not belong to a local reference frame. Therefore,
+		the returned [`{type_name}`] always has the `'static` lifetime."};
+
+	let cast_local_doc: String = indoc::formatdoc! {"
+		Cast a local reference to a [`{type_name}`]
+
+		This will do a runtime (`IsInstanceOf`) check that the object is an instance of the correct class.
+
+		Also see these other options for casting local or global references to a [`{type_name}`]:
+		- [Env::as_cast]({jni_path_str}::Env::as_cast)
+		- [Env::new_cast_local_ref]({jni_path_str}::Env::new_cast_local_ref)
+		- [Env::cast_local]({jni_path_str}::Env::cast_local)
+		- [Env::new_cast_global_ref]({jni_path_str}::Env::new_cast_global_ref)
+		- [Env::cast_global]({jni_path_str}::Env::cast_global)
+
+		# Errors
+
+		Returns [Error::WrongObjectType] if the `IsInstanceOf` check fails.
+
+		[Error::WrongObjectType]: {jni_path_str}::errors::Error::WrongObjectType
+	"};
+
 	quote! {
 		impl<'local> #type_name<'local> {
-			#[doc = concat!(
-				r#"Creates a [`"#, stringify!(#type_name), r#"`] that wraps the given `raw` [jobject]
-
-# Safety
-
-- `raw` must be a valid raw JNI local reference (or `null`).
-- `raw` must be an instance of the correct Java class.
-- There must not be any other owning [Reference] wrapper for the same reference.
-- The local reference must belong to the current thread and not outlive the
-  JNI stack frame associated with the [Env] `'local` lifetime.
-
-[jobject]: "#, #jni_path_str, r#"::sys::jobject
-[Reference]: "#, #jni_path_str, r#"::refs::Reference
-[Env]: "#, #jni_path_str, r#"::Env
-"#
-			)]
+			#[doc = #from_raw_doc]
 			#[inline]
 			pub unsafe fn from_raw<'env_inner>(
 				env: &#jni::Env<'env_inner>,
@@ -168,12 +194,7 @@ pub(super) fn generate_base_methods(type_name: &Ident, sys_type: Option<&Ident>,
 				unsafe { #type_name(#jni::objects::JObject::from_raw(env, raw as #jni::sys::jobject)) }
 			}
 
-			#[doc = concat!(
-				r#"Creates a new null reference.
-
-Null references are always valid and do not belong to a local reference frame. Therefore,
-the returned [`"#, stringify!(#type_name), r#"`] always has the `'static` lifetime."#
-			)]
+			#[doc = #null_doc]
 			#[inline]
 			pub const fn null() -> #type_name<'static> {
 				#type_name(#jni::objects::JObject::null())
@@ -185,25 +206,7 @@ the returned [`"#, stringify!(#type_name), r#"`] always has the `'static` lifeti
 				self.0.into_raw() as #sys_type_path
 			}
 
-			#[doc = concat!(
-				r#"Cast a local reference to a [`"#, stringify!(#type_name), r#"`]
-
-This will do a runtime (`IsInstanceOf`) check that the object is an instance of the correct class.
-
-Also see these other options for casting local or global references to a [`"#, stringify!(#type_name), r#"`]:
-- [Env::as_cast]("#, #jni_path_str, r#"::Env::as_cast)
-- [Env::new_cast_local_ref]("#, #jni_path_str, r#"::Env::new_cast_local_ref)
-- [Env::cast_local]("#, #jni_path_str, r#"::Env::cast_local)
-- [Env::new_cast_global_ref]("#, #jni_path_str, r#"::Env::new_cast_global_ref)
-- [Env::cast_global]("#, #jni_path_str, r#"::Env::cast_global)
-
-# Errors
-
-Returns [Error::WrongObjectType] if the `IsInstanceOf` check fails.
-
-[Error::WrongObjectType]: "#, #jni_path_str, r#"::errors::Error::WrongObjectType
-"#
-			)]
+			#[doc = #cast_local_doc]
 			#[inline]
 			pub fn cast_local<'any_local>(
 				env: &mut #jni::Env<'_>,
@@ -250,15 +253,16 @@ pub(super) fn generate_is_instance_of_code(
 				if let Some(stem) = &entry.stem {
 					let method_name: Ident = format_ident!("as_{}", stem);
 
-					is_instance_of_methods.push(quote! {
-                        #[doc = concat!(
-                        r#"Casts this `"#, stringify!(#type_name), r#"` to a `"#, #type_path_str, r#"`
+					let doc: String = indoc::formatdoc! {"
+						Casts this `{type_name}` to a `{type_path_str}`
 
-This does not require a runtime type check since any `"#, stringify!(#type_name), r#"` is also a `"#, #type_path_str, r#"`"#)]
-                        pub fn #method_name(&self) -> #jni::refs::Cast<'local, '_, #type_path<'local>> {
-                            unsafe { #jni::refs::Cast::<#type_path>::new_unchecked(self) }
-                        }
-                    });
+						This does not require a runtime type check since any `{type_name}` is also a `{type_path_str}`"};
+					is_instance_of_methods.push(quote! {
+						#[doc = #doc]
+						pub fn #method_name(&self) -> #jni::refs::Cast<'local, '_, #type_path<'local>> {
+							unsafe { #jni::refs::Cast::<#type_path>::new_unchecked(self) }
+						}
+					});
 				}
 
 				if type_alias != "JObject" && type_alias != "abos_jni::objects::JObject" {

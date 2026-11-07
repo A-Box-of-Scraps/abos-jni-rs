@@ -48,28 +48,28 @@ pub mod strings;
 mod env;
 pub use env::*;
 
+// Deprecation notes require a literal rather than a macro expansion.
 #[deprecated(
 	since = "0.22.0",
-	note = r#"Since 0.22, `JNIEnv` has been split into `Env` and `EnvUnowned`
-
-- `EnvUnowned` is FFI safe and can be accepted as an argument for native methods
-- `Env` is what provides the full JNI environment API and is not FFI safe.
-
-To remain safe by default, `abos_jni::JNIEnv` is now an alias for `EnvUnowned` (which is FFI safe).
-
-Use `EnvUnowned` to capture a raw `abos_jni_sys::JNIEnv` pointer in native methods, like:
-`pub extern "system" fn Java_HelloWorld_hello<'frame>(unowned_env: EnvUnowned<'frame>, ...)`
-Then use `unowned_env.with_env()` to upgrade it to an `Env` reference.
-
-Most of the time you should temporarily acquire a `Env` reference using:
-- `JavaVM::attach_current_thread` (preferred) or `JavaVM::attach_current_thread_for_scope`
-- `JavaVM::with_env` (if certain that the thread is already attached)
-- `UnownedEnv::with_env()` in native methods
-
-When migrating to 0.22, if you have a mixture of FFI/non-FFI usage of JNIEnv then err on the side
-of renaming `JNIEnv` to `EnvUnowned` because that's safe for FFI and for non-FFI usage there will be
-clear compiler errors if trying to access the real `Env` API through the `EnvUnowned` type.
-"#
+	note = "Since 0.22, `JNIEnv` has been split into `Env` and `EnvUnowned`\n\
+	\n\
+	- `EnvUnowned` is FFI safe and can be accepted as an argument for native methods\n\
+	- `Env` is what provides the full JNI environment API and is not FFI safe.\n\
+	\n\
+	To remain safe by default, `abos_jni::JNIEnv` is now an alias for `EnvUnowned` (which is FFI safe).\n\
+	\n\
+	Use `EnvUnowned` to capture a raw `abos_jni_sys::JNIEnv` pointer in native methods, like:\n\
+	`pub extern \"system\" fn Java_HelloWorld_hello<'frame>(unowned_env: EnvUnowned<'frame>, ...)`\n\
+	Then use `unowned_env.with_env()` to upgrade it to an `Env` reference.\n\
+	\n\
+	Most of the time you should temporarily acquire a `Env` reference using:\n\
+	- `JavaVM::attach_current_thread` (preferred) or `JavaVM::attach_current_thread_for_scope`\n\
+	- `JavaVM::with_env` (if certain that the thread is already attached)\n\
+	- `UnownedEnv::with_env()` in native methods\n\
+	\n\
+	When migrating to 0.22, if you have a mixture of FFI/non-FFI usage of JNIEnv then err on the side\n\
+	of renaming `JNIEnv` to `EnvUnowned` because that's safe for FFI and for non-FFI usage there will be\n\
+	clear compiler errors if trying to access the real `Env` API through the `EnvUnowned` type.\n"
 )]
 /// An FFI safe alias for `EnvUnowned` for (safer) compatibility with
 /// existing code.

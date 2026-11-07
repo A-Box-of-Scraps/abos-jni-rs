@@ -13,6 +13,7 @@ workspace = true
 abos-jni-macros.workspace = true
 abos-jni-sys.workspace = true
 cfg-if.workspace = true
+indoc.workspace = true
 log.workspace = true
 simd_cesu8.workspace = true
 thiserror.workspace = true

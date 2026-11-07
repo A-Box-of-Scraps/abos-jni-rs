@@ -296,3 +296,7 @@ use native_wrappers::generate_native_wrappers;
 
 mod native_exports;
 use native_exports::{generate_native_exports, generate_native_registration_code};
+
+#[cfg(test)]
+#[path = "../../../tests/unit/internal/bind_java_type.rs"]
+mod tests;

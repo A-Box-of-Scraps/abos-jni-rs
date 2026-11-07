@@ -18,10 +18,15 @@ fn fixture(root: &Path, selection: &str) -> TestResult {
 	fs::write(root.join("src/lib.rs"), "")?;
 	fs::write(
 		root.join("Cargo.toml"),
-		format!(
-			"[package]\nname = \"cargo-rebuild-probe\"\nversion = \"0.0.0\"\nedition = \"2024\"\n\
-			[workspace]\n[build-dependencies]\nabos-javac = {{ path = {dependency:?} }}\n"
-		),
+		indoc::formatdoc! {r#"
+			[package]
+			name = "cargo-rebuild-probe"
+			version = "0.0.0"
+			edition = "2024"
+			[workspace]
+			[build-dependencies]
+			abos-javac = {{ path = {dependency:?} }}
+		"#},
 	)?;
 	fs::write(
 		root.join("build.rs"),

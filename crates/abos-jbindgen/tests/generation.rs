@@ -229,10 +229,11 @@ fn configured_constructor_names_take_precedence_over_annotations() -> TestResult
 	let source: PathBuf = root.path().join("ConstructorNames.java");
 	fs::write(
 		&source,
-		"import io.github.jni_rs.jbindgen.RustName;
-		public class ConstructorNames {
-			@RustName(\"from_annotation\") public ConstructorNames() {}
-		}",
+		indoc::indoc! {r#"
+			import io.github.jni_rs.jbindgen.RustName;
+			public class ConstructorNames {
+				@RustName("from_annotation") public ConstructorNames() {}
+			}"#},
 	)?;
 	let builder: Builder = Builder::new().input_sources(vec![source], vec![annotations.path().to_owned()], Vec::new());
 	let annotated: String = builder.clone().generate()?.to_string();
