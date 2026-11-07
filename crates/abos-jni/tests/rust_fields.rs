@@ -35,11 +35,7 @@ impl Drop for Tracked {
 fn with_rust_field(test: impl FnOnce(&mut Env, &JObject, &Arc<AtomicUsize>) -> Result<()>) {
 	static CLASS: OnceLock<()> = OnceLock::new();
 	CLASS.get_or_init(|| {
-		let out_dir: std::path::PathBuf = util::setup_test_output("rust_fields");
-		let _classes: Vec<std::path::PathBuf> = abos_javac::Build::new()
-			.file("tests/java/com/example/TestRustFields.java")
-			.output_dir(&out_dir)
-			.compile();
+		let out_dir: std::path::PathBuf = util::java_fixtures();
 		util::attach_current_thread(|env| util::load_test_class(env, &out_dir, "TestRustFields"))
 			.expect("load Rust field test class");
 	});

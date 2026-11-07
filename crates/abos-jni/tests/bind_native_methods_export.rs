@@ -522,12 +522,7 @@ impl TestInnerClassNativeInterface for TestInnerClassAPI {
 rusty_fork::rusty_fork_test! {
 	#[test]
 	fn test_export_inner_class() {
-		let out_dir = util::setup_test_output("test_export_inner_class");
-
-		let _classes = abos_javac::Build::new()
-			.file("tests/java/com/example/TestNativeExports.java")
-			.output_dir(&out_dir)
-			.compile();
+		let out_dir: std::path::PathBuf = util::java_fixtures();
 
 		util::attach_current_thread(|env| {
 			// Load both outer and inner class

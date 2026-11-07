@@ -16,12 +16,7 @@ macro_rules! native_method_test {
             $(#[$attribute])*
             fn $test_name() {
                 #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
-                let out_dir = $crate::util::setup_test_output(stringify!($test_name));
-
-                let _classes = abos_javac::Build::new()
-                    .file(concat!("tests/java/", $java_class))
-                    .output_dir(&out_dir)
-                    .compile();
+                let out_dir = $crate::util::java_fixtures();
 
                 #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                 $crate::util::attach_current_thread(|$env| {
@@ -57,12 +52,7 @@ macro_rules! native_method_test {
             $(#[$attribute])*
             fn $test_name() {
                 #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
-                let out_dir = $crate::util::setup_test_output(stringify!($test_name));
-
-                let _classes = abos_javac::Build::new()
-                    .file(concat!("tests/java/", $java_class))
-                    .output_dir(&out_dir)
-                    .compile();
+                let out_dir = $crate::util::java_fixtures();
 
                 #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                 let result = $crate::util::attach_current_thread(|$env| {

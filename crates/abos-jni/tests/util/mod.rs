@@ -6,6 +6,10 @@ use abos_jni::{
 };
 
 mod example_proxy;
+mod fixtures;
+
+#[allow(unused_imports, reason = "Only tests that load Java fixtures use this helper.")]
+pub use fixtures::java_fixtures;
 
 #[allow(
 	unused_imports,
@@ -142,31 +146,4 @@ pub fn load_test_class(env: &mut Env, out_dir: &std::path::Path, class_name: &st
 	env.define_class(Some(&class_jni), &class_loader, &class_bytes)?;
 
 	Ok(())
-}
-
-#[allow(
-	dead_code,
-	reason = "Shared test and example helpers are used by different subsets of binaries."
-)]
-pub fn setup_test_output(test_name: &str) -> std::path::PathBuf {
-	// We use option_env unwrap so this utilities module can be used from trybuild tests
-	// (which won't have CARGO_TARGET_TMPDIR set) - assuming those tests don't need this function.
-	#[allow(
-		clippy::option_env_unwrap,
-		reason = "Trybuild fixtures lack CARGO_TARGET_TMPDIR; only runtime tests call this helper."
-	)]
-	let out_dir: std::path::PathBuf = std::path::PathBuf::from(
-		option_env!("CARGO_TARGET_TMPDIR").expect("CARGO_TARGET_TMPDIR environment variable not set"),
-	)
-	.join("jni_macros_tests")
-	.join(test_name);
-
-	match std::fs::remove_dir_all(&out_dir) {
-		Ok(()) => {}
-		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-		Err(error) => panic!("Failed to remove previous test output: {error}"),
-	}
-	std::fs::create_dir_all(&out_dir).expect("Failed to create test output directory");
-
-	out_dir
 }

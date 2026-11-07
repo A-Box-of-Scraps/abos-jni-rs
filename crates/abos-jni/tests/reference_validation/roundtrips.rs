@@ -1,4 +1,4 @@
-use super::{ReferenceTypes, compile_fixture, util};
+use super::{ReferenceTypes, util};
 use abos_jni::{
 	Env, JValue,
 	errors::Result,
@@ -85,7 +85,7 @@ fn check_reference_roundtrip(
 rusty_fork_test! {
 #[test]
 fn method_and_field_roundtrips_preserve_typed_references() {
-	let output = compile_fixture("reference_roundtrips");
+	let output: std::path::PathBuf = util::java_fixtures();
 	util::attach_current_thread(|env| {
 		util::load_test_class(env, &output, "ReferenceTypes")?;
 		let receiver = ReferenceTypes::new(env)?;

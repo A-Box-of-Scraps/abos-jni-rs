@@ -65,12 +65,7 @@ bind_java_type! {
 rusty_fork_test! {
 #[test]
 fn test_static_array_fields() {
-	let out_dir = setup_test_output("bind_arrays_static_fields");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestArrays.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
@@ -97,12 +92,7 @@ fn test_static_array_fields() {
 rusty_fork_test! {
 #[test]
 fn test_instance_array_fields() {
-	let out_dir = setup_test_output("bind_arrays_instance_fields");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestArrays.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
@@ -130,12 +120,7 @@ fn test_instance_array_fields() {
 rusty_fork_test! {
 #[test]
 fn test_array_field_write() {
-	let out_dir = setup_test_output("bind_arrays_field_write");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestArrays.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
@@ -159,12 +144,7 @@ fn test_array_field_write() {
 rusty_fork_test! {
 #[test]
 fn test_static_method_with_array_param() {
-	let out_dir = setup_test_output("bind_arrays_static_method_param");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestArrays.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
@@ -184,12 +164,7 @@ fn test_static_method_with_array_param() {
 rusty_fork_test! {
 #[test]
 fn test_static_method_returning_array() {
-	let out_dir = setup_test_output("bind_arrays_static_method_return");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestArrays.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
@@ -207,12 +182,7 @@ fn test_static_method_returning_array() {
 rusty_fork_test! {
 #[test]
 fn test_static_method_string_arrays() {
-	let out_dir = setup_test_output("bind_arrays_static_string_arrays");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestArrays.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
@@ -233,12 +203,7 @@ fn test_static_method_string_arrays() {
 rusty_fork_test! {
 #[test]
 fn test_static_method_2d_array() {
-	let out_dir = setup_test_output("bind_arrays_static_2d");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestArrays.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
@@ -271,12 +236,7 @@ fn test_static_method_2d_array() {
 rusty_fork_test! {
 #[test]
 fn test_instance_method_with_array_param() {
-	let out_dir = setup_test_output("bind_arrays_instance_method_param");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestArrays.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
@@ -300,12 +260,7 @@ fn test_instance_method_with_array_param() {
 rusty_fork_test! {
 #[test]
 fn test_instance_method_array_processing() {
-	let out_dir = setup_test_output("bind_arrays_instance_processing");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestArrays.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
@@ -328,12 +283,7 @@ fn test_instance_method_array_processing() {
 rusty_fork_test! {
 #[test]
 fn test_instance_method_string_array_processing() {
-	let out_dir = setup_test_output("bind_arrays_string_processing");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestArrays.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
@@ -355,12 +305,7 @@ fn test_instance_method_string_array_processing() {
 rusty_fork_test! {
 #[test]
 fn test_constructor_with_arrays() {
-	let out_dir = setup_test_output("bind_arrays_constructor");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestArrays.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
@@ -389,12 +334,7 @@ fn test_constructor_with_arrays() {
 rusty_fork_test! {
 #[test]
 fn test_create_string_array_static_method() {
-	let out_dir = setup_test_output("bind_arrays_create_string_array");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestArrays.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_arrays_class(env, &out_dir)?;
@@ -422,23 +362,6 @@ fn load_test_arrays_class(env: &mut Env, out_dir: &Path) -> abos_jni::errors::Re
 	env.define_class(Some(jni_str!("com/example/TestArrays")), &class_loader, &class_bytes)?;
 
 	Ok(())
-}
-
-fn setup_test_output(test_name: &str) -> PathBuf {
-	let out_dir: PathBuf = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
-		.join("jni_macros_tests")
-		.join(test_name);
-
-	match fs::remove_dir_all(&out_dir) {
-		Ok(()) => {}
-
-		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-
-		Err(error) => panic!("Failed to remove previous test output: {error}"),
-	}
-	fs::create_dir_all(&out_dir).expect("Failed to create test output directory");
-
-	out_dir
 }
 
 fn read_int_array(env: &mut Env, array: &JIntArray) -> abos_jni::errors::Result<Vec<i32>> {

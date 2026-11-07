@@ -61,12 +61,7 @@ bind_java_type! {
 rusty_fork_test! {
 #[test]
 fn test_static_primitive_fields() {
-	let out_dir = setup_test_output("bind_fields_static_primitives");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestFields.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_fields_class(env, &out_dir)?;
@@ -104,12 +99,7 @@ fn test_static_primitive_fields() {
 rusty_fork_test! {
 #[test]
 fn test_static_string_field() {
-	let out_dir = setup_test_output("bind_fields_static_string");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestFields.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_fields_class(env, &out_dir)?;
@@ -126,12 +116,7 @@ fn test_static_string_field() {
 rusty_fork_test! {
 #[test]
 fn test_static_field_write() {
-	let out_dir = setup_test_output("bind_fields_static_write");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestFields.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_fields_class(env, &out_dir)?;
@@ -153,12 +138,7 @@ fn test_static_field_write() {
 rusty_fork_test! {
 #[test]
 fn test_instance_primitive_fields() {
-	let out_dir = setup_test_output("bind_fields_instance_primitives");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestFields.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_fields_class(env, &out_dir)?;
@@ -214,12 +194,7 @@ fn test_instance_primitive_fields() {
 rusty_fork_test! {
 #[test]
 fn test_instance_string_field() {
-	let out_dir = setup_test_output("bind_fields_instance_string");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestFields.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_fields_class(env, &out_dir)?;
@@ -238,12 +213,7 @@ fn test_instance_string_field() {
 rusty_fork_test! {
 #[test]
 fn test_constructor_with_values() {
-	let out_dir = setup_test_output("bind_fields_constructor");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestFields.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_fields_class(env, &out_dir)?;
@@ -272,12 +242,7 @@ fn test_constructor_with_values() {
 rusty_fork_test! {
 #[test]
 fn test_cfg_guarded_fields() {
-	let out_dir = setup_test_output("bind_fields_cfg");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestFields.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_fields_class(env, &out_dir)?;
@@ -329,30 +294,10 @@ fn load_test_fields_class(env: &mut Env, out_dir: &Path) -> abos_jni::errors::Re
 	Ok(())
 }
 
-fn setup_test_output(test_name: &str) -> PathBuf {
-	let out_dir: PathBuf = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
-		.join("jni_macros_tests")
-		.join(test_name);
-
-	match fs::remove_dir_all(&out_dir) {
-		Ok(()) => {}
-		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-		Err(error) => panic!("Failed to remove previous test output: {error}"),
-	}
-	fs::create_dir_all(&out_dir).expect("Failed to create test output directory");
-
-	out_dir
-}
-
 rusty_fork_test! {
 #[test]
 fn test_non_null_field_validation() {
-	let out_dir = setup_test_output("bind_fields_non_null");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestFields.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_fields_class(env, &out_dir)?;
