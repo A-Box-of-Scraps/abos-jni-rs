@@ -384,9 +384,14 @@ impl<'local> Env<'local> {
 		Ok((!superclass.is_null()).then_some(superclass))
 	}
 
-	// Like is_assignable_from but it doesn't need a mutable Env reference because it doesn't do any
-	// descriptor lookups.
-	pub(super) fn is_assignable_from_class(&self, class1: &JClass, class2: &JClass) -> Result<bool> {
+	/// Tests assignability between already-resolved classes using a shared environment.
+	///
+	/// See [`Self::is_assignable_from`] for the direction of the check.
+	///
+	/// # Errors
+	///
+	/// Returns an error if either class is null or a Java exception is pending.
+	pub fn is_assignable_from_class(&self, class1: &JClass, class2: &JClass) -> Result<bool> {
 		let class1: &JClass<'_> = null_check!(class1, "is_assignable_from class1")?;
 		let class2: &JClass<'_> = null_check!(class2, "is_assignable_from class2")?;
 
@@ -404,10 +409,9 @@ impl<'local> Env<'local> {
 		}
 	}
 
-	// FIXME: this API shouldn't need a `&mut self` reference since it doesn't return a local reference
-	// (currently it just needs the `&mut self` for the sake of `Desc<JClass>::lookup`)
-	//
 	/// Tests whether class1 is assignable from class2.
+	///
+	/// Use [`Self::is_assignable_from_class`] with an already-resolved class and a shared environment.
 	///
 	/// # Errors
 	///
@@ -438,11 +442,14 @@ impl<'local> Env<'local> {
 		self.is_instance_of_class(obj, class)
 	}
 
-	// An internal helper that implements is_instance_of except it doesn't take a
-	// Desc for the class and doesn't need a mutable Env reference since it never
-	// needs to allocate a new local reference.
-	/// Returns true if the object reference can be cast to the given type.
-	pub(crate) fn is_instance_of_class<'other_local_1, 'other_local_2, O, C>(&self, object: O, class: C) -> Result<bool>
+	/// Tests whether an object can be cast to an already-resolved class using a shared environment.
+	///
+	/// A null object returns true for any non-null class, as with [`Self::is_instance_of`].
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class is null or a Java exception is pending.
+	pub fn is_instance_of_class<'other_local_1, 'other_local_2, O, C>(&self, object: O, class: C) -> Result<bool>
 	where
 		O: AsRef<JObject<'other_local_1>>,
 		C: AsRef<JClass<'other_local_2>>,
@@ -463,9 +470,6 @@ impl<'local> Env<'local> {
 		}
 	}
 
-	// FIXME: this API shouldn't need a `&mut self` reference since it doesn't return a local reference
-	// (currently it just needs the `&mut self` for the sake of `Desc<JClass>::lookup`)
-	//
 	/// Returns true if the object reference can be cast to the given type.
 	///
 	/// _NB: Unlike the operator `instanceof`, function `IsInstanceOf` *returns `true`*
@@ -473,6 +477,8 @@ impl<'local> Env<'local> {
 	///
 	/// See [JNI documentation](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#IsInstanceOf)
 	/// for details.
+	///
+	/// Use [`Self::is_instance_of_class`] with an already-resolved class and a shared environment.
 	///
 	/// # Errors
 	///
@@ -514,8 +520,4 @@ impl<'local> Env<'local> {
 			.map(|value| value != sys::JNI_FALSE)
 		}
 	}
-
-	// FIXME: this API shouldn't need a `&mut self` reference since it doesn't return a local reference
-	// (currently it just needs the `&mut self` for the sake of `Desc<JThrowable>::lookup`)
-	//
 }

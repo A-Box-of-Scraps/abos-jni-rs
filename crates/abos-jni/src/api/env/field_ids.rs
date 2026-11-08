@@ -27,6 +27,8 @@ impl<'local> Env<'local> {
 	///
 	/// Returns an error if the class or field cannot be resolved, its signature does not match, or a Java exception is pending.
 	///
+	/// Use [`Self::get_field_id_from_class`] with an already-resolved class and a shared environment.
+	///
 	/// # Panics
 	///
 	/// Panics if JNI returns a null field ID without reporting an exception.
@@ -37,6 +39,26 @@ impl<'local> Env<'local> {
 		S: AsRef<FieldSignature<'sig>>,
 	{
 		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
+		self.get_field_id_from_class(class.as_ref(), name, sig)
+	}
+
+	/// Looks up an instance field on an already-resolved class using a shared environment.
+	///
+	/// See [`Self::get_field_id`] for lookup and exception behavior.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class is null, lookup fails, or a Java exception is pending.
+	///
+	/// # Panics
+	///
+	/// Panics if JNI returns a null ID without reporting an exception.
+	pub fn get_field_id_from_class<'sig, N, S>(&self, class: &JClass<'_>, name: N, sig: S) -> Result<JFieldID>
+	where
+		N: AsRef<JNIStr>,
+		S: AsRef<FieldSignature<'sig>>,
+	{
+		let class = null_check!(class, "get_field_id_from_class class")?;
 		let ffi_name: &JNIStr = name.as_ref();
 		let ffi_sig: &FieldSignature<'_> = sig.as_ref();
 
@@ -61,14 +83,11 @@ impl<'local> Env<'local> {
 				self,
 				v1_1,
 				GetFieldID,
-				class.as_ref().as_raw(),
+				class.as_raw(),
 				ffi_name.as_ptr(),
 				ffi_sig.sig().as_ptr()
 			)?
 		};
-
-		// Ensure that `class` isn't dropped before the JNI call returns.
-		drop(class);
 
 		assert!(!field_id.is_null(), "Spurious null field ID returned with no exception");
 
@@ -76,9 +95,6 @@ impl<'local> Env<'local> {
 		Ok(unsafe { JFieldID::from_raw(field_id) })
 	}
 
-	// FIXME: this API shouldn't need a `&mut self` reference since it doesn't return a local reference
-	// (currently it just needs the `&mut self` for the sake of `Desc<JClass>::lookup`)
-	//
 	/// Look up the static field ID for a class/name/type combination.
 	///
 	/// # Example
@@ -103,6 +119,8 @@ impl<'local> Env<'local> {
 	///
 	/// Returns an error if the class or field cannot be resolved, its signature does not match, or a Java exception is pending.
 	///
+	/// Use [`Self::get_static_field_id_from_class`] with an already-resolved class and a shared environment.
+	///
 	/// # Panics
 	///
 	/// Panics if JNI returns a null field ID without reporting an exception.
@@ -118,6 +136,31 @@ impl<'local> Env<'local> {
 		V: AsRef<FieldSignature<'sig>>,
 	{
 		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
+		self.get_static_field_id_from_class(class.as_ref(), name, sig)
+	}
+
+	/// Looks up a static field on an already-resolved class using a shared environment.
+	///
+	/// See [`Self::get_static_field_id`] for lookup and exception behavior.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class is null, lookup fails, or a Java exception is pending.
+	///
+	/// # Panics
+	///
+	/// Panics if JNI returns a null ID without reporting an exception.
+	pub fn get_static_field_id_from_class<'sig, N, S>(
+		&self,
+		class: &JClass<'_>,
+		name: N,
+		sig: S,
+	) -> Result<JStaticFieldID>
+	where
+		N: AsRef<JNIStr>,
+		S: AsRef<FieldSignature<'sig>>,
+	{
+		let class = null_check!(class, "get_static_field_id_from_class class")?;
 		let ffi_name: &JNIStr = name.as_ref();
 		let ffi_sig: &FieldSignature<'_> = sig.as_ref();
 
@@ -142,14 +185,11 @@ impl<'local> Env<'local> {
 				self,
 				v1_1,
 				GetStaticFieldID,
-				class.as_ref().as_raw(),
+				class.as_raw(),
 				ffi_name.as_ptr(),
 				ffi_sig.sig().as_ptr()
 			)?
 		};
-
-		// Ensure that `class` isn't dropped before the JNI call returns.
-		drop(class);
 
 		assert!(!field_id.is_null(), "Spurious null field ID returned with no exception");
 

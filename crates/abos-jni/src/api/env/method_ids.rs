@@ -45,9 +45,6 @@ impl<'local> Env<'local> {
 		Ok(unsafe { JObject::from_raw(self, obj) })
 	}
 
-	// FIXME: this API shouldn't need a `&mut self` reference since it doesn't return a local reference
-	// (currently it just needs the `&mut self` for the sake of `Desc<JClass>::lookup`)
-	//
 	/// Look up a method by class descriptor, name, and signature.
 	///
 	/// # Example
@@ -73,6 +70,8 @@ impl<'local> Env<'local> {
 	///
 	/// Returns an error if the class or method cannot be resolved, its signature does not match, or a Java exception is pending.
 	///
+	/// Use [`Self::get_method_id_from_class`] with an already-resolved class and a shared environment.
+	///
 	/// # Panics
 	///
 	/// Panics if JNI returns a null method ID without reporting an exception.
@@ -88,6 +87,31 @@ impl<'local> Env<'local> {
 		S: AsRef<MethodSignature<'sig, 'sig_args>>,
 	{
 		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
+		self.get_method_id_from_class(class.as_ref(), name, sig)
+	}
+
+	/// Looks up an instance method on an already-resolved class using a shared environment.
+	///
+	/// See [`Self::get_method_id`] for lookup and exception behavior.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class is null, lookup fails, or a Java exception is pending.
+	///
+	/// # Panics
+	///
+	/// Panics if JNI returns a null ID without reporting an exception.
+	pub fn get_method_id_from_class<'sig, 'sig_args, N, S>(
+		&self,
+		class: &JClass<'_>,
+		name: N,
+		sig: S,
+	) -> Result<JMethodID>
+	where
+		N: AsRef<JNIStr>,
+		S: AsRef<MethodSignature<'sig, 'sig_args>>,
+	{
+		let class = null_check!(class, "get_method_id_from_class class")?;
 		let ffi_name: &JNIStr = name.as_ref();
 		let sig: &MethodSignature<'_, '_> = sig.as_ref();
 
@@ -112,14 +136,11 @@ impl<'local> Env<'local> {
 				self,
 				v1_1,
 				GetMethodID,
-				class.as_ref().as_raw(),
+				class.as_raw(),
 				ffi_name.as_ptr(),
 				sig.as_ref().sig().as_ptr()
 			)?
 		};
-
-		// Ensure that `class` isn't dropped before the JNI call returns.
-		drop(class);
 
 		assert!(
 			!method_id.is_null(),
@@ -130,9 +151,6 @@ impl<'local> Env<'local> {
 		Ok(unsafe { JMethodID::from_raw(method_id) })
 	}
 
-	// FIXME: this API shouldn't need a `&mut self` reference since it doesn't return a local reference
-	// (currently it just needs the `&mut self` for the sake of `Desc<JClass>::lookup`)
-	//
 	/// Look up a static method by class descriptor, name, and signature.
 	///
 	/// # Example
@@ -157,6 +175,8 @@ impl<'local> Env<'local> {
 	///
 	/// Returns an error if the class or method cannot be resolved, its signature does not match, or a Java exception is pending.
 	///
+	/// Use [`Self::get_static_method_id_from_class`] with an already-resolved class and a shared environment.
+	///
 	/// # Panics
 	///
 	/// Panics if JNI returns a null method ID without reporting an exception.
@@ -172,6 +192,31 @@ impl<'local> Env<'local> {
 		S: AsRef<MethodSignature<'sig, 'sig_args>>,
 	{
 		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
+		self.get_static_method_id_from_class(class.as_ref(), name, sig)
+	}
+
+	/// Looks up a static method on an already-resolved class using a shared environment.
+	///
+	/// See [`Self::get_static_method_id`] for lookup and exception behavior.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class is null, lookup fails, or a Java exception is pending.
+	///
+	/// # Panics
+	///
+	/// Panics if JNI returns a null ID without reporting an exception.
+	pub fn get_static_method_id_from_class<'sig, 'sig_args, N, S>(
+		&self,
+		class: &JClass<'_>,
+		name: N,
+		sig: S,
+	) -> Result<JStaticMethodID>
+	where
+		N: AsRef<JNIStr>,
+		S: AsRef<MethodSignature<'sig, 'sig_args>>,
+	{
+		let class = null_check!(class, "get_static_method_id_from_class class")?;
 		let ffi_name: &JNIStr = name.as_ref();
 		let sig: &MethodSignature<'_, '_> = sig.as_ref();
 
@@ -196,14 +241,11 @@ impl<'local> Env<'local> {
 				self,
 				v1_1,
 				GetStaticMethodID,
-				class.as_ref().as_raw(),
+				class.as_raw(),
 				ffi_name.as_ptr(),
 				sig.as_ref().sig().as_ptr()
 			)?
 		};
-
-		// Ensure that `class` isn't dropped before the JNI call returns.
-		drop(class);
 
 		assert!(
 			!method_id.is_null(),
@@ -213,8 +255,4 @@ impl<'local> Env<'local> {
 		// SAFETY: The static method ID came from JNI and was checked for null.
 		Ok(unsafe { JStaticMethodID::from_raw(method_id) })
 	}
-
-	// FIXME: this API shouldn't need a `&mut self` reference since it doesn't return a local reference
-	// (currently it just needs the `&mut self` for the sake of `Desc<JClass>::lookup`)
-	//
 }

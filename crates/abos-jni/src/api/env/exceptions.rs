@@ -65,9 +65,8 @@ impl<'local> Env<'local> {
 		}
 	}
 
-	// FIXME: this API shouldn't need a `&mut self` reference since it doesn't return a local reference
-	// (currently it just needs the `&mut self` for the sake of `Desc<JClass>::lookup`)
 	pub(super) fn throw_new_optional(&self, class: &JClass, msg: Option<&JNIStr>) -> Result<()> {
+		let class = null_check!(class, "throw_new class")?;
 		let throwable_class = JThrowable::lookup_class(self, &LoaderContext::None)?;
 		let throwable_class: &JClass = &throwable_class;
 
@@ -98,9 +97,6 @@ impl<'local> Env<'local> {
 		}
 	}
 
-	// FIXME: this API shouldn't need a `&mut self` reference since it doesn't return a local reference
-	// (currently it just needs the `&mut self` for the sake of `Desc<JClass>::lookup`)
-	//
 	/// Create and throw a new exception from a class descriptor and an error message.
 	///
 	/// The '?' operator should typically used to ensure that the new pending exception is reported
@@ -123,6 +119,8 @@ impl<'local> Env<'local> {
 	/// Alternatively, see [`Env::throw_new_void`] if you want to construct an exception with no
 	/// message argument.
 	///
+	/// Use [`Self::throw_new_from_class`] with an already-resolved class and a shared environment.
+	///
 	/// # Errors
 	///
 	/// Returns `Error::JavaException` after throwing, or an error if resolving or constructing the exception fails.
@@ -133,7 +131,22 @@ impl<'local> Env<'local> {
 	{
 		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 		let msg: &JNIStr = msg.as_ref();
-		self.throw_new_optional(class.as_ref(), Some(msg))
+		self.throw_new_from_class(class.as_ref(), msg)
+	}
+
+	/// Creates and throws an exception from an already-resolved class using a shared environment.
+	///
+	/// See [`Self::throw_new`] for exception behavior.
+	///
+	/// # Errors
+	///
+	/// Returns `Error::JavaException` after throwing, or an error if the class is null,
+	/// is not a throwable class, or constructing the exception fails.
+	pub fn throw_new_from_class<S>(&self, class: &JClass<'_>, msg: S) -> Result<()>
+	where
+		S: AsRef<JNIStr>,
+	{
+		self.throw_new_optional(class, Some(msg.as_ref()))
 	}
 
 	/// Create and throw a new exception from a class descriptor and no error message.
