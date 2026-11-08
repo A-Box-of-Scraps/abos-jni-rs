@@ -3,8 +3,8 @@ name = "abos-cafebabe"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
-rust-version.workspace = true
 repository.workspace = true
+rust-version.workspace = true
 description = "Small Java class-file metadata reader for JNI binding generation."
 
 [lints]
