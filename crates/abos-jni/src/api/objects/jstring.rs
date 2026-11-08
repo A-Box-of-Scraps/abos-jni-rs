@@ -204,6 +204,9 @@ impl JString<'_> {
 
 	/// Gets the contents of this string as a Rust `String`.
 	///
+	/// Each unpaired UTF-16 surrogate is replaced with U+FFFD. Valid characters,
+	/// including NULs and supplementary characters, are preserved.
+	///
 	/// For example:
 	///
 	/// ```rust,no_run

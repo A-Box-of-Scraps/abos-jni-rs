@@ -115,10 +115,34 @@ impl<'str_ref> From<&'str_ref JNIStr> for Cow<'str_ref, str> {
 			Ok(s) => s,
 			Err(e) => {
 				debug!("error decoding java cesu8: {e:#?}");
-				String::from_utf8_lossy(bytes)
+				Cow::Owned(decode_mutf8_lossy(other))
 			}
 		}
 	}
+}
+
+// JNIStr guarantees complete, valid MUTF-8 code units, but Java strings may
+// contain unpaired UTF-16 surrogates. Decode units before replacing surrogates
+// so encoded NULs and valid surrogate pairs remain intact.
+fn decode_mutf8_lossy(value: &JNIStr) -> String {
+	let mut bytes: std::slice::Iter<'_, u8> = value.to_bytes().iter();
+	char::decode_utf16(std::iter::from_fn(|| {
+		let first: u8 = *bytes.next()?;
+		let unit: u16 = if first < 0x80 {
+			u16::from(first)
+		} else {
+			let second: u8 = *bytes.next().expect("JNIStr contains complete MUTF-8 code units");
+			if first < 0xE0 {
+				(u16::from(first & 0x1F) << 6) | u16::from(second & 0x3F)
+			} else {
+				let third: u8 = *bytes.next().expect("JNIStr contains complete MUTF-8 code units");
+				(u16::from(first & 0x0F) << 12) | (u16::from(second & 0x3F) << 6) | u16::from(third & 0x3F)
+			}
+		};
+		Some(unit)
+	}))
+	.map(|unit| unit.unwrap_or(char::REPLACEMENT_CHARACTER))
+	.collect()
 }
 
 impl<'str_ref> From<&'str_ref JNIStr> for &'str_ref CStr {
@@ -387,7 +411,10 @@ impl JNIStr {
 	/// the string contains any such code points, and converts them into
 	/// standard UTF-8 encoding.
 	///
-	/// If the string contains only code points between U+0001 and U+FFFF, then
+	/// Each unpaired UTF-16 surrogate is replaced with U+FFFD, without changing
+	/// valid characters elsewhere in the string.
+	///
+	/// If the string contains only Unicode scalar values between U+0001 and U+FFFF, then
 	/// it does not need to be changed, and so this method will return
 	/// [`Cow::Borrowed`]. Otherwise, this method will perform the conversion
 	/// into a new string, and return [`Cow::Owned`].
