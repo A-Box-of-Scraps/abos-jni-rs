@@ -113,7 +113,14 @@ pub(super) fn generate_jni_call_for_return_type(
 			(
 				quote! { env.assert_top(); },
 				call_fn,
-				quote! { unsafe { <#return_type_tokens>::from_raw(env, ret) } },
+				quote! {
+					{
+						// The declared Java type may resolve through a different class loader
+						// than the mapped Rust wrapper's cached class.
+						let object = unsafe { #jni::objects::JObject::from_raw(env, ret) };
+						env.cast_local::<#return_type_tokens>(object)?
+					}
+				},
 			)
 		},
 		|prim| {

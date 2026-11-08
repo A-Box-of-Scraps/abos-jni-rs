@@ -116,7 +116,12 @@ impl<E: Reference + Send + Sync> JObjectArrayAPI<E> {
 
 		let created: Self = {
 			env.with_local_frame(DEFAULT_LOCAL_FRAME_CAPACITY, |env| -> Result<_> {
-				let class: JClass<'_> = loader_context.load_class_for_type::<JObjectArray<E>>(env, false)?;
+				// Derive the array class from the resolved element class, not its name:
+				// E may already be bound to a different loader than loader_context.
+				let element_class: &Global<JClass<'static>> = &*E::lookup_class(env, loader_context)?;
+				let element_class: &JClass<'_> = element_class.as_ref();
+				let array: JObjectArray<'_> = env.new_object_array(0, element_class, JObject::null())?;
+				let class: JClass<'_> = env.get_object_class(&array)?;
 				let class: Global<JClass<'_>> = env.new_global_ref(&class)?;
 				Ok(Self {
 					class,
