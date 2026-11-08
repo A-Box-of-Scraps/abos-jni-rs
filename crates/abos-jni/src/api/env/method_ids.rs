@@ -111,7 +111,7 @@ impl<'local> Env<'local> {
 		N: AsRef<JNIStr>,
 		S: AsRef<MethodSignature<'sig, 'sig_args>>,
 	{
-		let class = null_check!(class, "get_method_id_from_class class")?;
+		let class: &JClass<'_> = null_check!(class, "get_method_id_from_class class")?;
 		let ffi_name: &JNIStr = name.as_ref();
 		let sig: &MethodSignature<'_, '_> = sig.as_ref();
 
@@ -216,7 +216,7 @@ impl<'local> Env<'local> {
 		N: AsRef<JNIStr>,
 		S: AsRef<MethodSignature<'sig, 'sig_args>>,
 	{
-		let class = null_check!(class, "get_static_method_id_from_class class")?;
+		let class: &JClass<'_> = null_check!(class, "get_static_method_id_from_class class")?;
 		let ffi_name: &JNIStr = name.as_ref();
 		let sig: &MethodSignature<'_, '_> = sig.as_ref();
 

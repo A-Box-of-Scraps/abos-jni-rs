@@ -129,7 +129,7 @@ impl<'local> Env<'local> {
 		class: &JClass<'_>,
 		methods: &[NativeMethod],
 	) -> Result<()> {
-		let class = null_check!(class, "register_native_methods_from_class class")?;
+		let class: &JClass<'_> = null_check!(class, "register_native_methods_from_class class")?;
 		// Safety:
 		//  - NativeMethod is a #[transparent] / repr(C)] wrapper around sys::JNINativeMethod
 		//  - NativeMethod only has an `unsafe` constructor that requires the caller to ensure that

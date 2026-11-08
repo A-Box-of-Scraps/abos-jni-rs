@@ -66,7 +66,7 @@ impl<'local> Env<'local> {
 	}
 
 	pub(super) fn throw_new_optional(&self, class: &JClass, msg: Option<&JNIStr>) -> Result<()> {
-		let class = null_check!(class, "throw_new class")?;
+		let class: &JClass<'_> = null_check!(class, "throw_new class")?;
 		let throwable_class = JThrowable::lookup_class(self, &LoaderContext::None)?;
 		let throwable_class: &JClass = &throwable_class;
 

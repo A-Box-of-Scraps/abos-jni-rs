@@ -58,7 +58,7 @@ impl<'local> Env<'local> {
 		N: AsRef<JNIStr>,
 		S: AsRef<FieldSignature<'sig>>,
 	{
-		let class = null_check!(class, "get_field_id_from_class class")?;
+		let class: &JClass<'_> = null_check!(class, "get_field_id_from_class class")?;
 		let ffi_name: &JNIStr = name.as_ref();
 		let ffi_sig: &FieldSignature<'_> = sig.as_ref();
 
@@ -160,7 +160,7 @@ impl<'local> Env<'local> {
 		N: AsRef<JNIStr>,
 		S: AsRef<FieldSignature<'sig>>,
 	{
-		let class = null_check!(class, "get_static_field_id_from_class class")?;
+		let class: &JClass<'_> = null_check!(class, "get_static_field_id_from_class class")?;
 		let ffi_name: &JNIStr = name.as_ref();
 		let ffi_sig: &FieldSignature<'_> = sig.as_ref();
 

@@ -1,19 +1,22 @@
 use super::*;
-use abos_jni::objects::JClass;
+use abos_jni::{
+	ids::{JFieldID, JMethodID, JStaticFieldID, JStaticMethodID},
+	objects::JClass,
+};
 
 #[test]
 fn resolved_class_operations_accept_shared_env() {
 	attach_current_thread(|env| {
-		let string = env.find_class(STRING_CLASS)?;
-		let integer = env.find_class(INTEGER_CLASS)?;
-		let point = env.find_class(jni_str!("java/awt/Point"))?;
-		let exception = env.find_class(EXCEPTION_CLASS)?;
-		let object = env.new_string("shared")?;
-		let method = env.get_method_id(&string, jni_str!("length"), jni_sig!("()I"))?;
-		let static_method =
+		let string: JClass<'_> = env.find_class(STRING_CLASS)?;
+		let integer: JClass<'_> = env.find_class(INTEGER_CLASS)?;
+		let point: JClass<'_> = env.find_class(jni_str!("java/awt/Point"))?;
+		let exception: JClass<'_> = env.find_class(EXCEPTION_CLASS)?;
+		let object: JString<'_> = env.new_string("shared")?;
+		let method: JMethodID = env.get_method_id(&string, jni_str!("length"), jni_sig!("()I"))?;
+		let static_method: JStaticMethodID =
 			env.get_static_method_id(&integer, jni_str!("parseInt"), jni_sig!("(Ljava/lang/String;)I"))?;
-		let field = env.get_field_id(&point, jni_str!("x"), jni_sig!("I"))?;
-		let static_field = env.get_static_field_id(&integer, jni_str!("MAX_VALUE"), jni_sig!("I"))?;
+		let field: JFieldID = env.get_field_id(&point, jni_str!("x"), jni_sig!("I"))?;
+		let static_field: JStaticFieldID = env.get_static_field_id(&integer, jni_str!("MAX_VALUE"), jni_sig!("I"))?;
 		let env: &Env<'_> = env;
 		assert_eq!(
 			env.get_method_id_from_class(&string, jni_str!("length"), jni_sig!("()I"))?
@@ -58,7 +61,7 @@ fn resolved_class_operations_accept_shared_env() {
 #[test]
 fn resolved_class_lookup_errors_are_caught() {
 	attach_current_thread(|env| {
-		let class = env.find_class(STRING_CLASS)?;
+		let class: JClass<'_> = env.find_class(STRING_CLASS)?;
 		let env: &Env<'_> = env;
 		assert_matches!(
 			env.get_method_id_from_class(&class, jni_str!("missingMethod"), jni_sig!("()V")),
@@ -93,7 +96,7 @@ fn resolved_class_lookup_errors_are_caught() {
 #[test]
 fn resolved_class_operations_reject_null_classes() {
 	attach_current_thread(|env| {
-		let class = JClass::null();
+		let class: JClass<'_> = JClass::null();
 		let env: &Env<'_> = env;
 		assert_matches!(
 			env.get_method_id_from_class(&class, jni_str!("length"), jni_sig!("()I")),
@@ -134,8 +137,8 @@ fn resolved_class_operations_reject_null_classes() {
 #[test]
 fn resolved_class_operations_preserve_pending_exceptions() {
 	attach_current_thread(|env| {
-		let class = env.find_class(STRING_CLASS)?;
-		let exception = env.find_class(EXCEPTION_CLASS)?;
+		let class: JClass<'_> = env.find_class(STRING_CLASS)?;
+		let exception: JClass<'_> = env.find_class(EXCEPTION_CLASS)?;
 		let env: &Env<'_> = env;
 		assert_matches!(
 			env.throw_new_from_class(&exception, TEST_EXCEPTION_MESSAGE),
