@@ -20,9 +20,14 @@ pub fn intersect_classes(
 pub fn intersect_class_members(jar_class: &ClassInfo, stub_class: &ClassInfo) -> ClassInfo {
 	let jar_constructor_sigs: HashSet<String> = jar_class.constructors.iter().map(method_signature_key).collect();
 
-	let jar_method_sigs: HashSet<String> = jar_class.methods.iter().map(method_signature_key).collect();
-
-	let jar_native_sigs: HashSet<String> = jar_class.native_methods.iter().map(method_signature_key).collect();
+	// Stubs may replace native declarations with Java bodies (or vice versa),
+	// without changing the callable signature.
+	let jar_method_sigs: HashSet<String> = jar_class
+		.methods
+		.iter()
+		.chain(&jar_class.native_methods)
+		.map(method_signature_key)
+		.collect();
 
 	let jar_field_sigs: HashSet<String> = jar_class.fields.iter().map(field_signature_key).collect();
 
@@ -44,7 +49,7 @@ pub fn intersect_class_members(jar_class: &ClassInfo, stub_class: &ClassInfo) ->
 	let native_methods: Vec<crate::MethodInfo> = stub_class
 		.native_methods
 		.iter()
-		.filter(|m| jar_native_sigs.contains(&method_signature_key(m)))
+		.filter(|m| jar_method_sigs.contains(&method_signature_key(m)))
 		.cloned()
 		.collect();
 
