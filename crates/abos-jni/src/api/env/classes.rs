@@ -364,7 +364,7 @@ impl<'local> Env<'local> {
 	///
 	/// # Errors
 	///
-	/// If a JNI call fails
+	/// Returns an error if the class is null, class resolution fails, or a Java exception is pending.
 	pub fn get_superclass<'other_local, T>(&mut self, class: T) -> Result<Option<JClass<'local>>>
 	where
 		T: Desc<'local, JClass<'other_local>>,
@@ -373,11 +373,13 @@ impl<'local> Env<'local> {
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
-		// SAFETY: The class descriptor is valid and the returned local class reference is tied to the current frame.
+		let class: &JClass<'_> = class.as_ref();
+		let class: &JClass<'_> = null_check!(class, "get_superclass class argument")?;
+		// SAFETY: The class is non-null and the returned local class reference is tied to the current frame.
 		let superclass: JClass<'_> = unsafe {
 			JClass::from_raw(
 				self,
-				jni_call_no_post_check_ex!(self, v1_1, GetSuperclass, class.as_ref().as_raw())?,
+				jni_call_no_post_check_ex!(self, v1_1, GetSuperclass, class.as_raw())?,
 			)
 		};
 

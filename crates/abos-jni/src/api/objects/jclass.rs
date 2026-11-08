@@ -13,6 +13,9 @@ crate::bind_java_type! {
 		}
 	},
 	methods {
+		/// Returns whether this class represents a primitive type or `void`.
+		fn is_primitive() -> bool,
+
 		/// Returns the name of the class.
 		///
 		/// This returns a binary name, such as `java.lang.String`.

@@ -160,14 +160,16 @@ impl<'local> Env<'local> {
 	///
 	/// # Errors
 	///
-	/// Returns an error if the class cannot be resolved, unregistration fails, or a Java exception is pending.
+	/// Returns an error if the class is null or cannot be resolved, unregistration fails, or a Java exception is pending.
 	pub fn unregister_native_methods<'other_local, T>(&mut self, class: T) -> Result<()>
 	where
 		T: Desc<'local, JClass<'other_local>>,
 	{
 		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
-		// SAFETY: The class descriptor remains live during UnregisterNatives.
-		let res: i32 = unsafe { jni_call_post_check_ex!(self, v1_1, UnregisterNatives, class.as_ref().as_raw())? };
+		let resolved_class: &JClass<'_> = class.as_ref();
+		let resolved_class: &JClass<'_> = null_check!(resolved_class, "unregister_native_methods class argument")?;
+		// SAFETY: The class is non-null and its descriptor remains live during UnregisterNatives.
+		let res: i32 = unsafe { jni_call_post_check_ex!(self, v1_1, UnregisterNatives, resolved_class.as_raw())? };
 
 		// Ensure that `class` isn't dropped before the JNI call returns.
 		drop(class);

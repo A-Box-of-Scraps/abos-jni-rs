@@ -37,7 +37,9 @@ impl<'local> Env<'local> {
 	///
 	/// # Errors
 	///
-	/// Returns [`Error::WrongObjectType`] if a non-null initializer is not assignable to `element_class`.
+	/// Returns [`Error::NullPtr`] if `element_class` is null.
+	/// Returns [`Error::WrongObjectType`] if `element_class` represents a primitive type (including
+	/// `void`), or if a non-null initializer is not assignable to it.
 	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
 	pub fn new_object_array<'other_local_1, 'other_local_2, T, U>(
 		&mut self,
@@ -57,12 +59,17 @@ impl<'local> Env<'local> {
 		// Evaluate user-provided AsRef implementations once so validation and allocation
 		// use the same class and initializer references.
 		let element_class: &JClass<'_> = class.as_ref();
+		let element_class: &JClass<'_> = null_check!(element_class, "new_object_array element_class argument")?;
+		// NewObjectArray requires a reference component type, even with a null initializer.
+		if element_class.is_primitive(self)? {
+			return Err(Error::WrongObjectType);
+		}
 		let initial_element: &JObject<'_> = initial_element.as_ref();
 		if !initial_element.is_null() && !self.is_instance_of_class(initial_element, element_class)? {
 			return Err(Error::WrongObjectType);
 		}
 
-		// SAFETY: The resolved class is valid, the initializer is null or assignable to it,
+		// SAFETY: The class is non-null and non-primitive, the initializer is null or assignable to it,
 		// and both references remain live during the JNI call.
 		let array: JObjectArray<'_> = unsafe {
 			jni_call_post_check_ex_and_null_ret!(
