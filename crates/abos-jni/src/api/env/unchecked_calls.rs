@@ -1,3 +1,5 @@
+use crate::sys::jboolean;
+
 use super::{
 	Desc, Env, JClass, JMethodID, JObject, JStaticMethodID, JValueOwned, JavaType, Reference, Result, ReturnType,
 	jobject, jvalue,
@@ -59,7 +61,7 @@ impl<'local> Env<'local> {
 					let obj: JObject<'_> = JObject::from_raw(self, obj);
 					JValueOwned::from(obj)
 				}
-				Primitive(Boolean) => invoke!(CallStaticBooleanMethodA -> bool).into(),
+				Primitive(Boolean) => invoke!(CallStaticBooleanMethodA -> jboolean).into(),
 				Primitive(Char) => invoke!(CallStaticCharMethodA -> u16).into(),
 				Primitive(Byte) => invoke!(CallStaticByteMethodA -> i8).into(),
 				Primitive(Short) => invoke!(CallStaticShortMethodA -> i16).into(),
@@ -134,7 +136,7 @@ impl<'local> Env<'local> {
 					let obj: JObject<'_> = JObject::from_raw(self, obj);
 					JValueOwned::from(obj)
 				}
-				Primitive(Boolean) => invoke!(CallBooleanMethodA -> bool).into(),
+				Primitive(Boolean) => invoke!(CallBooleanMethodA -> jboolean).into(),
 				Primitive(Char) => invoke!(CallCharMethodA -> u16).into(),
 				Primitive(Byte) => invoke!(CallByteMethodA -> i8).into(),
 				Primitive(Short) => invoke!(CallShortMethodA -> i16).into(),
@@ -210,7 +212,7 @@ impl<'local> Env<'local> {
 					let obj: JObject<'_> = JObject::from_raw(self, obj);
 					JValueOwned::from(obj)
 				}
-				Primitive(Boolean) => invoke!(CallNonvirtualBooleanMethodA -> bool).into(),
+				Primitive(Boolean) => invoke!(CallNonvirtualBooleanMethodA -> jboolean).into(),
 				Primitive(Char) => invoke!(CallNonvirtualCharMethodA -> u16).into(),
 				Primitive(Byte) => invoke!(CallNonvirtualByteMethodA -> i8).into(),
 				Primitive(Short) => invoke!(CallNonvirtualShortMethodA -> i16).into(),

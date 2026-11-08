@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, fmt::Write};
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{Field, FnArg, ForeignItem, Ident, Item, ItemStruct, LitStr, Type, TypeFnPtr};
+use syn::{Field, FnArg, ForeignItem, Ident, Item, ItemStruct, LitStr, TypeFnPtr};
 
 use crate::types::{c_name, c_type, function_type};
 
@@ -74,17 +74,13 @@ impl Probe {
 
 	fn alias(&mut self, alias: &syn::ItemType) {
 		let name = &alias.ident;
-		if name == "va_list" {
-			// Rust intentionally uses an opaque pointer for va_list arguments. Its C object
-			// representation is platform-specific, so a sizeof comparison would be misleading.
-			return;
-		}
 		self.layout(name, &name.to_string());
-		// JNI permits only 0 and 1 for jboolean; Rust bool and C unsigned char differ in
-		// type identity. Check its layout and JNI_FALSE/JNI_TRUE, not C type identity.
-		if !(name == "jboolean" && matches!(alias.ty.as_ref(), Type::Path(path) if path.path.is_ident("bool"))) {
-			self.signature(&name.to_string(), &format!("({name})0"), &c_type(&alias.ty));
-		}
+		// Compare parameter types, allowing C array typedefs such as va_list to decay.
+		self.signature(
+			&name.to_string(),
+			&format!("(void (*)({name}))0"),
+			&format!("void (*)({})", c_type(&alias.ty)),
+		);
 	}
 
 	fn record<'a>(&mut self, name: &Ident, fields: impl Iterator<Item = &'a Field>) {

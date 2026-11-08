@@ -140,7 +140,11 @@ run = "cargo fuzz run jni_string_roundtrip -- -max_total_time=60 -max_len=65536 
 run = "cargo run --manifest-path tools/abos-jni-gen-windows-bindings/Cargo.toml -q"
 
 [tasks.lint]
-depends = ["lint:abos-jbindgen:runtime", "lint:docs"]
+depends = [
+  "lint:abos-jbindgen:runtime",
+  "lint:abos-jni-sys:systest",
+  "lint:docs",
+]
 env = { DYLINT_RUSTFLAGS = "-D warnings" }
 run = [
   "cargo clippy --workspace --all-targets --all-features -q -- -D warnings",
@@ -178,6 +182,8 @@ depends = [
   "test:abos-jni:jvm",
   "test:abos-jni-macros",
   "test:abos-jni-sys",
+  "test:abos-jni-sys:jvm",
+  "test:abos-jni-sys:systest",
   "test:abos-jni-sys-macros",
   "test:android-runner",
   "test:lints",

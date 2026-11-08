@@ -1,3 +1,5 @@
+use crate::sys;
+
 #[cfg(doc)]
 use crate::objects::{JByteArray, JThread};
 
@@ -398,7 +400,7 @@ impl<'local> Env<'local> {
 				IsAssignableFrom,
 				class1.as_raw(), // MUST not be null
 				class2.as_raw()  // MUST not be null
-			)?)
+			)? != sys::JNI_FALSE)
 		}
 	}
 
@@ -457,7 +459,7 @@ impl<'local> Env<'local> {
 				IsInstanceOf,
 				object.as_ref().as_raw(), // may be null
 				class.as_raw()            // MUST not be null
-			)?)
+			)? != sys::JNI_FALSE)
 		}
 	}
 
@@ -509,6 +511,7 @@ impl<'local> Env<'local> {
 				ref1.as_raw(), // may be null or weak
 				ref2.as_raw()  // may be null or weak
 			)
+			.map(|value| value != sys::JNI_FALSE)
 		}
 	}
 

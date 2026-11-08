@@ -14,7 +14,7 @@ use syn::{
 };
 
 use crate::internal::types::{TypeMappings, parse_type};
-use crate::internal::types::{generate_type_mapping_checks, sig_type_to_rust_type_core};
+use crate::internal::types::{generate_type_mapping_checks, native_argument, native_return, native_type};
 use crate::internal::{
 	mangle::{create_jni_fn_name, snake_case_to_lower_camel_case},
 	types::SigType,
@@ -189,7 +189,7 @@ impl<'a> NativeWrapper<'a> {
 			let name: &Ident = &parameter.name;
 			arguments.push(quote! { #name });
 		}
-		let return_type: TokenStream = sig_type_to_rust_type_core(
+		let return_type: TokenStream = native_type(
 			&input.signature.return_type,
 			&lifetime,
 			&input.type_mappings,
@@ -218,10 +218,22 @@ impl<'a> NativeWrapper<'a> {
 		let input: &NativeMethodStructInput = self.input;
 		let jni: &syn::Path = &input.jni_crate;
 		let function: &syn::Path = &input.fn_path;
-		let arguments: &Vec<TokenStream> = &self.arguments;
+		let mut arguments: Vec<TokenStream> = vec![self.arguments[0].clone()];
+		arguments.extend(
+			input
+				.signature
+				.parameters
+				.iter()
+				.map(|parameter| native_argument(&parameter.ty, &parameter.name, &input.type_mappings, jni)),
+		);
 		let abi_check: &TokenStream = &self.abi_check;
 		if input.is_raw_fn {
-			return quote! { #abi_check #function(unowned_env, #(#arguments),*) };
+			return native_return(
+				&input.signature.return_type,
+				quote! { #abi_check #function(unowned_env, #(#arguments),*) },
+				&input.type_mappings,
+				jni,
+			);
 		}
 		let with_env_api: TokenStream = if input.catch_unwind {
 			quote! { with_env }
@@ -232,9 +244,14 @@ impl<'a> NativeWrapper<'a> {
 			|| quote! { #jni::errors::ThrowRuntimeExAndDefault },
 			|path| quote! { #path },
 		);
-		quote! {
-			unowned_env.#with_env_api(|env| { #abi_check #function(env, #(#arguments),*) }).resolve::<#policy>()
-		}
+		native_return(
+			&input.signature.return_type,
+			quote! {
+				unowned_env.#with_env_api(|env| { #abi_check #function(env, #(#arguments),*) }).resolve::<#policy>()
+			},
+			&input.type_mappings,
+			jni,
+		)
 	}
 
 	fn method_block(&self, name_cstr: &syn::LitCStr, sig_cstr: &syn::LitCStr) -> TokenStream {
@@ -311,7 +328,7 @@ fn wrapper_parameters(input: &NativeMethodStructInput, lifetime: &TokenStream) -
 	}
 	for parameter in &input.signature.parameters {
 		let name: &Ident = &parameter.name;
-		let ty: TokenStream = sig_type_to_rust_type_core(&parameter.ty, lifetime, &input.type_mappings, jni);
+		let ty: TokenStream = native_type(&parameter.ty, lifetime, &input.type_mappings, jni);
 		parameters.push(quote! { #name: #ty });
 	}
 	parameters

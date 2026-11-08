@@ -25,3 +25,6 @@ mod tests {
 		);
 	}
 }
+
+#[cfg(test)]
+mod calls;

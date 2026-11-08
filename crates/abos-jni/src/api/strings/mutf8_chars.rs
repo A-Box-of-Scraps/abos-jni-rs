@@ -109,7 +109,7 @@ where
 		// - The pointer is immediately wrapped to ensure that the pointer will
 		//   be released when dropped.
 		unsafe {
-			let mut is_copy: jboolean = false;
+			let mut is_copy: jboolean = abos_jni_sys::JNI_FALSE;
 			let ptr: *const c_char =
 				jni_call_only_check_null_ret!(env, v1_1, GetStringUTFChars, obj.as_raw(), &raw mut is_copy)?;
 

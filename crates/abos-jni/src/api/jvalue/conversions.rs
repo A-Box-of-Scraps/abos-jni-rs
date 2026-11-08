@@ -60,6 +60,33 @@ impl TryFrom<JValue<'_>> for jboolean {
 	}
 }
 
+// Keep Rust booleans ergonomic without exposing bool at the JNI boundary.
+impl From<bool> for JValueOwned<'_> {
+	fn from(value: bool) -> Self {
+		Self::Bool(jboolean::from(value))
+	}
+}
+
+impl From<bool> for JValue<'_> {
+	fn from(value: bool) -> Self {
+		Self::Bool(jboolean::from(value))
+	}
+}
+
+impl TryFrom<JValueOwned<'_>> for bool {
+	type Error = Error;
+	fn try_from(value: JValueOwned) -> Result<Self> {
+		value.z()
+	}
+}
+
+impl TryFrom<JValue<'_>> for bool {
+	type Error = Error;
+	fn try_from(value: JValue) -> Result<Self> {
+		value.z()
+	}
+}
+
 // jchar
 impl From<jchar> for JValueOwned<'_> {
 	fn from(other: jchar) -> Self {

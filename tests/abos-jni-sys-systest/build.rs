@@ -41,8 +41,10 @@ fn main() {
 	let expected = probe.expected;
 	fs::write(out.join("expected.rs"), quote::quote!(vec![#expected]).to_string()).expect("write Rust expectations");
 	println!("cargo:rerun-if-changed=probe.c");
+	println!("cargo:rerun-if-changed=calls.c");
 	cc::Build::new()
 		.file("probe.c")
+		.file("calls.c")
 		.include(include)
 		.include(platform_include)
 		.include(out)

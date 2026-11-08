@@ -1,3 +1,5 @@
+use crate::sys;
+
 use super::{
 	DEFAULT_LOCAL_FRAME_CAPACITY, Desc, Env, Error, JClass, JNIStr, JThrowable, LoaderContext, Reference, Result,
 };
@@ -175,7 +177,7 @@ impl<'local> Env<'local> {
 	#[must_use]
 	pub fn exception_check(&self) -> bool {
 		// Safety: ExceptionCheck is 1.2 API, which we check for in `from_raw()`
-		unsafe { ex_safe_jni_call_no_post_check_ex!(self, v1_2, ExceptionCheck) }
+		unsafe { ex_safe_jni_call_no_post_check_ex!(self, v1_2, ExceptionCheck) != sys::JNI_FALSE }
 	}
 
 	/// Check whether or not an exception is currently in the process of being

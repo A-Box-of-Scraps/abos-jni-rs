@@ -1,6 +1,6 @@
 use super::{
 	Ident, NativeMethod, NativeMethodExport, Result, TokenStream, TypeMappings, create_jni_fn_name, extract_cfg_attrs,
-	format_ident, lit_cstr_mutf8, quote, sig_type_to_rust_return_type,
+	format_ident, lit_cstr_mutf8, quote,
 };
 
 /// Generate the native methods registration code for `API::get()`
@@ -154,7 +154,7 @@ pub(super) fn generate_single_native_export(
 	}
 
 	let return_type: TokenStream =
-		sig_type_to_rust_return_type(&method.signature.return_type, &lifetime, type_mappings, jni);
+		crate::internal::types::native_type(&method.signature.return_type, &lifetime, type_mappings, jni);
 
 	let no_mangle_attr: TokenStream = if cfg!(has_unsafe_attr) {
 		quote! { #[unsafe(no_mangle)] }

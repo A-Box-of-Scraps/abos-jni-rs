@@ -172,11 +172,11 @@ fn test_instance_methods_operations() {
 		assert_eq!(counter, 6);
 
 		let is_positive = obj.is_positive(env)?;
-		assert!(is_positive);
+		assert_eq!(is_positive, abos_jni::sys::JNI_TRUE);
 
 		obj.set_counter(env, -5)?;
 		let is_positive = obj.is_positive(env)?;
-		assert!(!is_positive);
+		assert_eq!(is_positive, abos_jni::sys::JNI_FALSE);
 
 		Ok(())
 	})

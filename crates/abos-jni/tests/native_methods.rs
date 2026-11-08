@@ -70,11 +70,11 @@ fn native_2d_array_invert_impl<'local>(
 	// SAFETY: The fixture does not access these arrays concurrently, and element guards drop before returning to Java.
 	unsafe {
 		for i in 0..arr.len(env)? {
-			let row: abos_jni::refs::Auto<'_, JPrimitiveArray<'_, bool>> = arr.get_element(env, i)?.auto();
-			let mut row_elems: abos_jni::elements::AutoElements<'_, bool, &JPrimitiveArray<'_, bool>> =
+			let row: abos_jni::refs::Auto<'_, JPrimitiveArray<'_, jboolean>> = arr.get_element(env, i)?.auto();
+			let mut row_elems: abos_jni::elements::AutoElements<'_, jboolean, &JPrimitiveArray<'_, jboolean>> =
 				row.get_elements(env, abos_jni::elements::ReleaseMode::CopyBack)?;
 			for j in 0..row_elems.len() {
-				row_elems[j] = !row_elems[j];
+				row_elems[j] = jboolean::from(row_elems[j] == 0);
 			}
 			row_elems.commit()?;
 		}
@@ -258,11 +258,11 @@ native_method_test! {
 	test_body: |env, class| {
 		use abos_jni::{jni_sig, jni_str};
 
-		// Create a 2D boolean array [[true, false], [false, true]]
+		// Create a 2D boolean array [[1, 0], [0, 1]]
 		let inner1 = env.new_boolean_array(2)?;
-		inner1.set_region(env, 0, &[true, false])?;
+		inner1.set_region(env, 0, &[1, 0])?;
 		let inner2 = env.new_boolean_array(2)?;
-		inner2.set_region(env, 0, &[false, true])?;
+		inner2.set_region(env, 0, &[0, 1])?;
 
 		let outer = JObjectArray::<JBooleanArray>::new(env, 2, inner1)?;
 		outer.set_element(env, 1, inner2)?;
@@ -275,16 +275,16 @@ native_method_test! {
 		)?.l()?;
 		let result = JObjectArray::<JBooleanArray>::cast_local(env, result)?;
 
-		// Check the result [[false, true], [true, false]]
+		// Check the result [[0, 1], [1, 0]]
 		let row1: JBooleanArray = result.get_element(env, 0)?;
-		let mut row1_data = [false; 2];
+		let mut row1_data = [0; 2];
 		row1.get_region(env, 0, &mut row1_data)?;
-		assert_eq!(row1_data, [false, true]);
+		assert_eq!(row1_data, [0, 1]);
 
 		let row2: JBooleanArray = result.get_element(env, 1)?;
-		let mut row2_data = [false; 2];
+		let mut row2_data = [0; 2];
 		row2.get_region(env, 0, &mut row2_data)?;
-		assert_eq!(row2_data, [true, false]);
+		assert_eq!(row2_data, [1, 0]);
 
 		Ok(())
 	}

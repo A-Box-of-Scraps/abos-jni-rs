@@ -120,6 +120,8 @@ pub(super) fn generate_jni_call_for_return_type(
 			let call_fn: Ident = format_ident!("{}{}MethodA", call_prefix, prim.jni_name());
 			let value: TokenStream = if prim == PrimitiveType::Void {
 				quote! { () }
+			} else if crate::internal::types::is_rust_bool(return_type, type_mappings) {
+				quote! { ret != #jni::sys::JNI_FALSE }
 			} else {
 				quote! { ret }
 			};

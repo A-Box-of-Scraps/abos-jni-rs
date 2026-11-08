@@ -1,6 +1,8 @@
+use crate::internal::types::{native_argument, native_return, native_type};
+
 use super::{
 	AbiCheck, Ident, NativeMethod, TokenStream, TypeMappings, extract_cfg_attrs, format_ident,
-	generate_native_method_abi_check, quote, sig_type_to_rust_native_trait_arg_type, sig_type_to_rust_return_type,
+	generate_native_method_abi_check, quote,
 };
 
 /// Generate wrapper functions for native methods as API struct methods
@@ -65,8 +67,7 @@ pub(super) fn generate_single_native_wrapper(
 
 	let params: Vec<TokenStream> = method.native_parameters(type_name, &lifetime, type_mappings, jni);
 
-	let return_type: TokenStream =
-		sig_type_to_rust_return_type(&method.signature.return_type, &lifetime, type_mappings, jni);
+	let return_type: TokenStream = native_type(&method.signature.return_type, &lifetime, type_mappings, jni);
 
 	let need_abi_check: AbiCheck = method.abi_check.unwrap_or(default_abi_check);
 	let abi_check: TokenStream = generate_native_method_abi_check(
@@ -94,6 +95,18 @@ pub(super) fn generate_single_native_wrapper(
 		jni,
 	);
 
+	let conversions: Vec<TokenStream> = method
+		.signature
+		.parameters
+		.iter()
+		.filter(|parameter| crate::internal::types::is_rust_bool(&parameter.ty, type_mappings))
+		.map(|parameter| {
+			let name: &Ident = &parameter.name;
+			let value: TokenStream = native_argument(&parameter.ty, name, type_mappings, jni);
+			quote! { let #name: bool = #value; }
+		})
+		.collect();
+	let wrapper_body: TokenStream = native_return(&method.signature.return_type, wrapper_body, type_mappings, jni);
 	let cfg_attrs: Vec<syn::Attribute> = extract_cfg_attrs(&method.attrs);
 
 	quote! {
@@ -102,6 +115,7 @@ pub(super) fn generate_single_native_wrapper(
 		extern "system" fn #wrapper_name<#lifetime>(
 			#(#params),*
 		) -> #return_type {
+			#(#conversions)*
 			#wrapper_body
 		}
 	}
@@ -162,11 +176,10 @@ impl NativeMethod {
 			params.push(quote! { this: #type_name<#lifetime> });
 		}
 
-		// Use native trait arg type (without AsRef) to match the trait signature
+		// The wrapper uses ABI types; bool conversion happens before calling the trait.
 		for param in &self.signature.parameters {
 			let param_name: &Ident = &param.name;
-			let rust_type: TokenStream =
-				sig_type_to_rust_native_trait_arg_type(&param.ty, lifetime, type_mappings, jni);
+			let rust_type: TokenStream = native_type(&param.ty, lifetime, type_mappings, jni);
 			params.push(quote! { #param_name: #rust_type });
 		}
 

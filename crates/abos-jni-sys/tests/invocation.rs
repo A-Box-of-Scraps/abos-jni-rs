@@ -62,6 +62,8 @@ fn invocation_and_native_calls() {
 			sys::JNI_OK
 		);
 		let value: sys::jint = integer_roundtrip(env);
+		boolean_roundtrip(env);
+		variadic_roundtrip(env);
 		assert_eq!(((**vm).v1_1.DetachCurrentThread)(vm), sys::JNI_OK);
 		let destroyed: sys::jint = ((**vm).v1_1.DestroyJavaVM)(vm);
 		std::mem::forget(guard);
@@ -117,5 +119,63 @@ unsafe fn integer_roundtrip(env: *mut sys::JNIEnv) -> sys::jint {
 		(api.DeleteLocalRef)(env, object);
 		(api.DeleteLocalRef)(env, class);
 		value
+	}
+}
+
+unsafe fn boolean_roundtrip(env: *mut sys::JNIEnv) {
+	// SAFETY: The caller owns a live environment. Handles and method IDs are checked
+	// before use, and only JNI_FALSE/JNI_TRUE are written to Java boolean arrays.
+	unsafe {
+		let api: &sys::JNINativeInterface__1_1 = &(**env).v1_1;
+		let class: sys::jclass = (api.FindClass)(env, c"java/lang/Boolean".as_ptr());
+		assert!(!class.is_null());
+		let method: sys::jmethodID = (api.GetStaticMethodID)(env, class, c"logicalXor".as_ptr(), c"(ZZ)Z".as_ptr());
+		assert!(!method.is_null());
+		for left in [sys::JNI_FALSE, sys::JNI_TRUE] {
+			for right in [sys::JNI_FALSE, sys::JNI_TRUE] {
+				let args = [sys::jvalue { z: left }, sys::jvalue { z: right }];
+				let value: sys::jboolean = (api.CallStaticBooleanMethodA)(env, class, method, args.as_ptr());
+				assert_no_exception(env);
+				assert_eq!(value, left ^ right);
+			}
+		}
+		let array: sys::jbooleanArray = (api.NewBooleanArray)(env, 2);
+		assert!(!array.is_null());
+		let expected: [sys::jboolean; 2] = [sys::JNI_FALSE, sys::JNI_TRUE];
+		(api.SetBooleanArrayRegion)(env, array, 0, 2, expected.as_ptr());
+		assert_no_exception(env);
+		let mut is_copy: sys::jboolean = sys::JNI_FALSE;
+		let elements: *mut sys::jboolean = (api.GetBooleanArrayElements)(env, array, &raw mut is_copy);
+		assert!(!elements.is_null());
+		assert!(matches!(is_copy, sys::JNI_FALSE | sys::JNI_TRUE));
+		assert_eq!(std::slice::from_raw_parts(elements, 2), expected);
+		(api.ReleaseBooleanArrayElements)(env, array, elements, sys::JNI_ABORT);
+		(api.DeleteLocalRef)(env, array);
+		(api.DeleteLocalRef)(env, class);
+	}
+}
+
+unsafe extern "C" fn call_static_int_v(
+	env: *mut sys::JNIEnv,
+	class: sys::jclass,
+	method: sys::jmethodID,
+	args: ...
+) -> sys::jint {
+	// SAFETY: The caller supplies a live environment and arguments matching the method.
+	unsafe { ((**env).v1_1.CallStaticIntMethodV)(env, class, method, args) }
+}
+
+unsafe fn variadic_roundtrip(env: *mut sys::JNIEnv) {
+	// SAFETY: The caller owns the environment. Math.max expects exactly two jint arguments.
+	unsafe {
+		let api: &sys::JNINativeInterface__1_1 = &(**env).v1_1;
+		let class: sys::jclass = (api.FindClass)(env, c"java/lang/Math".as_ptr());
+		assert!(!class.is_null());
+		let method: sys::jmethodID = (api.GetStaticMethodID)(env, class, c"max".as_ptr(), c"(II)I".as_ptr());
+		assert!(!method.is_null());
+		let result: sys::jint = call_static_int_v(env, class, method, -7_i32, 42_i32);
+		assert_no_exception(env);
+		assert_eq!(result, 42);
+		(api.DeleteLocalRef)(env, class);
 	}
 }

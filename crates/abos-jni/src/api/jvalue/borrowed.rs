@@ -1,6 +1,6 @@
 use super::{
-	Error, JNI_TRUE, JObject, JValue, JavaType, Primitive, Result, char_from_java, char_from_java_int,
-	char_to_java_int, jbyte, jchar, jdouble, jfloat, jint, jlong, jshort, jvalue, trace,
+	Error, JObject, JValue, JavaType, Primitive, Result, char_from_java, char_from_java_int, char_to_java_int, jbyte,
+	jchar, jdouble, jfloat, jint, jlong, jshort, jvalue, trace,
 };
 
 impl<'obj_ref> JValue<'obj_ref> {
@@ -14,7 +14,7 @@ impl<'obj_ref> JValue<'obj_ref> {
 			Self::Short(short) => jvalue { s: *short },
 			Self::Int(int) => jvalue { i: *int },
 			Self::Long(long) => jvalue { j: *long },
-			Self::Bool(boolean) => jvalue { b: i8::from(*boolean) },
+			Self::Bool(boolean) => jvalue { z: *boolean },
 			Self::Float(float) => jvalue { f: *float },
 			Self::Double(double) => jvalue { d: *double },
 			Self::Void => jvalue {
@@ -104,7 +104,7 @@ impl<'obj_ref> JValue<'obj_ref> {
 	/// Returns `Error::WrongJValueType` if the value has a different JNI type.
 	pub const fn z(self) -> Result<bool> {
 		match self {
-			Self::Bool(b) => Ok(b == JNI_TRUE),
+			Self::Bool(b) => Ok(b != 0),
 			_ => Err(Error::WrongJValueType("bool", self.type_name())),
 		}
 	}

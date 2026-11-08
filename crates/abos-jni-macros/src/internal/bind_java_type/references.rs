@@ -54,7 +54,7 @@ pub(super) fn generate_is_instance_of_assignable_checks(
 							};
 
 							assert!(
-								is_assignable,
+								is_assignable != #jni::sys::JNI_FALSE,
 								"{}({}) is not a subtype of {}({}) and is not a valid 'is_instance_of' type for {}",
 								#to_type_path_str,
 								#to_java_class_str,

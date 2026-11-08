@@ -17,7 +17,12 @@ pub(super) fn generate_jni_get_field_call(
 			return quote! { Ok(()) };
 		}
 		let call_fn: proc_macro2::Ident = format_ident!("{}{}Field", call_prefix, prim.jni_name());
-		(quote! {}, call_fn, quote! { ret })
+		let value: TokenStream = if crate::internal::types::is_rust_bool(field_type, type_mappings) {
+			quote! { ret != #jni::sys::JNI_FALSE }
+		} else {
+			quote! { ret }
+		};
+		(quote! {}, call_fn, value)
 	} else {
 		let call_fn: proc_macro2::Ident = format_ident!("{}ObjectField", call_prefix);
 		let return_type_tokens: TokenStream =
@@ -72,7 +77,7 @@ pub(super) fn generate_jni_set_field_call(
 			}
 			PrimitiveType::Boolean => {
 				let call_fn: proc_macro2::Ident = format_ident!("{}BooleanField", call_prefix);
-				(call_fn, quote! { #val as #jni::sys::jboolean })
+				(call_fn, quote! { #jni::sys::jboolean::from(#val) })
 			}
 			PrimitiveType::Byte => {
 				let call_fn: proc_macro2::Ident = format_ident!("{}ByteField", call_prefix);

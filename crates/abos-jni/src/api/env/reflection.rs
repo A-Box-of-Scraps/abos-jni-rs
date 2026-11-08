@@ -1,3 +1,5 @@
+use crate::sys;
+
 use super::{Desc, Env, JClass, JMethodID, JObject, JStaticMethodID, Reference, Result};
 
 impl<'local> Env<'local> {
@@ -72,7 +74,7 @@ impl<'local> Env<'local> {
 				ToReflectedMethod,
 				class.as_ref().as_raw(),
 				method_id,
-				is_static
+				sys::jboolean::from(is_static)
 			)
 			.map(|jobject| JObject::from_raw(self, jobject))
 		}

@@ -1,4 +1,4 @@
-use syn::{PointerMutability, ReturnType, Type, TypeFnPtr};
+use syn::{GenericArgument, PathArguments, PointerMutability, ReturnType, Type, TypeFnPtr};
 
 pub fn c_name(name: &str) -> String {
 	match name {
@@ -24,9 +24,23 @@ pub fn c_name(name: &str) -> String {
 
 pub fn c_type(ty: &Type) -> String {
 	match ty {
+		Type::Path(path)
+			if path.qself.is_none()
+				&& path.path.segments.len() == 3
+				&& path.path.segments[0].ident == "core"
+				&& path.path.segments[1].ident == "ffi"
+				&& path.path.segments[2].ident == "VaList" =>
+		{
+			assert_lifetime_arguments(&path.path.segments[2].arguments);
+			"va_list".to_owned()
+		}
 		Type::Path(path) if path.qself.is_none() && path.path.segments.len() == 1 => {
 			let segment = &path.path.segments[0];
-			assert!(segment.arguments.is_empty(), "Generic C types are unsupported");
+			if segment.ident == "va_list" {
+				assert_lifetime_arguments(&segment.arguments);
+			} else {
+				assert!(segment.arguments.is_empty(), "Generic C types are unsupported");
+			}
 			c_name(&segment.ident.to_string())
 		}
 		Type::Ptr(pointer) => {
@@ -73,4 +87,12 @@ pub fn function_type(function: &TypeFnPtr) -> String {
 		parameters.push("void".to_owned());
 	}
 	format!("{result} ({convention}*)({})", parameters.join(", "))
+}
+
+fn assert_lifetime_arguments(arguments: &PathArguments) {
+	assert!(
+		matches!(arguments, PathArguments::AngleBracketed(args)
+		if args.args.len() == 1 && matches!(args.args.first(), Some(GenericArgument::Lifetime(_)))),
+		"va_list requires exactly one lifetime argument"
+	);
 }

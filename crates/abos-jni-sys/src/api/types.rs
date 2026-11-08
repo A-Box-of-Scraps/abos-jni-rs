@@ -2,13 +2,14 @@ use core::ffi::{c_char, c_void};
 
 use super::{JNIInvokeInterface_, JNINativeInterface_};
 
-// FIXME is this sufficiently correct?
-pub type va_list = *mut c_void;
+/// C variable arguments, including target-specific layout and parameter passing.
+pub type va_list<'a> = core::ffi::VaList<'a>;
 
 pub type jint = i32;
 pub type jlong = i64;
 pub type jbyte = i8;
-pub type jboolean = bool;
+/// JNI unsigned-byte boolean. Pass `JNI_FALSE` or `JNI_TRUE` to Java.
+pub type jboolean = u8;
 pub type jchar = u16;
 pub type jshort = i16;
 pub type jfloat = f32;

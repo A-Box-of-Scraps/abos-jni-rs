@@ -484,3 +484,6 @@ mod mappings;
 pub use mappings::*;
 mod conversion;
 pub use conversion::*;
+
+mod boolean;
+pub use boolean::{is_rust_bool, native_argument, native_return, native_type};

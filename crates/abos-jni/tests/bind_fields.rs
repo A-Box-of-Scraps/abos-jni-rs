@@ -73,7 +73,7 @@ fn test_static_primitive_fields() {
 		assert_eq!(long_val, 9_876_543_210);
 
 		let bool_val = TestFields::static_boolean_field(env)?;
-		assert!(bool_val);
+		assert_eq!(bool_val, abos_jni::sys::JNI_TRUE);
 
 		let byte_val = TestFields::static_byte_field(env)?;
 		assert_eq!(byte_val, 127);
@@ -160,10 +160,10 @@ fn test_instance_primitive_fields() {
 		assert_eq!(long_val, 200);
 
 		let bool_val = obj.boolean_field(env)?;
-		assert!(!bool_val);
-		obj.set_boolean_field(env, true)?;
+		assert_eq!(bool_val, abos_jni::sys::JNI_FALSE);
+		obj.set_boolean_field(env, abos_jni::sys::JNI_TRUE)?;
 		let bool_val = obj.boolean_field(env)?;
-		assert!(bool_val);
+		assert_eq!(bool_val, abos_jni::sys::JNI_TRUE);
 
 		let byte_val = obj.byte_field(env)?;
 		assert_eq!(byte_val, 1);
@@ -231,7 +231,7 @@ fn test_constructor_with_values() {
 		assert_eq!(string_field.to_string(), "custom string");
 
 		let bool_val = obj.boolean_field(env)?;
-		assert!(bool_val); // true because intValue > 0
+		assert_eq!(bool_val, abos_jni::sys::JNI_TRUE); // true because intValue > 0
 
 		Ok(())
 	})
