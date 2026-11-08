@@ -262,7 +262,7 @@ public class Parser implements AutoCloseable {
         String regex;
         if (pattern.contains("*")) {
             regex = "^" + jvmPattern.replace(".", "\\.").replace("$", "\\$").replace("*", ".*") + "$";
-        } else if (pattern.contains("$")) {
+        } else if (jvmPattern.contains("$")) {
             // Specific inner class pattern - match exactly
             regex = "^" + jvmPattern.replace(".", "\\.").replace("$", "\\$") + "$";
         } else {
@@ -697,7 +697,7 @@ public class Parser implements AutoCloseable {
      * inner classes.
      */
     private String convertToJvmClassName(String qualifiedName) {
-        String[] parts = qualifiedName.split("\\\\.");
+        String[] parts = qualifiedName.split("\\.");
 
         StringBuilder result = new StringBuilder();
         boolean foundFirstClass = false;
