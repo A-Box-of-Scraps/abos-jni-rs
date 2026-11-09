@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Record a JNI Criterion benchmark as a CPU flamegraph using perf, blondie, or xctrace."""
+"""Record a JNI or JVMTI Criterion benchmark as a CPU flamegraph using perf, blondie, or xctrace."""
 
 import argparse
 import os
@@ -23,7 +23,9 @@ def backend_options(env):
     if system == "Linux":
         if shutil.which(env.get("PERF", "perf")) is None:
             raise RuntimeError("perf is required. Install your distribution's perf package.")
-        return ["--cmd", "record -e cycles:u -F 997 --call-graph dwarf,64000 -g -o perf.data"]
+        # cycles:u filters samples, but callchain collection also needs to exclude the kernel.
+        # This keeps recording compatible with perf_event_paranoid=2.
+        return ["--cmd", "record -e cycles:u -F 997 --call-graph dwarf,64000 --user-callchains -g -o perf.data"]
     if system == "Windows":
         # In flamegraph 0.6.15, a failed DTrace spawn selects bundled blondie.
         # An empty executable name ensures an installed DTrace cannot take precedence.
@@ -41,7 +43,7 @@ def backend_options(env):
     raise RuntimeError(f"Unsupported profiling platform: {system}. Supported platforms: Linux, Windows, macOS.")
 
 
-def profile(root, benchmark_filter, seconds):
+def profile(root, benchmark_filter, seconds, package="abos-jni"):
     env = os.environ.copy()
     env["CARGO_PROFILE_BENCH_DEBUG"] = "true"
     options = backend_options(env)
@@ -53,13 +55,13 @@ def profile(root, benchmark_filter, seconds):
         "--manifest-path",
         str(root / "Cargo.toml"),
         "--package",
-        "abos-jni",
+        package,
         "--features",
         "invocation",
         "--bench",
         "api_calls",
         "--output",
-        str(output / "abos-jni.svg"),
+        str(output / f"{package}.svg"),
         *options,
         "--",
         "--bench",
@@ -75,10 +77,11 @@ def profile(root, benchmark_filter, seconds):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--package", choices=["abos-jni", "abos-jvmti"], default="abos-jni")
     parser.add_argument(
         "filter",
         nargs="?",
-        default=os.environ.get("usage_filter", "^jni_call_static_abs_method_safe$"),
+        default=os.environ.get("usage_filter"),
         help="Criterion benchmark filter",
     )
     parser.add_argument(
@@ -88,11 +91,14 @@ def main(argv=None):
         help="profiling duration per matching benchmark",
     )
     args = parser.parse_args(argv)
+    if args.filter is None:
+        args.filter = "^jvmti/phase/wrapper$" if args.package == "abos-jvmti" else "^jni_call_static_abs_method_safe$"
     root = Path(__file__).resolve().parent.parent
     try:
-        return profile(root, args.filter, args.seconds)
+        return profile(root, args.filter, args.seconds, package=args.package)
     except (OSError, RuntimeError) as error:
-        print(f"Unable to profile JNI benchmark: {error}", file=sys.stderr)
+        interface = "JVMTI" if args.package == "abos-jvmti" else "JNI"
+        print(f"Unable to profile {interface} benchmark: {error}", file=sys.stderr)
         return 1
 
 

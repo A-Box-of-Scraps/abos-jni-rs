@@ -19,7 +19,47 @@ class ProfileJniTests(unittest.TestCase):
     def test_defaults_and_project_root(self):
         with patch.object(profiler, "profile", return_value=0) as run:
             self.assertEqual(profiler.main([]), 0)
-        run.assert_called_once_with(SCRIPT.parent.parent, "^jni_call_static_abs_method_safe$", 15)
+        run.assert_called_once_with(SCRIPT.parent.parent, "^jni_call_static_abs_method_safe$", 15, package="abos-jni")
+
+    def test_jvmti_defaults_and_overrides(self):
+        with patch.object(profiler, "profile", return_value=0) as run:
+            self.assertEqual(profiler.main(["--package", "abos-jvmti"]), 0)
+            run.assert_called_once_with(SCRIPT.parent.parent, "^jvmti/phase/wrapper$", 15, package="abos-jvmti")
+            self.assertEqual(profiler.main(["--package", "abos-jvmti", "jvmti/monitor", "--seconds", "2"]), 0)
+            run.assert_called_with(SCRIPT.parent.parent, "jvmti/monitor", 2, package="abos-jvmti")
+
+    def test_jvmti_command_and_output(self):
+        with (
+            tempfile.TemporaryDirectory(prefix="jvmti profile ") as directory,
+            patch.object(profiler.platform, "system", return_value="Linux"),
+            patch.object(profiler.shutil, "which", return_value="/usr/bin/perf"),
+            patch.object(profiler.subprocess, "run") as run,
+        ):
+            root = Path(directory)
+            run.return_value.returncode = 0
+            self.assertEqual(profiler.profile(root, "^jvmti/phase/wrapper$", 2, package="abos-jvmti"), 0)
+            command = run.call_args.args[0]
+            self.assertEqual(command[command.index("--package") + 1], "abos-jvmti")
+            self.assertEqual(command[command.index("--features") + 1], "invocation")
+            self.assertEqual(command[command.index("--bench") + 1], "api_calls")
+            self.assertEqual(command[command.index("--output") + 1], str(root / "target/profiling/abos-jvmti.svg"))
+            self.assertEqual(command[-5:], ["--", "--bench", "^jvmti/phase/wrapper$", "--profile-time", "2"])
+
+    def test_jvmti_mise_environment_arguments(self):
+        with (
+            patch.dict(os.environ, {"usage_filter": "jvmti/monitor", "usage_seconds": "30"}),
+            patch.object(profiler, "profile", return_value=0) as run,
+        ):
+            self.assertEqual(profiler.main(["--package", "abos-jvmti"]), 0)
+            run.assert_called_once_with(SCRIPT.parent.parent, "jvmti/monitor", 30, package="abos-jvmti")
+
+    def test_jvmti_errors_are_reported(self):
+        with (
+            patch.object(profiler, "profile", side_effect=FileNotFoundError("cargo")),
+            contextlib.redirect_stderr(io.StringIO()) as output,
+        ):
+            self.assertEqual(profiler.main(["--package", "abos-jvmti"]), 1)
+        self.assertIn("Unable to profile JVMTI benchmark: cargo", output.getvalue())
 
     def test_invalid_duration_does_not_run_profiler(self):
         for seconds in ("0", "-1", "abc"):
@@ -56,13 +96,14 @@ class ProfileJniTests(unittest.TestCase):
         ):
             root = Path(directory)
             run.return_value.returncode = 7
-            self.assertEqual(profiler.profile(root, "^jni_get_string$", 30), 7)
+            self.assertEqual(profiler.profile(root, "^jni_get_string$", 30, package="abos-jni"), 7)
             self.assertTrue((root / "target" / "profiling").is_dir())
             command = run.call_args.args[0]
             self.assertEqual(command[:2], ["cargo", "flamegraph"])
             self.assertEqual(command[-5:], ["--", "--bench", "^jni_get_string$", "--profile-time", "30"])
             self.assertEqual(command[command.index("--output") + 1], str(root / "target/profiling/abos-jni.svg"))
             self.assertIn("-o perf.data", command[command.index("--cmd") + 1])
+            self.assertIn("--user-callchains", command[command.index("--cmd") + 1])
             self.assertEqual(Path(run.call_args.kwargs["cwd"]).parent, root / "target/profiling")
             self.assertEqual(command[command.index("--manifest-path") + 1], str(root / "Cargo.toml"))
             self.assertEqual(run.call_args.kwargs["env"]["CARGO_PROFILE_BENCH_DEBUG"], "true")
@@ -120,9 +161,9 @@ class ProfileJniTests(unittest.TestCase):
             patch.object(profiler, "profile", return_value=0) as run,
         ):
             self.assertEqual(profiler.main([]), 0)
-            run.assert_called_once_with(SCRIPT.parent.parent, "^jni_get_string$", 30)
+            run.assert_called_once_with(SCRIPT.parent.parent, "^jni_get_string$", 30, package="abos-jni")
             self.assertEqual(profiler.main(["native_call_function", "--seconds", "2"]), 0)
-            run.assert_called_with(SCRIPT.parent.parent, "native_call_function", 2)
+            run.assert_called_with(SCRIPT.parent.parent, "native_call_function", 2, package="abos-jni")
 
     def test_os_errors_are_reported(self):
         with (

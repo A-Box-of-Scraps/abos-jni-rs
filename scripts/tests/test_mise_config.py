@@ -62,6 +62,17 @@ class MiseConfigTests(unittest.TestCase):
         self.assertEqual(tasks["lint:python"]["run"], "ruff check .")
         self.assertEqual(tasks["lint:python:fix"]["run"], "ruff check --fix .")
 
+    def test_jvmti_benchmarks_match_jni_setup(self):
+        tasks = tomllib.loads(CONFIG.read_text())["tasks"]
+        for suffix in ("", ":rust"):
+            with self.subTest(suffix=suffix):
+                self.assertEqual(
+                    tasks[f"bench:abos-jvmti{suffix}"]["run"],
+                    tasks[f"bench:abos-jni{suffix}"]["run"].replace("abos-jni", "abos-jvmti"),
+                )
+        self.assertEqual(tasks["profile:abos-jvmti"]["tools"], tasks["profile:abos-jni"]["tools"])
+        self.assertEqual(tasks["profile:abos-jvmti"]["run"], "python scripts/profile-abos-jni.py --package abos-jvmti")
+
     def test_task_dependencies_exist(self):
         tasks = tomllib.loads(CONFIG.read_text())["tasks"]
         for name, task in tasks.items():

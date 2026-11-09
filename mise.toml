@@ -23,6 +23,12 @@ run = "cargo bench --locked --package abos-jni --features invocation --bench api
 [tasks."bench:abos-jni:rust"]
 run = "cargo bench --locked --package abos-jni --bench rust_utilities"
 
+[tasks."bench:abos-jvmti"]
+run = "cargo bench --locked --package abos-jvmti --features invocation --bench api_calls --bench rust_utilities"
+
+[tasks."bench:abos-jvmti:rust"]
+run = "cargo bench --locked --package abos-jvmti --bench rust_utilities"
+
 [tasks.check]
 depends = ["fmt:check", "lint", "check:duplicates", "test"]
 
@@ -203,6 +209,15 @@ arg "[filter]" help="Criterion benchmark filter" default="^jni_call_static_abs_m
 flag "--seconds <seconds>" help="Profiling duration per matching benchmark" default="15"
 '''
 run = "python scripts/profile-abos-jni.py"
+
+[tasks."profile:abos-jvmti"]
+description = "Profile a JVMTI benchmark with flamegraph (Linux, Windows, macOS)"
+tools = { "cargo:flamegraph" = "0.6.15" }
+usage = '''
+arg "[filter]" help="Criterion benchmark filter" default="^jvmti/phase/wrapper$"
+flag "--seconds <seconds>" help="Profiling duration per matching benchmark" default="15"
+'''
+run = "python scripts/profile-abos-jni.py --package abos-jvmti"
 
 [tasks."setup:android"]
 raw = true
