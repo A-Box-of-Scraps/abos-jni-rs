@@ -1,4 +1,6 @@
 //! Compile fixture Java and generate Rust bindings for execution tests.
+#[path = "../support/core_classes.rs"]
+mod core_classes;
 #[path = "../support/jars.rs"]
 mod jar_fixtures;
 #[path = "../support/parity.rs"]
@@ -13,6 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let classes = output.join("classes");
 	let names = [
 		"SimpleClass",
+		"CoreTypes",
 		"Calculator",
 		"NoPackage",
 		"OuterClass",
@@ -123,6 +126,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.generate_native_interfaces(false)
 		.generate()?
 		.write_to_file(output.join("parity_bytecode.rs"))?;
+	let mut core_entries: Vec<(String, Vec<u8>)> = core_classes::entries(&output)?;
+	core_entries.push((
+		"com/example/CoreTypes.class".to_owned(),
+		std::fs::read(classes.join("com/example/CoreTypes.class"))?,
+	));
+	let core_jar: PathBuf = output.join("core-classes.jar");
+	jar_fixtures::write_jar(&core_jar, &core_entries)?;
+	abos_jbindgen::Builder::new()
+		.input_jar(core_jar)
+		.root_path("crate::core_bytecode")
+		.generate()?
+		.write_to_file(output.join("core_bytecode.rs"))?;
 	archive_bindings(&output)?;
 	Ok(())
 }

@@ -107,6 +107,14 @@ pub const fn builtin_jni_types() -> &'static [BuiltinType] {
 	]
 }
 
+/// Core wrappers are supplied by abos-jni and cannot be declared or remapped.
+pub fn core_jni_type(java_name: &str) -> Option<&'static BuiltinType> {
+	let java_name: Cow<'_, str> = canonical_java_name(java_name);
+	builtin_jni_types()
+		.iter()
+		.find(|builtin| builtin.is_core && builtin.java_name == java_name)
+}
+
 /// Derive a Rust type name from a Java class simple name, applying transformations
 /// to handle inner classes and applying optional prefix.
 ///

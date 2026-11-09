@@ -61,9 +61,22 @@ fn generates_and_filters_android_bindings_from_local_sdk_archives() -> Result<()
 		writer.write_all(&bytes)?;
 		if archive == "android.jar" {
 			android_platform::add_core_classes(&mut writer)?;
+		} else {
+			writer.start_file("java/lang/Object.java", SimpleFileOptions::default())?;
+			writer.write_all(b"package java.lang; public class Object {}")?;
 		}
 		writer.finish()?;
 	}
+	let broad: Output = Command::new(env!("CARGO_BIN_EXE_abos-jbindgen"))
+		.args(["android", "--api-level", "35", "--pattern", "*"])
+		.env("ANDROID_HOME", root.path())
+		.env_remove("ANDROID_SDK_ROOT")
+		.output()?;
+	assert!(broad.status.success(), "{}", String::from_utf8_lossy(&broad.stderr));
+	let broad_code: String = String::from_utf8(broad.stdout)?;
+	assert!(broad_code.contains("pub SimpleClass"), "{broad_code}");
+	assert!(!broad_code.contains("=> \"java.lang.Object\""), "{broad_code}");
+
 	let flags: PathBuf = root.path().join("hidden-api.csv");
 	fs::write(
 		&flags,

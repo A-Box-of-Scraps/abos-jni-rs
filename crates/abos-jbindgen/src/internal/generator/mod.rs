@@ -6,8 +6,8 @@ mod overloads;
 pub mod signatures;
 pub mod symbols;
 
-use crate::{BindgenOptions, ClassInfo, ModuleBinding, Result, TypeMap};
-use names::{canonical_java_name, derive_rust_type_name, macro_java_name};
+use crate::{BindgenOptions, ClassInfo, Error, ModuleBinding, Result, TypeMap};
+use names::{canonical_java_name, core_jni_type, derive_rust_type_name, macro_java_name};
 use std::{
 	collections::{HashMap, HashSet},
 	fmt::Write as _,
@@ -24,7 +24,18 @@ pub(super) struct Context<'a> {
 	pub member_names: HashMap<String, String>,
 }
 
+pub fn validate_class_binding(java_name: &str) -> Result<()> {
+	if let Some(builtin) = core_jni_type(java_name) {
+		return Err(Error::Unsupported(format!(
+			"Cannot generate bindings for core Java type '{}'; use abos_jni::objects::{} instead",
+			builtin.java_name, builtin.rust_name
+		)));
+	}
+	Ok(())
+}
+
 pub fn generate_with_type_map(class: &ClassInfo, options: &BindgenOptions, types: &TypeMap) -> Result<ModuleBinding> {
+	validate_class_binding(&class.class_name)?;
 	let name: String = derive_rust_type_name(
 		&class.class_name,
 		options
@@ -118,3 +129,7 @@ fn type_mappings(context: &Context<'_>, output: &mut String) {
 	}
 	output.push_str("    },\n");
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/internal/generator/core_types.rs"]
+mod tests;

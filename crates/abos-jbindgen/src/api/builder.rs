@@ -34,6 +34,11 @@ pub enum InputSource {
 }
 
 /// Builder for configuring and generating Java bindings.
+///
+/// Core classes (`java.lang.Object`, `java.lang.Class`, `java.lang.String`, and
+/// `java.lang.Throwable`) use the built-in `abos-jni` wrappers. Bulk inputs omit
+/// their declarations; single-class inputs and exact class patterns requesting
+/// them return [`Error::Unsupported`].
 #[must_use]
 #[derive(Debug, Clone)]
 pub struct Builder {

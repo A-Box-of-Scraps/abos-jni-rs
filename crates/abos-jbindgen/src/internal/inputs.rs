@@ -1,4 +1,4 @@
-use crate::internal::{bytecode, generator, java_parser};
+use crate::internal::{bytecode, generator, generator::names::core_jni_type, java_parser};
 use crate::{BindgenOptions, Error, ModuleBinding, Result};
 use std::{
 	fs,
@@ -54,7 +54,9 @@ pub fn generate_bindings_from_jar(
 	visit_jar_classes(jar_path, patterns, |name, bytes| {
 		let class: crate::ClassInfo =
 			bytecode::parse_class(bytes).map_err(|error| Error::CodeGen(format!("Failed to parse {name}: {error}")))?;
-		classes.push((name.to_owned(), class));
+		if core_jni_type(&class.class_name).is_none() {
+			classes.push((name.to_owned(), class));
+		}
 		Ok(())
 	})?;
 
@@ -78,13 +80,15 @@ pub fn generate_bindings_from_sources(
 	options: &BindgenOptions,
 	extra_type_map: Vec<(String, String)>,
 ) -> Result<Vec<ModuleBinding>> {
+	validate_class_patterns(patterns)?;
 	let pattern_str: String = if patterns.is_empty() {
 		"*".to_string()
 	} else {
 		patterns.join(",")
 	};
-	let classes: Vec<crate::ClassInfo> =
+	let mut classes: Vec<crate::ClassInfo> =
 		java_parser::parse_java_sources(source_paths, class_path_entries, &pattern_str)?;
+	classes.retain(|class| core_jni_type(&class.class_name).is_none());
 
 	let mut type_map: crate::TypeMap = crate::TypeMap::from_classes(classes.iter(), options)?;
 	type_map.merge(extra_type_map);
@@ -102,18 +106,30 @@ pub fn generate_bindings_from_sources(
 	Ok(results)
 }
 
+/// Exact core-class requests are errors even when mixed with broader patterns.
+pub fn validate_class_patterns(patterns: &[String]) -> Result<()> {
+	for pattern in patterns.iter().flat_map(|pattern| pattern.split(',')) {
+		generator::validate_class_binding(pattern.trim())?;
+	}
+	Ok(())
+}
+
 pub fn visit_jar_classes(
 	path: &Path,
 	patterns: &[String],
 	mut visitor: impl FnMut(&str, &[u8]) -> Result<()>,
 ) -> Result<()> {
+	validate_class_patterns(patterns)?;
 	let mut archive: zip::ZipArchive<fs::File> = zip::ZipArchive::new(fs::File::open(path)?)?;
 	// Select from the central-directory names before reading class data. Metadata and
 	// versioned entries are never parsed, and host JVM versions do not affect selection.
 	let mut names: Vec<String> = Vec::new();
 	for name in archive.file_names() {
 		let name: std::borrow::Cow<'_, str> = name?;
-		if is_binding_class_entry(&name) && (patterns.is_empty() || matches_any_pattern(&name, patterns)) {
+		if is_binding_class_entry(&name)
+			&& core_jni_type(name.trim_end_matches(".class")).is_none()
+			&& (patterns.is_empty() || matches_any_pattern(&name, patterns))
+		{
 			names.push(name.into_owned());
 		}
 	}

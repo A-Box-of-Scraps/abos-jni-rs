@@ -7,6 +7,11 @@
 //! Module-level conflicts between wrapper types, API types, native interfaces, package modules,
 //! and initialization helpers are rejected with diagnostics before Rust code is emitted.
 //!
+//! Core Java classes (`Object`, `Class`, `String`, and `Throwable` in `java.lang`)
+//! use the built-in `abos-jni` wrappers. Bulk generation omits their declarations
+//! and mappings. Single-class inputs and exact patterns requesting those classes
+//! fail during generation with a diagnostic naming the built-in wrapper.
+//!
 //! Java member names containing `$` are preserved for JNI lookup while their
 //! Rust bindings use normalized identifiers.
 //!
