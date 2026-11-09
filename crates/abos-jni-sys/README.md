@@ -1,5 +1,8 @@
 # abos-jni-sys
 
+[![github](https://img.shields.io/badge/github-A--Box--of--Scraps/abos--jni--rs-EE7C37?style=for-the-badge&labelColor=555555&logo=github)](https://github.com/A-Box-of-Scraps/abos-jni-rs/tree/HEAD/crates/abos-jni-sys)
+[![MIT license](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge&labelColor=555555)](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/LICENSE)
+
 Raw Rust definitions corresponding to jni.h.
 
 ## License
