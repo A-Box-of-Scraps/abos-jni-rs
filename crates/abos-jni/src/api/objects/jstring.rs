@@ -187,6 +187,7 @@ impl JString<'_> {
 	/// ```
 	///
 	/// When the [`MUTF8Chars`] guard is dropped, the reference to the contents gets released.
+	/// Cleanup temporarily attaches the current thread if it is no longer attached.
 	///
 	/// The [`MUTF8Chars`] guard dereferences to a [`JNIStr`].
 	///

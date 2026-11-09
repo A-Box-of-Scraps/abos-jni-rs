@@ -8,6 +8,7 @@ use crate::{
 	errors::Result,
 	objects::{JString, Reference},
 	strings::{JNIStr, JNIString},
+	vm::{AttachConfig, AttachmentExceptionPolicy},
 };
 
 #[cfg(doc)]
@@ -22,6 +23,11 @@ use ::{
 /// This guard type is returned by [`JString::mutf8_chars`] and represents the
 /// borrowed contents of a `java.lang.String` object that will be automatically
 /// released when dropped.
+///
+/// If the guard outlives a scoped thread attachment (for example, when borrowing
+/// a global string), cleanup temporarily attaches the current thread. Dropping
+/// the guard while still attached avoids that extra attachment cost. Cleanup
+/// leaves any pending Java exception unchanged.
 ///
 /// This can be dereferenced to obtain a [`JNIStr`] which can in turn be
 /// converted to a utf8 Rust string. (See [`JNIStr::to_str`] or `to_string`).
@@ -98,7 +104,7 @@ where
 	/// garbage collector.
 	///
 	/// Returns a [`MUTF8Chars`] that will automatically release the underlying
-	/// character array when dropped (see [`Self::release_string_utf_chars`]).
+	/// character array when dropped.
 	pub(crate) fn from_get_string_utf_chars(env: &Env<'_>, obj: StringRef) -> Result<Self> {
 		let obj: StringRef = null_check!(obj, "get_string_utf_chars obj argument")?;
 
@@ -261,15 +267,23 @@ where
 {
 	fn drop(&mut self) {
 		unsafe fn release_string_utf_chars(obj: abos_jni_sys::jobject, chars: *const c_char) -> Result<()> {
-			// Error: Since we can't construct a `MUTF8Chars` without a valid `Env` reference we know
-			// `JavaVM::singleton()` must be initialized and won't panic.
-			JavaVM::singleton()?.with_top_local_frame(|env| {
-				// This method is safe to call in case of pending exceptions (see the chapter 2 of the spec)
-				// SAFETY: The caller supplies the string and pointer paired by GetStringUTFChars, and this releases them once.
-				unsafe { ex_safe_jni_call_no_post_check_ex!(env, v1_1, ReleaseStringUTFChars, obj, chars) };
+			// Construction requires an Env, so the JavaVM singleton is initialized.
+			// A global string can outlive the attachment used to acquire its characters.
+			JavaVM::singleton()?.attach_current_thread_with_config(
+				|| {
+					AttachConfig::new()
+						.scoped(true)
+						.exceptions_policy(AttachmentExceptionPolicy::Ignore)
+				},
+				None,
+				|env| {
+					// ReleaseStringUTFChars is exception safe; Ignore leaves pending exceptions untouched.
+					// SAFETY: The caller supplies the string and pointer paired by GetStringUTFChars, and this releases them once.
+					unsafe { ex_safe_jni_call_no_post_check_ex!(env, v1_1, ReleaseStringUTFChars, obj, chars) };
 
-				Ok(())
-			})
+					Ok(())
+				},
+			)
 		}
 
 		// SAFETY: The guard retains its source string and releases its acquired character buffer exactly once.
