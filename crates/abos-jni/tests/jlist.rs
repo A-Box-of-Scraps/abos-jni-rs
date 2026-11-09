@@ -4,8 +4,9 @@
 
 use abos_jni::refs::Auto;
 use abos_jni::{
+	errors::Error,
 	jni_sig, jni_str,
-	objects::{IntoAuto, JList, JString},
+	objects::{IntoAuto, JIterator, JList, JObject, JString, JThrowable},
 	sys::jint,
 };
 
@@ -282,4 +283,72 @@ fn jlist_iterator_with_auto() {
 		Ok(())
 	})
 	.expect("attached JNI callback succeeds");
+}
+
+#[test]
+fn jlist_iterator_concurrent_modification() {
+	attach_current_thread(|env| {
+		let object: JObject<'_> = env.new_object(jni_str!("java/util/ArrayList"), jni_sig!("()V"), &[])?;
+		let list: JList<'_> = JList::cast_local(env, object)?;
+		list.add(env, &JObject::null())?;
+		let iter: JIterator<'_> = list.iter(env)?;
+		list.add(env, &JObject::null())?;
+
+		assert!(matches!(iter.next(env), Err(Error::JavaException)));
+		assert!(env.exception_check());
+		assert!(matches!(
+			env.exception_catch(),
+			Err(Error::CaughtJavaException { name, .. }) if name == "java.util.ConcurrentModificationException"
+		));
+		assert!(!env.exception_check());
+		assert_eq!(list.size(env)?, 2);
+		Ok(())
+	})
+	.expect("iterator failures remain catchable");
+}
+
+#[test]
+fn jlist_iterator_null_element_and_repeated_exhaustion() {
+	attach_current_thread(|env| {
+		let object: JObject<'_> = env.new_object(jni_str!("java/util/ArrayList"), jni_sig!("()V"), &[])?;
+		let list: JList<'_> = JList::cast_local(env, object)?;
+		list.add(env, &JObject::null())?;
+		let iter: JIterator<'_> = list.iter(env)?;
+
+		assert!(iter.next(env)?.expect("null is an element, not exhaustion").is_null());
+		for _ in 0..3 {
+			assert!(iter.next(env)?.is_none());
+			assert!(!env.exception_check());
+		}
+		Ok(())
+	})
+	.expect("only exhaustion is converted to None");
+}
+
+#[test]
+fn jlist_iterator_preserves_pending_exceptions() {
+	attach_current_thread(|env| {
+		let object: JObject<'_> = env.new_object(jni_str!("java/util/ArrayList"), jni_sig!("()V"), &[])?;
+		let list: JList<'_> = JList::cast_local(env, object)?;
+		list.add(env, &JObject::null())?;
+		let iter: JIterator<'_> = list.iter(env)?;
+
+		for class in [
+			jni_str!("java/lang/IllegalStateException"),
+			jni_str!("java/util/NoSuchElementException"),
+		] {
+			assert!(matches!(
+				env.throw_new(class, jni_str!("pending sentinel")),
+				Err(Error::JavaException)
+			));
+			let original: JThrowable<'_> = env.exception_occurred().expect("pending exception");
+			assert!(matches!(iter.next(env), Err(Error::JavaException)));
+			let remaining: JThrowable<'_> = env.exception_occurred().expect("exception remains pending");
+			env.exception_clear();
+			assert!(env.is_same_object(&original, &remaining)?);
+		}
+		assert!(iter.next(env)?.is_some(), "blocked calls must not advance the iterator");
+		Ok(())
+	})
+	.expect("pre-existing exceptions are not treated as iterator exhaustion");
 }

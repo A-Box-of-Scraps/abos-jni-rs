@@ -1,7 +1,9 @@
 use crate::{
 	Env,
 	errors::{Error, Result},
-	objects::JObject,
+	jni_str,
+	objects::{IntoAuto as _, JObject, JThrowable},
+	refs::Auto,
 };
 
 crate::bind_java_type! {
@@ -33,8 +35,9 @@ impl JIterator<'_> {
 	/// This is like [`std::iter::Iterator::next`], but requires a parameter of
 	/// type `&mut Env` in order to call into Java.
 	///
-	/// Any exceptions thrown are assumed to be a `NoSuchElementException` and
-	/// are caught + cleared before returning `None`.
+	/// A `NoSuchElementException` thrown by the iterator is caught and cleared
+	/// before returning `None`. Other Java exceptions remain pending and are
+	/// propagated as [`Error::JavaException`].
 	///
 	/// ## Beware of creating excessive local references in the current JNI stack frame
 	///
@@ -48,14 +51,31 @@ impl JIterator<'_> {
 	///
 	/// # Errors
 	///
-	/// Propagates JNI failures from checking or advancing the iterator. See above for how iteration exceptions are handled.
+	/// Propagates JNI failures and Java exceptions other than iterator exhaustion.
+	/// An exception already pending on entry is propagated without advancing the iterator.
 	pub fn next<'env_local>(&self, env: &mut Env<'env_local>) -> Result<Option<JObject<'env_local>>> {
+		// A pre-existing exception must not be mistaken for iterator exhaustion.
+		if env.exception_check() {
+			return Err(Error::JavaException);
+		}
+
 		match self._next(env) {
 			Ok(v) => Ok(Some(v)),
 			Err(Error::JavaException) => {
-				// Assume `NoSuchElementException` is thrown
+				let exception: Auto<'_, JThrowable<'_>> = env.exception_occurred().ok_or(Error::JavaException)?.auto();
+				// JNI type checks require clearing the pending exception first.
 				env.exception_clear();
-				Ok(None)
+				if matches!(
+					env.is_instance_of(&exception, jni_str!("java/util/NoSuchElementException")),
+					Ok(true)
+				) {
+					Ok(None)
+				} else {
+					// Preserve the original failure even if inspecting its type failed.
+					env.exception_clear();
+					env.throw(&*exception)?;
+					Err(Error::JavaException)
+				}
 			}
 			Err(e) => Err(e),
 		}
