@@ -1,9 +1,5 @@
-//! Compile Java sources from Cargo build scripts or Rust applications.
+#![doc = include_str!("../README.md")]
 #![deny(missing_docs)]
-
-#[doc = include_str!("../CHANGELOG.md")]
-#[doc = "\n\n[Unreleased]: #unreleased\n"]
-pub mod changelog {}
 
 mod api;
 mod internal;

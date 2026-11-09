@@ -23,7 +23,7 @@ requirements; see the
 
 Export the Java sources into a source root:
 
-```rust
+```rust,no_run
 fn main() -> std::io::Result<()> {
     let files = abos_jbindgen_annotations::write_sources("java")?;
     for file in files {
@@ -134,7 +134,7 @@ method's return type; the Java signature still uses `long`.
 
 In the consuming Rust crate, define the mapped type and its conversion to the JNI primitive:
 
-```rust
+```rust,ignore
 #[repr(transparent)]
 pub struct Handle(pub abos_jni::sys::jlong);
 

@@ -27,7 +27,7 @@ runtime setup and examples in both call directions.
 
 Build a JNI string and a typed method signature at compile time:
 
-```rust
+```rust,ignore
 use abos_jni::{jni_sig, jni_str};
 
 fn main() {
@@ -125,7 +125,7 @@ primitive, while returns convert back. Implement the required `From` conversions
 
 Use aliases to share names within a signature declaration:
 
-```rust
+```rust,ignore
 use abos_jni::{jni_sig, jni_sig_str};
 
 fn main() {
@@ -146,7 +146,7 @@ fn main() {
 
 Declare the subset of a Java API your Rust code needs:
 
-```rust
+```rust,ignore
 use abos_jni::sys::jint;
 use abos_jni::{Env, bind_java_type};
 
@@ -173,7 +173,7 @@ appropriate `LoaderContext` before calling its bindings.
 
 Match the Java declaration `public static native int twice(int value)` in `com.example.MathNative`:
 
-```rust
+```rust,ignore
 use abos_jni::objects::JClass;
 use abos_jni::sys::jint;
 use abos_jni::{Env, NativeMethod, native_method};
@@ -203,7 +203,7 @@ jni_runtime = { package = "abos-jni", version = "0.1.0" }
 
 Pass `jni = <path>` as the first property in string, signature, and binding macro invocations:
 
-```rust
+```rust,ignore
 use jni_runtime::{jni_sig, jni_str};
 
 fn main() {

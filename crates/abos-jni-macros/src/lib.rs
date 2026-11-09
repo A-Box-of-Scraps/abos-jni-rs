@@ -1,6 +1,4 @@
-//! Procedural macros for abos-jni.
-#![doc = include_str!("../CHANGELOG.md")]
-#![doc = "\n\n[Unreleased]: #unreleased\n"]
+#![doc = include_str!("../README.md")]
 
 mod api;
 mod internal;

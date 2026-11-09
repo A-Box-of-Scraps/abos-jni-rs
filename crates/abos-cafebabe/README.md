@@ -18,7 +18,7 @@ abos-cafebabe = "0.1.0"
 
 Read a `.class` file and extract its metadata:
 
-```rust
+```rust,no_run
 use abos_cafebabe::parse_class;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

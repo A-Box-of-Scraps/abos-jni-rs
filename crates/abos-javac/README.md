@@ -29,7 +29,7 @@ public class Example {}
 
 Then add a `build.rs` at your Cargo package root:
 
-```rust
+```rust,no_run
 fn main() -> abos_javac::Result<()> {
     abos_javac::Build::new()
         .source_dir("java")
@@ -90,7 +90,7 @@ An empty source selection is an error. A successful compiler invocation that rep
 
 In a build script, select a single source instead of scanning a directory:
 
-```rust
+```rust,no_run
 fn main() -> abos_javac::Result<()> {
     abos_javac::Build::new()
         .file("java/Example.java")
@@ -104,7 +104,7 @@ fn main() -> abos_javac::Result<()> {
 
 Compile sources against a dependency JAR, targeting a release supported by the selected JDK:
 
-```rust
+```rust,no_run
 fn main() -> abos_javac::Result<()> {
     abos_javac::Build::new()
         .source_dir("java")
@@ -121,7 +121,7 @@ fn main() -> abos_javac::Result<()> {
 
 Set an output directory and disable Cargo directives when compiling from an application or test:
 
-```rust
+```rust,no_run
 fn main() -> abos_javac::Result<()> {
     let classes = abos_javac::Build::new()
         .file("java/Example.java")

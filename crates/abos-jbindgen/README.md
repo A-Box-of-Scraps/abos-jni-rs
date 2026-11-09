@@ -51,7 +51,7 @@ public class Calculator {
 
 Add a `build.rs` that compiles the Java class and generates Rust bindings from its bytecode:
 
-```rust
+```rust,no_run
 use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -82,7 +82,7 @@ rebuild directives itself: when generating directly from existing inputs, track 
 
 In `src/main.rs`, include the generated file inside the module named by `.root_path(...)`:
 
-```rust
+```rust,ignore
 mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
@@ -198,7 +198,7 @@ Use class patterns or member skips to explicitly restrict the API surface.
 
 Select a package and generate bindings under `crate::bindings`:
 
-```rust
+```rust,no_run
 fn main() -> abos_jbindgen::Result<()> {
     abos_jbindgen::Builder::new()
         .input_jar("library.jar")
@@ -213,7 +213,7 @@ fn main() -> abos_jbindgen::Result<()> {
 
 With the required platform files installed, select an API level and package:
 
-```rust
+```rust,no_run
 fn main() -> abos_jbindgen::Result<()> {
     abos_jbindgen::Builder::new()
         .input_android_sdk(35, vec!["android.os.*".into()])
@@ -231,7 +231,7 @@ To additionally filter hidden APIs, call `.hiddenapi_flags("hiddenapi-flags.csv"
 Use a DEX signature to identify a specific overload. This example renames `add(int, int)` to `sum` and omits the default
 constructor:
 
-```rust
+```rust,no_run
 fn main() -> abos_jbindgen::Result<()> {
     abos_jbindgen::Builder::new()
         .input_class("classes/com/example/Calculator.class")
@@ -250,7 +250,7 @@ Name overrides take precedence over `@RustName` annotations. Field signatures us
 
 Write a directory tree rooted at `generated/mod.rs` and a reusable type-mapping file:
 
-```rust
+```rust,no_run
 fn main() -> abos_jbindgen::Result<()> {
     let bindings = abos_jbindgen::Builder::new()
         .input_jar("library.jar")
