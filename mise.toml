@@ -33,6 +33,39 @@ run = "cargo bench --locked --package abos-jvmti --features invocation --bench e
 [tasks."bench:abos-jvmti:rust"]
 run = "cargo bench --locked --package abos-jvmti --bench rust_utilities"
 
+[tasks.build]
+run = "cargo build --locked --workspace"
+
+[tasks."build:abos-cafebabe"]
+run = "cargo build --locked --package abos-cafebabe"
+
+[tasks."build:abos-javac"]
+run = "cargo build --locked --package abos-javac"
+
+[tasks."build:abos-jbindgen"]
+run = "cargo build --locked --package abos-jbindgen"
+
+[tasks."build:abos-jbindgen-annotations"]
+run = "cargo build --locked --package abos-jbindgen-annotations"
+
+[tasks."build:abos-jni"]
+run = "cargo build --locked --package abos-jni"
+
+[tasks."build:abos-jni-macros"]
+run = "cargo build --locked --package abos-jni-macros"
+
+[tasks."build:abos-jni-sys"]
+run = "cargo build --locked --package abos-jni-sys"
+
+[tasks."build:abos-jni-sys-macros"]
+run = "cargo build --locked --package abos-jni-sys-macros"
+
+[tasks."build:abos-jvmti"]
+run = "cargo build --locked --package abos-jvmti"
+
+[tasks."build:abos-jvmti-sys"]
+run = "cargo build --locked --package abos-jvmti-sys"
+
 [tasks.check]
 depends = ["fmt:check", "lint", "check:duplicates", "test"]
 
