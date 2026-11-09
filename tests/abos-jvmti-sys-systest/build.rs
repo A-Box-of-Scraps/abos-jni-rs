@@ -1,3 +1,5 @@
+#[path = "../abos-jni-sys-systest/support/compile_commands.rs"]
+mod compile_commands;
 #[path = "../abos-jni-sys-systest/support/generate.rs"]
 mod generate;
 #[path = "../abos-jni-sys-systest/support/types.rs"]
@@ -52,12 +54,15 @@ fn main() {
 	fs::write(out.join("expected.rs"), quote::quote!(vec![#expected]).to_string()).expect("write Rust expectations");
 	capabilities::generate(&out);
 	println!("cargo:rerun-if-changed=probe.c");
-	cc::Build::new()
+	let mut build = cc::Build::new();
+	build
 		.file("probe.c")
 		.include(&include)
 		.include(include.join(platform))
-		.include(out)
+		.include(&out)
 		.std("c11")
 		.warnings_into_errors(true)
 		.compile("abos_jvmti_probe");
+	println!("cargo:rerun-if-changed=../abos-jni-sys-systest/support/compile_commands.rs");
+	compile_commands::write(&build, &out);
 }

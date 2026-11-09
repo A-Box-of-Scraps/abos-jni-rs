@@ -26,6 +26,7 @@ lints/
 scripts/
 tests/
 tools/
+.clangd
 .gitattributes
 .gitignore
 .jscpd.json

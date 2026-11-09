@@ -2,6 +2,7 @@
 .idea/
 .vscode/
 .zed/
+/compile_commands.json
 
 # Rust
 target/

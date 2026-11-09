@@ -1,3 +1,5 @@
+#[path = "support/compile_commands.rs"]
+mod compile_commands;
 #[path = "support/generate.rs"]
 mod generate;
 #[path = "support/types.rs"]
@@ -42,13 +44,16 @@ fn main() {
 	fs::write(out.join("expected.rs"), quote::quote!(vec![#expected]).to_string()).expect("write Rust expectations");
 	println!("cargo:rerun-if-changed=probe.c");
 	println!("cargo:rerun-if-changed=calls.c");
-	cc::Build::new()
+	let mut build = cc::Build::new();
+	build
 		.file("probe.c")
 		.file("calls.c")
 		.include(include)
 		.include(platform_include)
-		.include(out)
+		.include(&out)
 		.std("c11")
 		.warnings_into_errors(true)
 		.compile("abos_jni_probe");
+	println!("cargo:rerun-if-changed=support/compile_commands.rs");
+	compile_commands::write(&build, &out);
 }

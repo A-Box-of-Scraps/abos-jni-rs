@@ -10,9 +10,10 @@ publish = false
 abos-jni-sys = { path = "../../crates/abos-jni-sys" }
 
 [build-dependencies]
-cc = "1"
+cc = "1.10"
 proc-macro2 = "1"
 quote = "1"
+serde_json = "1"
 syn = { version = "3", features = ["full"] }
 
 [dev-dependencies]

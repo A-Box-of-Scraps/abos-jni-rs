@@ -148,6 +148,9 @@ run = "cargo run --locked --manifest-path tools/abos-jni-gen-windows-bindings/Ca
 [tasks."generate:abos-jvmti-sys"]
 run = "python scripts/generate-jvmti.py"
 
+[tasks."generate:compile-commands"]
+run = "python scripts/generate-compile-commands.py"
+
 [tasks.lint]
 depends = [
   "lint:abos-jbindgen:runtime",
