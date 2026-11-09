@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 #![allow(
 	missing_docs,
 	reason = "Internal macros implementing versioned JNI and JVMTI table representations."

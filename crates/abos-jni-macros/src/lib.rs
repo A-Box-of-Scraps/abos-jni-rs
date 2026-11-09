@@ -1,4 +1,4 @@
-//! Procedural macros for abos-jni.
+#![doc = include_str!("../README.md")]
 
 mod api;
 mod internal;
@@ -52,6 +52,12 @@ pub fn native_method(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 }
 
 /// Generate Rust bindings for a Java type.
+///
+/// Generated methods and constructors check non-null reference arguments against
+/// their resolved Java parameter classes. These classes are cached lazily per
+/// binding, with the same process lifetime as the binding's cached class and
+/// method IDs. Every call still checks assignability, including class-loader
+/// identity; only the reflective parameter lookup is cached.
 ///
 /// Custom primitive mappings such as `unsafe Handle => long` use `Into` conversions
 /// when calling Java: arguments and field setters convert `Handle` into the JNI

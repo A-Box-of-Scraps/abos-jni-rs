@@ -161,9 +161,11 @@ impl CompiledMethodRecords<'_> {
 	/// Return [`OwnedCompiledMethodRecord`] values to retain decoded information.
 	///
 	/// # Safety
-	/// Call only inside the `CompiledMethodLoad` callback that supplied `compile_info`,
-	/// and only after establishing that this VM uses the `jvmticmlr.h` format (for
-	/// example, `HotSpot`). Standard JVMTI alone does not guarantee that format.
+	/// For VM-supplied data, call only inside the `CompiledMethodLoad` callback that
+	/// supplied `compile_info`, after establishing that the VM uses the `jvmticmlr.h`
+	/// format (for example, `HotSpot`). Standard JVMTI does not guarantee that format.
+	/// Synthetic records may also be decoded if they satisfy the same layout,
+	/// readability, and immutability requirements below for the entire scope.
 	/// Every non-null link must point to an aligned, initialized common header.
 	/// Recognized version 1.0 records must have their full corresponding layout.
 	/// Non-null arrays must be aligned, initialized, and readable for their declared

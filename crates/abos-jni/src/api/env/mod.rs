@@ -447,6 +447,8 @@ mod local_refs;
 mod method_ids;
 mod native;
 mod reference_validation;
+#[doc(hidden)]
+pub use reference_validation::MethodReferenceCache as __MethodReferenceCache;
 mod reflection;
 mod rust_fields;
 mod state;

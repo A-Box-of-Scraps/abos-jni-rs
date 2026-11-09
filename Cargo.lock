@@ -108,6 +108,7 @@ version = "0.1.0"
 dependencies = [
  "abos-jni",
  "abos-jvmti-sys",
+ "criterion",
  "static_assertions",
  "tempfile",
 ]

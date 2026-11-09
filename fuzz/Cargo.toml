@@ -16,6 +16,7 @@ resolver = "3"
 abos-cafebabe = { path = "../crates/abos-cafebabe" }
 abos-jbindgen = { path = "../crates/abos-jbindgen", features = ["_fuzzing"] }
 abos-jni = { path = "../crates/abos-jni" }
+abos-jvmti = { path = "../crates/abos-jvmti" }
 libfuzzer-sys = "0.4"
 
 [[bin]]
@@ -56,6 +57,20 @@ bench = false
 [[bin]]
 name = "jni_string_roundtrip"
 path = "fuzz_targets/jni_string_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "jvmti_compiled_method"
+path = "fuzz_targets/jvmti_compiled_method.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "jvmti_returned_data"
+path = "fuzz_targets/jvmti_returned_data.rs"
 test = false
 doc = false
 bench = false

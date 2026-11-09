@@ -1,5 +1,5 @@
 use super::{
-	ATTACHED_THREADS, AttachGuard, Env, Error, JNIVersion, JavaVM, JniError, Ordering, Result, ScopeToken,
+	ATTACHED_THREADS, AttachGuard, Env, Error, JNIVersion, JObject, JavaVM, JniError, Ordering, Result, ScopeToken,
 	THREAD_ATTACHMENT, THREAD_GUARD_NEST_LEVEL, jni_error_code_to_result, ptr, sys,
 };
 
@@ -23,6 +23,43 @@ impl JavaVM {
 	#[must_use]
 	pub fn thread_attach_guard_level() -> usize {
 		THREAD_GUARD_NEST_LEVEL.get()
+	}
+
+	/// Deletes an owned local reference using the active guard's JNI environment when available.
+	#[inline]
+	pub(crate) fn delete_local_ref(obj: JObject<'_>) {
+		// Null references can exist before any VM or thread attachment does.
+		if obj.is_null() {
+			return;
+		}
+		let env: *mut sys::JNIEnv = THREAD_ATTACHMENT.get();
+		if env.is_null() {
+			Self::delete_local_ref_without_guard(obj);
+			return;
+		}
+		// SAFETY: THREAD_ATTACHMENT is populated only while an AttachGuard keeps this
+		// thread attached, and is cleared when the last guard exits. The consumed
+		// object owns a local reference on this thread. DeleteLocalRef is exception
+		// safe and can delete references from outer frames; it creates no references
+		// and needs neither a new guard nor an assert_top check.
+		unsafe { ((**env).v1_1.DeleteLocalRef)(env, obj.into_raw()) };
+	}
+
+	#[cold]
+	fn delete_local_ref_without_guard(obj: JObject<'_>) {
+		let Ok(vm) = Self::singleton() else {
+			// A native method argument may be wrapped before the first library guard
+			// initializes the singleton. Its native frame will still release it.
+			log::error!("Failed to drop Auto: No JavaVM initialized");
+			return;
+		};
+		// Native arguments can outlive a library guard without outliving their JNI
+		// frame. Query the current attachment rather than caching an inactive one.
+		vm.with_top_local_frame(|env| -> Result<()> {
+			env.delete_local_ref(obj);
+			Ok(())
+		})
+		.expect("Auto local reference outlived its thread attachment");
 	}
 
 	/// Get an [`AttachGuard`] for the [`Env`] associated with the current thread or, if JNI is

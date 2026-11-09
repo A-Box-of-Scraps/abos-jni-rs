@@ -17,8 +17,18 @@ use std::hint::black_box;
 use std::rc::Rc;
 use std::sync::{Arc, LazyLock};
 
+#[path = "api_calls/arrays.rs"]
+mod arrays;
 #[path = "api_calls/calls.rs"]
 mod calls;
+#[path = "api_calls/comparisons.rs"]
+mod comparisons;
+#[path = "api_calls/reference_calls.rs"]
+mod reference_calls;
+#[path = "support/strings.rs"]
+mod string_inputs;
+#[path = "api_calls/strings.rs"]
+mod strings;
 use calls::{
 	jni_abs_safe, jni_hash_safe, jni_int_call_static_unchecked, jni_int_call_unchecked, jni_local_date_time_of_safe,
 	jni_object_call_static_unchecked, native_abs,
@@ -50,7 +60,7 @@ static VM: LazyLock<JavaVM> = LazyLock::new(|| {
 fn native_call_function(c: &mut Criterion) {
 	c.bench_function("native_call_function", |b| {
 		b.iter(|| {
-			let _ = native_abs(black_box(-3));
+			black_box(native_abs(black_box(-3)));
 		});
 	});
 }
@@ -282,9 +292,7 @@ fn jni_check_exception(c: &mut Criterion) {
 fn jni_get_java_vm(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
 		c.bench_function("jni_get_java_vm", |b| {
-			b.iter(|| {
-				let _jvm: std::result::Result<JavaVM, abos_jni::errors::Error> = env.get_java_vm();
-			});
+			b.iter(|| env.get_java_vm().expect("Java VM can be retrieved"));
 		});
 		Ok(())
 	})
@@ -297,31 +305,19 @@ fn jni_get_string(c: &mut Criterion) {
 			.new_string(TEST_STRING_UNICODE)
 			.expect("test string can be allocated");
 
+		assert_eq!(
+			string
+				.try_to_string(env)
+				.expect("test Java string can be converted to Rust"),
+			TEST_STRING_UNICODE
+		);
+
 		c.bench_function("jni_get_string", |b| {
 			b.iter(|| {
 				let s: String = string
 					.try_to_string(env)
 					.expect("test Java string can be converted to Rust");
-				assert_eq!(s, TEST_STRING_UNICODE);
-			});
-		});
-		Ok(())
-	})
-	.expect("scoped JNI callback succeeds");
-}
-
-fn jni_get_string_unchecked(c: &mut Criterion) {
-	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
-		let string: JString<'_> = env
-			.new_string(TEST_STRING_UNICODE)
-			.expect("test string can be allocated");
-
-		c.bench_function("jni_get_string_unchecked", |b| {
-			b.iter(|| {
-				let s: String = string
-					.try_to_string(env)
-					.expect("test Java string can be converted to Rust");
-				assert_eq!(s, TEST_STRING_UNICODE);
+				black_box(s);
 			});
 		});
 		Ok(())
@@ -350,16 +346,19 @@ fn jni_noop_with_local_frame(c: &mut Criterion) {
 	.expect("scoped JNI callback succeeds");
 }
 
-/// A benchmark measuring Push/PopLocalFrame overhead while retuning a local reference
+/// Measures local-frame object creation and return, including deletion of the returned local reference.
 fn jni_with_local_frame_returning_local(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
 		const LOCAL_FRAME_SIZE: usize = 32;
 
 		let class: JClass<'_> = env.find_class(CLASS_OBJECT).expect("test class can be resolved");
 		let mut operation = || {
-			env.with_local_frame_returning_local::<_, JObject, _>(LOCAL_FRAME_SIZE, |env| {
-				env.new_object(&class, &SIG_OBJECT_CTOR, &[])
-			})
+			let local: JObject<'_> = env
+				.with_local_frame_returning_local::<_, JObject, _>(LOCAL_FRAME_SIZE, |env| {
+					env.new_object(&class, &SIG_OBJECT_CTOR, &[])
+				})
+				.expect("local-frame object creation succeeds");
+			env.delete_local_ref(local);
 		};
 		c.bench_function("jni_with_local_frame_returning_local", |b| {
 			b.iter(&mut operation);
@@ -369,9 +368,8 @@ fn jni_with_local_frame_returning_local(c: &mut Criterion) {
 	.expect("scoped JNI callback succeeds");
 }
 
-/// A benchmark measuring Push/PopLocalFrame overhead while retuning a global
-/// object reference that then gets converted into a local reference before
-/// dropping the global
+/// Measures local-frame object creation and return via a temporary global reference,
+/// including deletion of both the global and the resulting local reference.
 fn jni_with_local_frame_returning_global_to_local(c: &mut Criterion) {
 	VM.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
 		const LOCAL_FRAME_SIZE: usize = 32;
@@ -385,7 +383,8 @@ fn jni_with_local_frame_returning_global_to_local(c: &mut Criterion) {
 					Ok(global)
 				})
 				.expect("test object can be allocated");
-			let _local: JObject<'_> = env.new_local_ref(global).expect("local reference can be allocated");
+			let local: JObject<'_> = env.new_local_ref(global).expect("local reference can be allocated");
+			env.delete_local_ref(local);
 		};
 		c.bench_function("jni_with_local_frame_returning_global_to_local", |b| {
 			b.iter(&mut operation);
@@ -510,7 +509,6 @@ criterion_group!(
 	jni_check_exception,
 	jni_get_java_vm,
 	jni_get_string,
-	jni_get_string_unchecked,
 	jni_noop_with_local_frame,
 	jni_with_local_frame_returning_local,
 	jni_with_local_frame_returning_global_to_local,
@@ -518,7 +516,13 @@ criterion_group!(
 	jni_new_string_with_repeat_scoped_thread_attachments,
 	jni_new_string_with_repeat_permanent_thread_attachments,
 	native_arc,
-	native_rc
+	native_rc,
+	strings::strings,
+	arrays::arrays,
+	comparisons::calls,
+	reference_calls::reference_calls,
+	comparisons::references,
+	comparisons::attachment
 );
 
 criterion_main!(benches);
