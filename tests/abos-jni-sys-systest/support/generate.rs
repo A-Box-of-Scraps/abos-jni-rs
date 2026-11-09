@@ -86,7 +86,9 @@ impl Probe {
 	fn record<'a>(&mut self, name: &Ident, fields: impl Iterator<Item = &'a Field>) {
 		let c_record = c_name(&name.to_string());
 		self.layout(name, &c_record);
-		for field in fields {
+		// Private storage (for example C bitfields) is checked separately by
+		// cross-language round trips, while the record still gets layout checks.
+		for field in fields.filter(|field| matches!(field.vis, syn::Visibility::Public(_))) {
 			self.field_type(&c_record, field);
 			self.field_offset(name, &c_record, field);
 		}

@@ -6,6 +6,7 @@ exclude = [
   "lints",
   "tests/android-test-activity",
   "tests/abos-jni-sys-systest",
+  "tests/abos-jvmti-sys-systest",
   "crates/abos-jbindgen/tests/runtime",
 ]
 
@@ -24,6 +25,7 @@ abos-jni = { path = "crates/abos-jni", version = "0.1.0" }
 abos-jni-macros = { path = "crates/abos-jni-macros", version = "0.1.0" }
 abos-jni-sys = { path = "crates/abos-jni-sys", version = "0.1.0" }
 abos-jni-sys-macros = { path = "crates/abos-jni-sys-macros", version = "0.1.0" }
+abos-jvmti-sys = { path = "crates/abos-jvmti-sys", version = "0.1.0" }
 
 # Shared external dependencies
 indoc = "2"

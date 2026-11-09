@@ -54,6 +54,7 @@ run = [
   "cargo fmt --manifest-path crates/abos-jbindgen/tests/runtime/Cargo.toml -q",
   "cargo fmt --manifest-path tests/android-test-activity/Cargo.toml -q",
   "cargo fmt --manifest-path tests/abos-jni-sys-systest/Cargo.toml -q",
+  "cargo fmt --manifest-path tests/abos-jvmti-sys-systest/Cargo.toml -q",
   "cd lints && cargo fmt --all -q",
   "dprint fmt --log-level warn",
 ]
@@ -68,6 +69,7 @@ run = [
   "cargo fmt --manifest-path crates/abos-jbindgen/tests/runtime/Cargo.toml --check -q",
   "cargo fmt --manifest-path tests/android-test-activity/Cargo.toml --check -q",
   "cargo fmt --manifest-path tests/abos-jni-sys-systest/Cargo.toml --check -q",
+  "cargo fmt --manifest-path tests/abos-jvmti-sys-systest/Cargo.toml --check -q",
   "cd lints && cargo fmt --all --check -q",
   "dprint check --log-level warn",
 ]
@@ -143,10 +145,14 @@ run = "cargo fuzz run jni_string_roundtrip -- -max_total_time=60 -max_len=65536 
 [tasks."generate:abos-jni:windows-bindings"]
 run = "cargo run --locked --manifest-path tools/abos-jni-gen-windows-bindings/Cargo.toml -q"
 
+[tasks."generate:abos-jvmti-sys"]
+run = "python scripts/generate-jvmti.py"
+
 [tasks.lint]
 depends = [
   "lint:abos-jbindgen:runtime",
   "lint:abos-jni-sys:systest",
+  "lint:abos-jvmti-sys:systest",
   "lint:docs",
   "lint:python",
   "lint:tools:windows-bindings",
@@ -162,6 +168,9 @@ run = "cargo clippy --manifest-path crates/abos-jbindgen/tests/runtime/Cargo.tom
 
 [tasks."lint:abos-jni-sys:systest"]
 run = "cargo clippy --locked --manifest-path tests/abos-jni-sys-systest/Cargo.toml --all-targets -q -- -D warnings"
+
+[tasks."lint:abos-jvmti-sys:systest"]
+run = "cargo clippy --locked --manifest-path tests/abos-jvmti-sys-systest/Cargo.toml --all-targets -q -- -D warnings"
 
 [tasks."lint:docs"]
 env = { RUSTDOCFLAGS = "-D warnings" }
@@ -192,6 +201,7 @@ run = ["mise install cargo:cargo-fuzz", "rustup show active-toolchain"]
 depends = [
   "test:abos-jni:examples",
   "test:abos-jni-sys:systest",
+  "test:abos-jvmti-sys:systest",
   "test:android-runner",
   "test:lints",
   "test:scripts",
@@ -253,6 +263,18 @@ run = [
 
 [tasks."test:abos-jni:jvm"]
 run = "cargo test --locked --package abos-jni --all-features -q"
+
+[tasks."test:abos-jvmti"]
+run = "cargo test --locked --package abos-jvmti -q"
+
+[tasks."test:abos-jvmti-sys"]
+run = "cargo test --locked --package abos-jvmti-sys -q"
+
+[tasks."test:abos-jvmti-sys:systest"]
+run = [
+  "python scripts/generate-jvmti.py --check",
+  "cargo test --locked --manifest-path tests/abos-jvmti-sys-systest/Cargo.toml -q",
+]
 
 [tasks."test:android"]
 run = "python tests/android-test-activity/tests/run.py"

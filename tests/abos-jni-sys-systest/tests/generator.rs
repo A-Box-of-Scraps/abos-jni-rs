@@ -114,3 +114,25 @@ fn va_list_parameters_keep_the_c_type_and_accept_only_lifetimes() {
 fn rejects_va_list_type_arguments() {
 	types::c_type(&parse_quote!(va_list<u8>));
 }
+
+#[test]
+fn nullable_callback_types_preserve_the_function_signature() {
+	let ty: Type = parse_quote!(Option<unsafe extern "system" fn(*mut jvmtiEnv, *mut JNIEnv)>);
+	assert_eq!(types::c_type(&ty), "void (JNICALL *)(jvmtiEnv *, JNIEnv *)");
+}
+
+#[test]
+#[should_panic(expected = "Only nullable function pointers")]
+fn rejects_options_without_a_guaranteed_c_niche() {
+	types::c_type(&parse_quote!(Option<jint>));
+}
+
+#[test]
+fn opaque_bitfield_storage_still_gets_record_layout_checks() {
+	let mut probe = generate::Probe::default();
+	probe.add_source("pub struct jvmtiCapabilities { words: [u32; 4] }");
+	let expected = probe.expected.to_string();
+	assert!(expected.contains("sizeof(jvmtiCapabilities)"));
+	assert!(expected.contains("alignof(jvmtiCapabilities)"));
+	assert_eq!(probe.signatures, "");
+}

@@ -2,7 +2,15 @@ use syn::{GenericArgument, PathArguments, PointerMutability, ReturnType, Type, T
 
 pub fn c_name(name: &str) -> String {
 	match name {
-		"JNINativeInterface_" | "JNIInvokeInterface_" | "JNIEnv_" | "_jobject" | "_jfieldID" | "_jmethodID" => {
+		"JNINativeInterface_"
+		| "JNIInvokeInterface_"
+		| "JNIEnv_"
+		| "_jobject"
+		| "_jfieldID"
+		| "_jmethodID"
+		| "jvmtiInterface_1_"
+		| "_jvmtiEnv"
+		| "_jrawMonitorID" => {
 			format!("struct {name}")
 		}
 		"c_void" => "void".to_owned(),
@@ -36,6 +44,16 @@ pub fn c_type(ty: &Type) -> String {
 		}
 		Type::Path(path) if path.qself.is_none() && path.path.segments.len() == 1 => {
 			let segment = &path.path.segments[0];
+			if segment.ident == "Option" {
+				let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+					panic!("Option requires a function pointer");
+				};
+				assert_eq!(arguments.args.len(), 1, "Option requires one argument");
+				let Some(GenericArgument::Type(Type::FnPtr(function))) = arguments.args.first() else {
+					panic!("Only nullable function pointers have a C representation");
+				};
+				return function_type(function);
+			}
 			if segment.ident == "va_list" {
 				assert_lifetime_arguments(&segment.arguments);
 			} else {

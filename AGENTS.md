@@ -18,6 +18,8 @@ crates/
   abos-jni-macros/
   abos-jni-sys/
   abos-jni-sys-macros/
+  abos-jvmti/
+  abos-jvmti-sys/
 fuzz/
 licenses/
 lints/

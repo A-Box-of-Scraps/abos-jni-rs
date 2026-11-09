@@ -103,6 +103,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "abos-jvmti"
+version = "0.1.0"
+dependencies = [
+ "abos-jni",
+ "abos-jvmti-sys",
+ "static_assertions",
+ "tempfile",
+]
+
+[[package]]
+name = "abos-jvmti-sys"
+version = "0.1.0"
+dependencies = [
+ "abos-jni-sys",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

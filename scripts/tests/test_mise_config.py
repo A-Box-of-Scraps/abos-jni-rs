@@ -26,6 +26,7 @@ class MiseConfigTests(unittest.TestCase):
             [
                 "test:abos-jni:examples",
                 "test:abos-jni-sys:systest",
+                "test:abos-jvmti-sys:systest",
                 "test:android-runner",
                 "test:lints",
                 "test:scripts",
