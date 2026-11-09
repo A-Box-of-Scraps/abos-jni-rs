@@ -1,0 +1,14 @@
+error: lifetime may not live long enough
+ --> tests/ui/fail/auto-local-escapes-frame.rs:5:3
+  |
+4 |     let string = env.with_local_frame(1, |inner| {
+  |                                           ------ return type of closure is Result<Auto<'2, JString<'_>>, abos_jni::errors::Error>
+  |                                           |
+  |                                           has type `&mut Env<'1>`
+5 |         inner.new_string("local").map(|string| string.auto())
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ returning this value requires that `'1` must outlive `'2`
+  |
+help: consider adding 'move' keyword before the nested closure
+  |
+5 |         inner.new_string("local").map(move |string| string.auto())
+  |                                       ++++
