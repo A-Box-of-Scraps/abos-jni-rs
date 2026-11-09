@@ -1,5 +1,5 @@
 #![doc = include_str!("../CHANGELOG.md")]
-#![doc = "\n[Unreleased]: #unreleased\n"]
+#![doc = "\n\n[Unreleased]: #unreleased\n"]
 #![allow(
 	missing_docs,
 	reason = "Internal macros implementing versioned JNI and JVMTI table representations."

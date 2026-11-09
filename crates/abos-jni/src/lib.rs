@@ -2,7 +2,7 @@
 #![allow(unsafe_code, reason = "JNI bindings require raw FFI operations.")]
 
 #[doc = include_str!("../CHANGELOG.md")]
-#[doc = "\n[Unreleased]: #unreleased\n"]
+#[doc = "\n\n[Unreleased]: #unreleased\n"]
 pub mod changelog {}
 
 extern crate self as abos_jni;

@@ -67,7 +67,7 @@
 #![allow(unsafe_code, reason = "JVMTI utilities invoke the native function table.")]
 
 #[doc = include_str!("../CHANGELOG.md")]
-#[doc = "\n[Unreleased]: #unreleased\n"]
+#[doc = "\n\n[Unreleased]: #unreleased\n"]
 pub mod changelog {}
 
 mod api;

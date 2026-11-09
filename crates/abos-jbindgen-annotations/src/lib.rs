@@ -1,7 +1,7 @@
 //! Embedded Java annotations for customizing generated Rust bindings.
 
 #[doc = include_str!("../CHANGELOG.md")]
-#[doc = "\n[Unreleased]: #unreleased\n"]
+#[doc = "\n\n[Unreleased]: #unreleased\n"]
 pub mod changelog {}
 
 use std::{
