@@ -26,6 +26,10 @@ run = "cargo bench --locked --package abos-jni --bench rust_utilities"
 [tasks."bench:abos-jvmti"]
 run = "cargo bench --locked --package abos-jvmti --features invocation --bench api_calls --bench rust_utilities"
 
+[tasks."bench:abos-jvmti:lifecycle"]
+description = "Benchmark bounded JVMTI lifecycle batches with explicit GC resets (HotSpot)"
+run = "cargo bench --locked --package abos-jvmti --features invocation --bench environment_lifecycle"
+
 [tasks."bench:abos-jvmti:rust"]
 run = "cargo bench --locked --package abos-jvmti --bench rust_utilities"
 

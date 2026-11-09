@@ -29,6 +29,11 @@ harness = false
 required-features = ["invocation"]
 
 [[bench]]
+name = "environment_lifecycle"
+harness = false
+required-features = ["invocation"]
+
+[[bench]]
 name = "rust_utilities"
 harness = false
 

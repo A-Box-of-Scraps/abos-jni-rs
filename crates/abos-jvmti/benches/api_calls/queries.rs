@@ -3,7 +3,7 @@ use std::hint::black_box;
 use abos_jvmti::{Env, sys};
 use criterion::{BenchmarkGroup, Criterion, measurement::WallTime};
 
-use super::{VM, with_jvmti};
+use super::with_jvmti;
 
 pub fn queries(c: &mut Criterion) {
 	with_jvmti(c, |c, env| {
@@ -61,14 +61,6 @@ fn construction(c: &mut Criterion, env: &Env<'_>) {
 		b.iter(|| {
 			// SAFETY: The environment is live and this attached thread is outside callbacks.
 			unsafe { Env::from_raw(black_box(env.as_raw())) }.expect("version query succeeds")
-		});
-	});
-	group.bench_function("create_dispose", |b| {
-		b.iter(|| {
-			// SAFETY: VM remains live and this attached thread can create independent environments.
-			let independent: Env<'_> = unsafe { Env::from_vm(black_box(&VM)) }.expect("environment is created");
-			// SAFETY: No resources, callbacks, or other users reference this independent environment.
-			unsafe { black_box(independent).dispose() }.expect("environment is disposed");
 		});
 	});
 }
