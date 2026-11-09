@@ -1,3 +1,5 @@
+use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
+
 use super::{
 	AttachConfig, AttachGuard, AttachmentExceptionPolicy, DEFAULT_LOCAL_FRAME_CAPACITY, Env, Error, JavaVM, JniError,
 	Result, ScopeToken, THREAD_GUARD_NEST_LEVEL, current, sys_attach_current_thread,
@@ -34,7 +36,8 @@ impl JavaVM {
 	/// If the thread is already attached and has a pending exception (before the callback is run),
 	/// the exception will be stashed and re-thrown after the callback completes to avoid side
 	/// effects and to also ensure your callback can run un-affected by the pending exception. (this
-	/// never affects the return value)
+	/// never affects the return value). The original exception is also restored if the callback
+	/// panics and unwinds.
 	///
 	/// If your callback throws an exception this will be caught and returned as an
 	/// [`Error::CaughtJavaException`].
@@ -78,7 +81,8 @@ impl JavaVM {
 	/// If the thread is already attached and has a pending exception (before the callback is run),
 	/// the exception will be stashed and re-thrown after the callback completes to avoid side
 	/// effects and to also ensure your callback can run un-affected by the pending exception. (this
-	/// never affects the return value)
+	/// never affects the return value). The original exception is also restored if the callback
+	/// panics and unwinds.
 	///
 	/// If your callback throws an exception this will be caught and returned as an
 	/// [`Error::CaughtJavaException`].
@@ -183,10 +187,23 @@ impl JavaVM {
 			}),
 		};
 
-		let ret: std::result::Result<T, E> = if let Some(capacity) = capacity {
-			env.with_local_frame(capacity, callback)
-		} else {
-			callback(env)
+		let ret: std::result::Result<T, E> = match catch_unwind(AssertUnwindSafe(|| {
+			if let Some(capacity) = capacity {
+				env.with_local_frame(capacity, callback)
+			} else {
+				callback(env)
+			}
+		})) {
+			Ok(ret) => ret,
+			Err(payload) => {
+				// The callback's local frame has unwound, but the attachment and saved
+				// throwable are still live. Restore before AttachGuard drops on unwind.
+				if let Some(throwable) = pre_pending_exception {
+					env.exception_clear();
+					drop(env.throw(throwable));
+				}
+				resume_unwind(payload);
+			}
 		};
 
 		// Explicitly detach the guard (instead of relying on Drop) so we can

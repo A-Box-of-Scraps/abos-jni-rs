@@ -43,6 +43,10 @@ pub enum AttachmentExceptionPolicy {
 	/// return value. The assumption in this case is that the caller is already
 	/// aware of this pending exception.
 	///
+	/// If the callback panics and unwinds, the saved exception is restored before
+	/// the original Rust panic resumes, replacing any Java exception raised by
+	/// the callback.
+	///
 	/// This is intended to make the best default trade off between avoiding
 	/// side effects and consistently running orthogonal code within an
 	/// attachment closure.

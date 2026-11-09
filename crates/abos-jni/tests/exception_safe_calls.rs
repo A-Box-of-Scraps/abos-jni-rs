@@ -487,3 +487,83 @@ fn test_instance_check_checks_exception_after_conversion() {
 	})
 	.expect("instance checks must preserve conversion exceptions");
 }
+
+#[test]
+fn test_nested_attachment_panic_restores_pending_exception() {
+	util::attach_current_thread(|env| {
+		for capacity in [None, Some(8)] {
+			for throw_in_callback in [false, true] {
+				assert_panic_preserves_exception(env, capacity, throw_in_callback)?;
+			}
+		}
+		Ok(())
+	})
+	.expect("nested attachment restores the original exception before resuming a panic");
+}
+
+fn assert_panic_preserves_exception(
+	env: &mut abos_jni::Env<'_>,
+	capacity: Option<usize>,
+	throw_in_callback: bool,
+) -> abos_jni::errors::Result<()> {
+	let vm: &std::sync::Arc<abos_jni::JavaVM> = util::jvm();
+	assert!(matches!(
+		env.throw("original failure"),
+		Err(abos_jni::errors::Error::JavaException)
+	));
+	let original: JThrowable<'_> = env.exception_occurred().expect("original exception is pending");
+	let level: usize = abos_jni::JavaVM::thread_attach_guard_level();
+	let payload: std::sync::Arc<()> = std::sync::Arc::new(());
+
+	let unwind: std::thread::Result<abos_jni::errors::Result<()>> =
+		std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+			vm.attach_current_thread_with_config(AttachConfig::default, capacity, |env| {
+				assert!(!env.exception_check(), "the callback starts with no pending exception");
+				if throw_in_callback {
+					assert!(matches!(
+						env.throw("callback failure"),
+						Err(abos_jni::errors::Error::JavaException)
+					));
+				}
+				std::panic::panic_any(std::sync::Arc::clone(&payload));
+			})
+		}));
+	let caught: Box<dyn std::any::Any + Send> = unwind.expect_err("callback panic must propagate");
+	assert!(std::sync::Arc::ptr_eq(
+		caught
+			.downcast_ref::<std::sync::Arc<()>>()
+			.expect("original panic payload type"),
+		&payload,
+	));
+	assert_eq!(abos_jni::JavaVM::thread_attach_guard_level(), level);
+	let restored: JThrowable<'_> = env
+		.exception_occurred()
+		.expect("original exception is restored after panic");
+	env.exception_clear();
+	assert!(env.is_same_object(&original, &restored)?);
+	Ok(())
+}
+
+#[test]
+fn test_scoped_attachment_panic_detaches() {
+	let vm: &std::sync::Arc<abos_jni::JavaVM> = util::jvm();
+	std::thread::spawn(move || {
+		assert!(!vm.is_thread_attached().expect("worker starts detached"));
+		let unwind: std::thread::Result<abos_jni::errors::Result<()>> = std::panic::catch_unwind(|| {
+			vm.attach_current_thread_for_scope(|_env| {
+				panic!("scoped callback panic");
+			})
+		});
+		assert!(unwind.is_err());
+		assert!(!vm.is_thread_attached().expect("worker is detached after panic"));
+		assert_eq!(abos_jni::JavaVM::thread_attach_guard_level(), 0);
+		vm.attach_current_thread_for_scope(|env| -> abos_jni::errors::Result<()> {
+			assert!(!env.exception_check());
+			let _ = env.new_string("attachment remains usable")?;
+			Ok(())
+		})
+		.expect("worker can reattach after a panic");
+	})
+	.join()
+	.expect("scoped attachment cleanup survives a callback panic");
+}
