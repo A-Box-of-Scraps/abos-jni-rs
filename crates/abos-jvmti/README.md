@@ -1,6 +1,6 @@
 # abos-jvmti
 
-[![github](https://img.shields.io/badge/github-A--Box--of--Scraps/abos--jni--rs-EE7C37?style=for-the-badge&labelColor=555555&logo=github)](https://github.com/A-Box-of-Scraps/abos-jni-rs/tree/HEAD/crates/abos-jvmti)
+[![github](https://img.shields.io/badge/github-A--Box--of--Scraps/abos--jvmti-EE7C37?style=for-the-badge&labelColor=555555&logo=github)](https://github.com/A-Box-of-Scraps/abos-jni-rs/tree/HEAD/crates/abos-jvmti)
 [![MIT license](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge&labelColor=555555)](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/LICENSE)
 
 Environment and agent utilities for the Java Virtual Machine Tool Interface.

@@ -1,6 +1,6 @@
 # abos-jbindgen
 
-[![github](https://img.shields.io/badge/github-A--Box--of--Scraps/abos--jni--rs-EE7C37?style=for-the-badge&labelColor=555555&logo=github)](https://github.com/A-Box-of-Scraps/abos-jni-rs/tree/HEAD/crates/abos-jbindgen)
+[![github](https://img.shields.io/badge/github-A--Box--of--Scraps/abos--jbindgen-EE7C37?style=for-the-badge&labelColor=555555&logo=github)](https://github.com/A-Box-of-Scraps/abos-jni-rs/tree/HEAD/crates/abos-jbindgen)
 [![MIT license](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge&labelColor=555555)](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/LICENSE)
 
 Generate Rust JNI bindings from Java source, bytecode, and Android SDKs.
