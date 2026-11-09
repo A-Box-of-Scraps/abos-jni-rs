@@ -78,3 +78,20 @@ fn jmap_iterator_concurrent_modification() {
 	})
 	.expect("map iterator failures remain catchable");
 }
+
+#[test]
+fn jmap_iterator_rejects_non_entry() {
+	let fixtures: std::path::PathBuf = util::java_fixtures();
+	attach_current_thread(|env| {
+		util::load_test_class(env, &fixtures, "TestMalformedMap")?;
+		let object: JObject<'_> = env.new_object(jni_str!("com/example/TestMalformedMap"), jni_sig!("()V"), &[])?;
+		let map: JMap<'_> = JMap::cast_local(env, object)?;
+		let mut iter: JMapIter<'_> = map.iter(env)?;
+
+		assert!(matches!(iter.next(env), Err(Error::WrongObjectType)));
+		assert!(!env.exception_check());
+		assert!(iter.next(env)?.is_none());
+		Ok(())
+	})
+	.expect("malformed map entries are rejected without a Java exception");
+}
