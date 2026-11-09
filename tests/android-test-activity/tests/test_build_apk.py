@@ -1,12 +1,13 @@
 """Package validation and build orchestration without SDK tools or a device."""
+
 import contextlib
 import io
-from pathlib import Path
 import struct
 import tempfile
 import unittest
-from unittest.mock import patch
 import zipfile
+from pathlib import Path
+from unittest.mock import patch
 
 import android_env as environment
 import android_tools as tools
@@ -75,9 +76,12 @@ class PackageTests(unittest.TestCase):
 
     def test_alignment_and_signature_checks_use_native_executables(self):
         write_apk(self.apk, "arm64-v8a")
-        with patch.object(environment, "build_tool", return_value=Path("zipalign.exe")), \
-                patch.object(environment, "require_file", side_effect=lambda path: path), \
-                patch.object(tools, "java_tool", return_value="java.exe"), patch.object(tools, "execute") as execute:
+        with (
+            patch.object(environment, "build_tool", return_value=Path("zipalign.exe")),
+            patch.object(environment, "require_file", side_effect=lambda path: path),
+            patch.object(tools, "java_tool", return_value="java.exe"),
+            patch.object(tools, "execute") as execute,
+        ):
             build_apk.validate_apk(self.apk, "arm64-v8a", self.root)
         first, second = [call.args for call in execute.call_args_list]
         self.assertEqual(first[1:6], ("-c", "-P", "16", "-v", "4"))
@@ -99,9 +103,14 @@ class PackageTests(unittest.TestCase):
                 write_apk(self.root / "app/build/outputs/apk/debug/app-debug.apk", "arm64-v8a")
             return ""
 
-        with patch.object(tools, "PROJECT", self.root), patch.object(tools, "java_tool", return_value="java"), \
-                patch.object(environment, "check_environment"), patch.object(tools, "execute", side_effect=execute), \
-                patch.object(build_apk, "validate_apk") as validate, contextlib.redirect_stdout(io.StringIO()):
+        with (
+            patch.object(tools, "PROJECT", self.root),
+            patch.object(tools, "java_tool", return_value="java"),
+            patch.object(environment, "check_environment"),
+            patch.object(tools, "execute", side_effect=execute),
+            patch.object(build_apk, "validate_apk") as validate,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
             artifact = build_apk.package(self.root / "sdk", environment.DEFAULT_TARGET, [])
         self.assertTrue(artifact.is_file())
         self.assertEqual(len(calls), 2)
@@ -112,9 +121,12 @@ class PackageTests(unittest.TestCase):
         self.assertFalse(any("adb" in str(arg) for call in calls for arg in call))
 
     def test_failed_native_build_never_invokes_gradle(self):
-        with patch.object(tools, "PROJECT", self.root), patch.object(environment, "check_environment"), \
-                patch.object(tools, "execute", side_effect=RuntimeError("link failed")) as execute:
-            with self.assertRaisesRegex(RuntimeError, "link failed"):
-                build_apk.package(self.root, environment.DEFAULT_TARGET, [])
+        with (
+            patch.object(tools, "PROJECT", self.root),
+            patch.object(environment, "check_environment"),
+            patch.object(tools, "execute", side_effect=RuntimeError("link failed")) as execute,
+            self.assertRaisesRegex(RuntimeError, "link failed"),
+        ):
+            build_apk.package(self.root, environment.DEFAULT_TARGET, [])
         self.assertEqual(execute.call_count, 1)
         self.assertEqual(list((self.root / "build").iterdir()), [])

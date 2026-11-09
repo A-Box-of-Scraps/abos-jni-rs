@@ -21,22 +21,45 @@ class MiseConfigTests(unittest.TestCase):
 
     def test_global_tests_include_examples_and_standalone_suites(self):
         tasks = tomllib.loads(CONFIG.read_text())["tasks"]
-        self.assertCountEqual(tasks["test"]["depends"], [
-            "test:abos-jni:examples",
-            "test:abos-jni-sys:systest",
-            "test:android-runner",
-            "test:lints",
-            "test:scripts",
-            "test:workspace",
-        ])
+        self.assertCountEqual(
+            tasks["test"]["depends"],
+            [
+                "test:abos-jni:examples",
+                "test:abos-jni-sys:systest",
+                "test:android-runner",
+                "test:lints",
+                "test:scripts",
+                "test:workspace",
+            ],
+        )
 
     def test_workspace_tests_cover_all_features_default_jni_and_ignored_jvm(self):
         tasks = tomllib.loads(CONFIG.read_text())["tasks"]
-        self.assertEqual(tasks["test:workspace"]["run"], [
-            "cargo test --locked --workspace --all-features -q",
-            tasks["test:abos-jni"]["run"],
-            tasks["test:abos-jni-sys:jvm"]["run"],
-        ])
+        self.assertEqual(
+            tasks["test:workspace"]["run"],
+            [
+                "cargo test --locked --workspace --all-features -q",
+                tasks["test:abos-jni"]["run"],
+                tasks["test:abos-jni-sys:jvm"]["run"],
+            ],
+        )
+
+    def test_python_quality_tasks_are_wired_into_global_tasks(self):
+        config = tomllib.loads(CONFIG.read_text())
+        self.assertIn("ruff", config["tools"])
+        tasks = config["tasks"]
+        for parent, child in [
+            ("fmt", "fmt:python"),
+            ("fmt:check", "fmt:python:check"),
+            ("lint", "lint:python"),
+            ("lint:fix", "lint:python:fix"),
+        ]:
+            with self.subTest(task=parent):
+                self.assertIn(child, tasks[parent]["depends"])
+        self.assertEqual(tasks["fmt:python"]["run"], ["ruff check --select I --fix .", "ruff format ."])
+        self.assertEqual(tasks["fmt:python:check"]["run"], ["ruff check --select I .", "ruff format --check ."])
+        self.assertEqual(tasks["lint:python"]["run"], "ruff check .")
+        self.assertEqual(tasks["lint:python:fix"]["run"], "ruff check --fix .")
 
     def test_task_dependencies_exist(self):
         tasks = tomllib.loads(CONFIG.read_text())["tasks"]
@@ -56,9 +79,9 @@ class MiseConfigTests(unittest.TestCase):
                 if len(args) < 2 or args[0] != "cargo" or args[1] not in commands:
                     continue
                 if args[1] == "dylint":
-                    cargo_args = args[args.index("--") + 1:]
+                    cargo_args = args[args.index("--") + 1 :]
                 else:
-                    cargo_args = args[2:args.index("--")] if "--" in args else args[2:]
+                    cargo_args = args[2 : args.index("--")] if "--" in args else args[2:]
                 with self.subTest(task=name, command=command):
                     self.assertIn("--locked", cargo_args)
 

@@ -49,9 +49,15 @@ def clone_reference(name, reference_root):
         # Prepare the replacement before touching the old copy.
         subprocess.run(
             [
-                "git", "clone", "--quiet", "--depth", "5", "--single-branch",
+                "git",
+                "clone",
+                "--quiet",
+                "--depth",
+                "5",
+                "--single-branch",
                 "--no-tags",
-                f"https://github.com/jni-rs/{name}.git", str(staging),
+                f"https://github.com/jni-rs/{name}.git",
+                str(staging),
             ],
             check=True,
         )

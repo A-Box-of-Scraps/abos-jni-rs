@@ -1,10 +1,10 @@
 """Native process launchers shared by Android setup and tests."""
-import os
-from pathlib import Path
-import shutil
-import platform
-import subprocess
 
+import os
+import platform
+import shutil
+import subprocess
+from pathlib import Path
 
 PROJECT = Path(__file__).resolve().parents[1]
 
@@ -38,10 +38,20 @@ def execute(*args, capture=True, timeout=600):
     command = [str(arg) for arg in args]
     command[0] = executable(command[0])
     try:
-        result = subprocess.run(command, cwd=PROJECT, check=True, text=True, encoding="utf-8",
-                                errors="replace", capture_output=capture, timeout=timeout)
+        result = subprocess.run(
+            command,
+            cwd=PROJECT,
+            check=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=capture,
+            timeout=timeout,
+        )
     except subprocess.CalledProcessError as error:
-        raise RuntimeError(f"Command failed ({error.returncode}): {command}\n{error.stdout or ''}\n{error.stderr or ''}") from error
+        raise RuntimeError(
+            f"Command failed ({error.returncode}): {command}\n{error.stdout or ''}\n{error.stderr or ''}"
+        ) from error
     except subprocess.TimeoutExpired as error:
         raise RuntimeError(f"Command timed out after {timeout}s: {command}") from error
     return result.stdout or ""
@@ -49,5 +59,13 @@ def execute(*args, capture=True, timeout=600):
 
 def gradle_command(*args):
     wrapper = PROJECT / "gradle/wrapper/gradle-wrapper.jar"
-    return [java_tool(), "-Xmx64m", "-Xms64m", "-classpath", str(wrapper),
-            "org.gradle.wrapper.GradleWrapperMain", "--no-daemon", *args]
+    return [
+        java_tool(),
+        "-Xmx64m",
+        "-Xms64m",
+        "-classpath",
+        str(wrapper),
+        "org.gradle.wrapper.GradleWrapperMain",
+        "--no-daemon",
+        *args,
+    ]

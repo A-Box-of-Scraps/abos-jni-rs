@@ -80,8 +80,11 @@ class SeedFuzzCorpusTests(unittest.TestCase):
         script.parent.mkdir()
         shutil.copyfile(SCRIPT, script)
         result = subprocess.run(
-            [sys.executable, "-B", str(script)], cwd=script.parent,
-            capture_output=True, text=True, check=False,
+            [sys.executable, "-B", str(script)],
+            cwd=script.parent,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(

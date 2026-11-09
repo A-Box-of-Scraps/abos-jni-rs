@@ -36,6 +36,8 @@ LICENSE
 mise.toml
 pom.xml
 README.md
+ruff.toml
+rust-toolchain.toml
 rustfmt.toml
 THIRD_PARTY_NOTICES
 ```
@@ -45,8 +47,8 @@ This project is using `mise` check `mise.toml` to learn about available tasks an
 ## Commands
 
 ```bash
-mise run fmt        # Format using `dprint` and `rustfmt`.
-mise run lint       # Lint using `clippy` and `dylint`.
+mise run fmt        # Format using `dprint`, `rustfmt`, Spotless, and Ruff.
+mise run lint       # Lint using `clippy`, `dylint`, and Ruff.
 mise run test       # Run tests.
 mise run check      # Check formatting, linting, duplicates, and tests.
 ```

@@ -1,11 +1,12 @@
 """SDK setup tests use disposable layouts and never download or accept licenses."""
+
 import contextlib
 import io
 import os
-from pathlib import Path
 import tempfile
 import tomllib
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import android_env as environment
@@ -26,8 +27,12 @@ class EnvironmentTests(unittest.TestCase):
             (directory / "source.properties").write_text(f"Pkg.Revision={version}\n", encoding="utf-8")
 
     def test_host_support_is_explicit(self):
-        cases = [("Linux", "x86_64", "linux-x86_64"), ("Windows", "AMD64", "windows-x86_64"),
-                 ("Darwin", "arm64", "darwin-x86_64"), ("Darwin", "x86_64", "darwin-x86_64")]
+        cases = [
+            ("Linux", "x86_64", "linux-x86_64"),
+            ("Windows", "AMD64", "windows-x86_64"),
+            ("Darwin", "arm64", "darwin-x86_64"),
+            ("Darwin", "x86_64", "darwin-x86_64"),
+        ]
         for system, machine, expected in cases:
             with self.subTest(system=system, machine=machine):
                 self.assertEqual(environment.supported_host(system, machine), expected)
@@ -50,11 +55,17 @@ class EnvironmentTests(unittest.TestCase):
             ("Windows", "LOCALAPPDATA", self.root / "Local App Data"),
             ("Linux", "XDG_DATA_HOME", self.root / "share"),
         ]:
-            with self.subTest(system=system), patch.object(environment.platform, "system", return_value=system), \
-                    patch.dict(os.environ, {variable: str(base)}, clear=True):
+            with (
+                self.subTest(system=system),
+                patch.object(environment.platform, "system", return_value=system),
+                patch.dict(os.environ, {variable: str(base)}, clear=True),
+            ):
                 self.assertEqual(environment.sdk_root(), base / "abos/android-sdk")
-        with patch.object(environment.platform, "system", return_value="Darwin"), \
-                patch.object(Path, "home", return_value=self.root), patch.dict(os.environ, {}, clear=True):
+        with (
+            patch.object(environment.platform, "system", return_value="Darwin"),
+            patch.object(Path, "home", return_value=self.root),
+            patch.dict(os.environ, {}, clear=True),
+        ):
             self.assertEqual(environment.sdk_root(), self.root / "Library/Application Support/abos/android-sdk")
 
     def test_configure_selects_pinned_ndk_and_sdk_for_children(self):
@@ -76,22 +87,32 @@ class EnvironmentTests(unittest.TestCase):
             environment.missing_packages(self.sdk)
 
     def test_license_gate_cannot_be_implicitly_accepted(self):
-        with patch.object(environment, "check_host"), patch.object(tools, "execute") as execute, \
-                patch.object(environment.sys.stdin, "isatty", return_value=False), \
-                contextlib.redirect_stdout(io.StringIO()):
+        with (
+            patch.object(environment, "check_host"),
+            patch.object(tools, "execute") as execute,
+            patch.object(environment.sys.stdin, "isatty", return_value=False),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
             with self.assertRaisesRegex(RuntimeError, "accept-licenses"):
                 environment.setup(self.sdk, [environment.DEFAULT_TARGET])
             execute.assert_not_called()
             self.assertFalse(self.sdk.exists())
-        with patch.object(environment.sys.stdin, "isatty", return_value=True), \
-                patch("builtins.input", return_value="no"), contextlib.redirect_stdout(io.StringIO()):
-            with self.assertRaisesRegex(RuntimeError, "cancelled"):
-                environment.confirm_licenses(False)
+        with (
+            patch.object(environment.sys.stdin, "isatty", return_value=True),
+            patch("builtins.input", return_value="no"),
+            contextlib.redirect_stdout(io.StringIO()),
+            self.assertRaisesRegex(RuntimeError, "cancelled"),
+        ):
+            environment.confirm_licenses(False)
 
     def test_explicit_setup_installs_exact_revisions_and_disables_metrics(self):
-        with patch.object(environment, "check_host"), patch.object(environment, "check_environment"), \
-                patch.object(tools, "executable"), patch.object(tools, "execute") as execute, \
-                contextlib.redirect_stdout(io.StringIO()):
+        with (
+            patch.object(environment, "check_host"),
+            patch.object(environment, "check_environment"),
+            patch.object(tools, "executable"),
+            patch.object(tools, "execute") as execute,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
             environment.setup(self.sdk, [environment.DEFAULT_TARGET], accepted=True)
         commands = [call.args for call in execute.call_args_list]
         packages = [f"{name}@{version}" for name, version in environment.PACKAGES.items()]
@@ -104,28 +125,38 @@ class EnvironmentTests(unittest.TestCase):
 
     def test_setup_reuses_installed_packages_without_license_prompt(self):
         self.installed()
-        with patch.object(environment, "check_host"), patch.object(environment, "check_environment"), \
-                patch.object(environment, "confirm_licenses") as confirm, patch.object(tools, "execute") as execute, \
-                contextlib.redirect_stdout(io.StringIO()):
+        with (
+            patch.object(environment, "check_host"),
+            patch.object(environment, "check_environment"),
+            patch.object(environment, "confirm_licenses") as confirm,
+            patch.object(tools, "execute") as execute,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
             environment.setup(self.sdk, [environment.DEFAULT_TARGET])
         confirm.assert_not_called()
         execute.assert_called_once_with("rustup", "target", "add", environment.DEFAULT_TARGET, capture=False)
 
     def test_check_detects_incomplete_installation_and_missing_target(self):
         self.installed()
-        with patch.object(environment, "check_host"):
-            with self.assertRaisesRegex(RuntimeError, "android.jar"):
-                environment.check_environment(self.sdk)
-        with patch.object(environment, "check_host"), patch.object(environment, "require_file"), \
-                patch.object(tools, "PROJECT", self.root), patch.object(tools, "execute", return_value=""):
-            with self.assertRaisesRegex(RuntimeError, "Missing Rust target"):
-                environment.check_environment(self.sdk)
+        with patch.object(environment, "check_host"), self.assertRaisesRegex(RuntimeError, "android.jar"):
+            environment.check_environment(self.sdk)
+        with (
+            patch.object(environment, "check_host"),
+            patch.object(environment, "require_file"),
+            patch.object(tools, "PROJECT", self.root),
+            patch.object(tools, "execute", return_value=""),
+            self.assertRaisesRegex(RuntimeError, "Missing Rust target"),
+        ):
+            environment.check_environment(self.sdk)
         (self.root / "local.properties").write_text("sdk.dir=C\\:\\other\n", encoding="utf-8")
-        with patch.object(environment, "check_host"), patch.object(environment, "require_file"), \
-                patch.object(tools, "PROJECT", self.root), \
-                patch.object(tools, "execute", return_value=environment.DEFAULT_TARGET):
-            with self.assertRaisesRegex(RuntimeError, "sdk.dir"):
-                environment.check_environment(self.sdk)
+        with (
+            patch.object(environment, "check_host"),
+            patch.object(environment, "require_file"),
+            patch.object(tools, "PROJECT", self.root),
+            patch.object(tools, "execute", return_value=environment.DEFAULT_TARGET),
+            self.assertRaisesRegex(RuntimeError, "sdk.dir"),
+        ):
+            environment.check_environment(self.sdk)
 
     def test_pins_match_gradle_and_mise_tasks_are_sorted(self):
         catalog = tomllib.loads((tools.PROJECT / "gradle/libs.versions.toml").read_text(encoding="utf-8"))

@@ -4,14 +4,13 @@
 import argparse
 import json
 import os
-from pathlib import Path
 import time
 import uuid
+from pathlib import Path
 
 import android_env as environment
 import android_tools as tools
 import build_apk
-
 
 PROJECT = Path(__file__).resolve().parents[1]
 APPLICATION = "io.github.jni_rs.jbindgen.testactivity"
@@ -89,8 +88,12 @@ def main():
     mode.add_argument("--compile-only", action="store_true", help="check Rust bindings without linking or packaging")
     mode.add_argument("--package-only", action="store_true", help="cross-build and validate an APK without a device")
     parser.add_argument("--sdk-root", help="SDK directory; otherwise uses ANDROID_HOME or a user-owned default")
-    parser.add_argument("--target", choices=sorted(TARGETS.values()), default=environment.DEFAULT_TARGET,
-                        help="Rust target for no-device modes; device runs detect the ABI")
+    parser.add_argument(
+        "--target",
+        choices=sorted(TARGETS.values()),
+        default=environment.DEFAULT_TARGET,
+        help="Rust target for no-device modes; device runs detect the ABI",
+    )
     parser.add_argument("--timeout", type=int, default=120)
     args = parser.parse_args()
     features = selected_features(args, parser)
@@ -120,7 +123,20 @@ def main():
     print(run(*device, "install", "-r", str(apk)))
     run(*device, "shell", "am", "force-stop", APPLICATION)
     run_id = uuid.uuid4().hex
-    print(run(*device, "shell", "am", "start", "-W", "-n", f"{APPLICATION}/.TestActivity", "--es", "abos.test.run-id", run_id))
+    print(
+        run(
+            *device,
+            "shell",
+            "am",
+            "start",
+            "-W",
+            "-n",
+            f"{APPLICATION}/.TestActivity",
+            "--es",
+            "abos.test.run-id",
+            run_id,
+        )
+    )
     expected = SMOKE_TESTS | {SDK_TESTS[feature] for feature in features}
     print(f"Selected {len(expected)} tests; SDK features: {', '.join(features) or 'none (smoke only)'}")
     deadline = time.monotonic() + args.timeout
@@ -128,7 +144,9 @@ def main():
         log = run(*device, "logcat", "-d", "-s", "TestActivity:I")
         report = read_report(log, run_id, expected)
         if report is not None:
-            print(f"Android JNI tests passed: {report['executed']} executed, {report['failed']} failed, {report['skipped']} skipped.")
+            print(
+                f"Android JNI tests passed: {report['executed']} executed, {report['failed']} failed, {report['skipped']} skipped."
+            )
             return
         time.sleep(1)
     raise RuntimeError("Android tests did not report success before the timeout")

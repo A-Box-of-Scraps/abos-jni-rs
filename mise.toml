@@ -11,6 +11,7 @@ java = "temurin-25.0.5+8.0.LTS"
 maven = "3.9.16"
 mold = { version = "3.0.0", os = ["linux"] }
 python = "3.15.2"
+ruff = "0.17.4"
 
 [settings]
 task.output = "interleave"
@@ -44,7 +45,7 @@ run = "python scripts/clone-reference.py jni-rs"
 run = "python scripts/clone-reference.py jni-sys"
 
 [tasks.fmt]
-depends = ["fmt:java"]
+depends = ["fmt:java", "fmt:python"]
 run = [
   "mise fmt -q",
   "cargo fmt --all -q",
@@ -58,7 +59,7 @@ run = [
 ]
 
 [tasks."fmt:check"]
-depends = ["fmt:java:check"]
+depends = ["fmt:java:check", "fmt:python:check"]
 run = [
   "mise fmt --check -q",
   "cargo fmt --all --check -q",
@@ -76,6 +77,12 @@ run = "mvn --batch-mode --no-transfer-progress -q spotless:apply"
 
 [tasks."fmt:java:check"]
 run = "mvn --batch-mode --no-transfer-progress -q spotless:check"
+
+[tasks."fmt:python"]
+run = ["ruff check --select I --fix .", "ruff format ."]
+
+[tasks."fmt:python:check"]
+run = ["ruff check --select I .", "ruff format --check ."]
 
 [tasks."fuzz:build"]
 dir = "fuzz"
@@ -141,6 +148,7 @@ depends = [
   "lint:abos-jbindgen:runtime",
   "lint:abos-jni-sys:systest",
   "lint:docs",
+  "lint:python",
   "lint:tools:windows-bindings",
 ]
 env = { DYLINT_RUSTFLAGS = "-D warnings" }
@@ -160,7 +168,14 @@ env = { RUSTDOCFLAGS = "-D warnings" }
 run = "cargo doc --locked --workspace --all-features --no-deps -q"
 
 [tasks."lint:fix"]
+depends = ["lint:python:fix"]
 run = "cargo clippy --locked --fix --workspace --all-targets --all-features -q"
+
+[tasks."lint:python"]
+run = "ruff check ."
+
+[tasks."lint:python:fix"]
+run = "ruff check --fix ."
 
 [tasks."lint:tools:windows-bindings"]
 run = "cargo clippy --manifest-path tools/abos-jni-gen-windows-bindings/Cargo.toml --all-targets --all-features --locked -q -- -D warnings"
