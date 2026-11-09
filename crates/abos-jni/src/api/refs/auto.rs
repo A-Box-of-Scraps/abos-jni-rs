@@ -3,7 +3,7 @@ use std::{borrow::Cow, marker::PhantomData, mem::ManuallyDrop, ops::Deref, ptr};
 use abos_jni_sys::jobject;
 
 use crate::{
-	Env, JavaVM, errors,
+	Env, JavaVM,
 	objects::{Global, JClass, JObject, LoaderContext},
 	strings::JNIStr,
 };
@@ -190,39 +190,7 @@ where
 		let obj: T = unsafe { ManuallyDrop::take(&mut self.obj) };
 		let obj: JObject = obj.into();
 
-		// Null Objects are a special case that don't need to be explicitly deleted
-		// and since they can also have a `'static` lifetime then we can't assume
-		// the current thread is attached when dropping null references.
-		if !obj.is_null() {
-			let Ok(vm) = JavaVM::singleton() else {
-				// Since we wrap a non-null reference with a lifetime associated with a JNI stack
-				// frame we can (mostly) assume that JavaVM::singleton() must have been initialized
-				// in order to get a Env reference.
-				//
-				// The only (remote) exception to this is that the reference came from a native
-				// method argument and for some reason an `Auto` wrapper was created before an
-				// AttachGuard was created to access a Env reference (which would initialize the
-				// JavaVM singleton).
-				//
-				// This would be a redundant thing to try, but just to err on the side of caution we
-				// avoid panicking here and only log an error.
-				log::error!("Failed to drop Auto: No JavaVM initialized");
-				// In this unlikely case it should be fine to return early, since it would be
-				// redundant to explicitly delete the local reference of a native method argument.
-				return;
-			};
-
-			// Panic:
-			//
-			// Since we have a non-null local reference associated with a JNI stack frame lifetime
-			// we know that the thread is attached and so `with_top_local_frame()` can't return an
-			// error.
-			vm.with_top_local_frame(|env| -> errors::Result<()> {
-				env.delete_local_ref(obj);
-				Ok(())
-			})
-			.expect("Infallible"); // The closure is infallible
-		}
+		JavaVM::delete_local_ref(obj);
 	}
 }
 
