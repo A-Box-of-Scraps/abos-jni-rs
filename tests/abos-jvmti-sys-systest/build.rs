@@ -24,6 +24,7 @@ fn main() {
 	let include = home.join("include");
 	for header in [
 		include.join("jvmti.h"),
+		include.join("jvmticmlr.h"),
 		include.join("jni.h"),
 		include.join(platform).join("jni_md.h"),
 	] {
@@ -31,7 +32,15 @@ fn main() {
 		println!("cargo:rerun-if-changed={}", header.display());
 	}
 	let mut probe = generate::Probe::default();
-	for name in ["base", "constants", "types", "callbacks", "interface", "capabilities"] {
+	for name in [
+		"base",
+		"constants",
+		"types",
+		"callbacks",
+		"interface",
+		"capabilities",
+		"compiled_method",
+	] {
 		let source = format!("../../crates/abos-jvmti-sys/src/api/{name}.rs");
 		println!("cargo:rerun-if-changed={source}");
 		probe.add_source(&fs::read_to_string(source).expect("read bindings"));

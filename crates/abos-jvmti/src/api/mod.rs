@@ -19,3 +19,9 @@ pub use strings::{JvmtiString, JvmtiStringList};
 mod monitor;
 pub use env::instrumentation::ClassDefinition;
 pub use monitor::{RawMonitor, RawMonitorGuard};
+
+mod compiled_method;
+pub use compiled_method::{
+	CompiledMethodError, CompiledMethodHeader, CompiledMethodRecord, CompiledMethodRecords, InlineFrame,
+	OwnedCompiledMethodRecord, OwnedPcStack, PcStack,
+};

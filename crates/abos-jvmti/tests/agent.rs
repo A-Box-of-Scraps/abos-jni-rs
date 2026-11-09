@@ -1,4 +1,4 @@
-//! Build the example agent and exercise it in an isolated, bounded JVM process.
+//! Exercise event and profiling agents in isolated, bounded `HotSpot` JVM processes.
 use std::{
 	fs::{self, File},
 	path::{Path, PathBuf},
@@ -8,7 +8,7 @@ use std::{
 };
 
 #[test]
-fn agent_receives_vm_and_thread_events() -> Result<(), Box<dyn std::error::Error>> {
+fn agents_receive_vm_thread_and_compiled_method_events() -> Result<(), Box<dyn std::error::Error>> {
 	let manifest: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 	let target: PathBuf = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("events-agent");
 	let build: Output = Command::new(env!("CARGO"))
@@ -21,6 +21,8 @@ fn agent_receives_vm_and_thread_events() -> Result<(), Box<dyn std::error::Error
 			"abos-jvmti",
 			"--example",
 			"events_agent",
+			"--example",
+			"profiling_agent",
 			"--target-dir",
 		])
 		.arg(&target)
@@ -44,6 +46,7 @@ fn agent_receives_vm_and_thread_events() -> Result<(), Box<dyn std::error::Error
 		.arg(manifest.join("tests/java/AgentSmoke.java"))
 		.arg(manifest.join("tests/java/AgentFeatures.java"))
 		.arg(manifest.join("tests/java/FeatureTarget.java"))
+		.arg(manifest.join("tests/java/ProfileTarget.java"))
 		.output()?;
 	assert!(
 		compilation.status.success(),
@@ -56,14 +59,38 @@ fn agent_receives_vm_and_thread_events() -> Result<(), Box<dyn std::error::Error
 		!homes.is_empty(),
 		"JVMTI_TEST_JAVA_HOMES must contain at least one runtime"
 	);
+	let profiler: PathBuf = target.join("debug/examples").join(format!(
+		"{}profiling_agent{}",
+		std::env::consts::DLL_PREFIX,
+		std::env::consts::DLL_SUFFIX
+	));
 	for home in homes {
 		run_agent(&home, &agent, directory.path(), false)?;
 		run_agent(&home, &agent, directory.path(), true)?;
+		let output: String = run_java(
+			&home,
+			&profiler,
+			directory.path(),
+			"=hotspot",
+			"ProfileTarget",
+			&["-Xbatch", "-XX:-TieredCompilation", "-XX:CompileThreshold=100"],
+		)?;
+		for marker in ["JVMTI_COMPILED", "JVMTI_INLINE", "PROFILE_TARGET_OK"] {
+			assert!(output.contains(marker), "missing {marker}:\n{output}");
+		}
+		assert!(!output.contains("JVMTI_PROFILE_ERROR"), "{output}");
 	}
 	Ok(())
 }
 
-fn run_agent(home: &Path, agent: &Path, classes: &Path, features: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn run_java(
+	home: &Path,
+	agent: &Path,
+	classes: &Path,
+	options: &str,
+	class: &str,
+	vm_args: &[&str],
+) -> Result<String, Box<dyn std::error::Error>> {
 	let java: PathBuf = home.join("bin").join(format!("java{}", std::env::consts::EXE_SUFFIX));
 	let directory: tempfile::TempDir = tempfile::tempdir()?;
 	let log_path: PathBuf = directory.path().join("agent.log");
@@ -72,15 +99,12 @@ fn run_agent(home: &Path, agent: &Path, classes: &Path, features: bool) -> Resul
 	// contains any JVM crash reports. The child timeout bounds native-agent failures.
 	let mut child: std::process::Child = Command::new(java)
 		.arg("-Xcheck:jni")
-		.arg(format!(
-			"-agentpath:{}{}",
-			agent.display(),
-			if features { "=features" } else { "" }
-		))
+		.args(vm_args)
+		.arg(format!("-agentpath:{}{options}", agent.display()))
 		.arg("-cp")
 		.arg(classes)
-		.arg("AgentSmoke")
-		.args(features.then_some("features"))
+		.arg(class)
+		.args((options == "=features").then_some("features"))
 		.current_dir(directory.path())
 		.stdout(Stdio::from(log.try_clone()?))
 		.stderr(Stdio::from(log))
@@ -99,6 +123,18 @@ fn run_agent(home: &Path, agent: &Path, classes: &Path, features: bool) -> Resul
 	};
 	let output: String = fs::read_to_string(&log_path)?;
 	assert!(status.success(), "JVM {} failed ({status}):\n{output}", home.display());
+	Ok(output)
+}
+
+fn run_agent(home: &Path, agent: &Path, classes: &Path, features: bool) -> Result<(), Box<dyn std::error::Error>> {
+	let output: String = run_java(
+		home,
+		agent,
+		classes,
+		if features { "=features" } else { "" },
+		"AgentSmoke",
+		&[],
+	)?;
 	for marker in [
 		"JVMTI_VM_INIT version=",
 		"JVMTI_COMPAT_OK",

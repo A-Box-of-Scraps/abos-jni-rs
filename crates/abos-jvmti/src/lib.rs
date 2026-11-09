@@ -33,6 +33,18 @@
 //! ownership contract. Native availability errors are preserved rather than
 //! prechecked with additional calls that could race capability/phase changes.
 //!
+//! # Compiled-method profiling
+//!
+//! [`CompiledMethodRecords::with`] decodes callback-borrowed `compile_info` using
+//! the implementation-specific `jvmticmlr.h` ABI, not the standard JVMTI interface.
+//! Only use it after establishing VM format compatibility. Null data is empty;
+//! unknown kinds and unsupported versions remain header-only records. Inline
+//! mappings pair method IDs and BCIs in VM order. Scoped borrows cannot escape;
+//! [`OwnedCompiledMethodRecord`] deep-copies recognized payloads into Rust storage.
+//! Copies do not keep compiled code or declaring classes alive. Never pass this
+//! callback memory to JVMTI allocation owners or `Deallocate`. The `profiling_agent`
+//! example demonstrates capability/event setup and mapping output.
+//!
 //! # Returned-data ownership
 //!
 //! [`JvmtiArray`] adopts initialized flat buffers, [`JvmtiString`] owns modified

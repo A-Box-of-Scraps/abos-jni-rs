@@ -1,4 +1,5 @@
 #include <jvmti.h>
+#include <jvmticmlr.h>
 #include <stddef.h>
 #include <stdint.h>
 

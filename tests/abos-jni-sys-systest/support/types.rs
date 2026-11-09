@@ -70,6 +70,7 @@ pub fn c_type(ty: &Type) -> String {
 			};
 			format!("{element}{qualifier} *")
 		}
+		Type::Array(array) => format!("{} *", c_type(&array.elem)),
 		Type::FnPtr(function) => function_type(function),
 		// C's FatalError returns void; Rust additionally models its non-returning behavior.
 		Type::Never(_) => "void".to_owned(),

@@ -136,3 +136,16 @@ fn opaque_bitfield_storage_still_gets_record_layout_checks() {
 	assert!(expected.contains("alignof(jvmtiCapabilities)"));
 	assert_eq!(probe.signatures, "");
 }
+
+#[test]
+fn fixed_arrays_check_element_type_and_length_before_decay() {
+	let mut probe = generate::Probe::default();
+	probe.add_source("pub struct Example { pub message: [c_char; 50] }");
+	assert!(probe.signatures.contains("char *: 1"));
+	assert!(
+		probe
+			.measurements
+			.contains("sizeof(((Example *)0)->message) / sizeof(((Example *)0)->message[0])")
+	);
+	assert!(probe.expected.to_string().contains("lengthof(Example.message)"));
+}

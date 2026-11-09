@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, fmt::Write};
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{Field, FnArg, ForeignItem, Ident, Item, ItemStruct, LitStr, TypeFnPtr};
+use syn::{Field, FnArg, ForeignItem, Ident, Item, ItemStruct, LitStr, Type, TypeFnPtr};
 
 use crate::types::{c_name, c_type, function_type};
 
@@ -156,6 +156,15 @@ impl Probe {
 
 	fn field_type(&mut self, c_record: &str, field: &Field) {
 		let name = field.ident.as_ref().expect("named field");
+		if let Type::Array(array) = &field.ty {
+			let length = &array.len;
+			let member = format!("(({c_record} *)0)->{name}");
+			self.measure(
+				&format!("lengthof({c_record}.{name})"),
+				&format!("sizeof({member}) / sizeof({member}[0])"),
+				&quote!({ let length: usize = #length; i64::try_from(length).expect("array length fits i64") }),
+			);
+		}
 		self.signature(
 			&format!("{c_record}.{name}"),
 			&format!("(({c_record} *)0)->{name}"),

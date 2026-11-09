@@ -21,7 +21,7 @@ mod tests {
 			assert_eq!(*rust_value, unsafe { abos_jvmti_probe_value(index) }, "{label}");
 		}
 		println!(
-			"{} ABI measurements match jvmti.h; C signature checks passed",
+			"{} ABI measurements match jvmti.h and jvmticmlr.h; C signature checks passed",
 			expected.len()
 		);
 	}
