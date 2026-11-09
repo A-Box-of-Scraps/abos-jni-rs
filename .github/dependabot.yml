@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directories:
+      - /
+      - /fuzz
+      - /lints
+      - /tests/android-test-activity
+      - /tests/abos-jni-sys-systest
+      - /tests/abos-jvmti-sys-systest
+      - /crates/abos-jbindgen/tests/runtime
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
