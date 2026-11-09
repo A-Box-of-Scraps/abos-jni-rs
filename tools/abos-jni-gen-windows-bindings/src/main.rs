@@ -11,6 +11,5 @@ fn main() {
 		output.to_str().expect("UTF-8 output path"),
 		"--etc",
 		config.to_str().expect("UTF-8 config path"),
-	])
-	.unwrap();
+	]);
 }

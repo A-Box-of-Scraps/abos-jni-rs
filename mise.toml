@@ -8,7 +8,7 @@ android-cli = "1.1.16717390"
 dprint = "0.64.3"
 fd = "10.5.1"
 java = "temurin-25.0.5+8.0.LTS"
-maven = "3.9.16"
+maven = "3.10.0"
 mold = { version = "3.0.0", os = ["linux"] }
 python = "3.15.2"
 ruff = "0.17.4"

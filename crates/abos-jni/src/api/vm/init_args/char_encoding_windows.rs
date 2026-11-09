@@ -18,6 +18,10 @@ type WSize = c_int;
 // The type of Windows codepage numbers.
 type WCodepage = c_uint;
 
+// Win32 accepts unsigned code page IDs, but the metadata constants are signed.
+const CP_UTF7: WCodepage = windows_sys::CP_UTF7.cast_unsigned();
+const CP_UTF8: WCodepage = windows_sys::CP_UTF8.cast_unsigned();
+
 // The maximum length, in UTF-8 bytes, of strings that will be accepted for transcoding.
 //
 // The purpose of this limit is to prevent overflow. `WideCharToMultiByte` behaves rather badly
@@ -64,7 +68,7 @@ pub(super) fn str_to_cstr_win32(s: Cow<str>, needed_codepage: WCodepage) -> Resu
 		// https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-widechartomultibyte
 		42 | 50220 | 50221 | 50222 | 50225 | 50227 | 50229 | 54936 | 57002..=57011 | 65000 | 65001 => 0,
 
-		_ => windows_sys::WC_COMPOSITECHECK | windows_sys::WC_NO_BEST_FIT_CHARS,
+		_ => (windows_sys::WC_COMPOSITECHECK | windows_sys::WC_NO_BEST_FIT_CHARS).cast_unsigned(),
 	};
 
 	// Find out how much buffer space will be needed for the output and whether the string is
@@ -73,7 +77,7 @@ pub(super) fn str_to_cstr_win32(s: Cow<str>, needed_codepage: WCodepage) -> Resu
 		// All characters are representable in UTF-7 and UTF-8, and moreover
 		// `WideCharToMultiByte` will fail if the target encoding is UTF-7 or UTF-8 and this is not
 		// `None`.
-		windows_sys::CP_UTF7 | windows_sys::CP_UTF8 => None,
+		CP_UTF7 | CP_UTF8 => None,
 		_ => Some(MaybeUninit::uninit()),
 	};
 
@@ -183,7 +187,7 @@ pub(super) fn str_to_cstr_win32_default_codepage(s: Cow<str>) -> Result<Cow<CStr
 	// Safety: This function isn't actually unsafe.
 	let needed_codepage: u32 = unsafe { windows_sys::GetACP() };
 
-	if needed_codepage == windows_sys::CP_UTF8 {
+	if needed_codepage == CP_UTF8 {
 		// The code page is UTF-8! Lucky us.
 		return utf8_to_cstr(s);
 	}
