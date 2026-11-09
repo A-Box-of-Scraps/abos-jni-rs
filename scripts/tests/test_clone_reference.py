@@ -1,12 +1,11 @@
 import importlib.util
-from pathlib import Path
 import stat
 import subprocess
 import tempfile
 import tomllib
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
-
 
 REPOSITORY = "javac"
 SOURCE_FILE = "source"
@@ -15,6 +14,8 @@ REPLACEMENT_CONTENT = "replacement"
 
 SCRIPT = Path(__file__).resolve().parents[1] / "clone-reference.py"
 SPEC = importlib.util.spec_from_file_location("clone_reference", SCRIPT)
+if SPEC is None or SPEC.loader is None:
+    raise ImportError(f"Unable to load script: {SCRIPT}")
 clone = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(clone)
 
@@ -90,9 +91,12 @@ class CloneReferenceTests(unittest.TestCase):
 
     def test_rejects_linked_reference_roots(self):
         for link_check in ["is_symlink", "is_junction"]:
-            with self.subTest(link_check=link_check), patch.object(Path, link_check, return_value=True):
-                with self.assertRaises(OSError):
-                    clone.clone_reference(REPOSITORY, self.root)
+            with (
+                self.subTest(link_check=link_check),
+                patch.object(Path, link_check, return_value=True),
+                self.assertRaises(OSError),
+            ):
+                clone.clone_reference(REPOSITORY, self.root)
         self.git.assert_not_called()
 
     def test_retries_readonly_file_deletion(self):

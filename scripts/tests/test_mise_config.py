@@ -1,8 +1,7 @@
-from pathlib import Path
 import shlex
 import tomllib
 import unittest
-
+from pathlib import Path
 
 CONFIG = Path(__file__).resolve().parents[2] / "mise.toml"
 

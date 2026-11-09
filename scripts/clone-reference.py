@@ -3,13 +3,12 @@
 
 import argparse
 import os
-from pathlib import Path
 import shutil
 import stat
 import subprocess
 import sys
 import tempfile
-
+from pathlib import Path
 
 REVISIONS = {
     "javac": "8dcbc94481d5bdf003895957dd010486e95bf20e",
