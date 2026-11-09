@@ -47,6 +47,10 @@ public class ReferenceTypes {
         return ++calls;
     }
 
+    public int acceptPair(int ignored, Comparable first, Comparable second) {
+        return ++calls;
+    }
+
     public ReferenceTypes echo(ReferenceTypes value) {
         return value;
     }

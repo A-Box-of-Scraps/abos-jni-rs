@@ -189,7 +189,7 @@ fn generate_method(api_name: &Ident, method: &Method, type_mappings: &TypeMappin
 
 	let args: JniCallArgs = generate_jni_call_args(&method.signature.parameters, type_mappings, jni);
 
-	let validation: TokenStream = args.reference_validation(&method_id_field, is_static);
+	let validation: TokenStream = args.reference_validation(&method_id_field, is_static, jni);
 	let decls: &Vec<TokenStream> = &args.decls;
 	let jvalue_conversions: &Vec<TokenStream> = &args.jvalue_conversions;
 
@@ -284,7 +284,7 @@ pub(super) fn checked_return(jni_call: &TokenStream, non_null: bool, jni: &syn::
 }
 
 impl JniCallArgs {
-	pub(super) fn reference_validation(&self, method_id: &Ident, is_static: bool) -> TokenStream {
+	pub(super) fn reference_validation(&self, method_id: &Ident, is_static: bool, jni: &syn::Path) -> TokenStream {
 		let references: &Vec<TokenStream> = &self.reference_args;
 		let bindings: &Vec<TokenStream> = &self.reference_bindings;
 		if references.is_empty() {
@@ -293,10 +293,12 @@ impl JniCallArgs {
 		quote! {
 			// Evaluate AsRef once so validation and invocation use the same objects.
 			#(#bindings)*
-			// SAFETY: The cached ID and reference parameter indices belong to this API class.
+			static __JNI_REFERENCE_TYPES: #jni::__MethodReferenceCache = #jni::__MethodReferenceCache::new();
+			// SAFETY: This binding always uses the same ID and reference indices. Its
+			// process-wide API retains the resolved class for the cache's lifetime.
 			unsafe {
-				env.__validate_method_reference_args(
-					api.class.as_ref(), api.#method_id.into_raw(), #is_static, &[#(#references),*],
+				__JNI_REFERENCE_TYPES.validate(
+					env, api.class.as_ref(), api.#method_id.into_raw(), #is_static, &[#(#references),*],
 				)?;
 			}
 		}

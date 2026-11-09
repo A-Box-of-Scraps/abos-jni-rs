@@ -4,6 +4,9 @@
 
 mod util;
 
+#[path = "reference_validation/cached_calls.rs"]
+mod cached_calls;
+
 #[path = "reference_validation/roundtrips.rs"]
 mod roundtrips;
 

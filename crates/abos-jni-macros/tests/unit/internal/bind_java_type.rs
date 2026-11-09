@@ -92,3 +92,40 @@ fn generated_documentation_preserves_formatting_and_resolves_names() {
 	);
 	assert!(docs.values().all(|doc| !doc.contains('\t')));
 }
+
+#[test]
+fn reference_validation_caches_are_per_binding_and_honor_the_jni_path() {
+	let tokens: TokenStream = bind_java_type_impl(quote! {
+		jni = ::renamed_jni,
+		rust_type = Example,
+		java_type = "com.example.Example",
+		constructors { fn new(value: JString), },
+		methods {
+			fn consume(value: JString) -> jint,
+			static fn compare(first: JObject, second: JObject) -> jint,
+			fn primitive(value: jint) -> jint,
+		},
+	})
+	.expect("valid binding");
+	let file: syn::File = syn::parse2(tokens).expect("generated Rust");
+	let mut cached: Vec<String> = Vec::new();
+	for item in file.items {
+		let syn::Item::Impl(item) = item else { continue };
+		for item in item.items {
+			let syn::ImplItem::Fn(method) = item else { continue };
+			if let Some(ty) = reference_cache_type(&method) {
+				assert_eq!(quote!(#ty).to_string(), ":: renamed_jni :: __MethodReferenceCache");
+				cached.push(method.sig.ident.to_string());
+			}
+		}
+	}
+	cached.sort();
+	assert_eq!(cached, ["compare", "consume", "new"]);
+}
+
+fn reference_cache_type(method: &syn::ImplItemFn) -> Option<&syn::Type> {
+	method.block.stmts.iter().find_map(|statement| match statement {
+		syn::Stmt::Item(syn::Item::Static(item)) if item.ident == "__JNI_REFERENCE_TYPES" => Some(item.ty.as_ref()),
+		_ => None,
+	})
+}

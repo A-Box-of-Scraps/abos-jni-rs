@@ -23,6 +23,8 @@ mod arrays;
 mod calls;
 #[path = "api_calls/comparisons.rs"]
 mod comparisons;
+#[path = "api_calls/reference_calls.rs"]
+mod reference_calls;
 #[path = "support/strings.rs"]
 mod string_inputs;
 #[path = "api_calls/strings.rs"]
@@ -518,6 +520,7 @@ criterion_group!(
 	strings::strings,
 	arrays::arrays,
 	comparisons::calls,
+	reference_calls::reference_calls,
 	comparisons::references,
 	comparisons::attachment
 );
