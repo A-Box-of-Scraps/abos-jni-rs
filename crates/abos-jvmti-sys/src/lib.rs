@@ -25,6 +25,10 @@
 	reason = "Generated sibling modules share JNI and JVMTI types."
 )]
 
+#[doc = include_str!("../CHANGELOG.md")]
+#[doc = "\n[Unreleased]: #unreleased\n"]
+pub mod changelog {}
+
 mod api;
 mod internal;
 

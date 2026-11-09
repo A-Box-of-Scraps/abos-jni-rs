@@ -26,6 +26,11 @@
 //! of silently returning incomplete bindings. Class failures retain their context
 //! and underlying cause. There is no partial-output mode; class patterns and member
 //! skips remain explicit ways to select the API surface.
+
+#[doc = include_str!("../CHANGELOG.md")]
+#[doc = "\n[Unreleased]: #unreleased\n"]
+pub mod changelog {}
+
 mod api;
 mod internal;
 

@@ -66,6 +66,10 @@
 //! must never be used for callback-borrowed data or JNI string/array leases.
 #![allow(unsafe_code, reason = "JVMTI utilities invoke the native function table.")]
 
+#[doc = include_str!("../CHANGELOG.md")]
+#[doc = "\n[Unreleased]: #unreleased\n"]
+pub mod changelog {}
+
 mod api;
 mod internal;
 

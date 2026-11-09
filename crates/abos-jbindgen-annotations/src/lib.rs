@@ -1,4 +1,9 @@
 //! Embedded Java annotations for customizing generated Rust bindings.
+
+#[doc = include_str!("../CHANGELOG.md")]
+#[doc = "\n[Unreleased]: #unreleased\n"]
+pub mod changelog {}
+
 use std::{
 	fs, io,
 	path::{Path, PathBuf},

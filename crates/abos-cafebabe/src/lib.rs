@@ -7,6 +7,10 @@
 //! metadata containing unpaired surrogates cannot be represented as Rust strings
 //! and is rejected. Unused Java string constants may contain unpaired surrogates.
 
+#[doc = include_str!("../CHANGELOG.md")]
+#[doc = "\n[Unreleased]: #unreleased\n"]
+pub mod changelog {}
+
 mod api;
 mod internal;
 
