@@ -42,17 +42,14 @@ THIRD_PARTY_NOTICES
 
 This project is using `mise` check `mise.toml` to learn about available tasks and tools.
 
-## Upstream References
+## Commands
 
-Run `mise run clone:<repo>` to populate the Git-ignored `.references/` directory with pinned upstream source snapshots.
-Available `<repo>` values are:
-
-- `javac`
-- `jbindgen`
-- `jni-rs`
-- `jni-sys`
-
-Run `mise run clone:all` to refresh all upstream references.
+```bash
+mise run fmt        # Format using `dprint` and `rustfmt`.
+mise run lint       # Lint using `clippy` and `dylint`.
+mise run test       # Run tests.
+mise run check      # Check formatting, linting, duplicates, and tests.
+```
 
 ## Commits & Pull Requests
 

@@ -1,4 +1,5 @@
 from pathlib import Path
+import shlex
 import tomllib
 import unittest
 
@@ -13,6 +14,81 @@ class MiseConfigTests(unittest.TestCase):
             with self.subTest(section=section):
                 keys = list(config[section])
                 self.assertEqual(keys, sorted(keys))
+
+    def test_check_is_the_single_non_mutating_validation_gate(self):
+        tasks = tomllib.loads(CONFIG.read_text())["tasks"]
+        self.assertNotIn("check:ci", tasks)
+        self.assertCountEqual(tasks["check"]["depends"], ["fmt:check", "lint", "check:duplicates", "test"])
+
+    def test_global_tests_include_examples_and_standalone_suites(self):
+        tasks = tomllib.loads(CONFIG.read_text())["tasks"]
+        self.assertCountEqual(tasks["test"]["depends"], [
+            "test:abos-jni:examples",
+            "test:abos-jni-sys:systest",
+            "test:android-runner",
+            "test:lints",
+            "test:scripts",
+            "test:workspace",
+        ])
+
+    def test_workspace_tests_cover_all_features_default_jni_and_ignored_jvm(self):
+        tasks = tomllib.loads(CONFIG.read_text())["tasks"]
+        self.assertEqual(tasks["test:workspace"]["run"], [
+            "cargo test --locked --workspace --all-features -q",
+            tasks["test:abos-jni"]["run"],
+            tasks["test:abos-jni-sys:jvm"]["run"],
+        ])
+
+    def test_task_dependencies_exist(self):
+        tasks = tomllib.loads(CONFIG.read_text())["tasks"]
+        for name, task in tasks.items():
+            for dependency in task.get("depends", []):
+                with self.subTest(task=name, dependency=dependency):
+                    self.assertIn(dependency, tasks)
+
+    def test_cargo_commands_use_locked_dependencies(self):
+        tasks = tomllib.loads(CONFIG.read_text())["tasks"]
+        commands = {"bench", "clippy", "doc", "dylint", "run", "test"}
+        for name, task in tasks.items():
+            runs = task.get("run", [])
+            run_commands = [runs] if isinstance(runs, str) else runs
+            for command in run_commands:
+                args = shlex.split(command)
+                if len(args) < 2 or args[0] != "cargo" or args[1] not in commands:
+                    continue
+                if args[1] == "dylint":
+                    cargo_args = args[args.index("--") + 1:]
+                else:
+                    cargo_args = args[2:args.index("--")] if "--" in args else args[2:]
+                with self.subTest(task=name, command=command):
+                    self.assertIn("--locked", cargo_args)
+
+    def test_lint_includes_the_standalone_windows_bindings_generator(self):
+        tasks = tomllib.loads(CONFIG.read_text())["tasks"]
+        name = "lint:tools:windows-bindings"
+        self.assertIn(name, tasks["lint"]["depends"])
+        args = shlex.split(tasks[name]["run"])
+        self.assertEqual(args[:2], ["cargo", "clippy"])
+        self.assertEqual(args[args.index("--manifest-path") + 1], "tools/abos-jni-gen-windows-bindings/Cargo.toml")
+        self.assertIn("--all-targets", args)
+        self.assertIn("--all-features", args)
+        self.assertEqual(args[-3:], ["--", "-D", "warnings"])
+
+    def test_individual_fuzz_smoke_tasks_only_build_the_selected_target(self):
+        config = tomllib.loads(CONFIG.read_text())
+        tasks = config["tasks"]
+        manifest = CONFIG.parent / "fuzz" / "Cargo.toml"
+        targets = {target["name"] for target in tomllib.loads(manifest.read_text())["bin"]}
+        smoke_tasks = tasks["fuzz:smoke:all"]["depends"]
+        selected_targets = set()
+        for name in smoke_tasks:
+            with self.subTest(task=name):
+                self.assertCountEqual(tasks[name]["depends"], ["fuzz:seed"])
+                self.assertEqual(tasks[name]["dir"], "fuzz")
+                args = shlex.split(tasks[name]["run"])
+                self.assertEqual(args[:3], ["cargo", "fuzz", "run"])
+                selected_targets.add(args[3])
+        self.assertEqual(selected_targets, targets)
 
 
 if __name__ == "__main__":

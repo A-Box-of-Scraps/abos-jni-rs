@@ -17,16 +17,13 @@ task.output = "interleave"
 task.quiet = true
 
 [tasks."bench:abos-jni"]
-run = "cargo bench --package abos-jni --features invocation --bench api_calls"
+run = "cargo bench --locked --package abos-jni --features invocation --bench api_calls"
 
 [tasks.check]
-depends = ["fmt", "lint", "check:duplicates"]
+depends = ["fmt:check", "lint", "check:duplicates", "test"]
 
 [tasks."check:android-env"]
 run = "python tests/android-test-activity/tests/android_env.py check"
-
-[tasks."check:ci"]
-depends = ["fmt:check", "lint", "check:duplicates"]
 
 [tasks."check:duplicates"]
 run = "jscpd --fail-on-empty --no-tips"
@@ -107,62 +104,66 @@ depends = [
 ]
 
 [tasks."fuzz:smoke:cafebabe"]
-depends = ["fuzz:build", "fuzz:seed"]
+depends = ["fuzz:seed"]
 dir = "fuzz"
 run = "cargo fuzz run cafebabe_parse_class -- -max_total_time=60 -max_len=65536 -timeout=5 -rss_limit_mb=2048"
 
 [tasks."fuzz:smoke:jbindgen-descriptors"]
-depends = ["fuzz:build", "fuzz:seed"]
+depends = ["fuzz:seed"]
 dir = "fuzz"
 run = "cargo fuzz run jbindgen_descriptors -- -max_total_time=60 -max_len=65536 -timeout=5 -rss_limit_mb=2048"
 
 [tasks."fuzz:smoke:jbindgen-parse-class"]
-depends = ["fuzz:build", "fuzz:seed"]
+depends = ["fuzz:seed"]
 dir = "fuzz"
 run = "cargo fuzz run jbindgen_parse_class -- -max_total_time=60 -max_len=65536 -timeout=5 -rss_limit_mb=2048"
 
 [tasks."fuzz:smoke:jni-mutf8"]
-depends = ["fuzz:build", "fuzz:seed"]
+depends = ["fuzz:seed"]
 dir = "fuzz"
 run = "cargo fuzz run jni_mutf8 -- -max_total_time=60 -max_len=65536 -timeout=5 -rss_limit_mb=2048"
 
 [tasks."fuzz:smoke:jni-signatures"]
-depends = ["fuzz:build", "fuzz:seed"]
+depends = ["fuzz:seed"]
 dir = "fuzz"
 run = "cargo fuzz run jni_signatures -- -max_total_time=60 -max_len=65536 -timeout=5 -rss_limit_mb=2048"
 
 [tasks."fuzz:smoke:jni-string-roundtrip"]
-depends = ["fuzz:build", "fuzz:seed"]
+depends = ["fuzz:seed"]
 dir = "fuzz"
 run = "cargo fuzz run jni_string_roundtrip -- -max_total_time=60 -max_len=65536 -timeout=5 -rss_limit_mb=2048"
 
 [tasks."generate:abos-jni:windows-bindings"]
-run = "cargo run --manifest-path tools/abos-jni-gen-windows-bindings/Cargo.toml -q"
+run = "cargo run --locked --manifest-path tools/abos-jni-gen-windows-bindings/Cargo.toml -q"
 
 [tasks.lint]
 depends = [
   "lint:abos-jbindgen:runtime",
   "lint:abos-jni-sys:systest",
   "lint:docs",
+  "lint:tools:windows-bindings",
 ]
 env = { DYLINT_RUSTFLAGS = "-D warnings" }
 run = [
-  "cargo clippy --workspace --all-targets --all-features -q -- -D warnings",
-  "cargo dylint --all --workspace --fail-on-no-libraries -q -- --all-targets --all-features -q",
+  "cargo clippy --locked --workspace --all-targets --all-features -q -- -D warnings",
+  "cargo dylint --all --workspace --fail-on-no-libraries -q -- --all-targets --all-features --locked -q",
 ]
 
 [tasks."lint:abos-jbindgen:runtime"]
 run = "cargo clippy --manifest-path crates/abos-jbindgen/tests/runtime/Cargo.toml --all-targets --all-features --locked -q -- -D warnings"
 
 [tasks."lint:abos-jni-sys:systest"]
-run = "cargo clippy --manifest-path tests/abos-jni-sys-systest/Cargo.toml --all-targets -q -- -D warnings"
+run = "cargo clippy --locked --manifest-path tests/abos-jni-sys-systest/Cargo.toml --all-targets -q -- -D warnings"
 
 [tasks."lint:docs"]
 env = { RUSTDOCFLAGS = "-D warnings" }
-run = "cargo doc --workspace --all-features --no-deps -q"
+run = "cargo doc --locked --workspace --all-features --no-deps -q"
 
 [tasks."lint:fix"]
-run = "cargo clippy --fix --workspace --all-targets --all-features -q"
+run = "cargo clippy --locked --fix --workspace --all-targets --all-features -q"
+
+[tasks."lint:tools:windows-bindings"]
+run = "cargo clippy --manifest-path tools/abos-jni-gen-windows-bindings/Cargo.toml --all-targets --all-features --locked -q -- -D warnings"
 
 [tasks."setup:android"]
 raw = true
@@ -174,33 +175,25 @@ run = ["mise install cargo:cargo-fuzz", "rustup show active-toolchain"]
 
 [tasks.test]
 depends = [
-  "test:abos-cafebabe",
-  "test:abos-javac",
-  "test:abos-jbindgen",
-  "test:abos-jbindgen-annotations",
-  "test:abos-jni",
-  "test:abos-jni:jvm",
-  "test:abos-jni-macros",
-  "test:abos-jni-sys",
-  "test:abos-jni-sys:jvm",
+  "test:abos-jni:examples",
   "test:abos-jni-sys:systest",
-  "test:abos-jni-sys-macros",
   "test:android-runner",
   "test:lints",
   "test:scripts",
+  "test:workspace",
 ]
 
 [tasks."test:abos-cafebabe"]
-run = "cargo test --package abos-cafebabe -q"
+run = "cargo test --locked --package abos-cafebabe -q"
 
 [tasks."test:abos-javac"]
-run = "cargo test --package abos-javac --all-features -q"
+run = "cargo test --locked --package abos-javac --all-features -q"
 
 [tasks."test:abos-jbindgen"]
-run = "cargo test --package abos-jbindgen --all-features -q"
+run = "cargo test --locked --package abos-jbindgen --all-features -q"
 
 [tasks."test:abos-jbindgen-annotations"]
-run = "cargo test --package abos-jbindgen-annotations -q"
+run = "cargo test --locked --package abos-jbindgen-annotations -q"
 
 [tasks."test:abos-jbindgen:parity"]
 run = [
@@ -209,38 +202,38 @@ run = [
 ]
 
 [tasks."test:abos-jni"]
-run = "cargo test --package abos-jni -q"
+run = "cargo test --locked --package abos-jni -q"
 
 [tasks."test:abos-jni-macros"]
-run = "cargo test --package abos-jni-macros -q"
+run = "cargo test --locked --package abos-jni-macros -q"
 
 [tasks."test:abos-jni-sys"]
-run = "cargo test --package abos-jni-sys -q"
+run = "cargo test --locked --package abos-jni-sys -q"
 
 [tasks."test:abos-jni-sys-macros"]
-run = "cargo test --package abos-jni-sys-macros -q"
+run = "cargo test --locked --package abos-jni-sys-macros -q"
 
 [tasks."test:abos-jni-sys:jvm"]
-run = "cargo test --package abos-jni-sys --test invocation -q -- --ignored"
+run = "cargo test --locked --package abos-jni-sys --test invocation -q -- --ignored"
 
 [tasks."test:abos-jni-sys:systest"]
-run = "cargo test --manifest-path tests/abos-jni-sys-systest/Cargo.toml -q"
+run = "cargo test --locked --manifest-path tests/abos-jni-sys-systest/Cargo.toml -q"
 
 [tasks."test:abos-jni:examples"]
 run = [
-  "cargo run --package abos-jni --features invocation --example bind_java_type -q",
-  "cargo run --package abos-jni --features invocation --example bind_java_type_hooks -q",
-  "cargo run --package abos-jni --features invocation --example bind_java_type_is_instance_of -q",
-  "cargo run --package abos-jni --features invocation --example bind_java_type_wrapper -q",
-  "cargo run --package abos-jni --features invocation --example jni_sig -q",
-  "cargo run --package abos-jni --features invocation --example jni_sig_wrapper -q",
-  "cargo run --package abos-jni --features invocation --example jni_str -q",
-  "cargo run --package abos-jni --features invocation --example native_method -q",
-  "cargo run --package abos-jni --features invocation --example native_method_wrapper -q",
+  "cargo run --locked --package abos-jni --features invocation --example bind_java_type -q",
+  "cargo run --locked --package abos-jni --features invocation --example bind_java_type_hooks -q",
+  "cargo run --locked --package abos-jni --features invocation --example bind_java_type_is_instance_of -q",
+  "cargo run --locked --package abos-jni --features invocation --example bind_java_type_wrapper -q",
+  "cargo run --locked --package abos-jni --features invocation --example jni_sig -q",
+  "cargo run --locked --package abos-jni --features invocation --example jni_sig_wrapper -q",
+  "cargo run --locked --package abos-jni --features invocation --example jni_str -q",
+  "cargo run --locked --package abos-jni --features invocation --example native_method -q",
+  "cargo run --locked --package abos-jni --features invocation --example native_method_wrapper -q",
 ]
 
 [tasks."test:abos-jni:jvm"]
-run = "cargo test --package abos-jni --all-features -q"
+run = "cargo test --locked --package abos-jni --all-features -q"
 
 [tasks."test:android"]
 run = "python tests/android-test-activity/tests/run.py"
@@ -263,7 +256,14 @@ run = "cargo test --locked --test seeds -q"
 
 [tasks."test:lints"]
 dir = "lints"
-run = "cargo test --workspace -q"
+run = "cargo test --locked --workspace -q"
 
 [tasks."test:scripts"]
 run = "python -B -m unittest discover --start-directory scripts/tests --quiet"
+
+[tasks."test:workspace"]
+run = [
+  "cargo test --locked --workspace --all-features -q",
+  "cargo test --locked --package abos-jni -q",
+  "cargo test --locked --package abos-jni-sys --test invocation -q -- --ignored",
+]
