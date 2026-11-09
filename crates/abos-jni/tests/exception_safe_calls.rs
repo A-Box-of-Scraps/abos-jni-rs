@@ -408,3 +408,82 @@ fn assert_caught_exception<T: std::fmt::Debug>(
 		assert_eq!(msg, message);
 	}
 }
+
+struct ExceptionOnAsRef<'a, 'local, T> {
+	env: &'a abos_jni::Env<'local>,
+	exception_class: &'a abos_jni::objects::JClass<'local>,
+	value: &'a T,
+	calls: std::cell::Cell<usize>,
+}
+
+impl<T> AsRef<T> for ExceptionOnAsRef<'_, '_, T> {
+	fn as_ref(&self) -> &T {
+		self.calls.set(self.calls.get() + 1);
+		assert!(matches!(
+			self.env
+				.throw_new_from_class(self.exception_class, abos_jni::jni_str!("argument conversion")),
+			Err(abos_jni::errors::Error::JavaException)
+		));
+		self.value
+	}
+}
+
+#[test]
+fn test_array_set_checks_exception_after_conversion() {
+	util::attach_current_thread(|env| {
+		let exception_class: abos_jni::objects::JClass<'_> =
+			env.find_class(abos_jni::jni_str!("java/lang/RuntimeException"))?;
+		let original: abos_jni::objects::JString<'_> = env.new_string("original")?;
+		let replacement: abos_jni::objects::JString<'_> = env.new_string("replacement")?;
+		let array: abos_jni::objects::JObjectArray<'_, abos_jni::objects::JString<'_>> =
+			abos_jni::objects::JObjectArray::<abos_jni::objects::JString>::new(env, 1, &original)?;
+		let value: ExceptionOnAsRef<'_, '_, abos_jni::objects::JString<'_>> = ExceptionOnAsRef {
+			env,
+			exception_class: &exception_class,
+			value: &replacement,
+			calls: std::cell::Cell::new(0),
+		};
+
+		let result: abos_jni::errors::Result<()> = array.set_element(env, 0, &value);
+		assert_eq!(value.calls.get(), 1);
+		assert!(matches!(result, Err(abos_jni::errors::Error::JavaException)));
+		assert!(env.exception_check());
+		assert_caught_exception(
+			&env.exception_catch(),
+			"java.lang.RuntimeException",
+			Some("argument conversion"),
+		);
+		let element: abos_jni::objects::JString<'_> = array.get_element(env, 0)?;
+		assert!(env.is_same_object(&element, &original)?);
+		Ok(())
+	})
+	.expect("argument conversion must not modify the array or consume its exception");
+}
+
+#[test]
+fn test_instance_check_checks_exception_after_conversion() {
+	util::attach_current_thread(|env| {
+		let exception_class: abos_jni::objects::JClass<'_> =
+			env.find_class(abos_jni::jni_str!("java/lang/RuntimeException"))?;
+		let string_class: abos_jni::objects::JClass<'_> = env.find_class(abos_jni::jni_str!("java/lang/String"))?;
+		let object: abos_jni::objects::JObject<'_> = env.new_string("value")?.into();
+		let value: ExceptionOnAsRef<'_, '_, abos_jni::objects::JObject<'_>> = ExceptionOnAsRef {
+			env,
+			exception_class: &exception_class,
+			value: &object,
+			calls: std::cell::Cell::new(0),
+		};
+
+		let result: abos_jni::errors::Result<bool> = env.is_instance_of_class(&value, &string_class);
+		assert_eq!(value.calls.get(), 1);
+		assert!(matches!(result, Err(abos_jni::errors::Error::JavaException)));
+		assert!(env.exception_check());
+		assert_caught_exception(
+			&env.exception_catch(),
+			"java.lang.RuntimeException",
+			Some("argument conversion"),
+		);
+		Ok(())
+	})
+	.expect("instance checks must preserve conversion exceptions");
+}

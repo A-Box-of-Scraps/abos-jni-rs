@@ -127,3 +127,64 @@ fn _compile_test_jni_try(env: &mut crate::Env<'_>) -> crate::errors::Result<()> 
 
 	Ok(())
 }
+
+#[test]
+fn arguments_are_evaluated_before_exception_check_and_temporaries_survive() {
+	use std::cell::RefCell;
+
+	struct PendingEnv {
+		events: RefCell<Vec<&'static str>>,
+	}
+
+	impl PendingEnv {
+		fn exception_check(&self) -> bool {
+			self.events.borrow_mut().push("check");
+			true
+		}
+
+		fn get_raw(&self) -> *mut crate::sys::JNIEnv {
+			panic!(
+				"unexpected access to the JNI function table after {:?}",
+				self.events.borrow()
+			);
+		}
+	}
+
+	struct Argument<'a>(&'a PendingEnv);
+
+	impl Argument<'_> {
+		fn as_raw(&self) -> crate::sys::jobject {
+			self.0.events.borrow_mut().push("value");
+			std::ptr::null_mut()
+		}
+	}
+
+	impl Drop for Argument<'_> {
+		fn drop(&mut self) {
+			self.0.events.borrow_mut().push("drop");
+		}
+	}
+
+	let env: PendingEnv = PendingEnv {
+		events: RefCell::new(Vec::new()),
+	};
+	// SAFETY: The mock reports a pending exception, so no raw JNI call may occur.
+	let result: crate::errors::Result<()> = unsafe {
+		jni_call_no_post_check_ex!(
+			env,
+			v1_1,
+			SetObjectArrayElement,
+			{
+				env.events.borrow_mut().push("array");
+				std::ptr::null_mut()
+			},
+			{
+				env.events.borrow_mut().push("index");
+				0
+			},
+			Argument(&env).as_raw()
+		)
+	};
+	assert!(matches!(result, Err(Error::JavaException)));
+	assert_eq!(*env.events.borrow(), ["array", "index", "value", "check", "drop"]);
+}

@@ -43,12 +43,16 @@ macro_rules! ex_safe_jni_call_no_post_check_ex {
     }};
 }
 
-/// Pre-checks for a pending exception error and then calls an Env FFI function
+/// Evaluates arguments, checks for a pending exception, then calls an Env FFI function
 ///
 /// Since most JNI functions may trigger undefined behaviour if they are called
 /// with a pending exception, this macro will explicitly check for a pending
 /// exception (and return a `Err(crate::errors::Error::JavaException)` if one is
 /// found) before calling the JNI function.
+///
+/// Arguments are evaluated exactly once before this check, since user-defined
+/// conversions may raise Java exceptions. Argument temporaries remain alive
+/// until after the call.
 ///
 /// # Safety
 ///
@@ -59,15 +63,26 @@ macro_rules! ex_safe_jni_call_no_post_check_ex {
 /// for the current JNI version.
 macro_rules! jni_call_no_post_check_ex {
     ( $jnienv:expr, $version:tt, $name:ident $(, $args:expr )*) => {{
-        $crate::__must_use(if $jnienv.exception_check() {
+        jni_call_no_post_check_ex!(@bind $jnienv, $version, $name, [] ; $($args),*)
+    }};
+    // Bind each expression once before checking exceptions. Match scrutinees keep
+    // argument temporaries alive through the JNI call, including owners of raw pointers.
+    (@bind $jnienv:expr, $version:tt, $name:ident, [$($bound:ident,)*] ; $arg:expr $(, $rest:expr)*) => {{
+        match $arg {
+            arg => jni_call_no_post_check_ex!(@bind $jnienv, $version, $name, [$($bound,)* arg,] ; $($rest),*)
+        }
+    }};
+    (@bind $jnienv:expr, $version:tt, $name:ident, [$($bound:ident,)*] ;) => {{
+        let jnienv = &$jnienv;
+        $crate::__must_use(if jnienv.exception_check() {
             Err(crate::errors::Error::JavaException)
         } else {
             // Safety: we know that the Env pointer can't be null, since that's
             // checked in `from_raw()`
-            let env: *mut abos_jni_sys::JNIEnv = $jnienv.get_raw();
+            let env: *mut abos_jni_sys::JNIEnv = jnienv.get_raw();
             let interface: *const abos_jni_sys::JNINativeInterface_ = *env;
 
-            Ok(((*interface).$version.$name)(env $(, $args)*))
+            Ok(((*interface).$version.$name)(env $(, $bound)*))
         })
     }};
 }
