@@ -38,6 +38,28 @@ impl JavaCompiler {
 	/// the source argument file. Sources are absolute; output and classpath paths
 	/// retain the caller's spelling, so take care when changing the working directory.
 	///
+	/// Running the command directly does not emit Cargo metadata or collect class-file
+	/// paths. Handle its exit status and output yourself.
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// # fn main() -> abos_javac::Result<()> {
+	/// let compiler = abos_javac::Build::new()
+	///     .file("java/Example.java")
+	///     .output_dir("target/java-classes")
+	///     .try_get_compiler()?;
+	///
+	/// let mut child = compiler.to_command()?.spawn()?;
+	/// let status = child.wait()?;
+	///
+	/// // Keep the source argument file alive until the child process has finished.
+	/// drop(compiler);
+	/// assert!(status.success());
+	/// # Ok(())
+	/// # }
+	/// ```
+	///
 	/// # Errors
 	/// Returns an error for missing sources, invalid options, or filesystem failures.
 	pub fn to_command(&self) -> Result<Command> {
