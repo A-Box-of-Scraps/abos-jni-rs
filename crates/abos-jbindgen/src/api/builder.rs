@@ -109,7 +109,10 @@ impl Builder {
 		self
 	}
 
-	/// Set the input to Java source files.
+	/// Set the input to Java source files, directories, or source JARs.
+	///
+	/// Every source path must exist and be a directory or a regular `.java` or `.jar` file.
+	/// Invalid inputs fail generation; valid inputs with no selected classes succeed with empty bindings.
 	///
 	/// Source and bytecode inputs include non-private constructors, ordinary methods, and fields.
 	/// Native methods, including private ones, are retained for registration bindings.

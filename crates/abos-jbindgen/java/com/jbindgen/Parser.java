@@ -6,6 +6,7 @@ import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.jar.*;
 import javax.lang.model.element.*;
@@ -81,7 +82,15 @@ public class Parser implements AutoCloseable {
         for (String sourcePath : sourcePaths) {
             File sourceFile = new File(sourcePath);
 
-            if (sourceFile.isDirectory()) {
+            BasicFileAttributes attributes = Files.readAttributes(sourceFile.toPath(), BasicFileAttributes.class);
+            if (!attributes.isDirectory()
+                    && (!attributes.isRegularFile()
+                            || (!sourcePath.endsWith(".java") && !sourcePath.endsWith(".jar")))) {
+                throw new IOException(
+                        "Unsupported source path (expected a directory, .java file, or .jar file): " + sourcePath);
+            }
+
+            if (attributes.isDirectory()) {
                 List<File> javaFiles = new ArrayList<>();
                 findJavaFiles(sourceFile, javaFiles);
                 Iterable<? extends JavaFileObject> fileObjects = fileManager.getJavaFileObjectsFromFiles(javaFiles);
@@ -579,15 +588,19 @@ public class Parser implements AutoCloseable {
         }
     }
 
-    private void findJavaFiles(File dir, List<File> javaFiles) {
+    private void findJavaFiles(File dir, List<File> javaFiles) throws IOException {
         File[] files = dir.listFiles();
-        if (files != null) {
-            for (File file : files) {
-                if (file.isDirectory()) {
-                    findJavaFiles(file, javaFiles);
-                } else if (file.getName().endsWith(".java")) {
-                    javaFiles.add(file);
+        if (files == null) {
+            throw new IOException("Cannot list source directory: " + dir);
+        }
+        for (File file : files) {
+            if (file.isDirectory()) {
+                findJavaFiles(file, javaFiles);
+            } else if (file.getName().endsWith(".java")) {
+                if (!file.isFile()) {
+                    throw new IOException("Source is not a regular file: " + file);
                 }
+                javaFiles.add(file);
             }
         }
     }
