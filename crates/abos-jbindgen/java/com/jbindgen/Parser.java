@@ -9,6 +9,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.jar.*;
+import java.util.regex.Pattern;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import javax.lang.model.util.*;
@@ -24,6 +25,7 @@ import javax.tools.*;
  * - Source files within JAR archives
  */
 public class Parser implements AutoCloseable {
+    private static final Pattern PATTERN_WHITESPACE = Pattern.compile("(?U)^\\s+|\\s+$");
     private final JavaCompiler compiler;
     private final StandardJavaFileManager fileManager;
 
@@ -263,35 +265,45 @@ public class Parser implements AutoCloseable {
 
         String[] patternList = patterns.split(",");
         for (String pattern : patternList) {
-            pattern = pattern.trim();
-            if (matchesSinglePattern(jvmClassName, pattern)) {
+            pattern = PATTERN_WHITESPACE.matcher(pattern).replaceAll("");
+            if (!pattern.isEmpty() && matchesSinglePattern(jvmClassName, pattern.replace('/', '.'))) {
                 return true;
             }
         }
         return false;
     }
 
-    private boolean matchesSinglePattern(String jvmClassName, String pattern) {
-        if (pattern.equals("*")) {
+    // Keep aligned with inputs::matches_class_pattern; source_patterns.rs tests both implementations.
+    private boolean matchesSinglePattern(String name, String pattern) {
+        // matched[i] means the pattern processed so far matches the first i UTF-16 units.
+        // Only '*' is special; '.' also accepts a binary nesting separator ('$').
+        boolean[] matched = new boolean[name.length() + 1];
+        matched[0] = true;
+        for (int patternIndex = 0; patternIndex < pattern.length(); patternIndex++) {
+            char token = pattern.charAt(patternIndex);
+            if (token == '*') {
+                for (int index = 1; index <= name.length(); index++) {
+                    matched[index] = matched[index] || matched[index - 1];
+                }
+            } else {
+                for (int index = name.length(); index > 0; index--) {
+                    matched[index] = matched[index - 1]
+                            && (token == name.charAt(index - 1) || (token == '.' && name.charAt(index - 1) == '$'));
+                }
+                matched[0] = false;
+            }
+        }
+        if (matched[name.length()]) {
             return true;
         }
-
-        // Pattern is given in Java format (with dots), convert to JVM format (with $)
-        String jvmPattern = convertToJvmClassName(pattern);
-
-        String regex;
-        if (pattern.contains("*")) {
-            regex = "^" + jvmPattern.replace(".", "\\.").replace("$", "\\$").replace("*", ".*") + "$";
-        } else if (jvmPattern.contains("$")) {
-            // Specific inner class pattern - match exactly
-            regex = "^" + jvmPattern.replace(".", "\\.").replace("$", "\\$") + "$";
-        } else {
-            // Outer class pattern - also match all inner classes
-            regex = "^" + jvmPattern.replace(".", "\\.").replace("$", "\\$")
-                    + "(\\$.*)?$"; // Match the class itself or any inner class
+        if (pattern.indexOf('*') < 0) {
+            for (int index = 0; index < name.length(); index++) {
+                if (name.charAt(index) == '$' && matched[index]) {
+                    return true;
+                }
+            }
         }
-
-        return jvmClassName.matches(regex);
+        return false;
     }
 
     private ClassDescription analyzeClass(TypeElement element, Elements elements, Types types) {
@@ -709,39 +721,5 @@ public class Parser implements AutoCloseable {
         public boolean isStatic;
         public boolean isFinal;
         public boolean isDeprecated;
-    }
-
-    /**
-     * Convert a Java qualified name to JVM class name format.
-     * Inner classes use $ separator instead of . separator.
-     * For example: android.os.Build.Partition -> android.os.Build$Partition
-     *
-     * Uses a heuristic: parts that start with uppercase are likely class names.
-     * The first uppercase part is the outer class, subsequent uppercase parts are
-     * inner classes.
-     */
-    private String convertToJvmClassName(String qualifiedName) {
-        String[] parts = qualifiedName.split("\\.");
-
-        StringBuilder result = new StringBuilder();
-        boolean foundFirstClass = false;
-
-        for (int i = 0; i < parts.length; i++) {
-            if (i > 0) {
-                if (foundFirstClass && parts[i].length() > 0 && Character.isUpperCase(parts[i].charAt(0))) {
-                    result.append('$');
-                } else {
-                    result.append('.');
-                }
-            }
-
-            result.append(parts[i]);
-
-            if (!foundFirstClass && parts[i].length() > 0 && Character.isUpperCase(parts[i].charAt(0))) {
-                foundFirstClass = true;
-            }
-        }
-
-        return result.toString();
     }
 }

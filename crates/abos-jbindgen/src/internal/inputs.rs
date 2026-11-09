@@ -5,21 +5,46 @@ use std::{
 	io::Read,
 	path::{Path, PathBuf},
 };
-/// Check if a class name matches any of the given patterns.
-/// Patterns can use wildcards like "android.app.*" or exact matches.
-/// For JAR files, patterns match against paths like "com/example/MyClass.class"
+/// Match archive names using the class-pattern contract documented on `Builder::patterns`.
+/// Keep this implementation aligned with `Parser.matchesSinglePattern`; `source_patterns.rs`
+/// runs the same selection cases against both parsers.
 pub fn matches_any_pattern(name: &str, patterns: &[String]) -> bool {
-	let name: String = name.trim_end_matches(".class").replace('/', ".");
-	patterns.iter().any(|pattern| {
-		let pattern: String = pattern.replace('/', ".");
-		if pattern == "*" || pattern == "**" {
-			return true;
+	let name: String = name.strip_suffix(".class").unwrap_or(name).replace('/', ".");
+	patterns.is_empty()
+		|| patterns
+			.iter()
+			.flat_map(|pattern| pattern.split(','))
+			.map(str::trim)
+			.filter(|pattern| !pattern.is_empty())
+			.any(|pattern| matches_class_pattern(&name, &pattern.replace('/', ".")))
+}
+
+fn matches_class_pattern(name: &str, pattern: &str) -> bool {
+	let name: &[u8] = name.as_bytes();
+	let pattern: &[u8] = pattern.as_bytes();
+	// matched[i] means the pattern processed so far matches the first i bytes.
+	// Only '*' is special; '.' also accepts a binary nesting separator ('$').
+	let mut matched: Vec<bool> = vec![false; name.len() + 1];
+	matched[0] = true;
+	for &token in pattern {
+		if token == b'*' {
+			for index in 1..=name.len() {
+				matched[index] = matched[index] || matched[index - 1];
+			}
+		} else {
+			for index in (1..=name.len()).rev() {
+				matched[index] =
+					matched[index - 1] && (token == name[index - 1] || (token == b'.' && name[index - 1] == b'$'));
+			}
+			matched[0] = false;
 		}
-		if let Some(prefix) = pattern.strip_suffix(".*") {
-			return name == prefix || name.starts_with(&format!("{prefix}."));
-		}
-		name == pattern || name.starts_with(&format!("{pattern}$"))
-	})
+	}
+	matched[name.len()]
+		|| (!pattern.contains(&b'*')
+			&& name
+				.iter()
+				.enumerate()
+				.any(|(index, &byte)| byte == b'$' && matched[index]))
 }
 
 pub fn generate_bindings_with_type_map(
@@ -128,7 +153,7 @@ pub fn visit_jar_classes(
 		let name: std::borrow::Cow<'_, str> = name?;
 		if is_binding_class_entry(&name)
 			&& core_jni_type(name.trim_end_matches(".class")).is_none()
-			&& (patterns.is_empty() || matches_any_pattern(&name, patterns))
+			&& matches_any_pattern(&name, patterns)
 		{
 			names.push(name.into_owned());
 		}

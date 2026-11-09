@@ -194,7 +194,22 @@ impl Builder {
 		self
 	}
 
-	/// Set class patterns for filtering which classes to generate bindings for.
+	/// Set class patterns for source, JAR, and Android inputs.
+	///
+	/// Matching is case-sensitive and covers the full qualified class name. Binary nested
+	/// names (`pkg.Outer$Inner`) and dotted aliases (`pkg.Outer.Inner`) are accepted without
+	/// capitalization heuristics. `/` is accepted as an alternative to a package separator.
+	/// Literal names select the class and all its nested descendants, at every nesting level;
+	/// in particular, a source pattern naming an inner class also selects its descendants.
+	///
+	/// `*` matches zero or more characters, including package and nesting separators.
+	/// Repeated stars have the same meaning as one star; other characters are literal.
+	/// Wildcard matches do not implicitly include descendants: `*Inner` selects names
+	/// ending in `Inner`, while `pkg.Outer$*` selects nested classes but not `Outer` itself.
+	///
+	/// Repeated and comma-separated patterns are combined as a union. Surrounding Unicode whitespace
+	/// is trimmed and empty entries are ignored. An empty pattern list selects all eligible
+	/// classes; a nonempty list matching nothing successfully produces empty bindings.
 	pub fn patterns<I, S>(mut self, patterns: I) -> Self
 	where
 		I: IntoIterator<Item = S>,

@@ -59,6 +59,8 @@ pub struct Options {
 	pub name_prefix: Option<String>,
 	#[arg(long)]
 	pub private: bool,
+	/// Class selection (repeatable or comma-separated): literal names include nested descendants;
+	/// '*' matches any characters. Accepts dotted or '$' nested names. Quote wildcards in the shell.
 	#[arg(long = "pattern")]
 	pub patterns: Vec<String>,
 	/// RustType=>java.Type entries or files containing those entries.
