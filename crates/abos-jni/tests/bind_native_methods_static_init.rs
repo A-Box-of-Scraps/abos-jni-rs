@@ -57,3 +57,32 @@ native_method_test! {
 		Ok(())
 	}
 }
+
+rusty_fork_test! {
+	#[test]
+	fn test_native_method_in_static_initializer_from_worker() {
+		let fixtures: std::path::PathBuf = util::java_fixtures();
+		util::attach_current_thread(|env| {
+			util::load_test_class(env, &fixtures, "TestNativeStaticInit")
+		})
+		.expect("define class without initializing it");
+
+		std::thread::spawn(|| {
+			util::attach_current_thread(|env| {
+				let thread: abos_jni::objects::JThread<'_> = abos_jni::objects::JThread::current_thread(env)?;
+				thread.set_context_class_loader(env, abos_jni::objects::JClassLoader::null())?;
+
+				// A null context loader cannot find the application class. The fallback
+				// must leave it uninitialized until the API registers its native method.
+				let class: JClass<'_> = abos_jni::refs::LoaderContext::None.load_class_for_type::<TestNativeStaticInit>(env, false)?;
+				assert!(!class.is_null());
+				let static_value: jint = TestNativeStaticInit::get_static_value(env)?;
+				assert_eq!(static_value, 42);
+				Ok(())
+			})
+			.expect("register natives before initializing the class on a worker");
+		})
+		.join()
+		.expect("worker succeeds");
+	}
+}

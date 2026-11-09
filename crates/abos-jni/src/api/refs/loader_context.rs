@@ -8,13 +8,18 @@ use crate::{
 };
 
 /// Represents the context that influences how a class may be loaded.
+///
+/// Non-initializing lookups never fall back to `FindClass`, which may initialize the
+/// requested class. For classes only visible to a custom native caller's loader,
+/// supply that loader explicitly or set the thread context class loader.
 #[derive(Debug, Default)]
 pub enum LoaderContext<'any_local, 'a> {
 	/// There's no extra context that influences how the class should be loaded, and a default
 	/// strategy will be used:
 	///
 	/// 1. The Thread context will be used to find a `ClassLoader` to check via Class.forName
-	/// 2. `FindClass` will be called
+	/// 2. For initializing lookups, `FindClass` will be called; otherwise
+	///    `Class.forName` will be called with the system class loader and initialization disabled.
 	#[default]
 	None,
 	/// A direct reference to the class loader that should be used (with no fallback to `FindClass`)
@@ -28,7 +33,8 @@ pub enum LoaderContext<'any_local, 'a> {
 	/// The search strategy will be:
 	/// 1. The Thread context will be used to find a `ClassLoader` to check via Class.forName
 	/// 2. The `ClassLoader` associated with the object being downcast will be used
-	/// 3. `FindClass` will be called
+	/// 3. For initializing lookups, `FindClass` will be called; otherwise
+	///    `Class.forName` will be called with the system class loader and initialization disabled.
 	FromObject(&'a JObject<'any_local>),
 }
 
@@ -272,7 +278,14 @@ fn lookup_class_with_fallbacks<'local>(
 		}
 	}
 
-	find_class(env, name)
+	if initialize {
+		find_class(env, name)
+	} else {
+		// FindClass initializes its result, so it cannot preserve initialize=false.
+		// The system loader matches FindClass's fallback on native worker threads.
+		let loader: JClassLoader<'_> = JClassLoader::get_system_class_loader(env)?;
+		load_class_with_catch(env, name, false, &loader)
+	}
 }
 
 /// Convert an internal name or array descriptor (like `"java/lang/String"` or

@@ -177,7 +177,7 @@ rusty_fork::rusty_fork_test! {
 		attach_current_thread(|env| {
 			util::load_test_class(env, &out_dir, "TestFields")?;
 
-			let class = env.load_class(jni_str!("com/example/TestFields"))?;
+			let class = env.load_class(jni_str!("com.example.TestFields"))?;
 
 			let arr = env.new_byte_array(1)?;
 			env.set_static_field(

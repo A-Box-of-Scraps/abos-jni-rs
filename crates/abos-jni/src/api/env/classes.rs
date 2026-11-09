@@ -284,8 +284,9 @@ impl<'local> Env<'local> {
 		}
 	}
 
-	/// Look up a class by its fully-qualified name, via `Class.forName(<name>,
-	/// <initialize>, <loader>)` with a `FindClass` fallback.
+	/// Look up a class by its fully-qualified name without initializing it, via
+	/// `Class.forName(<name>, false, <loader>)`, trying the thread context class
+	/// loader first and then the system class loader.
 	///
 	/// This is a convenience wrapper around [`LoaderContext::load_class`] with
 	/// [`LoaderContext::None`].
