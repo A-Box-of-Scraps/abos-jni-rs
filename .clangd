@@ -1,0 +1,5 @@
+# Generate with: mise run generate:compile-commands
+If:
+  PathMatch: tests/abos-(jni|jvmti)-sys-systest/.*
+CompileFlags:
+  CompilationDatabase: .
