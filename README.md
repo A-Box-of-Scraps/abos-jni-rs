@@ -10,7 +10,8 @@ Small Java class-file metadata reader for JNI binding generation.
 
 ### [abos-javac](crates/abos-javac)
 
-A build-time dependency for Cargo build scripts and unit tests to assist in invoking the native Java compiler to compile Java source files into class files.
+A build-time dependency for Cargo build scripts and unit tests to assist in invoking the native Java compiler to compile
+Java source files into class files.
 
 ### [abos-jbindgen](crates/abos-jbindgen)
 
@@ -43,6 +44,16 @@ Environment and agent utilities for the Java Virtual Machine Tool Interface.
 ### [abos-jvmti-sys](crates/abos-jvmti-sys)
 
 Raw Rust definitions corresponding to jvmti.h.
+
+## Contributing
+
+Contributions are welcome!
+
+- Read the contributor guide in [CONTRIBUTING.md](CONTRIBUTING.md).
+- Report bugs or request features in [Issues](https://github.com/A-Box-of-Scraps/abos-jni-rs/issues/)
+- Open changes through [Pull Requests](https://github.com/A-Box-of-Scraps/abos-jni-rs/pulls/)
+
+> All pull requests must be tested before being submitted.
 
 ## License
 
