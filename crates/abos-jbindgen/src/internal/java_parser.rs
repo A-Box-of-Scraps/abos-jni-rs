@@ -8,7 +8,7 @@ use crate::api::error::{Error, Result};
 use crate::api::types::{ArgInfo, ClassInfo, FieldInfo, InstanceOfInfo, MethodInfo, MethodSignature, TypeInfo};
 use abos_jni::objects::{JObjectArray, JString};
 use abos_jni::{Env, InitArgsBuilder, JNIVersion, JavaVM};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use std::io::Read;
@@ -107,7 +107,7 @@ abos_jni::bind_java_type! {
 		ClassDescription => com.jbindgen.Parser::ClassDescription,
 	},
 	methods {
-		static fn parse(source_paths: JString[], class_path_entries: JString[], class_pattern: JString) -> ClassDescription[],
+		static fn parse(source_paths: JString[], class_path_entries: JString[], class_pattern: JString, android_jar: JString) -> ClassDescription[],
 	},
 }
 
@@ -179,6 +179,25 @@ pub fn parse_java_sources(
 	class_path_entries: &[PathBuf],
 	class_pattern: &str,
 ) -> Result<Vec<ClassInfo>> {
+	parse_sources(source_paths, class_path_entries, class_pattern, None)
+}
+
+/// Parse SDK documentation stubs against Android's core APIs instead of host modules.
+pub fn parse_android_sources(
+	source_paths: &[PathBuf],
+	class_path_entries: &[PathBuf],
+	class_pattern: &str,
+	android_jar: &Path,
+) -> Result<Vec<ClassInfo>> {
+	parse_sources(source_paths, class_path_entries, class_pattern, Some(android_jar))
+}
+
+fn parse_sources(
+	source_paths: &[PathBuf],
+	class_path_entries: &[PathBuf],
+	class_pattern: &str,
+	android_jar: Option<&Path>,
+) -> Result<Vec<ClassInfo>> {
 	let jvm: &abos_jni::vm::JavaVM = get_parser_jvm()?;
 
 	let result: std::result::Result<Vec<ClassInfo>, abos_jni::errors::Error> = jvm.attach_current_thread(|env| {
@@ -190,12 +209,24 @@ pub fn parse_java_sources(
 
 		let pattern_jstring: abos_jni::objects::JString<'_> = JString::from_str(env, class_pattern)?;
 
+		let platform: JString<'_> = match android_jar {
+			Some(path) => JString::from_str(
+				env,
+				path.to_str().ok_or_else(|| {
+					abos_jni::errors::Error::ParseFailed("Invalid Android platform path encoding".to_owned())
+				})?,
+			)?,
+			None => JString::null(),
+		};
+
 		let result_array: abos_jni::objects::JObjectArray<'_, crate::internal::java_parser::ClassDescription<'_>> =
-			ParserWrapper::parse(env, &source_paths_array, &classpath_array, &pattern_jstring).or_else(|error| {
-				// Preserve the parser's diagnostic instead of reporting only a pending Java exception.
-				env.exception_catch()?;
-				Err(error)
-			})?;
+			ParserWrapper::parse(env, &source_paths_array, &classpath_array, &pattern_jstring, &platform).or_else(
+				|error| {
+					// Preserve the parser's diagnostic instead of reporting only a pending Java exception.
+					env.exception_catch()?;
+					Err(error)
+				},
+			)?;
 
 		let mut classes: Vec<crate::ClassInfo> = Vec::new();
 		let len: usize = result_array.len(env)?;

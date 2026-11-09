@@ -210,6 +210,10 @@ run = "cargo test --locked --package abos-jbindgen --all-features -q"
 [tasks."test:abos-jbindgen-annotations"]
 run = "cargo test --locked --package abos-jbindgen-annotations -q"
 
+# Requires ANDROID_HOME or ANDROID_SDK_ROOT with platforms;android-35 installed.
+[tasks."test:abos-jbindgen:android-sdk"]
+run = "cargo test --locked --package abos-jbindgen --test android_sdk_installed -q -- --ignored"
+
 [tasks."test:abos-jbindgen:parity"]
 run = [
   "cargo test --package abos-jbindgen --lib internal::java_parser::tests --locked -q",

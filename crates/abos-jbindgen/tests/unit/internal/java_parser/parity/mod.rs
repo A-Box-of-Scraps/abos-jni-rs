@@ -69,7 +69,8 @@ fn check_descriptors(sources: &[PathBuf]) -> TestResult {
 		let paths: JObjectArray<'_, JString<'_>> = create_string_array(env, sources)?;
 		let classpath: JObjectArray<'_, JString<'_>> = create_string_array(env, &[])?;
 		let pattern: JString<'_> = env.new_string("*")?;
-		let classes: JObjectArray<'_, ClassDescription<'_>> = ParserWrapper::parse(env, paths, classpath, pattern)?;
+		let classes: JObjectArray<'_, ClassDescription<'_>> =
+			ParserWrapper::parse(env, paths, classpath, pattern, JString::null())?;
 		for i in 0..classes.len(env)? {
 			let class: ClassDescription<'_> = classes.get_element(env, i)?;
 			check_java_descriptors(env, &class)?;

@@ -1,4 +1,7 @@
 //! Android callable signatures must match independently of the native modifier.
+#[path = "support/android_platform.rs"]
+mod android_platform;
+
 use std::{
 	fs,
 	io::Write,
@@ -35,6 +38,9 @@ fn sdk() -> TestResult<TempDir> {
 		let mut writer: ZipWriter<fs::File> = ZipWriter::new(fs::File::create(platform.join(archive))?);
 		writer.start_file(entry, SimpleFileOptions::default())?;
 		writer.write_all(&bytes)?;
+		if archive == "android.jar" {
+			android_platform::add_core_classes(&mut writer)?;
+		}
 		writer.finish()?;
 	}
 	Ok(root)

@@ -27,7 +27,7 @@ pub fn generate_android_bindings(
 	let stubs_jar: std::path::PathBuf = sdk.get_stubs_src_jar()?;
 	let classpath: Vec<std::path::PathBuf> = sdk.get_classpath()?;
 	let stub_classes: std::collections::HashMap<String, crate::ClassInfo> =
-		parse_source_stubs(&stubs_jar, &classpath, patterns)?;
+		parse_source_stubs(&stubs_jar, &android_jar, &classpath, patterns)?;
 
 	let mut filtered_classes: Vec<crate::ClassInfo> = intersect_classes(jar_classes, &stub_classes);
 
@@ -75,6 +75,7 @@ pub(super) fn parse_jar_classes(jar_path: &Path, patterns: &[String]) -> Result<
 /// Parse source stubs from android-stubs-src.jar
 pub(super) fn parse_source_stubs(
 	stubs_jar: &Path,
+	android_jar: &Path,
 	classpath: &[PathBuf],
 	patterns: &[String],
 ) -> Result<HashMap<String, ClassInfo>> {
@@ -85,7 +86,7 @@ pub(super) fn parse_source_stubs(
 	};
 
 	let classes: Vec<crate::ClassInfo> =
-		java_parser::parse_java_sources(&[stubs_jar.to_path_buf()], classpath, &pattern_str)?;
+		java_parser::parse_android_sources(&[stubs_jar.to_path_buf()], classpath, &pattern_str, android_jar)?;
 
 	let mut result: std::collections::HashMap<String, crate::ClassInfo> = HashMap::new();
 	for class_info in classes {

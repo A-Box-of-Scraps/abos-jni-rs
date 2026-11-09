@@ -122,6 +122,10 @@ impl Builder {
 
 	/// Set the input to Android SDK APIs.
 	///
+	/// Source stubs are analyzed against the selected `android.jar`, not host JDK modules.
+	/// SDK documentation-only Android annotations and unused imports are excluded from
+	/// analysis; Java deprecation, Javadoc, and binding annotations are preserved.
+	///
 	/// Generation fails on the first selected-class parsing or code-generation error;
 	/// it never returns partial bindings after silently dropping a failing class.
 	/// Class failures preserve the class/archive context and underlying error.

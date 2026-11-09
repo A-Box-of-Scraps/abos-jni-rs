@@ -1,4 +1,7 @@
 //! Android SDK discovery tests using a temporary SDK layout, without Android tooling.
+#[path = "support/android_platform.rs"]
+mod android_platform;
+
 use abos_jbindgen::{AndroidSdk, Error};
 use std::{fs, path::PathBuf};
 use tempfile::TempDir;
@@ -56,6 +59,9 @@ fn generates_and_filters_android_bindings_from_local_sdk_archives() -> Result<()
 		let mut writer: ZipWriter<fs::File> = ZipWriter::new(fs::File::create(platform.join(archive))?);
 		writer.start_file(entry, SimpleFileOptions::default())?;
 		writer.write_all(&bytes)?;
+		if archive == "android.jar" {
+			android_platform::add_core_classes(&mut writer)?;
+		}
 		writer.finish()?;
 	}
 	let flags: PathBuf = root.path().join("hidden-api.csv");

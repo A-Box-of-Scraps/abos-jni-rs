@@ -70,9 +70,11 @@ public class Parser implements AutoCloseable {
      *                         paths
      * @param classPathEntries Array of classpath entries (JARs or directories)
      * @param classPattern     Pattern to match classes (e.g., "android.app.*")
+     * @param androidJar       Android boot classpath, or null for the host JDK
      * @return Array of ClassDescription objects
      */
-    public ClassDescription[] parse(String[] sourcePaths, String[] classPathEntries, String classPattern)
+    public ClassDescription[] parse(
+            String[] sourcePaths, String[] classPathEntries, String classPattern, String androidJar)
             throws IOException {
         List<JavaFileObject> compilationUnits = new ArrayList<>();
 
@@ -106,8 +108,17 @@ public class Parser implements AutoCloseable {
             String joinedClasspath = String.join(File.pathSeparator, classPathEntries);
             options.add(joinedClasspath);
         }
+        if (androidJar != null) {
+            // Android supplies its own java.* APIs, not the host JDK's named modules.
+            // Source/target 8 enables a boot classpath without restricting APIs to Java SE 8.
+            options.addAll(Arrays.asList("-source", "8", "-target", "8", "-bootclasspath", androidJar));
+        }
         options.add("-proc:none"); // Disable annotation processing
         options.add("-nowarn"); // Suppress warnings
+
+        if (androidJar != null) {
+            compilationUnits = AndroidStubs.prepare(compiler, fileManager, compilationUnits, options);
+        }
 
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
 
@@ -168,7 +179,7 @@ public class Parser implements AutoCloseable {
             return classes.toArray(new ClassDescription[0]);
 
         } catch (IOException e) {
-            throw new IOException("Failed to parse source files", e);
+            throw new IOException("Failed to parse source files: " + e.getMessage(), e);
         }
     }
 

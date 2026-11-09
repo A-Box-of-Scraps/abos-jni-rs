@@ -1,4 +1,7 @@
 //! Android generation must fail without publishing incomplete binding output.
+#[path = "support/android_platform.rs"]
+mod android_platform;
+
 use std::{
 	fs,
 	io::Write,
@@ -78,6 +81,7 @@ fn sdk(failure: Failure) -> TestResult<TempDir> {
 			bytecode.write_all(&fs::read(class)?)?;
 		}
 	}
+	android_platform::add_core_classes(&mut bytecode)?;
 	bytecode.finish()?;
 	stubs.finish()?;
 	Ok(root)
