@@ -52,6 +52,17 @@ pub fn native_method(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 }
 
 /// Generate Rust bindings for a Java type.
+///
+/// Custom primitive mappings such as `unsafe Handle => long` use `Into` conversions
+/// when calling Java: arguments and field setters convert `Handle` into the JNI
+/// primitive (`jlong`), while method returns and field getters convert it back.
+/// Implementing `From<Handle> for jlong` and `From<jlong> for Handle` supplies both
+/// directions. Only the conversions used by the declared members are required;
+/// the wrapper does not need to be `Copy`.
+///
+/// Custom primitives must have the same size and alignment as their JNI primitive.
+/// Built-in `bool` returns and getters normalize JNI booleans to `false` or `true`;
+/// raw `jboolean` and custom boolean wrappers use the raw JNI byte instead.
 #[proc_macro]
 pub fn bind_java_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	api::bind_java_type(input)

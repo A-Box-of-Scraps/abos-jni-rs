@@ -125,13 +125,7 @@ pub(super) fn generate_jni_call_for_return_type(
 		},
 		|prim| {
 			let call_fn: Ident = format_ident!("{}{}MethodA", call_prefix, prim.jni_name());
-			let value: TokenStream = if prim == PrimitiveType::Void {
-				quote! { () }
-			} else if crate::internal::types::is_rust_bool(return_type, type_mappings) {
-				quote! { ret != #jni::sys::JNI_FALSE }
-			} else {
-				quote! { ret }
-			};
+			let value: TokenStream = primitive_return(&prim, return_type, type_mappings, jni);
 			(quote! {}, call_fn, value)
 		},
 	);
@@ -152,6 +146,22 @@ pub(super) fn generate_jni_call_for_return_type(
 		&quote! { #null_check #top_check },
 		&return_tokens,
 	)
+}
+
+/// Convert raw JNI method and field results into the declared Rust primitive type.
+pub(super) fn primitive_return(
+	primitive: &PrimitiveType,
+	ty: &SigType,
+	type_mappings: &TypeMappings,
+	jni: &syn::Path,
+) -> TokenStream {
+	if *primitive == PrimitiveType::Void {
+		quote! { () }
+	} else if crate::internal::types::is_rust_bool(ty, type_mappings) {
+		quote! { ret != #jni::sys::JNI_FALSE }
+	} else {
+		quote! { ret.into() }
+	}
 }
 
 /// Generate method implementations (instance or static methods)
