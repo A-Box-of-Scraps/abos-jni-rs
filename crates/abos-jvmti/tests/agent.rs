@@ -94,6 +94,7 @@ fn run_agent(home: &Path, agent: &Path, classes: &Path) -> Result<(), Box<dyn st
 	for marker in [
 		"JVMTI_VM_INIT version=",
 		"JVMTI_COMPAT_OK",
+		"JVMTI_OWNERSHIP_OK",
 		"JVMTI_WORKER_OK",
 		"JVMTI_AGENT_OK thread_start=",
 	] {

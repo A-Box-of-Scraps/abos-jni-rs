@@ -8,3 +8,10 @@ pub use error::{Error, Result};
 
 mod version;
 pub use version::JvmtiVersion;
+
+mod array;
+mod local_variables;
+mod strings;
+pub use array::JvmtiArray;
+pub use local_variables::{LocalVariable, LocalVariableTable};
+pub use strings::{JvmtiString, JvmtiStringList};

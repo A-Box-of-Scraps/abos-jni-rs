@@ -1,23 +1,17 @@
-use core::{
-	mem::ManuallyDrop,
-	ops::{Deref, DerefMut},
-	ptr::NonNull,
-};
+use core::ops::{Deref, DerefMut};
 
-use crate::{Env, Error, Result, internal::error::check, sys};
+use super::array::Deallocator;
+use crate::{Env, Error, JvmtiArray, Result, internal::error::check, sys};
 
 /// A zero-initialized byte allocation owned by a JVMTI environment.
 ///
-/// Drop releases it with JVMTI `Deallocate`, never Rust's allocator. It cannot
-/// move between threads. The environment and VM must remain alive through drop;
-/// the creating thread must remain in a context where `Deallocate` is permitted.
-/// A native deallocation failure during drop cannot be reported.
+/// Drop releases it with the originating environment's `Deallocate`, never
+/// Rust's allocator. [`JvmtiArray`]'s lifetime and cleanup-context requirements
+/// apply. A native deallocation failure during drop cannot be reported; use
+/// [`Self::free`] to observe cleanup errors.
 #[derive(Debug)]
 pub struct Allocation<'env, 'vm> {
-	env: &'env Env<'vm>,
-	pointer: NonNull<u8>,
-	length: usize,
-	deallocate: unsafe extern "system" fn(*mut sys::jvmtiEnv, *mut u8) -> sys::jvmtiError,
+	bytes: JvmtiArray<'env, 'vm, u8>,
 }
 
 impl<'vm> Env<'vm> {
@@ -38,27 +32,20 @@ impl<'vm> Env<'vm> {
 		}
 		let allocate: unsafe extern "system" fn(*mut sys::jvmtiEnv, sys::jlong, *mut *mut u8) -> sys::jvmtiError =
 			self.table().Allocate.ok_or(Error::MissingFunction("Allocate"))?;
-		let deallocate: unsafe extern "system" fn(*mut sys::jvmtiEnv, *mut u8) -> sys::jvmtiError =
-			self.table().Deallocate.ok_or(Error::MissingFunction("Deallocate"))?;
+		let _deallocator: Deallocator<'_, '_> = Deallocator::new(self)?;
 		let mut raw: *mut u8 = core::ptr::null_mut();
 		// SAFETY: The caller guarantees the context; size is representable and raw writable.
 		check(unsafe { allocate(self.as_raw(), size, &raw mut raw) })?;
-		let pointer: NonNull<u8> = if length == 0 {
-			// JVMTI specifies a null allocation for size zero. Use a dangling pointer
-			// solely to satisfy the non-null requirement of empty Rust slices.
-			NonNull::dangling()
-		} else {
-			let pointer: NonNull<u8> = NonNull::new(raw).ok_or(Error::NullPointer)?;
+		if length != 0 {
+			if raw.is_null() {
+				return Err(Error::NullPointer);
+			}
 			// SAFETY: Allocate returned exclusive writable storage for length bytes.
-			unsafe { pointer.as_ptr().write_bytes(0, length) };
-			pointer
-		};
-		Ok(Allocation {
-			env: self,
-			pointer,
-			length,
-			deallocate,
-		})
+			unsafe { raw.write_bytes(0, length) };
+		}
+		// SAFETY: Storage is initialized; null is permitted only for an empty allocation.
+		let bytes: JvmtiArray<'_, '_, u8> = unsafe { JvmtiArray::from_raw(self, raw, length) }?;
+		Ok(Allocation { bytes })
 	}
 }
 
@@ -66,42 +53,31 @@ impl Allocation<'_, '_> {
 	/// Transfers ownership to the caller, for example for a class-file load hook.
 	///
 	/// The result must be released with the same environment's `Deallocate` or
-	/// transferred to a JVMTI operation that takes ownership. Returns null for an
-	/// empty allocation. Dropping the Rust handle no longer frees the memory.
+	/// transferred to a JVMTI operation that takes ownership. The original pointer
+	/// is preserved, including null for a zero-sized JVMTI allocation.
 	#[must_use]
 	pub fn into_raw(self) -> *mut u8 {
-		let allocation: ManuallyDrop<Self> = ManuallyDrop::new(self);
-		if allocation.length == 0 {
-			core::ptr::null_mut()
-		} else {
-			allocation.pointer.as_ptr()
-		}
+		self.bytes.into_raw().0
+	}
+
+	/// Consumes the allocation and attempts cleanup once, without a drop retry.
+	///
+	/// # Errors
+	/// Returns a native cleanup error. See [`JvmtiArray::free`] for failure policy.
+	pub fn free(self) -> Result<()> {
+		self.bytes.free()
 	}
 }
 
 impl Deref for Allocation<'_, '_> {
 	type Target = [u8];
-
 	fn deref(&self) -> &[u8] {
-		// SAFETY: The allocation is initialized, valid, and bounded by isize::MAX;
-		// the empty case uses a non-null aligned dangling pointer.
-		unsafe { core::slice::from_raw_parts(self.pointer.as_ptr(), self.length) }
+		&self.bytes
 	}
 }
 
 impl DerefMut for Allocation<'_, '_> {
 	fn deref_mut(&mut self) -> &mut [u8] {
-		// SAFETY: Ownership and the mutable borrow guarantee exclusive access.
-		unsafe { core::slice::from_raw_parts_mut(self.pointer.as_ptr(), self.length) }
-	}
-}
-
-impl Drop for Allocation<'_, '_> {
-	fn drop(&mut self) {
-		if self.length != 0 {
-			// SAFETY: The allocation is still owned here. The allocate contract requires
-			// its environment and thread context to remain suitable through drop.
-			let _code: sys::jvmtiError = unsafe { (self.deallocate)(self.env.as_raw(), self.pointer.as_ptr()) };
-		}
+		&mut self.bytes
 	}
 }

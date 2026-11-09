@@ -3,6 +3,7 @@ use core::{marker::PhantomData, ptr::NonNull};
 use crate::{Error, JvmtiVersion, Result, internal::error::check, sys};
 
 mod construction;
+mod returned_data;
 
 /// A borrowed JVMTI 1.2-or-newer environment, usable across threads.
 ///

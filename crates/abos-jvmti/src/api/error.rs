@@ -26,4 +26,6 @@ pub enum Error {
 	NullPointer,
 	/// The requested allocation cannot be represented by a Rust slice or `jlong`.
 	AllocationTooLarge,
+	/// A successful native operation returned a negative element count.
+	InvalidCount(sys::jint),
 }

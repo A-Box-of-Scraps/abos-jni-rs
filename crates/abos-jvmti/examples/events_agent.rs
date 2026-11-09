@@ -8,7 +8,8 @@ use std::{
 	sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
-use abos_jvmti::{Allocation, Env, Error, JvmtiVersion, Result, sys};
+use abos_jni::jni_str;
+use abos_jvmti::{Allocation, Env, Error, JvmtiString, JvmtiStringList, JvmtiVersion, Result, sys};
 
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
 static FAILED: AtomicBool = AtomicBool::new(false);
@@ -45,7 +46,19 @@ unsafe extern "system" fn vm_init(raw: *mut sys::jvmtiEnv, _jni: *mut sys::JNIEn
 			}
 			let mut bytes: Allocation<'_, '_> = env.allocate(16)?;
 			bytes.copy_from_slice(b"JVMTI allocation");
-			drop(bytes);
+			bytes.free()?;
+			let properties: JvmtiStringList<'_, '_> = env.system_properties()?;
+			let vm_name: JvmtiString<'_, '_> = env.system_property(jni_str!("java.vm.name"))?;
+			if !properties.iter().any(|key| key == jni_str!("java.vm.name")) || vm_name.to_bytes().is_empty() {
+				return Err(Error::Jvmti(sys::JVMTI_ERROR_INTERNAL));
+			}
+			vm_name.free()?;
+			properties.free()?;
+			match env.system_property(jni_str!("abos.jvmti.missing.property")) {
+				Err(Error::Jvmti(sys::JVMTI_ERROR_NOT_AVAILABLE)) => {}
+				_ => return Err(Error::Jvmti(sys::JVMTI_ERROR_INTERNAL)),
+			}
+			report(format_args!("JVMTI_OWNERSHIP_OK"));
 			report(format_args!("JVMTI_VM_INIT version={:#x}", env.version().as_raw()));
 		}
 		INITIALIZED.store(true, Ordering::SeqCst);

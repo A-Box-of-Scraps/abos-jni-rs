@@ -17,14 +17,14 @@
 
 ## 2. Returned-data ownership
 
-- [ ] Add ownership wrappers for JVMTI-returned buffers, arrays, and modified UTF-8 strings, beyond newly allocated byte
+- [x] Add ownership wrappers for JVMTI-returned buffers, arrays, and modified UTF-8 strings, beyond newly allocated byte
       buffers.
-- [ ] Support nested allocations and operation-specific cleanup for returned structures.
-- [ ] Keep JVMTI allocation ownership separate from JNI reference ownership and lifetimes.
-- [ ] Use the originating environment's `Deallocate`, never Rust's allocator, for JVMTI-owned memory.
-- [ ] Document environment lifetime, thread attachment, phase, and callback-context requirements for access and cleanup.
-- [ ] Provide explicit ownership transfer and fallible cleanup where appropriate.
-- [ ] Test empty results, partial failures, nested cleanup, and exactly-once deallocation.
+- [x] Support nested allocations and operation-specific cleanup for returned structures.
+- [x] Keep JVMTI allocation ownership separate from JNI reference ownership and lifetimes.
+- [x] Use the originating environment's `Deallocate`, never Rust's allocator, for JVMTI-owned memory.
+- [x] Document environment lifetime, thread attachment, phase, and callback-context requirements for access and cleanup.
+- [x] Provide explicit ownership transfer and fallible cleanup where appropriate.
+- [x] Test empty results, partial failures, nested cleanup, and exactly-once deallocation.
 
 ## 3. Missing Rust wrapper features
 
