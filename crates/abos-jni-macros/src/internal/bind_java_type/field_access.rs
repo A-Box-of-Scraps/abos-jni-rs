@@ -37,8 +37,7 @@ pub(super) fn generate_jni_get_field_call(
 		)
 	};
 
-	// The JNI spec asserts that `Get<Type>Field` _must_ not be called with a `null` object reference
-	// Note: we assume that the class will never be null when getting static fields
+	// JNI instance field access requires a non-null receiver; cached static classes are non-null.
 	let null_check: TokenStream = super::calls::generate_receiver_null_check(
 		is_static,
 		this_or_class,
@@ -74,7 +73,6 @@ pub(super) fn generate_jni_set_field_call(
 
 	let (call_fn, val_conversion) = if let Some(prim) = field_type.try_as_primitive(type_mappings) {
 		if prim == PrimitiveType::Void {
-			// Void fields don't make sense but we handle them for completeness.
 			return quote! { Ok(()) };
 		}
 		let call_fn: proc_macro2::Ident = format_ident!("{}{}Field", call_prefix, prim.jni_name());
@@ -84,8 +82,7 @@ pub(super) fn generate_jni_set_field_call(
 		(call_fn, quote! { #val.as_raw() })
 	};
 
-	// The JNI spec asserts that `Set<Type>Field` _must_ not be called with a `null` object reference
-	// Note: we assume that the class will never be null when setting static fields
+	// JNI instance field access requires a non-null receiver; cached static classes are non-null.
 	let null_check: TokenStream = super::calls::generate_receiver_null_check(
 		is_static,
 		this_or_class,

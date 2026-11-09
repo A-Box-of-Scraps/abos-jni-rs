@@ -103,8 +103,7 @@ pub(super) fn generate_reference_impl(
 
 			#[inline]
 			fn class_name() -> ::std::borrow::Cow<'static, #jni::strings::JNIStr> {
-				// Safety: we have compile-time encoded the name of the Java class as MUTF8
-				// and therefore know it's safe to cast as a JNIStr
+				// SAFETY: The class name was encoded as modified UTF-8 at compile time.
 				unsafe {
 					::std::borrow::Cow::Borrowed(#jni::strings::JNIStr::from_cstr_unchecked(#java_class_cstr))
 				}

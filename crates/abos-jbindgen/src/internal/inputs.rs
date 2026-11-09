@@ -6,8 +6,7 @@ use std::{
 	path::{Path, PathBuf},
 };
 /// Match archive names using the class-pattern contract documented on `Builder::patterns`.
-/// Keep this implementation aligned with `Parser.matchesSinglePattern`; `source_patterns.rs`
-/// runs the same selection cases against both parsers.
+/// Uses the same selection rules as the Java parser's `Parser.matchesSinglePattern`.
 pub fn matches_any_pattern(name: &str, patterns: &[String]) -> bool {
 	let name: String = name.strip_suffix(".class").unwrap_or(name).replace('/', ".");
 	patterns.is_empty()

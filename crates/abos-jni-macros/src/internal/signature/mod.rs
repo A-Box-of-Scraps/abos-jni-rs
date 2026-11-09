@@ -1,18 +1,8 @@
-//! Procedural macro for generating JNI signatures at compile time
+//! Compile-time JNI method and field descriptors for `jni_sig!`.
 //!
-//! This module provides a `jni_sig!` macro that parses method and field signatures
-//! and generates JNI signature string literals.
-//!
-//! # Method Signatures
-//! Method signatures have the form `(parameters) -> return_type` and generate a JNI
-//! method descriptor like `"(ILjava/lang/String;)V"`.
-//!
-//! # Field Signatures
-//! Field signatures are just a bare type and generate a JNI field descriptor like
-//! `"Ljava/lang/String;"` or `"I"`.
-//!
-//! The parser automatically detects which type of signature based on the presence of
-//! parentheses and a return arrow.
+//! Method signatures use `(parameters) -> return_type`, producing descriptors such as
+//! `(ILjava/lang/String;)V`. A bare type denotes a field, producing descriptors such as
+//! `Ljava/lang/String;` or `I`.
 
 use proc_macro2::{Span, TokenStream};
 use quote::quote;

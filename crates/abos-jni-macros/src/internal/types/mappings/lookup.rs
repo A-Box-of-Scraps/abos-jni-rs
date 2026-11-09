@@ -4,20 +4,9 @@ use super::{
 };
 
 impl TypeMappings {
-	/// Insert a mapping from a Rust `Reference` type path to a Java class
+	/// Map a Rust reference type to a Java class, replacing the class's reverse lookup.
 	///
-	/// If there is already a a Rust type mapping to the same Java class, the reverse
-	/// mapping from Java class to Rust type path will be updated to point to the new
-	/// Rust type path (so that user-defined types can override built-in types).
-	///
-	/// Note:
-	/// - User code cannot create mappings for core Java classes.
-	/// - User code cannot _change_ the mapping for an existing Rust type path.
-	/// - User code cannot currently create multiple alias for a single Rust type path.
-	///
-	/// Returns an error if:
-	/// - Attempting to map a core Java class
-	/// - Attempting to change the mapping for an existing Rust type path
+	/// Rejects core Java classes and aliases already bound to a different Rust type.
 	pub fn insert_ref_type(
 		&mut self,
 		alias: &str,
@@ -126,56 +115,14 @@ impl TypeMappings {
 		Ok(())
 	}
 
-	/// Parse `type_map` block with Reference + primitive mappings and aliases
+	/// Parse a braced `type_map` block, optionally preceded by `=`.
 	///
-	/// This is a shared parser used by both `bind_java_type`! and `jni_sig`! macros. Parses a
-	/// braced block containing type mappings from Rust type paths to Java class names.
+	/// Entries are comma-separated, with an optional trailing comma:
+	/// - `RustPath => java.lang.Class` maps a reference type.
+	/// - `unsafe RustPath => long` maps a custom primitive representation.
+	/// - `typealias NewName => ExistingName` aliases an existing mapping.
 	///
-	/// # Syntax
-	///
-	/// A `type_map` block can be comprised of:
-	/// - Reference type mappings
-	/// - Primitive type mappings (unsafe)
-	/// - Type aliases
-	///
-	/// In all cases:
-	/// - The type separator is `=>`
-	/// - Mappings are separated by commas
-	/// - Trailing comma is optional
-	///
-	/// ## Reference Type Mappings
-	///
-	/// Each Reference type mapping has the form: `RustPath => java.lang.Class`
-	/// - `RustPath` can be a simple identifier (e.g., `JString`) or a path (e.g.,
-	///   `abos_jni::objects::JString`)
-	///
-	/// ## Primitive Type Mappings
-	///
-	/// Primitive type mappings are considered `unsafe`, but can be especially useful for mapping
-	/// wrapped pointers types to a Java `long` type (e.g. to associate native handles with Java
-	/// objects).
-	///
-	/// Each Primitive type mapping has the form: `unsafe RustPrimitive => java_primitive`
-	///
-	/// ## Aliases
-	///
-	/// Type aliases allow you to create a new name for an existing type mapping. This can be useful
-	/// for making signatures more readable (e.g. before you have a defined a real type binding).
-	///
-	/// An alias mapping has the form: `alias NewTypeName => ExistingTypeName`
-	///
-	/// Aliases for array types are not supported.
-	///
-	/// # Example
-	/// ```ignore
-	/// type_map = {
-	///     MyType => java.lang.MyType,
-	///     custom::MyOtherType => com.example.MyOtherType,
-	///     unsafe MyBoxHandle => long,
-	///     typealias MyTypeAlias => MyType,
-	///     typealias MyOtherTypeAlias => JObject,
-	/// }
-	/// ```
+	/// Array aliases are not supported.
 	pub fn parse_mappings(&mut self, input: ParseStream) -> Result<()> {
 		if input.peek(Token![=]) {
 			input.parse::<Token![=]>()?;

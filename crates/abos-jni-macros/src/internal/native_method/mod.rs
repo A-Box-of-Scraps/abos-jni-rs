@@ -1,9 +1,4 @@
-//! Procedural macros for generating compile-time type-checked `NativeMethod`
-//! structs
-//!
-//! This module implements the `native_method!` macro that create `NativeMethod`
-//! descriptors with compile-time guarantees that the function pointer matches
-//! the JNI signature.
+//! `NativeMethod` descriptors with compile-time checks that function pointers match JNI signatures.
 
 use proc_macro2::TokenStream;
 use quote::quote;

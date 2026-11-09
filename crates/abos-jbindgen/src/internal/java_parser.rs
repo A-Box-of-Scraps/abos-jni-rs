@@ -1,8 +1,4 @@
-//! Java source parser using `JavacTask` for extracting API information
-//!
-//! This module provides integration with the Java compiler API to parse
-//! Java source files and extract API information including fully-qualified
-//! types and parameter names.
+//! Extract Java API types and parameter names from source files using `JavacTask`.
 
 use crate::api::error::{Error, Result};
 use crate::api::types::{ArgInfo, ClassInfo, FieldInfo, InstanceOfInfo, MethodInfo, MethodSignature, TypeInfo};

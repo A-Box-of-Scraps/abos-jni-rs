@@ -1,51 +1,15 @@
-//! Windows-specific Fiber Local Storage (FLS) implementation for thread attachment tracking.
+//! Windows thread attachment tracking through Fiber Local Storage (FLS).
 //!
-//! This module provides a Windows-specific alternative to thread-local storage that uses Fiber
-//! Local Storage (FLS) callbacks. The key advantage is that FLS callbacks run without holding the
-//! Windows loader lock, avoiding potential deadlocks.
+//! FLS cleanup avoids the loader-lock deadlock possible with TLS destructors: detachment
+//! can wait for a JVM safepoint while a Java thread needs the loader lock to reach it.
+//! See <https://github.com/jni-rs/jni-rs/issues/701>.
 //!
-//! For example see: <https://github.com/jni-rs/jni-rs/issues/701>
+//! Fiber switching, fiber deletion, and external thread detachment must not occur while
+//! any `AttachGuard` is active. They can invalidate the environment pointer, local frames,
+//! and pending exception state in use by Rust code.
 //!
-//! On Windows, this sequence of events can trigger a deadlock:
-//!
-//! 1. A native thread, previously attached to a JVM, is stopped
-//! 2. Windows kernel calls the TLS destructor - This happens while [holding Windows Loader
-//!    Lock](https://doc.rust-lang.org/stable/std/thread/struct.LocalKey.html#synchronization-in-thread-local-destructors)
-//! 3. jni-rs `InternalAttachGuard` calls `DetachCurrentThread`. This involves a thread state
-//!    transition from Native to VM
-//! 4. Concurrently, there is a new Java thread being started by some other thread
-//! 5. During the Native -> VM transition, the native thread is trapped in a JVM safepoint. While
-//!    holding the loader lock!
-//! 6. The Java thread created at step no. 4 is already runnable from JVM's point of view, and the
-//!    JVM expects this thread to arrive at the safepoint. But Windows won't execute user code on
-//!    this thread until it manages to acquire the loader lock. Which is held by the Rust thread
-//!    that is trapped at safepoint. This means the Java thread cannot make any progress and
-//!    certainly cannot reach the safepoint. JVM won't release the native thread until all threads
-//!    are at safepoint -> Deadlock
-//!
-//! Design Notes:
-//! - The goal is not to try and support fibers in a general-purpose way and in fact we don't expect
-//!   any application using Rust + JNI to be scheduling multiple fibers on the same thread.
-//! - At the very-least, if an application does schedule fibers then we're assuming they are never
-//!   preempting Rust code that is using JNI.
-//! - No attempt is made to support fiber switching while there are active `AttachGuard`s.
-//!    - Trying to support this would raise all kinds of state tracking / safety issues, like, what
-//!      happens to any pushed local frames, or pending exceptions, etc.
-//! - No attempt is made support the freeing of fibers while there are active `AttachGuard`s for the
-//!   current thread.
-//!     - This could effectively rug pull the thread's attachment state while JNI is in use by a
-//!       different fiber context.
-//!
-//! Consistent with other platforms, we assume that no external code (e.g., other JNI language
-//! bindings may spontaneously detach the current thread while there are active `AttachGuard`s. This
-//! isn't something we can technically enforce, but we document it as a safety invariant. It would
-//! be totally impractical to try and use JNI without being able to make this assumption and
-//! probably impossible if code could be arbitrarily preempted by fiber switches (since you wouldn't
-//! ever know if your per-thread env pointer is still valid)
-//!
-//! As with TLS based attachment tracking we do want to be resilient to external code manually
-//! detaching threads when there are no active `AttachGuard`s, so `attach_current_thread()` will
-//! always check the real JNI attachment state if there are no active guards.
+//! External detachment is supported when no guards are active. `attach_current_thread()`
+//! checks the JNI attachment state before reusing an unguarded attachment.
 
 use std::{
 	ptr,
@@ -63,44 +27,29 @@ use crate::{
 
 use crate::windows_sys::{FlsAlloc, FlsGetValue, FlsSetValue};
 
-/// The FLS index used to store the attachment guard data.
-/// This is allocated once when the first thread attaches.
+/// Shared FLS index, initialized on first attachment.
 static FLS_INDEX: OnceLock<u32> = OnceLock::new();
 
 /// Data stored in FLS for each attached fiber.
 ///
-/// Note: We don't store the env pointer because:
-/// 1. Multiple fibers on the same thread share the same env pointer
-/// 2. After the first fiber detaches, the env pointer becomes invalid
-/// 3. Even with a single fiber, it's possible for external code to manually detach the thread,
-///    making the stored env pointer invalid.
+/// Environment pointers are not retained: another fiber or external code can detach
+/// the thread when no `AttachGuard`s are active, invalidating the shared pointer.
 #[derive(Debug)]
 struct FlsAttachData {
 	thread: Thread,
 }
 
-/// FLS callback that runs when a fiber terminates.
+/// Detach the current thread when Windows destroys a fiber or frees its FLS slot.
 ///
-/// SAFETY: This callback is invoked by Windows when:
-/// 1. A fiber terminates or is deleted
-/// 2. The FLS slot is freed (via `FlsFree`)
-///
-/// When this callback runs, it detaches the current thread from the JVM.
-///
-/// In the unlikely event that multiple fibers have attached the same thread (e.g., if
-/// `DetachCurrentThread` was called manually by external code), each fiber's termination
-/// will attempt to detach the thread, but subsequent detach calls are harmless no-ops.
+/// Multiple fibers can hold attachment data for the same thread after external detach
+/// and reattach operations. Each callback releases one logical attachment; detaching
+/// an already detached thread is a no-op at the JNI level.
 ///
 /// # Panics
 ///
-/// This function will panic if called while there are active `AttachGuard` instances
-/// (`thread_attach_guard_level() > 0`). Fiber switching or termination must not occur
-/// while an `AttachGuard` is in scope - this is a critical safety invariant.
+/// Panics if any `AttachGuard`s are active. Unwinding across this callback's ABI aborts.
 unsafe extern "system" fn fls_callback(data: *const core::ffi::c_void) {
-	// The pointer could have been cleared via fls_detach_current_thread()
 	if data.is_null() {
-		// Technically this should never be reached because the FlsFree docs state that
-		// callbacks are only invoked for non-null values, but just in case...
 		return;
 	}
 
@@ -121,9 +70,7 @@ unsafe extern "system" fn fls_callback(data: *const core::ffi::c_void) {
 		attach_data.thread.id()
 	);
 
-	// Always safe to detach when guard_level == 0
-	// Note: We pass None for cross_check_env because with multiple fibers, subsequent
-	// detach attempts will have stale env pointers. DetachCurrentThread is idempotent.
+	// No environment cross-check: another fiber may already have detached the thread.
 	// SAFETY: No attachment guards remain, as checked above; no environment is used after detaching.
 	if let Err(e) = unsafe { sys_detach_current_thread(None, &attach_data.thread) } {
 		error!(
@@ -135,9 +82,7 @@ unsafe extern "system" fn fls_callback(data: *const core::ffi::c_void) {
 	}
 }
 
-/// Initialize FLS if not already initialized.
-///
-/// Returns the FLS index, allocating it if necessary.
+/// Return the shared FLS index, allocating it if necessary.
 fn get_or_init_fls_index() -> Result<u32> {
 	if let Some(&index) = FLS_INDEX.get() {
 		return Ok(index);
@@ -153,39 +98,22 @@ fn get_or_init_fls_index() -> Result<u32> {
 	Ok(*FLS_INDEX.get_or_init(|| new_index))
 }
 
-/// Attach the current fiber using FLS for cleanup tracking.
+/// Attach the current thread and register cleanup in the current fiber's FLS slot.
 ///
-/// This attaches the current thread and stores attachment data in FLS so that when the fiber
-/// terminates, the FLS callback will automatically detach the thread from the JVM (without holding
-/// the loader lock).
+/// The caller must first use `GetEnv` to confirm that the thread is detached.
 ///
-/// Note: This function assumes that the caller has already used `GetEnv` to check if the thread is
-/// already attached, and only calls this function if it is not attached.
-///
-/// Typically only one fiber per thread will call this function because subsequent fibers on the
-/// same thread will find the thread already attached.
-///
-/// Note: Although it is unlikely, it's possible that this can be called from multiple fibers on the
-/// the same thread, if `DetachCurrentThread` was called manually by external code (we allow this as
-/// long as there are no active `AttachGuards`). In this case we allow the `ATTACHED_THREADS` counter to
-/// be incremented for each fiber with its own FLS data so the number can technically diverge from
-/// the real _thread_ attachment count. This is acceptable since the number is only used for
-/// debugging and unit tests. In fact, on Windows the unit tests will test for this scenario.
-///
-/// If we do end up with multiple fibers having FLS data then each fiber's termination will attempt to
-/// detach the thread, but subsequent detach calls are harmless no-ops. They will also decrement the
-/// `ATTACHED_THREADS` counter accordingly so the logical count remains correct.
+/// After external detachment, multiple fibers can independently reattach the same thread.
+/// `ATTACHED_THREADS` counts their FLS records rather than OS threads. Each cleanup releases
+/// one record, even if another fiber has already detached the thread.
 ///
 /// # Panics
 ///
-/// This function will panic if called while there are active `AttachGuard`s.
+/// Panics if any `AttachGuard`s are active.
 pub unsafe fn fls_attach_current_thread<'local>(
 	java_vm: &crate::JavaVM,
 	config: &crate::vm::AttachConfig,
 ) -> Result<crate::vm::AttachGuard<'local>> {
-	// CRITICAL INVARIANT: Fiber attachment must not occur while an AttachGuard is in scope.
-	// This would indicate that a new fiber is being attached (or an existing fiber is being
-	// switched to) while an AttachGuard is active, which violates our safety contract.
+	// Fiber attachment while a guard is active can invalidate its JNI state.
 	let guard_level: usize = JavaVM::thread_attach_guard_level();
 	assert!(
 		guard_level == 0,
@@ -239,15 +167,10 @@ pub unsafe fn fls_attach_current_thread<'local>(
 	Ok(unsafe { AttachGuard::from_unowned(env) })
 }
 
-/// Explicitly detach the current fiber if attached via FLS.
+/// Detach the current thread if the current fiber has an FLS attachment record.
 ///
-/// This clears the FLS slot without invoking the callback, since we're detaching manually.
-/// If the thread is attached via JNI, it will be detached.
-///
-/// # Panics
-///
-/// This function will panic if called while there are active `AttachGuard` instances.
-/// Fiber detachment/switching must not occur while an `AttachGuard` is in scope.
+/// Clears the FLS slot before detaching so cleanup cannot detach it again.
+/// Returns `Error::ThreadAttachmentGuarded` if any `AttachGuard`s are active.
 pub fn fls_detach_current_thread() -> Result<()> {
 	if JavaVM::thread_attach_guard_level() != 0 {
 		return Err(Error::ThreadAttachmentGuarded);
@@ -266,17 +189,13 @@ pub fn fls_detach_current_thread() -> Result<()> {
 	// Clear the FLS slot first (before detaching) to prevent the callback from running
 	// Safety: fls_index is valid
 	let result: i32 = unsafe { FlsSetValue(fls_index, ptr::null_mut()) };
-	// Treat this as a fatal error because the only documented errors are:
-	// - ERROR_INVALID_PARAMETER: fls_index is invalid (implies a bug and should not happen)
-	// - ERROR_NO_MEMORY: Should not happen if we're clearing a slot that must have been allocated
-	// Returning an error here would lead to a double-decrement of the attached threads counter
+	// Failure leaves the callback owning this record; continuing would risk duplicate cleanup.
 	assert_ne!(result, 0, "FATAL: Failed to clear FLS slot during detach");
 
-	// Safety: data_ptr came from FlsGetValue and we stored Box<FlsAttachData>
+	// SAFETY: `data_ptr` is the boxed record retrieved from the cleared FLS slot.
 	let attach_data: Box<FlsAttachData> = unsafe { Box::from_raw(data_ptr.cast::<FlsAttachData>()) };
 
-	// Note: We pass None for cross_check_env because we don't store env pointers in FLS
-	// (they can become stale with multiple fibers). DetachCurrentThread is idempotent.
+	// No environment cross-check: FLS records outlive external detachment.
 	// SAFETY: No attachment guards remain, and the FLS slot was cleared before detaching.
 	unsafe { sys_detach_current_thread(None, &attach_data.thread)? };
 	Ok(())

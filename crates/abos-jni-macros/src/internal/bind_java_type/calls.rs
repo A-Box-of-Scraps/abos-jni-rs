@@ -3,8 +3,7 @@ use super::{
 	sig_type_to_rust_arg_type, sig_type_to_rust_return_type,
 };
 
-/// Generate JNI call arguments processing data for a method/constructor
-/// This consolidates the common logic for processing parameters into jvalue arrays
+/// Generate `jvalue` array entries for method or constructor arguments.
 pub(super) fn generate_jni_call_args(
 	parameters: &[crate::internal::signature::Parameter],
 	type_mappings: &TypeMappings,
@@ -130,8 +129,7 @@ pub(super) fn generate_jni_call_for_return_type(
 		},
 	);
 
-	// The JNI spec asserts that `Call<Type>MethodA` _must_ not be called with a `null` object reference
-	// Note: we assume that the class will never be null when calling static methods
+	// JNI instance calls require a non-null receiver; cached static classes are non-null.
 	let null_check: TokenStream = generate_receiver_null_check(
 		is_static,
 		this_or_class,

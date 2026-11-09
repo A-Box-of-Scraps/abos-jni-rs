@@ -1,15 +1,6 @@
 use syn::{Ident, Token};
 
-/// The default name for the `abos-jni` crate
-///
-/// Note: This used to be resolved using `proc_macro_crate` but we later decided
-/// to remove the dependency (it brings in numerous sub dependencies and adds
-/// complexity that's not strictly necessary if the `jni=<path>` can be used to
-/// specify the path explicitly). It should be very rare to need a non-default
-/// path.
-///
-/// We now assume that the name will either be overridden explicitly or else we
-/// use the default '`abos_jni`' name
+/// Default crate path when no `jni = <path>` override is supplied.
 fn jni_crate_default() -> syn::Path {
 	syn::parse_quote!(::abos_jni)
 }

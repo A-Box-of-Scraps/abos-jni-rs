@@ -8,8 +8,7 @@ fn test_single_ident_fails_as_java_class() {
 	};
 
 	let result: Result<proc_macro2::TokenStream> = jni_sig_impl(input);
-	// Should fail because "String" without a dot is treated as a Rust type
-	// and there's no type mapping for it
+	// Undotted `String` is a Rust type alias and requires a mapping.
 	assert!(result.is_err());
 }
 

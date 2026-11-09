@@ -48,9 +48,7 @@ pub(super) fn generate_native_registration_code(
 
 	Ok(quote! {
 		{
-			// Safety: All of the name and signature CStr literals have been validate
-			// at compile time and encoded as MUTF-8 - therefore they can be safely
-			// cast to a JNIStr unchecked at runtime.
+			// SAFETY: Name and signature literals are validated and encoded as modified UTF-8 at compile time.
 			unsafe {
 				let native_methods = &[
 					#(#native_method_descriptors),*

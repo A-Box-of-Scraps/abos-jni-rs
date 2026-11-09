@@ -1,10 +1,4 @@
-//! JNI-compatible method signature generator for Rust libraries.
-//!
-//! This crate was designed for use with the [`jni`](https://crates.io/crates/jni) crate, which
-//! exposes JNI-compatible type bindings. Although it's possible to use `jni` without `jni_fn`, the
-//! procedural macro defined here will make it easier to write the method signatures correctly.
-//!
-//! See the `jni_fn` attribute macro documentation below for more info and usage examples.
+//! JNI export-name generation for the `jni_mangle` attribute.
 
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
@@ -15,8 +9,7 @@ use std::fmt::Write as _;
 use syn::parse_quote;
 use syn::spanned::Spanned;
 
-/// Deals exclusively with `proc_macro2::TokenStream` instead of `proc_macro::TokenStream`,
-/// allowing it and all interior functionality to be unit tested.
+/// Expand `jni_mangle` into a public system-ABI function with a JNI export name.
 pub fn jni_mangle2(attr: TokenStream, item: TokenStream) -> TokenStream {
 	let attr_span: proc_macro2::Span = attr.span();
 	let item_span: proc_macro2::Span = item.span();
@@ -135,20 +128,10 @@ fn set_system_abi(function: &mut syn::ItemFn) -> syn::Result<()> {
 	Ok(())
 }
 
-/// Ensures that `namespace` appears roughly like a valid package name.
-///
-/// A package name is a '.'-separated identifier list.
-///
-/// Identifiers are described in section 3.8 of the Java language specification, although some
-/// JVM-compatible languages have slightly different restrictions on what is considered a valid
-/// identifier. This function attempts to catch obviously incorrect strings.
-///
-/// Please submit an issue report or patch to make this more permissive if it's required for
-/// valid JVM code! Otherwise, making it more restrictive is appreciated as long as it's confirmed
-/// to work with multiple JVM-compatible languages.
+/// Reject obviously invalid dot-separated package names without enforcing Java-only
+/// identifier rules, since other JVM languages may use different naming conventions.
 fn valid_namespace(namespace: &str) -> bool {
 	fn is_valid_ident(ident: &str) -> bool {
-		/// These shouldn't occur as the first character of an identifier.
 		const FORBIDDEN_START_CHARS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 		if ident.is_empty() {
@@ -164,7 +147,6 @@ fn valid_namespace(namespace: &str) -> bool {
 		true
 	}
 
-	/// These shouldn't occur _anywhere_ in the package name.
 	const FORBIDDEN_CHARS: &[char] = &[
 		' ', ',', ':', ';', '|', '\\', '/', '!', '@', '#', '%', '^', '&', '*', '(', ')', '{', '}', '[', ']', '-', '`',
 		'~', '\t', '\n', '\r',
@@ -193,30 +175,11 @@ fn valid_namespace(namespace: &str) -> bool {
 	true
 }
 
-/// Converts a `snake_case` identifier to lowerCamelCase.
-/// This transformation is idempotent - if the input is already in lowerCamelCase, it returns unchanged.
-/// If the input contains any uppercase letters, it's returned unchanged to preserve intentional casing.
-/// Leading underscores are preserved except for one underscore that is removed.
-/// Trailing underscores are preserved.
+/// Convert `snake_case` to lowerCamelCase, preserving names that contain uppercase letters.
 ///
-/// When capitalizing segments after underscores, the first non-numeric character is capitalized.
-/// This ensures that segments with numeric prefixes are properly capitalized.
-///
-/// Examples:
-/// - "`say_hello`" -> "sayHello"
-/// - "`get_user_name`" -> "getUserName"
-/// - "_`private_method`" -> "privateMethod" (one leading underscore removed)
-/// - "__dunder__" -> "_dunder__" (one leading underscore removed)
-/// - "___priv" -> "__priv" (one leading underscore removed)
-/// - "trailing_" -> "trailing_"
-/// - "sayHello" -> "sayHello" (unchanged)
-/// - "getUserName" -> "getUserName" (unchanged)
-/// - "`Foo_Bar`" -> "`Foo_Bar`" (unchanged - contains uppercase)
-/// - "`XMLParser`" -> "`XMLParser`" (unchanged - contains uppercase)
-/// - "init" -> "init" (unchanged - no underscores)
-/// - "`test_αλφα`" -> "testΑλφα" (Unicode-aware)
-/// - "`array_2d_foo`" -> "array2DFoo" (capitalizes first char after digits)
-/// - "`test_3d`" -> "test3D" (capitalizes first char after digits)
+/// Removes one leading underscore and preserves trailing underscores; all-underscore names
+/// are unchanged. After each internal underscore, capitalizes the first non-ASCII-digit
+/// character using Unicode casing (e.g., `array_2d_foo` becomes `array2DFoo`).
 pub fn snake_case_to_lower_camel_case(s: &str) -> String {
 	// Preserve intentional mixed or uppercase naming.
 	if s.chars().any(char::is_uppercase) {
@@ -270,8 +233,7 @@ pub fn snake_case_to_lower_camel_case(s: &str) -> String {
 }
 
 /// Creates a JNI-compatible function name from the given namespace, function name, and optional signature.
-/// This does _not_ transform the provided function name into `snakeCase` if it's not already; but
-/// `#[allow(non_snake_case)]` should be added to prevent errors.
+/// Preserves the method name's casing.
 ///
 /// Any underscores in the original namespace or function name need to be replaced by "_1", and
 /// then dot separators need to be turned into underscores.
@@ -281,7 +243,7 @@ pub fn snake_case_to_lower_camel_case(s: &str) -> String {
 /// - ';' -> "_2"
 /// - '[' -> "_3"
 /// - '/' -> "_"
-/// - Non-ASCII characters (including '$') -> "_0xxxx" where xxxx is the lowercase hex Unicode codepoint
+/// - Other characters, including '$', -> "_0xxxx" with the lowercase hex Unicode codepoint
 ///
 /// The return type is ignored, and parentheses are not included in the mangled name.
 pub fn create_jni_fn_name(namespace: &str, fn_name: &str, signature: Option<&str>) -> String {

@@ -77,20 +77,10 @@ pub fn java_type_to_snake_case_suffix(type_info: &crate::api::types::TypeInfo) -
 	}
 }
 
-/// Generate a unique name for an overloaded method or constructor
+/// Generate and reserve one unique name per method, preserving the input order.
 ///
-/// This function generates unique names by:
-/// 1. Grouping overloads by arity (number of arguments)
-/// 2. For each arity group, determining which argument positions vary across overloads
-/// 3. Adding "<N>" or "_args<N>" suffix if arity differs from number of varying positions
-/// 4. Adding `snake_case` type suffixes for varying argument positions
-///
-/// # Arguments
-/// * `base_name` - The base name (e.g., "new" for constructors, "`get_value`" for methods)
-/// * `methods` - All methods in this overload group (already sorted)
-/// * `used_names` - Set of names already used
-///
-/// Returns a Vec of unique names, one for each method
+/// Groups overloads by arity, then adds arity and type suffixes for varying parameter
+/// positions. Numeric suffixes resolve remaining collisions with `used_names`.
 pub fn generate_unique_overload_names(
 	base_name: &str,
 	methods: &[&MethodInfo],

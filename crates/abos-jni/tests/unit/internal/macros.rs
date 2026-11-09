@@ -3,12 +3,7 @@ use crate::{
 	objects::JThrowable,
 };
 
-/// Smoke test that some example usage of `jni_call_with_catch_and_null_check!` compiles.
-///
-/// `name` and `sig` represent the method/field name and descriptor that would be in scope when
-/// calling a lookup JNI function.
-///
-/// This tries to test plausible mappings for all the exception types we have bindings for.
+/// Compile-check typed exception handlers, including handlers that retain Java causes.
 fn _compile_test_jni_call_with_catch_and_null_check(
 	env: &mut crate::Env<'_>,
 	name: &crate::strings::JNIStr,
@@ -96,7 +91,6 @@ fn _compile_test_jni_call_with_catch_and_null_check(
 					Err(Error::ParseFailed(String::new())),
 
 				else => Err(Error::NullPtr("Unexpected Exception"))
-				//else => Err(Error::JniCall(JniError::Unknown))
 			},
 			env,
 			v1_1,
