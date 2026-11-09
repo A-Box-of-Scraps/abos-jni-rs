@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Install or validate the pinned Android build environment without Android Studio."""
+
 import argparse
 import os
-from pathlib import Path
 import platform
 import re
 import sys
 import tempfile
+from pathlib import Path
 
 import android_tools as tools
-
 
 API = 35
 MIN_API = 31
@@ -44,8 +44,10 @@ def supported_host(system=None, machine=None):
         return "darwin-x86_64"
     if system == "Windows" and x64:
         return "windows-x86_64"
-    raise RuntimeError(f"Unsupported Android build host: {system}/{machine}. "
-                       "Supported: Linux x86-64, macOS Intel/Apple Silicon, Windows x86-64.")
+    raise RuntimeError(
+        f"Unsupported Android build host: {system}/{machine}. "
+        "Supported: Linux x86-64, macOS Intel/Apple Silicon, Windows x86-64."
+    )
 
 
 def sdk_root(explicit=None):
@@ -55,8 +57,9 @@ def sdk_root(explicit=None):
     legacy = os.environ.get("ANDROID_SDK_ROOT")
     if home and legacy and Path(home).resolve() != Path(legacy).resolve():
         raise RuntimeError("ANDROID_HOME and ANDROID_SDK_ROOT disagree; set one SDK or use --sdk-root.")
-    if home or legacy:
-        return Path(home or legacy).expanduser().resolve()
+    configured_root = home or legacy
+    if configured_root:
+        return Path(configured_root).expanduser().resolve()
     if platform.system() == "Windows":
         base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))
     elif platform.system() == "Darwin":
@@ -99,8 +102,10 @@ def missing_packages(sdk):
         if actual is None:
             missing.append(f"{package}@{version}")
         elif revision_tuple(actual) != revision_tuple(version):
-            raise RuntimeError(f"{sdk / package} has revision {actual}; expected {version}. "
-                               "Use a separate --sdk-root to avoid changing a shared SDK.")
+            raise RuntimeError(
+                f"{sdk / package} has revision {actual}; expected {version}. "
+                "Use a separate --sdk-root to avoid changing a shared SDK."
+            )
     return missing
 
 
@@ -133,9 +138,11 @@ def check_host(probe_linker=False):
             try:
                 tools.execute("rustc", str(source), "-o", str(Path(temporary) / "probe"))
             except RuntimeError as error:
-                raise RuntimeError("Host Rust linking failed. Install the OS C/C++ toolchain "
-                                   "(MSVC Build Tools on Windows, Xcode Command Line Tools on macOS, "
-                                   f"or a C compiler/linker on Linux).\n{error}") from error
+                raise RuntimeError(
+                    "Host Rust linking failed. Install the OS C/C++ toolchain "
+                    "(MSVC Build Tools on Windows, Xcode Command Line Tools on macOS, "
+                    f"or a C compiler/linker on Linux).\n{error}"
+                ) from error
 
 
 def check_environment(sdk, target=DEFAULT_TARGET, probe_linker=False):
@@ -148,8 +155,7 @@ def check_environment(sdk, target=DEFAULT_TARGET, probe_linker=False):
     for name in ["zipalign", "aapt2"]:
         build_tool(sdk, name)
     host = supported_host()
-    require_file(sdk / f"ndk/{NDK}/toolchains/llvm/prebuilt/{host}/bin" /
-                 tools.executable_name("clang"))
+    require_file(sdk / f"ndk/{NDK}/toolchains/llvm/prebuilt/{host}/bin" / tools.executable_name("clang"))
     adb(sdk)
     if target:
         installed = tools.execute("rustup", "target", "list", "--installed").splitlines()
@@ -165,8 +171,10 @@ def confirm_licenses(accepted):
         return
     print(f"Installing Android SDK packages requires accepting the SDK license: {TERMS}")
     if not sys.stdin.isatty():
-        raise RuntimeError("Run setup interactively to review the license, or pass --accept-licenses "
-                           "only after you have reviewed and accepted it.")
+        raise RuntimeError(
+            "Run setup interactively to review the license, or pass --accept-licenses "
+            "only after you have reviewed and accepted it."
+        )
     if input("After reviewing the license, type 'accept' to install: ").strip() != "accept":
         raise RuntimeError("SDK installation cancelled; license not accepted.")
 
@@ -180,8 +188,17 @@ def setup(sdk, targets, accepted=False):
         sdk.mkdir(parents=True, exist_ok=True)
         for package in missing:
             # Pin revisions, disable CLI telemetry, and leave unrelated packages alone.
-            tools.execute("android", "--no-metrics", f"--sdk={sdk}", "sdk", "--ignore-outdated-xmls",
-                          "install", package, capture=False, timeout=1800)
+            tools.execute(
+                "android",
+                "--no-metrics",
+                f"--sdk={sdk}",
+                "sdk",
+                "--ignore-outdated-xmls",
+                "install",
+                package,
+                capture=False,
+                timeout=1800,
+            )
     for target in targets:
         tools.execute("rustup", "target", "add", target, capture=False)
         check_environment(sdk, target)
@@ -193,7 +210,9 @@ def main():
     parser.add_argument("action", choices=["setup", "check"])
     parser.add_argument("--sdk-root", help="SDK directory; otherwise uses ANDROID_HOME or a user-owned default")
     parser.add_argument("--target", action="append", choices=sorted(TARGETS.values()))
-    parser.add_argument("--accept-licenses", action="store_true", help="affirm that you reviewed and accepted the Android SDK license")
+    parser.add_argument(
+        "--accept-licenses", action="store_true", help="affirm that you reviewed and accepted the Android SDK license"
+    )
     args = parser.parse_args()
     sdk = sdk_root(args.sdk_root)
     configure(sdk)

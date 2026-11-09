@@ -11,12 +11,13 @@ public class ParserWrapper {
      * @param sourcePaths      Array of source file or directory paths
      * @param classPathEntries Array of classpath entries (JARs or directories)
      * @param classPattern     Pattern to match classes (e.g., "android.app.*")
+     * @param androidJar       Android boot classpath, or null for the host JDK
      * @return Array of ClassDescription objects
      */
     public static Parser.ClassDescription[] parse(
-            String[] sourcePaths, String[] classPathEntries, String classPattern) {
+            String[] sourcePaths, String[] classPathEntries, String classPattern, String androidJar) {
         try (Parser parser = new Parser()) {
-            return parser.parse(sourcePaths, classPathEntries, classPattern);
+            return parser.parse(sourcePaths, classPathEntries, classPattern, androidJar);
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse sources: " + e.getMessage(), e);
         }

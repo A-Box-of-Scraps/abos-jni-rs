@@ -26,7 +26,7 @@ fn test_bind_java_type_constructor_emits_assert_top() {
 	jvm.attach_current_thread(|env| {
 		let _bad_obj: JBoolean<'_> = env.get_java_vm()?.with_local_frame(16, |_| {
 			//let s = env.new_string("s")?; // triggers the runtime error
-			JBoolean::new(env, true)
+			JBoolean::new(env, abos_jni::sys::JNI_TRUE)
 		})?;
 		eprintln!("ERROR: Should not have reached here without a runtime check!");
 		Ok::<_, abos_jni::errors::Error>(())

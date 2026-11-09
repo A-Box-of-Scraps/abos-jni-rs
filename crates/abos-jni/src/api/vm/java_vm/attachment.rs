@@ -1,3 +1,5 @@
+use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
+
 use super::{
 	AttachConfig, AttachGuard, AttachmentExceptionPolicy, DEFAULT_LOCAL_FRAME_CAPACITY, Env, Error, JavaVM, JniError,
 	Result, ScopeToken, THREAD_GUARD_NEST_LEVEL, current, sys_attach_current_thread,
@@ -14,8 +16,9 @@ impl JavaVM {
 	/// If the thread was not already attached then a new attachment is made which will be
 	/// automatically detached when the current thread terminates.
 	///
-	/// Calling this in a thread that is already attached is cheap since it will only need to check
-	/// thread local storage without making a JNI call.
+	/// When an `AttachGuard` is already active, attachment state is reused from thread-local
+	/// storage. Otherwise, JNI `GetEnv` checks whether the thread is still attached, even if
+	/// a permanent attachment was recorded earlier.
 	///
 	/// This API requests to permanently attach the current thread but since pre-existing
 	/// attachments aren't affected by this API, it should not be assumed that the thread will
@@ -34,10 +37,11 @@ impl JavaVM {
 	/// If the thread is already attached and has a pending exception (before the callback is run),
 	/// the exception will be stashed and re-thrown after the callback completes to avoid side
 	/// effects and to also ensure your callback can run un-affected by the pending exception. (this
-	/// never affects the return value)
+	/// never affects the return value). The original exception is also restored if the callback
+	/// panics and unwinds.
 	///
-	/// If your callback throws an exception this will be caught and returned as an
-	/// [`Error::CaughtJavaException`].
+	/// If your callback leaves an exception pending, it is caught and returned as
+	/// [`Error::CaughtJavaException`] instead of the callback's result.
 	///
 	/// The exception handling policy can be changed via [`AttachConfig::exceptions_policy`] and
 	/// using [`JavaVM::attach_current_thread_with_config`].
@@ -64,8 +68,9 @@ impl JavaVM {
 	/// If the thread was not already attached, the thread will be detached when the callback
 	/// returns.
 	///
-	/// Calling this in a thread that is already attached is cheap since it will only need to check
-	/// thread local storage without making a JNI call.
+	/// When an `AttachGuard` is already active, attachment state is reused from thread-local
+	/// storage. Otherwise, JNI `GetEnv` checks whether the thread is still attached, even if
+	/// a permanent attachment was recorded earlier.
 	///
 	/// Attaching a thread is an expensive operation if it was not already attached, so it's
 	/// generally recommended that you should use [`Self::attach_current_thread()`] (requesting to
@@ -78,10 +83,11 @@ impl JavaVM {
 	/// If the thread is already attached and has a pending exception (before the callback is run),
 	/// the exception will be stashed and re-thrown after the callback completes to avoid side
 	/// effects and to also ensure your callback can run un-affected by the pending exception. (this
-	/// never affects the return value)
+	/// never affects the return value). The original exception is also restored if the callback
+	/// panics and unwinds.
 	///
-	/// If your callback throws an exception this will be caught and returned as an
-	/// [`Error::CaughtJavaException`].
+	/// If your callback leaves an exception pending, it is caught and returned as
+	/// [`Error::CaughtJavaException`] instead of the callback's result.
 	///
 	/// The exception handling policy can be changed via [`AttachConfig::exceptions_policy`] and
 	/// using [`JavaVM::attach_current_thread_with_config`].
@@ -183,10 +189,23 @@ impl JavaVM {
 			}),
 		};
 
-		let ret: std::result::Result<T, E> = if let Some(capacity) = capacity {
-			env.with_local_frame(capacity, callback)
-		} else {
-			callback(env)
+		let ret: std::result::Result<T, E> = match catch_unwind(AssertUnwindSafe(|| {
+			if let Some(capacity) = capacity {
+				env.with_local_frame(capacity, callback)
+			} else {
+				callback(env)
+			}
+		})) {
+			Ok(ret) => ret,
+			Err(payload) => {
+				// The callback's local frame has unwound, but the attachment and saved
+				// throwable are still live. Restore before AttachGuard drops on unwind.
+				if let Some(throwable) = pre_pending_exception {
+					env.exception_clear();
+					drop(env.throw(throwable));
+				}
+				resume_unwind(payload);
+			}
 		};
 
 		// Explicitly detach the guard (instead of relying on Drop) so we can

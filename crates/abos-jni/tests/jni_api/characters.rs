@@ -104,3 +104,36 @@ fn test_java_char_conversion() {
 	})
 	.expect("attached JNI callback succeeds");
 }
+
+#[test]
+fn string_conversion_preserves_valid_characters_around_unpaired_surrogates() {
+	attach_current_thread(|env| {
+		// Include NUL, a supplementary character, and BMP text before and after
+		// unpaired high and low surrogates, including a trailing high surrogate.
+		let utf16: &[u16] = &[
+			0x0041, 0x0000, 0xD83D, 0xDE00, 0xD800, 0x0042, 0x0000, 0xD83D, 0xDE00, 0xDC00, 0x65E5, 0xD800,
+		];
+		assert_string_conversion_matches_utf16(env, utf16)
+	})
+	.expect("Java string conversion succeeds");
+}
+
+#[test]
+fn string_conversion_matches_utf16_for_every_code_unit() {
+	attach_current_thread(|env| {
+		let utf16: Vec<u16> = (0..=u16::MAX).collect();
+		assert_string_conversion_matches_utf16(env, &utf16)
+	})
+	.expect("all UTF-16 code units are decoded correctly");
+}
+
+fn assert_string_conversion_matches_utf16(env: &mut Env<'_>, utf16: &[u16]) -> abos_jni::errors::Result<()> {
+	let chars: abos_jni::objects::JCharArray<'_> = env.new_char_array(utf16.len())?;
+	chars.set_region(env, 0, utf16)?;
+	let object: JObject<'_> = env.new_object(STRING_CLASS, jni_sig!("([C)V"), &[JValue::from(&chars)])?;
+	let string: JString<'_> = JString::cast_local(env, object)?;
+	let expected: String = String::from_utf16_lossy(utf16);
+	assert_eq!(string.try_to_string(env)?, expected);
+	assert_eq!(string.mutf8_chars(env)?.to_str(), expected);
+	Ok(())
+}

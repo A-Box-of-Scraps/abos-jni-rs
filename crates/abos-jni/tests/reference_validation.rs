@@ -43,15 +43,6 @@ bind_java_type! {
 	}
 }
 
-fn compile_fixture(name: &str) -> std::path::PathBuf {
-	let output: std::path::PathBuf = util::setup_test_output(name);
-	let _classes: Vec<std::path::PathBuf> = abos_javac::Build::new()
-		.file("tests/java/com/example/ReferenceTypes.java")
-		.output_dir(&output)
-		.compile();
-	output
-}
-
 fn assert_wrong_type<T: std::fmt::Debug>(result: Result<T>, env: &Env<'_>) {
 	assert_matches!(
 		result.expect_err("incompatible reference must be rejected"),
@@ -153,7 +144,7 @@ fn object_array_uses_the_validated_initializer() {
 
 #[test]
 fn calls_validate_reference_assignability() {
-	let output = compile_fixture("reference_calls");
+	let output: std::path::PathBuf = util::java_fixtures();
 	util::attach_current_thread(|env| {
 		util::load_test_class(env, &output, "ReferenceTypes")?;
 		let class = env.find_class(jni_str!("com/example/ReferenceTypes"))?;
@@ -265,7 +256,7 @@ fn calls_validate_reference_assignability() {
 
 #[test]
 fn fields_validate_before_writing() {
-	let output = compile_fixture("reference_fields");
+	let output: std::path::PathBuf = util::java_fixtures();
 	util::attach_current_thread(|env| {
 		util::load_test_class(env, &output, "ReferenceTypes")?;
 		let class = env.find_class(jni_str!("com/example/ReferenceTypes"))?;
@@ -373,7 +364,7 @@ fn fields_validate_before_writing() {
 
 #[test]
 fn generated_bindings_validate_unmapped_references() {
-	let output = compile_fixture("generated_reference_validation");
+	let output: std::path::PathBuf = util::java_fixtures();
 	util::attach_current_thread(|env| {
 		util::load_test_class(env, &output, "ReferenceTypes")?;
 		let receiver = ReferenceTypes::new(env)?;
@@ -413,7 +404,7 @@ fn generated_bindings_validate_unmapped_references() {
 
 #[test]
 fn generated_bindings_use_the_validated_reference() {
-	let output = compile_fixture("reference_as_ref");
+	let output: std::path::PathBuf = util::java_fixtures();
 	util::attach_current_thread(|env| {
 		util::load_test_class(env, &output, "ReferenceTypes")?;
 		let receiver = ReferenceTypes::new(env)?;
@@ -466,7 +457,7 @@ fn generated_bindings_use_the_validated_reference() {
 
 #[test]
 fn validation_preserves_class_loader_identity_and_inheritance() {
-	let output = compile_fixture("reference_loaders");
+	let output: std::path::PathBuf = util::java_fixtures();
 	let bytes = std::fs::read(output.join("com/example/ReferenceTypes.class")).expect("fixture class");
 	let child_bytes = std::fs::read(output.join("com/example/ReferenceTypes$Child.class")).expect("child class");
 	util::attach_current_thread(|env| {

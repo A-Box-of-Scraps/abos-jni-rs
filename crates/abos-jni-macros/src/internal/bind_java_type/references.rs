@@ -54,7 +54,7 @@ pub(super) fn generate_is_instance_of_assignable_checks(
 							};
 
 							assert!(
-								is_assignable,
+								is_assignable != #jni::sys::JNI_FALSE,
 								"{}({}) is not a subtype of {}({}) and is not a valid 'is_instance_of' type for {}",
 								#to_type_path_str,
 								#to_java_class_str,
@@ -103,8 +103,7 @@ pub(super) fn generate_reference_impl(
 
 			#[inline]
 			fn class_name() -> ::std::borrow::Cow<'static, #jni::strings::JNIStr> {
-				// Safety: we have compile-time encoded the name of the Java class as MUTF8
-				// and therefore know it's safe to cast as a JNIStr
+				// SAFETY: The class name was encoded as modified UTF-8 at compile time.
 				unsafe {
 					::std::borrow::Cow::Borrowed(#jni::strings::JNIStr::from_cstr_unchecked(#java_class_cstr))
 				}

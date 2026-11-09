@@ -149,12 +149,7 @@ rusty_fork::rusty_fork_test! {
 	fn set_array_field() {
 		// Array values report JavaType::Object, but array signatures report JavaType::Array.
 		// Field assignment must accept this combination.
-		let out_dir = util::setup_test_output("set_array_field");
-
-		let _classes = abos_javac::Build::new()
-			.file("tests/java/com/example/TestFields.java")
-			.output_dir(&out_dir)
-			.compile();
+		let out_dir: std::path::PathBuf = util::java_fixtures();
 		attach_current_thread(|env| {
 			util::load_test_class(env, &out_dir, "TestFields")?;
 
@@ -177,17 +172,12 @@ rusty_fork::rusty_fork_test! {
 	fn set_static_array_field() {
 		// Array values report JavaType::Object, but array signatures report JavaType::Array.
 		// Static field assignment must accept this combination.
-		let out_dir = util::setup_test_output("set_static_array_field");
-
-		let _classes = abos_javac::Build::new()
-			.file("tests/java/com/example/TestFields.java")
-			.output_dir(&out_dir)
-			.compile();
+		let out_dir: std::path::PathBuf = util::java_fixtures();
 
 		attach_current_thread(|env| {
 			util::load_test_class(env, &out_dir, "TestFields")?;
 
-			let class = env.load_class(jni_str!("com/example/TestFields"))?;
+			let class = env.load_class(jni_str!("com.example.TestFields"))?;
 
 			let arr = env.new_byte_array(1)?;
 			env.set_static_field(

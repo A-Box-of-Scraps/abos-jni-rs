@@ -34,6 +34,11 @@ pub enum InputSource {
 }
 
 /// Builder for configuring and generating Java bindings.
+///
+/// Core classes (`java.lang.Object`, `java.lang.Class`, `java.lang.String`, and
+/// `java.lang.Throwable`) use the built-in `abos-jni` wrappers. Bulk inputs omit
+/// their declarations; single-class inputs and exact class patterns requesting
+/// them return [`Error::Unsupported`].
 #[must_use]
 #[derive(Debug, Clone)]
 pub struct Builder {
@@ -104,7 +109,10 @@ impl Builder {
 		self
 	}
 
-	/// Set the input to Java source files.
+	/// Set the input to Java source files, directories, or source JARs.
+	///
+	/// Every source path must exist and be a directory or a regular `.java` or `.jar` file.
+	/// Invalid inputs fail generation; valid inputs with no selected classes succeed with empty bindings.
 	///
 	/// Source and bytecode inputs include non-private constructors, ordinary methods, and fields.
 	/// Native methods, including private ones, are retained for registration bindings.
@@ -121,6 +129,10 @@ impl Builder {
 	}
 
 	/// Set the input to Android SDK APIs.
+	///
+	/// Source stubs are analyzed against the selected `android.jar`, not host JDK modules.
+	/// SDK documentation-only Android annotations and unused imports are excluded from
+	/// analysis; Java deprecation, Javadoc, and binding annotations are preserved.
 	///
 	/// Generation fails on the first selected-class parsing or code-generation error;
 	/// it never returns partial bindings after silently dropping a failing class.
@@ -182,7 +194,22 @@ impl Builder {
 		self
 	}
 
-	/// Set class patterns for filtering which classes to generate bindings for.
+	/// Set class patterns for source, JAR, and Android inputs.
+	///
+	/// Matching is case-sensitive and covers the full qualified class name. Binary nested
+	/// names (`pkg.Outer$Inner`) and dotted aliases (`pkg.Outer.Inner`) are accepted without
+	/// capitalization heuristics. `/` is accepted as an alternative to a package separator.
+	/// Literal names select the class and all its nested descendants, at every nesting level;
+	/// in particular, a source pattern naming an inner class also selects its descendants.
+	///
+	/// `*` matches zero or more characters, including package and nesting separators.
+	/// Repeated stars have the same meaning as one star; other characters are literal.
+	/// Wildcard matches do not implicitly include descendants: `*Inner` selects names
+	/// ending in `Inner`, while `pkg.Outer$*` selects nested classes but not `Outer` itself.
+	///
+	/// Repeated and comma-separated patterns are combined as a union. Surrounding Unicode whitespace
+	/// is trimmed and empty entries are ignored. An empty pattern list selects all eligible
+	/// classes; a nonempty list matching nothing successfully produces empty bindings.
 	pub fn patterns<I, S>(mut self, patterns: I) -> Self
 	where
 		I: IntoIterator<Item = S>,

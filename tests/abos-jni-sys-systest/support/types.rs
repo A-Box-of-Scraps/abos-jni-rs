@@ -1,8 +1,16 @@
-use syn::{PointerMutability, ReturnType, Type, TypeFnPtr};
+use syn::{GenericArgument, PathArguments, PointerMutability, ReturnType, Type, TypeFnPtr};
 
 pub fn c_name(name: &str) -> String {
 	match name {
-		"JNINativeInterface_" | "JNIInvokeInterface_" | "JNIEnv_" | "_jobject" | "_jfieldID" | "_jmethodID" => {
+		"JNINativeInterface_"
+		| "JNIInvokeInterface_"
+		| "JNIEnv_"
+		| "_jobject"
+		| "_jfieldID"
+		| "_jmethodID"
+		| "jvmtiInterface_1_"
+		| "_jvmtiEnv"
+		| "_jrawMonitorID" => {
 			format!("struct {name}")
 		}
 		"c_void" => "void".to_owned(),
@@ -24,9 +32,33 @@ pub fn c_name(name: &str) -> String {
 
 pub fn c_type(ty: &Type) -> String {
 	match ty {
+		Type::Path(path)
+			if path.qself.is_none()
+				&& path.path.segments.len() == 3
+				&& path.path.segments[0].ident == "core"
+				&& path.path.segments[1].ident == "ffi"
+				&& path.path.segments[2].ident == "VaList" =>
+		{
+			assert_lifetime_arguments(&path.path.segments[2].arguments);
+			"va_list".to_owned()
+		}
 		Type::Path(path) if path.qself.is_none() && path.path.segments.len() == 1 => {
 			let segment = &path.path.segments[0];
-			assert!(segment.arguments.is_empty(), "Generic C types are unsupported");
+			if segment.ident == "Option" {
+				let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+					panic!("Option requires a function pointer");
+				};
+				assert_eq!(arguments.args.len(), 1, "Option requires one argument");
+				let Some(GenericArgument::Type(Type::FnPtr(function))) = arguments.args.first() else {
+					panic!("Only nullable function pointers have a C representation");
+				};
+				return function_type(function);
+			}
+			if segment.ident == "va_list" {
+				assert_lifetime_arguments(&segment.arguments);
+			} else {
+				assert!(segment.arguments.is_empty(), "Generic C types are unsupported");
+			}
 			c_name(&segment.ident.to_string())
 		}
 		Type::Ptr(pointer) => {
@@ -38,6 +70,7 @@ pub fn c_type(ty: &Type) -> String {
 			};
 			format!("{element}{qualifier} *")
 		}
+		Type::Array(array) => format!("{} *", c_type(&array.elem)),
 		Type::FnPtr(function) => function_type(function),
 		// C's FatalError returns void; Rust additionally models its non-returning behavior.
 		Type::Never(_) => "void".to_owned(),
@@ -73,4 +106,12 @@ pub fn function_type(function: &TypeFnPtr) -> String {
 		parameters.push("void".to_owned());
 	}
 	format!("{result} ({convention}*)({})", parameters.join(", "))
+}
+
+fn assert_lifetime_arguments(arguments: &PathArguments) {
+	assert!(
+		matches!(arguments, PathArguments::AngleBracketed(args)
+		if args.args.len() == 1 && matches!(args.args.first(), Some(GenericArgument::Lifetime(_)))),
+		"va_list requires exactly one lifetime argument"
+	);
 }

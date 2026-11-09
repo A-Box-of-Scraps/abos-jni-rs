@@ -3,6 +3,7 @@ name = "abos-javac"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 rust-version.workspace = true
 description = """
 A build-time dependency for Cargo build scripts and unit tests to assist in

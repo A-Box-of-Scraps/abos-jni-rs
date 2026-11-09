@@ -1,9 +1,8 @@
-//! Various macros for making low-level JNI calls more ergonomic
+//! Low-level JNI calls with exception and null checks.
 //!
-//! Note: all macros must avoid un-hygienic / hidden control flow like `return`
-//! or `?`
+//! Macro-local `return` and `?` must not return from the caller's function.
 
-/// Directly calls an exception-safe Env FFI function, nothing else
+/// Call an exception-safe `Env` FFI function without additional checks.
 ///
 /// # Safety
 ///
@@ -27,15 +26,11 @@
 /// - `PopLocalFrame()`
 /// - `DetachCurrentThread()`
 ///
-/// You must also ensure that the arguments you pass are valid for the
-/// particular JNI function you are calling.
-///
-/// When calling any function added after JNI 1.1 you must know that it's valid
-/// for the current JNI version.
+/// Arguments must satisfy the JNI function's requirements, and the function must be
+/// available in the current JNI version.
 macro_rules! ex_safe_jni_call_no_post_check_ex {
     ( $jnienv:expr, $version:tt, $name:ident $(, $args:expr )*) => {{
-        // Safety: we know that the Env pointer can't be null, since that's
-        // checked in `from_raw()`
+        // SAFETY: `Env::from_raw()` checks that the environment pointer is non-null.
         let env: *mut abos_jni_sys::JNIEnv = $jnienv.get_raw();
         let interface: *const abos_jni_sys::JNINativeInterface_ = *env;
 
@@ -43,49 +38,49 @@ macro_rules! ex_safe_jni_call_no_post_check_ex {
     }};
 }
 
-/// Pre-checks for a pending exception error and then calls an Env FFI function
+/// Evaluates arguments, checks for a pending exception, then calls an Env FFI function
 ///
-/// Since most JNI functions may trigger undefined behaviour if they are called
-/// with a pending exception, this macro will explicitly check for a pending
-/// exception (and return a `Err(crate::errors::Error::JavaException)` if one is
-/// found) before calling the JNI function.
+/// Returns `Err(Error::JavaException)` without calling JNI if an exception is pending.
+/// This prevents calling exception-unsafe functions with a pending exception.
+///
+/// Arguments are evaluated exactly once before this check, since user-defined
+/// conversions may raise Java exceptions. Argument temporaries remain alive
+/// until after the call.
 ///
 /// # Safety
 ///
-/// You must also ensure that the arguments you pass are valid for the
-/// particular JNI function you are calling.
-///
-/// When calling any function added after JNI 1.1 you must know that it's valid
-/// for the current JNI version.
+/// Arguments must satisfy the JNI function's requirements, and the function must be
+/// available in the current JNI version.
 macro_rules! jni_call_no_post_check_ex {
     ( $jnienv:expr, $version:tt, $name:ident $(, $args:expr )*) => {{
-        $crate::__must_use(if $jnienv.exception_check() {
+        jni_call_no_post_check_ex!(@bind $jnienv, $version, $name, [] ; $($args),*)
+    }};
+    // Bind each expression once before checking exceptions. Match scrutinees keep
+    // argument temporaries alive through the JNI call, including owners of raw pointers.
+    (@bind $jnienv:expr, $version:tt, $name:ident, [$($bound:ident,)*] ; $arg:expr $(, $rest:expr)*) => {{
+        match $arg {
+            arg => jni_call_no_post_check_ex!(@bind $jnienv, $version, $name, [$($bound,)* arg,] ; $($rest),*)
+        }
+    }};
+    (@bind $jnienv:expr, $version:tt, $name:ident, [$($bound:ident,)*] ;) => {{
+        let jnienv = &$jnienv;
+        $crate::__must_use(if jnienv.exception_check() {
             Err(crate::errors::Error::JavaException)
         } else {
-            // Safety: we know that the Env pointer can't be null, since that's
-            // checked in `from_raw()`
-            let env: *mut abos_jni_sys::JNIEnv = $jnienv.get_raw();
+            // SAFETY: `Env::from_raw()` checks that the environment pointer is non-null.
+            let env: *mut abos_jni_sys::JNIEnv = jnienv.get_raw();
             let interface: *const abos_jni_sys::JNINativeInterface_ = *env;
 
-            Ok(((*interface).$version.$name)(env $(, $args)*))
+            Ok(((*interface).$version.$name)(env $(, $bound)*))
         })
     }};
 }
 
-/// Calls a Env function, then checks for a pending exception
+/// Call an `Env` function with exception checks before and after the call.
 ///
-/// This will do a pre-check for pending exceptions to avoid undefined behaviour when calling JNI
-/// functions that are not exception safe.
-///
-/// Note: After the JNI call, this only _checks_ for an exception, it doesn't clear the exception
-/// and so the exception must still be handled (or left to be handled in Java by returning control
-/// to the JVM).
-///
-/// Returns `Err(Error::JavaException)` if there is a pending exception after the call.
-///
-/// Carefully consider whether to use `jni_call_with_catch` instead of this because if the function
-/// throws any exceptions they will not be caught/cleared by this macro (it will just return an
-/// `Err(Error::JavaException)` to notify you of the pending exception that must be handled).
+/// Returns `Err(Error::JavaException)` for a pending exception without clearing it.
+/// The caller or Java must handle it; `jni_call_with_catch!` clears and maps exceptions
+/// raised by the call instead.
 macro_rules! jni_call_post_check_ex {
     ( $jnienv:expr, $version:tt, $name:ident $(, $args:expr )* ) => ({
         jni_call_no_post_check_ex!($jnienv, $version, $name $(, $args)*).and_then(|ret| {
@@ -98,21 +93,11 @@ macro_rules! jni_call_post_check_ex {
     })
 }
 
-/// Calls a Env function, then checks for a pending exception, then checks for a `null` return value
+/// Call an `Env` function with exception checks, then reject a null result.
 ///
-/// This will do a pre-check for pending exceptions to avoid undefined behaviour when calling JNI
-/// functions that are not exception safe.
-///
-/// Note: After the JNI call, this only _checks_ for an exception, it doesn't clear the exception
-/// and so the exception must still be handled (or left to be handled in Java by returning control
-/// to the JVM).
-///
-/// Returns `Err(Error::JavaException)` if there is a pending exception after the call. Returns
-/// `Err(Error::NullPtr)` if the JNI function returns `null`
-///
-/// Carefully consider whether to use `jni_call_with_catch` instead of this because if the function
-/// throws any exceptions they will not be caught/cleared by this macro (it will just return an
-/// `Err(Error::JavaException)` to notify you of the pending exception that must be handled).
+/// Like `jni_call_post_check_ex!`, leaves exceptions pending and returns
+/// `Err(Error::JavaException)`. Returns `Err(Error::NullPtr)` for a null result
+/// without an exception.
 macro_rules! jni_call_post_check_ex_and_null_ret {
     ( $jnienv:expr, $version:tt, $name:ident $(, $args:expr )* ) => ({
         jni_call_post_check_ex!($jnienv, $version, $name $(, $args)*).and_then(|ret| {
@@ -125,17 +110,11 @@ macro_rules! jni_call_post_check_ex_and_null_ret {
     })
 }
 
-/// Calls a Env function, with no post check for exceptions, then checks for a
-/// `null` return value
+/// Call an `Env` function after checking for a pending exception, then reject a null result.
 ///
-/// This will do a pre-check for pending exceptions to avoid undefined behaviour
-/// when calling JNI functions that are not exception safe.
-///
-/// Returns `Err(Error::NullPtr)` if the JNI function returns `null`
-///
-/// Carefully consider whether to use `jni_call_with_catch` instead of this because if the function
-/// throws any exceptions they will not be caught/cleared by this macro (it will just return an
-/// `Err(Error::JavaException)` to notify you of the pending exception that must be handled).
+/// Returns `Err(Error::JavaException)` without calling JNI if an exception is already
+/// pending, or `Err(Error::NullPtr)` if the result is null. Exceptions raised by the call
+/// are neither checked nor cleared; use `jni_call_with_catch!` to handle them.
 macro_rules! jni_call_only_check_null_ret {
     ( $jnienv:expr, $version:tt, $name:ident $(, $args:expr )* ) => ({
         jni_call_no_post_check_ex!($jnienv, $version, $name $(, $args)*).and_then(|ret| {
@@ -185,10 +164,9 @@ macro_rules! __jni_match_exceptions {
     };
 }
 
-/// Calls a Env function, then catches (checks + clears) any pending exception
+/// Call an `Env` function, then clear and map any exception raised by the call.
 ///
-/// This macro takes a `catch |env| {}` block that specifies how all possible
-/// exceptions should be mapped to `Result` values:
+/// A `catch |env| {}` block maps exceptions to `Result` values:
 ///
 /// ```ignore
 /// jni_call_with_catch!(
@@ -205,35 +183,20 @@ macro_rules! __jni_match_exceptions {
 ///     env, version, FunctionName, args...
 /// )
 /// ```
-/// The exception is always cleared before matching or evaluating any handler
-/// expression.
+/// If an exception is pending before the call, returns `Err(Error::JavaException)`
+/// without clearing it.
+/// Exceptions raised by the call are cleared before handlers run. Types are matched in
+/// order with `::matches()`; the first matching handler supplies the result. A named
+/// handler (`exception: ExceptionType => ...`) receives the cast exception. The final
+/// `else => ...` handler is required for unmatched exceptions.
 ///
-/// Any exception thrown by the JNI function is matched against the exception
-/// types in order (via its `::matches` method, which will also `Cast` the
-/// exception if it does match).
-///
-/// The expression of the first matching handler is returned as the `Result`
-/// value.
-///
-/// A required `else => expr` entry at the end acts as a catch-all for any
-/// exception not claimed by a typed handler.
-///
-/// When an exception is matched then it will also be `Cast` to the matched
-/// exception type and can be given a name that is accessible to right-hand
-/// expression (e.g. `exception_name: ExceptionType => { ... }`).
-///
-/// Note: The catch expressions always have access to an `env: &mut Env`
-/// reference (regardless of whether the initial `Env` reference passed to the
-/// macro was mutable) - since the mapping is always done within a
-/// `with_local_frame` closure. This `env` reference is named based on the
-/// `catch |env|` syntax in the macro invocation.
+/// Handlers run in a local frame with a mutable `Env` named by `catch |env|`, even when
+/// the original environment reference is immutable.
 macro_rules! jni_call_with_catch {
     ( catch |$env_mut:ident| { $($ex_handlers:tt)* }, $jnienv:expr, $version:tt, $name:ident $(, $args:expr )* ) => ({
-        // Wrap everything in a closure so we can use '?' without causing a
-        // surprising return from the _callers_ function.
+        // The closure keeps `?` from returning from the caller.
         $crate::__must_use((|| -> $crate::errors::Result<_> {
-            // The only `Err` we expect here is `Error::JavaException` in case
-            // there is already a pending exception
+            // Pre-existing exceptions bypass the handlers and remain pending.
             let ret = jni_call_no_post_check_ex!($jnienv, $version, $name $(, $args)*) ?;
             if $jnienv.exception_check() {
                 $jnienv.with_local_frame(
@@ -253,13 +216,7 @@ macro_rules! jni_call_with_catch {
     });
 }
 
-/// Calls a Env function, then catches (checks + clears) any pending exception, then checks for null
-///
-/// This behaves the same as `jni_call_with_catch!`, but additionally checks if the result is null
-/// and returns `Err(Error::NullPtr)` in that case.
-///
-/// Use this when a `null` return value represents an error condition and `null` may be returned
-/// without any exception being thrown.
+/// Apply `jni_call_with_catch!`, then return `Err(Error::NullPtr)` for a null result.
 macro_rules! jni_call_with_catch_and_null_check {
     ( catch |$env_mut:ident| { $($ex_handlers:tt)* }, $jnienv:expr, $version:tt, $name:ident $(, $args:expr )* ) => ({
         jni_call_with_catch! {
@@ -277,12 +234,9 @@ macro_rules! jni_call_with_catch_and_null_check {
     });
 }
 
-/// Wrap a block of JNI code into a closure and then catch and handle exceptions
-/// after running
+/// Run a block of JNI code, then clear and map any pending exception.
 ///
-/// This macro takes a try block of code to run followed by a `catch |env| {}`
-/// block that specifies how all possible exceptions should be mapped to
-/// `Result` values:
+/// Uses the handler syntax of `jni_call_with_catch!`:
 ///
 /// ```ignore
 /// jni_try!(
@@ -302,28 +256,9 @@ macro_rules! jni_call_with_catch_and_null_check {
 /// )
 /// ```
 ///
-/// The exception is always cleared before matching or evaluating any handler
-/// expression.
-///
-/// Any exception thrown is matched against the exception types in order (via
-/// its `::matches` method, which will also `Cast` the exception if it does
-/// match).
-///
-/// The expression of the first matching handler is returned as the `Result`
-/// value.
-///
-/// A required `else => expr` entry at the end acts as a catch-all for any
-/// exception not claimed by a typed handler.
-///
-/// When an exception is matched then it will also be `Cast` to the matched
-/// exception type and can be given a name that is accessible to right-hand
-/// expressions (e.g. `exception_name: ExceptionType => { ... }`).
-///
-/// Note: The catch expressions always have access to an `env: &mut Env`
-/// reference (regardless of whether the initial `Env` reference passed to the
-/// macro was mutable) - since the mapping is always done within a
-/// `with_local_frame` closure. This `env` reference is named based on the
-/// `catch |env|` syntax in the macro invocation.
+/// Pending exceptions are cleared and dispatched using the same ordered, typed handlers
+/// and required fallback as `jni_call_with_catch!`. Handlers receive a mutable `Env` in a
+/// local frame. If no exception is pending, returns the block's result unchanged.
 macro_rules! jni_try {
     ( ($jnienv:expr) -> $ret_ty:ty { $($jni_code:tt)* } catch |$env_mut:ident| { $($ex_handlers:tt)* }) => ({
         // Wrap everything in a closure so any use of '?' can't return from the encompassing function.
@@ -345,14 +280,7 @@ macro_rules! jni_try {
     });
 }
 
-/// Maps a pointer to either Ok(ptr) or `Err(Error::NullPtr)`
-///
-/// This makes it reasonably ergonomic to use `?` to early-exit with an `Err` in
-/// case of `null` pointer arguments.
-///
-/// Unlike earlier macros this avoids using `return`, since that can result in
-/// surprising control flow if the caller doesn't realize that a macro might
-/// explicitly return from the current function.
+/// Map a pointer to `Ok(ptr)` or `Err(Error::NullPtr)` without returning from the caller.
 macro_rules! null_check {
 	( $obj:expr, $ctx:expr ) => {
 		if $obj.is_null() {
@@ -371,8 +299,7 @@ macro_rules! null_check {
 /// function you are calling.
 macro_rules! java_vm_call_unchecked {
     ( $jvm:expr, $version:tt, $name:ident $(, $args:expr )*) => {{
-        // Safety: we know that the pointer can't be null, since that's
-        // checked in `from_raw()`
+        // SAFETY: `JavaVM::from_raw()` checks that the pointer is non-null.
         let jvm: *mut abos_jni_sys::JavaVM = $jvm.get_raw();
         ((*(*jvm)).$version.$name)(jvm $(, $args)*)
     }};

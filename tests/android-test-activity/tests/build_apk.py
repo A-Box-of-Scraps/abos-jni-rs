@@ -1,13 +1,13 @@
 """Cross-build the JNI library and validate an APK without a device."""
-from pathlib import Path
+
 import shutil
 import struct
 import tempfile
 import zipfile
+from pathlib import Path
 
 import android_env as environment
 import android_tools as tools
-
 
 # ELF class and e_machine for Android's supported ABIs.
 ELF_TARGETS = {"arm64-v8a": (2, 183), "armeabi-v7a": (1, 40), "x86_64": (2, 62), "x86": (1, 3)}
@@ -42,8 +42,13 @@ def verify_apk_contents(apk, abi):
         with archive.open(expected) as library:
             header = library.read(64)
         elf_class, machine = ELF_TARGETS[abi]
-        if (len(header) < 52 or header[:4] != b"\x7fELF" or header[4] != elf_class or header[5] != 1
-                or struct.unpack_from("<HH", header, 16) != (3, machine)):
+        if (
+            len(header) < 52
+            or header[:4] != b"\x7fELF"
+            or header[4] != elf_class
+            or header[5] != 1
+            or struct.unpack_from("<HH", header, 16) != (3, machine)
+        ):
             raise RuntimeError(f"APK native library is not an Android {abi} ELF shared library")
 
 
@@ -65,7 +70,11 @@ def package(sdk, target, features):
         libraries = Path(temporary)
         print(tools.execute(*native_command(target, features, libraries), capture=False, timeout=1800))
         environment.require_file(libraries / abi / "libtestactivity.so")
-        print(tools.execute(*tools.gradle_command(f"-PabosJniLibs={libraries}", ":app:assembleDebug"), capture=False, timeout=1800))
+        print(
+            tools.execute(
+                *tools.gradle_command(f"-PabosJniLibs={libraries}", ":app:assembleDebug"), capture=False, timeout=1800
+            )
+        )
         apk = environment.require_file(tools.PROJECT / "app/build/outputs/apk/debug/app-debug.apk")
         validate_apk(apk, abi, sdk)
         destination = build / "test-apks" / abi / "app-debug.apk"

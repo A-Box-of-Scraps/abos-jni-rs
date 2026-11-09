@@ -285,9 +285,8 @@ crate::bind_java_type! {
 /// information.
 ///
 /// This is implemented as a thin wrapper over [`JIterator`] and the only
-/// difference is that [`JMapIter::next`] will yield [`JMapEntry`] values,
-/// (avoiding the need for a runtime type check, compared to using
-/// [`JIterator::next`] followed by [`JMapEntry::cast_local`]).
+/// difference is that [`JMapIter::next`] checks that each value is a
+/// [`JMapEntry`] before returning it.
 ///
 /// This derefs to [`JIterator`].
 #[derive(Debug)]
@@ -322,7 +321,7 @@ impl JMapIter<'_> {
 	/// * `Ok(Some(_))`: if there was another key-value pair in the map.
 	/// * `Ok(None)`: if there are no more key-value pairs in the map.
 	/// * `Err(_)`: if there was an error calling the Java method to get the
-	///   next key-value pair.
+	///   next key-value pair, or if the returned object is not a [`JMapEntry`].
 	///
 	/// This is like [`std::iter::Iterator::next`], but requires a parameter of
 	/// type `&mut Env` in order to call into Java.
@@ -330,12 +329,11 @@ impl JMapIter<'_> {
 	/// # Errors
 	///
 	/// Returns an error if resolving or calling the Java map or iterator methods fails, including pending Java exceptions.
+	/// Returns [`crate::errors::Error::WrongObjectType`] if an entry is not a `java.util.Map.Entry`.
 	pub fn next<'env_local>(&mut self, env: &mut Env<'env_local>) -> Result<Option<JMapEntry<'env_local>>> {
-		self.iterator.next(env)?.map_or(Ok(None), |entry| {
-			// SAFETY: we know that the entrySet iterator will yield Map.Entry values
-			// so we can safely downcast without needing a runtime type check
-			let entry: JMapEntry<'_> = unsafe { JMapEntry::from_raw(env, entry.into_raw()) };
-			Ok(Some(entry))
-		})
+		self.iterator
+			.next(env)?
+			.map(|entry| env.cast_local::<JMapEntry>(entry))
+			.transpose()
 	}
 }

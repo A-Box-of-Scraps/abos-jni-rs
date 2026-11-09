@@ -1,11 +1,12 @@
 """Test Android runner orchestration without invoking Android tools."""
+
 import contextlib
 import io
 import json
 import os
-from pathlib import Path
 import tomllib
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import run as runner
@@ -18,9 +19,20 @@ def event(**values):
 def report(features=(), **counts):
     names = runner.SMOKE_TESTS | {runner.SDK_TESTS[feature] for feature in features}
     lines = [event(type="result", name=name, status="passed", message="failed errors: 0") for name in sorted(names)]
-    lines.append(event(type="summary", status="passed", **{
-        "selected": len(names), "executed": len(names), "passed": len(names), "failed": 0, "skipped": 0, **counts,
-    }))
+    lines.append(
+        event(
+            type="summary",
+            status="passed",
+            **{
+                "selected": len(names),
+                "executed": len(names),
+                "passed": len(names),
+                "failed": 0,
+                "skipped": 0,
+                **counts,
+            },
+        )
+    )
     return "\n".join(lines)
 
 
@@ -43,13 +55,18 @@ class AndroidRunnerTests(unittest.TestCase):
             return Path("verified.apk")
 
         env = {"ANDROID_HOME": "/sdk", "ANDROID_TEST_SERIAL": "device"} if environment is None else environment
-        with patch.dict(os.environ, env, clear=True), patch("sys.argv", ["run.py", *extra]), \
-                patch.object(runner, "run", side_effect=execute), patch.object(runner.uuid, "uuid4") as uuid, \
-                patch.object(runner.environment, "adb", return_value=Path("adb")), \
-                patch.object(runner.environment, "check_environment"), \
-                patch.object(runner.build_apk, "package", side_effect=package), \
-                patch.object(runner.time, "sleep"), contextlib.redirect_stdout(io.StringIO()), \
-                contextlib.redirect_stderr(io.StringIO()):
+        with (
+            patch.dict(os.environ, env, clear=True),
+            patch("sys.argv", ["run.py", *extra]),
+            patch.object(runner, "run", side_effect=execute),
+            patch.object(runner.uuid, "uuid4") as uuid,
+            patch.object(runner.environment, "adb", return_value=Path("adb")),
+            patch.object(runner.environment, "check_environment"),
+            patch.object(runner.build_apk, "package", side_effect=package),
+            patch.object(runner.time, "sleep"),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
             uuid.return_value.hex = "current-run"
             runner.main()
         return calls
@@ -92,7 +109,9 @@ class AndroidRunnerTests(unittest.TestCase):
 
     def test_current_failure_overrides_success(self):
         with self.assertRaisesRegex(RuntimeError, "Android test failed"):
-            self.invoke(report() + "\n" + event(type="result", name="setup", status="failed"), extra=("--suite", "smoke"))
+            self.invoke(
+                report() + "\n" + event(type="result", name="setup", status="failed"), extra=("--suite", "smoke")
+            )
 
     def test_requires_explicit_device(self):
         with self.assertRaises(SystemExit):
@@ -106,20 +125,33 @@ class AndroidRunnerTests(unittest.TestCase):
         self.assertEqual(calls[0][3:], tuple(sorted(runner.SDK_TESTS)))
 
     def test_rejects_invalid_options(self):
-        for extra in [("--compile-only", "--package-only"), ("--timeout", "0"), ("--features", ""), ("--features", "typo"),
-                      ("--features", "sdk_os_build,sdk_os_build"), ("--suite", "smoke", "--features", "sdk_os_build")]:
+        for extra in [
+            ("--compile-only", "--package-only"),
+            ("--timeout", "0"),
+            ("--features", ""),
+            ("--features", "typo"),
+            ("--features", "sdk_os_build,sdk_os_build"),
+            ("--suite", "smoke", "--features", "sdk_os_build"),
+        ]:
             with self.subTest(extra=extra), self.assertRaises(SystemExit):
                 self.invoke("", extra=extra)
 
     def test_stale_success_does_not_pass(self):
-        with patch.object(runner.time, "monotonic", side_effect=[0, 0, 121]):
-            with self.assertRaisesRegex(RuntimeError, "timeout"):
-                self.invoke(report().replace("current-run", "previous-run"))
+        with (
+            patch.object(runner.time, "monotonic", side_effect=[0, 0, 121]),
+            self.assertRaisesRegex(RuntimeError, "timeout"),
+        ):
+            self.invoke(report().replace("current-run", "previous-run"))
 
     def test_rejects_incomplete_or_incorrect_reports(self):
-        for log in [report(executed=0), report(passed=True), report(skipped=1),
-                    report().splitlines()[-1], report() + "\n" + report(),
-                    event(type="mystery", status="passed")]:
+        for log in [
+            report(executed=0),
+            report(passed=True),
+            report(skipped=1),
+            report().splitlines()[-1],
+            report() + "\n" + report(),
+            event(type="mystery", status="passed"),
+        ]:
             with self.subTest(log=log), self.assertRaises(RuntimeError):
                 runner.read_report(log, "current-run", runner.SMOKE_TESTS)
 
@@ -129,11 +161,14 @@ class AndroidRunnerTests(unittest.TestCase):
         self.assertIsNotNone(runner.read_report(truncated + "\n" + report(), "current-run", runner.SMOKE_TESTS))
 
     def test_exact_run_id_match_and_explicit_status(self):
-        self.assertIsNone(runner.read_report(report().replace("current-run", "current-run-extra"),
-                                             "current-run", runner.SMOKE_TESTS))
+        self.assertIsNone(
+            runner.read_report(report().replace("current-run", "current-run-extra"), "current-run", runner.SMOKE_TESTS)
+        )
         self.assertIsNotNone(runner.read_report(report(), "current-run", runner.SMOKE_TESTS))
 
     def test_command_failures_propagate(self):
-        with patch.object(runner.tools, "execute", side_effect=RuntimeError("command failed")):
-            with self.assertRaises(RuntimeError):
-                runner.run("adb", "devices")
+        with (
+            patch.object(runner.tools, "execute", side_effect=RuntimeError("command failed")),
+            self.assertRaises(RuntimeError),
+        ):
+            runner.run("adb", "devices")

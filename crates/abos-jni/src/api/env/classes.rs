@@ -1,3 +1,5 @@
+use crate::sys;
+
 #[cfg(doc)]
 use crate::objects::{JByteArray, JThread};
 
@@ -282,8 +284,9 @@ impl<'local> Env<'local> {
 		}
 	}
 
-	/// Look up a class by its fully-qualified name, via `Class.forName(<name>,
-	/// <initialize>, <loader>)` with a `FindClass` fallback.
+	/// Look up a class by its fully-qualified name without initializing it, via
+	/// `Class.forName(<name>, false, <loader>)`, trying the thread context class
+	/// loader first and then the system class loader.
 	///
 	/// This is a convenience wrapper around [`LoaderContext::load_class`] with
 	/// [`LoaderContext::None`].
@@ -362,7 +365,7 @@ impl<'local> Env<'local> {
 	///
 	/// # Errors
 	///
-	/// If a JNI call fails
+	/// Returns an error if the class is null, class resolution fails, or a Java exception is pending.
 	pub fn get_superclass<'other_local, T>(&mut self, class: T) -> Result<Option<JClass<'local>>>
 	where
 		T: Desc<'local, JClass<'other_local>>,
@@ -371,20 +374,27 @@ impl<'local> Env<'local> {
 		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
-		// SAFETY: The class descriptor is valid and the returned local class reference is tied to the current frame.
+		let class: &JClass<'_> = class.as_ref();
+		let class: &JClass<'_> = null_check!(class, "get_superclass class argument")?;
+		// SAFETY: The class is non-null and the returned local class reference is tied to the current frame.
 		let superclass: JClass<'_> = unsafe {
 			JClass::from_raw(
 				self,
-				jni_call_no_post_check_ex!(self, v1_1, GetSuperclass, class.as_ref().as_raw())?,
+				jni_call_no_post_check_ex!(self, v1_1, GetSuperclass, class.as_raw())?,
 			)
 		};
 
 		Ok((!superclass.is_null()).then_some(superclass))
 	}
 
-	// Like is_assignable_from but it doesn't need a mutable Env reference because it doesn't do any
-	// descriptor lookups.
-	pub(super) fn is_assignable_from_class(&self, class1: &JClass, class2: &JClass) -> Result<bool> {
+	/// Tests assignability between already-resolved classes using a shared environment.
+	///
+	/// See [`Self::is_assignable_from`] for the direction of the check.
+	///
+	/// # Errors
+	///
+	/// Returns an error if either class is null or a Java exception is pending.
+	pub fn is_assignable_from_class(&self, class1: &JClass, class2: &JClass) -> Result<bool> {
 		let class1: &JClass<'_> = null_check!(class1, "is_assignable_from class1")?;
 		let class2: &JClass<'_> = null_check!(class2, "is_assignable_from class2")?;
 
@@ -398,14 +408,13 @@ impl<'local> Env<'local> {
 				IsAssignableFrom,
 				class1.as_raw(), // MUST not be null
 				class2.as_raw()  // MUST not be null
-			)?)
+			)? != sys::JNI_FALSE)
 		}
 	}
 
-	// FIXME: this API shouldn't need a `&mut self` reference since it doesn't return a local reference
-	// (currently it just needs the `&mut self` for the sake of `Desc<JClass>::lookup`)
-	//
 	/// Tests whether class1 is assignable from class2.
+	///
+	/// Use [`Self::is_assignable_from_class`] with an already-resolved class and a shared environment.
 	///
 	/// # Errors
 	///
@@ -436,11 +445,14 @@ impl<'local> Env<'local> {
 		self.is_instance_of_class(obj, class)
 	}
 
-	// An internal helper that implements is_instance_of except it doesn't take a
-	// Desc for the class and doesn't need a mutable Env reference since it never
-	// needs to allocate a new local reference.
-	/// Returns true if the object reference can be cast to the given type.
-	pub(crate) fn is_instance_of_class<'other_local_1, 'other_local_2, O, C>(&self, object: O, class: C) -> Result<bool>
+	/// Tests whether an object can be cast to an already-resolved class using a shared environment.
+	///
+	/// A null object returns true for any non-null class, as with [`Self::is_instance_of`].
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class is null or a Java exception is pending.
+	pub fn is_instance_of_class<'other_local_1, 'other_local_2, O, C>(&self, object: O, class: C) -> Result<bool>
 	where
 		O: AsRef<JObject<'other_local_1>>,
 		C: AsRef<JClass<'other_local_2>>,
@@ -457,13 +469,10 @@ impl<'local> Env<'local> {
 				IsInstanceOf,
 				object.as_ref().as_raw(), // may be null
 				class.as_raw()            // MUST not be null
-			)?)
+			)? != sys::JNI_FALSE)
 		}
 	}
 
-	// FIXME: this API shouldn't need a `&mut self` reference since it doesn't return a local reference
-	// (currently it just needs the `&mut self` for the sake of `Desc<JClass>::lookup`)
-	//
 	/// Returns true if the object reference can be cast to the given type.
 	///
 	/// _NB: Unlike the operator `instanceof`, function `IsInstanceOf` *returns `true`*
@@ -471,6 +480,8 @@ impl<'local> Env<'local> {
 	///
 	/// See [JNI documentation](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#IsInstanceOf)
 	/// for details.
+	///
+	/// Use [`Self::is_instance_of_class`] with an already-resolved class and a shared environment.
 	///
 	/// # Errors
 	///
@@ -509,10 +520,7 @@ impl<'local> Env<'local> {
 				ref1.as_raw(), // may be null or weak
 				ref2.as_raw()  // may be null or weak
 			)
+			.map(|value| value != sys::JNI_FALSE)
 		}
 	}
-
-	// FIXME: this API shouldn't need a `&mut self` reference since it doesn't return a local reference
-	// (currently it just needs the `&mut self` for the sake of `Desc<JThrowable>::lookup`)
-	//
 }

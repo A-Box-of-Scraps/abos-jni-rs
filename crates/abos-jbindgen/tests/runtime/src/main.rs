@@ -73,6 +73,10 @@ mod helper_no_init {
 mod parity_bytecode {
 	include!(concat!(env!("OUT_DIR"), "/parity_bytecode.rs"));
 }
+#[allow(dead_code, non_snake_case)]
+mod core_bytecode {
+	include!(concat!(env!("OUT_DIR"), "/core_bytecode.rs"));
+}
 mod collisions;
 mod default_package;
 mod enclosing;
@@ -146,6 +150,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		tree_dollars.set__value(env, 17)?;
 		assert_eq!(tree_dollars._value(env)?, 17);
 		assert_eq!(tree_dollars.foo_bar(env)?, 17);
+		core_bytecode::jni_init(env, &abos_jni::refs::LoaderContext::default())?;
+		let text: abos_jni::objects::JString<'_> = env.new_string("core wrapper")?;
+		let echoed: abos_jni::objects::JString<'_> = core_bytecode::com::example::CoreTypes::text(env, &text)?;
+		assert!(env.is_same_object(&text, &echoed)?);
 		collisions::check(env)?;
 		generated_collisions::check(env)?;
 		default_package::check(env)?;

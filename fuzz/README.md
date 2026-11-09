@@ -21,9 +21,10 @@ The setup task installs the cargo-fuzz version pinned in `mise.toml` and activat
 compiler is required to build libFuzzer. On GNU/Linux, the repository's linker configuration also requires mold (`mise
 install mold`). Install the project JDK with `mise install java` if it is not already available.
 
-`fuzz:build` builds all six targets. Each smoke task first waits for the shared build and seed tasks, then fuzzes for
-roughly 60 seconds, excluding compilation. The initial limits per process are 64 KiB generated inputs, five seconds per
-input, and a 2048 MiB RSS limit. These are operating limits, not format guarantees.
+`fuzz:build` builds all six targets as an optional cache warm-up. Each smoke task waits for the seed task, builds only
+its selected target through `cargo fuzz run`, then fuzzes for roughly 60 seconds, excluding compilation. Previously
+built targets reuse the build cache. The initial limits per process are 64 KiB generated inputs, five seconds per input,
+and a 2048 MiB RSS limit. These are operating limits, not format guarantees.
 
 `fuzz:smoke:all` schedules the six independent smoke tasks concurrently up to mise's job limit. `--jobs 2` runs at most
 two at once (roughly three minutes of fuzzing); `--jobs 6` can run all six at once (roughly one minute). Memory limits

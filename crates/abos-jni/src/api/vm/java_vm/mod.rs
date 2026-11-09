@@ -79,9 +79,9 @@ static JAVA_VM_SINGLETON: std::sync::OnceLock<JavaVM> = std::sync::OnceLock::new
 /// This library supports these modes of attachment:
 /// * A permanent attachment with [`JavaVM::attach_current_thread`]. The thread will automatically
 ///   detach itself before it terminates (recommended for attaching in native threads).
-/// * A scoped attachment with [`JavaVM::attach_current_thread_for_scope`]. The thread will
-///   automatically detach itself once your given closure returns (and the hidden [`AttachGuard`]
-///   is dropped).
+/// * A scoped attachment with [`JavaVM::attach_current_thread_for_scope`]. If the thread was
+///   detached on entry, it is detached again when the closure returns and the hidden
+///   [`AttachGuard`] is dropped. Existing attachments are left intact.
 /// * Implicit ("unowned") attachments, for use in native methods. The thread will never get
 ///   explicitly detached by `jni-rs` if we have implicit attachment.
 ///
@@ -103,7 +103,7 @@ static JAVA_VM_SINGLETON: std::sync::OnceLock<JavaVM> = std::sync::OnceLock::new
 /// Cargo.toml:
 ///
 /// ```toml
-/// jni = { version = "0.22.1", features = ["invocation"] }
+/// abos-jni = { version = "0.1", features = ["invocation"] }
 /// ```
 ///
 /// The application will be able to use [`JavaVM::new`] which will dynamically load a `jvm` library
@@ -185,8 +185,8 @@ unsafe impl Sync for JavaVM {}
 
 /// Tracks the number of logical attachments managed by this crate.
 ///
-/// This is unconditionally incremented for each call to `sys_attach_current_thread` and decremented
-/// for each call to `sys_detach_current_thread`.
+/// `sys_attach_current_thread` increments this only for a new logical attachment, not when
+/// reusing a TLS/FLS record after external detachment. `sys_detach_current_thread` decrements it.
 ///
 /// **Windows with FLS caveats:**
 ///

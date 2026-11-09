@@ -90,15 +90,11 @@ fn check_valid<E: Reference>(env: &mut Env<'_>, name: &str) -> Result<()> {
 rusty_fork_test! {
 #[test]
 fn single_letter_object_array_casts_reject_primitive_arrays() {
-	let output = util::setup_test_output("single_letter_array_casts");
-	let classes = abos_javac::Build::new()
-		.file("tests/java/SingleLetterTypes.java")
-		.output_dir(&output)
-		.compile();
+	let output: std::path::PathBuf = util::java_fixtures();
 	util::attach_current_thread(|env| {
 		let loader = JClassLoader::get_system_class_loader(env)?;
-		for path in classes {
-			let bytes = std::fs::read(path).expect("read compiled single-letter class");
+		for name in ["Z", "B", "C", "S", "I", "J", "F", "D", "V", "A"] {
+			let bytes = std::fs::read(output.join(format!("{name}.class"))).expect("read compiled single-letter class");
 			env.define_class(None::<&abos_jni::strings::JNIStr>, &loader, &bytes)?;
 		}
 		macro_rules! check_cast {

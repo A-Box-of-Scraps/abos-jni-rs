@@ -26,7 +26,7 @@ fn codepage_to_string_win32(
 		windows_sys::MultiByteToWideChar(
 			codepage,
 			0,
-			codepage_string_slice.as_ptr(),
+			codepage_string_slice.as_ptr().cast(),
 			codepage_string_slice_len,
 			buf.as_mut_ptr(),
 			max_expected_utf16_len,
@@ -53,14 +53,14 @@ fn codepage_to_string_win32(
 fn test() {
 	{
 		let result: Cow<'_, CStr> =
-			str_to_cstr_win32("Hello, world 😎".into(), windows_sys::CP_UTF8).expect("UTF-8 conversion succeeds");
+			str_to_cstr_win32("Hello, world 😎".into(), CP_UTF8).expect("UTF-8 conversion succeeds");
 		assert_eq!(result.to_bytes_with_nul(), b"Hello, world \xf0\x9f\x98\x8e\0");
 		assert_matches!(result, Cow::Owned(_));
 	}
 
 	{
 		let result: Cow<'_, CStr> =
-			str_to_cstr_win32("Hello, world 😎\0".into(), windows_sys::CP_UTF8).expect("UTF-8 conversion succeeds");
+			str_to_cstr_win32("Hello, world 😎\0".into(), CP_UTF8).expect("UTF-8 conversion succeeds");
 		assert_eq!(result.to_bytes_with_nul(), b"Hello, world \xf0\x9f\x98\x8e\0");
 	}
 
@@ -154,14 +154,14 @@ fn test_overflow() {
 		// This string is currently one character too long to transcode, so there should be an
 		// overflow error.
 		//eprintln!("Transcoding ASCII string that's too long");
-		expect_opt_string_too_long(&string, str_to_cstr_win32(string.as_str().into(), windows_sys::CP_UTF8));
+		expect_opt_string_too_long(&string, str_to_cstr_win32(string.as_str().into(), CP_UTF8));
 
 		// But if we remove one character…
 		assert_eq!(string.pop(), Some('H'));
 
 		// …then it should transcode fine.
 		//eprintln!("Transcoding ASCII string that's not too long");
-		expect_successful_roundtrip(&string, str_to_cstr_win32(string.as_str().into(), windows_sys::CP_UTF8));
+		expect_successful_roundtrip(&string, str_to_cstr_win32(string.as_str().into(), CP_UTF8));
 	}
 
 	{
@@ -180,20 +180,20 @@ fn test_overflow() {
 
 		// Again, the string should transcode without overflow.
 		//eprintln!("Transcoding non-ASCII to UTF-8");
-		expect_successful_roundtrip(string, str_to_cstr_win32(string.into(), windows_sys::CP_UTF8));
+		expect_successful_roundtrip(string, str_to_cstr_win32(string.into(), CP_UTF8));
 
 		// This should work even with UTF-7. This is the real reason we're using U+07FF: we need
 		// to check that the highest code point that fits under the limit will not overflow even
 		// with the worst-case code page.
 		{
 			//eprintln!("Transcoding non-ASCII to UTF-7");
-			let result: Cow<'_, CStr> = expect_success(string, str_to_cstr_win32(string.into(), windows_sys::CP_UTF7));
+			let result: Cow<'_, CStr> = expect_success(string, str_to_cstr_win32(string.into(), CP_UTF7));
 
 			// *And* it should roundtrip back to UTF-8.
 			//eprintln!("Transcoding UTF-7 back to UTF-8");
 			let result: String = codepage_to_string_win32(
 				result.to_bytes(),
-				windows_sys::CP_UTF7,
+				CP_UTF7,
 				(string.len() / 2)
 					.try_into()
 					.expect("fixture length fits Win32 integer"),

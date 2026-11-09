@@ -3,13 +3,12 @@
 
 import argparse
 import os
-from pathlib import Path
 import shutil
 import stat
 import subprocess
 import sys
 import tempfile
-
+from pathlib import Path
 
 REVISIONS = {
     "javac": "8dcbc94481d5bdf003895957dd010486e95bf20e",
@@ -50,9 +49,15 @@ def clone_reference(name, reference_root):
         # Prepare the replacement before touching the old copy.
         subprocess.run(
             [
-                "git", "clone", "--quiet", "--depth", "5", "--single-branch",
+                "git",
+                "clone",
+                "--quiet",
+                "--depth",
+                "5",
+                "--single-branch",
                 "--no-tags",
-                f"https://github.com/jni-rs/{name}.git", str(staging),
+                f"https://github.com/jni-rs/{name}.git",
+                str(staging),
             ],
             check=True,
         )

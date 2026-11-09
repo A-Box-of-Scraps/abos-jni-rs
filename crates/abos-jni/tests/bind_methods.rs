@@ -59,12 +59,7 @@ bind_java_type! {
 rusty_fork_test! {
 #[test]
 fn test_static_methods() {
-	let out_dir = setup_test_output("bind_methods_static");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestMethods.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_methods_class(env, &out_dir)?;
@@ -94,12 +89,7 @@ fn test_static_methods() {
 rusty_fork_test! {
 #[test]
 fn test_constructors() {
-	let out_dir = setup_test_output("bind_methods_constructors");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestMethods.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_methods_class(env, &out_dir)?;
@@ -133,12 +123,7 @@ fn test_constructors() {
 rusty_fork_test! {
 #[test]
 fn test_instance_methods_getters_setters() {
-	let out_dir = setup_test_output("bind_methods_getters_setters");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestMethods.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_methods_class(env, &out_dir)?;
@@ -171,12 +156,7 @@ fn test_instance_methods_getters_setters() {
 rusty_fork_test! {
 #[test]
 fn test_instance_methods_operations() {
-	let out_dir = setup_test_output("bind_methods_operations");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestMethods.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_methods_class(env, &out_dir)?;
@@ -192,11 +172,11 @@ fn test_instance_methods_operations() {
 		assert_eq!(counter, 6);
 
 		let is_positive = obj.is_positive(env)?;
-		assert!(is_positive);
+		assert_eq!(is_positive, abos_jni::sys::JNI_TRUE);
 
 		obj.set_counter(env, -5)?;
 		let is_positive = obj.is_positive(env)?;
-		assert!(!is_positive);
+		assert_eq!(is_positive, abos_jni::sys::JNI_FALSE);
 
 		Ok(())
 	})
@@ -207,12 +187,7 @@ fn test_instance_methods_operations() {
 rusty_fork_test! {
 #[test]
 fn test_string_methods() {
-	let out_dir = setup_test_output("bind_methods_strings");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestMethods.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_methods_class(env, &out_dir)?;
@@ -239,12 +214,7 @@ fn test_string_methods() {
 rusty_fork_test! {
 #[test]
 fn test_calculate_multiple_types() {
-	let out_dir = setup_test_output("bind_methods_calculate");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestMethods.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_methods_class(env, &out_dir)?;
@@ -263,12 +233,7 @@ fn test_calculate_multiple_types() {
 rusty_fork_test! {
 #[test]
 fn test_reset_method() {
-	let out_dir = setup_test_output("bind_methods_reset");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestMethods.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_methods_class(env, &out_dir)?;
@@ -297,12 +262,7 @@ fn test_reset_method() {
 rusty_fork_test! {
 #[test]
 fn test_non_null_validation() {
-	let out_dir = setup_test_output("bind_methods_non_null");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestMethods.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_methods_class(env, &out_dir)?;
@@ -333,12 +293,7 @@ fn test_non_null_validation() {
 rusty_fork_test! {
 #[test]
 fn test_cfg_guarded_methods() {
-	let out_dir = setup_test_output("bind_methods_cfg");
-
-	let _classes = abos_javac::Build::new()
-		.file("tests/java/com/example/TestMethods.java")
-		.output_dir(&out_dir)
-		.compile();
+	let out_dir: std::path::PathBuf = util::java_fixtures();
 
 	util::attach_current_thread(|env| {
 		load_test_methods_class(env, &out_dir)?;
@@ -384,19 +339,4 @@ fn load_test_methods_class(env: &mut Env, out_dir: &Path) -> abos_jni::errors::R
 	env.define_class(Some(jni_str!("com/example/TestMethods")), &class_loader, &class_bytes)?;
 
 	Ok(())
-}
-
-fn setup_test_output(test_name: &str) -> PathBuf {
-	let out_dir: PathBuf = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
-		.join("jni_macros_tests")
-		.join(test_name);
-
-	match fs::remove_dir_all(&out_dir) {
-		Ok(()) => {}
-		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-		Err(error) => panic!("Failed to remove previous test output: {error}"),
-	}
-	fs::create_dir_all(&out_dir).expect("Failed to create test output directory");
-
-	out_dir
 }

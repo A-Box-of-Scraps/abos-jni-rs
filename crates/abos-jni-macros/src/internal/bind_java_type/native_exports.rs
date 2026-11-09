@@ -1,6 +1,6 @@
 use super::{
 	Ident, NativeMethod, NativeMethodExport, Result, TokenStream, TypeMappings, create_jni_fn_name, extract_cfg_attrs,
-	format_ident, lit_cstr_mutf8, quote, sig_type_to_rust_return_type,
+	format_ident, lit_cstr_mutf8, quote,
 };
 
 /// Generate the native methods registration code for `API::get()`
@@ -48,9 +48,7 @@ pub(super) fn generate_native_registration_code(
 
 	Ok(quote! {
 		{
-			// Safety: All of the name and signature CStr literals have been validate
-			// at compile time and encoded as MUTF-8 - therefore they can be safely
-			// cast to a JNIStr unchecked at runtime.
+			// SAFETY: Name and signature literals are validated and encoded as modified UTF-8 at compile time.
 			unsafe {
 				let native_methods = &[
 					#(#native_method_descriptors),*
@@ -154,7 +152,7 @@ pub(super) fn generate_single_native_export(
 	}
 
 	let return_type: TokenStream =
-		sig_type_to_rust_return_type(&method.signature.return_type, &lifetime, type_mappings, jni);
+		crate::internal::types::native_type(&method.signature.return_type, &lifetime, type_mappings, jni);
 
 	let no_mangle_attr: TokenStream = if cfg!(has_unsafe_attr) {
 		quote! { #[unsafe(no_mangle)] }

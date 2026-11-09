@@ -121,7 +121,7 @@ pub(super) fn fields(context: &mut Context<'_>) {
 		);
 		let modifier: &str = if field.is_static { "static " } else { "" };
 		// The macro puts leading underscores before "set_" in shorthand syntax.
-		// Explicit setters keep the emitted API consistent with the name we reserved.
+		// Explicit setters keep the emitted API consistent with the reserved name.
 		if reversible && !name.starts_with('_') && setter.as_deref() == Some(format!("set_{name}").as_str()) {
 			writeln!(context.body, "        {modifier}{name}: {ty},").expect("writing to String");
 		} else {

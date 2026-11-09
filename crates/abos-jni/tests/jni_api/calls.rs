@@ -331,13 +331,10 @@ pub fn call_static_method_with_bad_args_errs() {
 }
 
 #[test]
-pub fn get_reflected_method_from_id() {
+pub fn get_reflected_constructor() {
 	attach_current_thread(|env| {
-		let ctor_method_id: abos_jni::ids::JMethodID = env
-			.get_method_id(INTEGER_CLASS, jni_str!("<init>"), jni_sig!("(Ljava/lang/String;)V"))
-			.expect("constructor from string exists");
 		let ctor: JObject<'_> = env
-			.to_reflected_method(INTEGER_CLASS, ctor_method_id)
+			.to_reflected_method(INTEGER_CLASS, jni_str!("<init>"), jni_sig!("(Ljava/lang/String;)V"))
 			.expect("to reflected method succeeds");
 
 		let value: JObject<'_> = {
@@ -370,16 +367,13 @@ pub fn get_reflected_method_from_id() {
 }
 
 #[test]
-pub fn get_reflected_static_method_from_id() {
+pub fn get_reflected_static_method() {
 	attach_current_thread(|env| {
 		let x: JValue<'_> = JValue::from(-10);
 		let math_class: abos_jni::objects::JClass<'_> = env.find_class(MATH_CLASS).expect("test class can be resolved");
-		let abs_method_id: abos_jni::ids::JStaticMethodID = env
-			.get_static_method_id(&math_class, MATH_ABS_METHOD_NAME, MATH_ABS_SIGNATURE)
-			.expect("test static method can be resolved");
 
 		let abs_method: JObject<'_> = env
-			.to_reflected_static_method(&math_class, abs_method_id)
+			.to_reflected_static_method(&math_class, MATH_ABS_METHOD_NAME, MATH_ABS_SIGNATURE)
 			.expect("to reflected static method succeeds");
 
 		let arg: JObject<'_> = env

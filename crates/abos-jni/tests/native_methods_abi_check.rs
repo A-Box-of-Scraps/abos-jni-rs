@@ -201,7 +201,7 @@ native_method_test! {
 // This fixture test is designed to abort when run in debug mode
 #[cfg(debug_assertions)]
 native_method_test! {
-	#[ignore = "This is run in a separate cargo process by test_abi_debug_only_in_debug_mode_raw"]
+	#[ignore = "This is run in a separate test process by test_abi_debug_only_in_debug_mode_raw"]
 	test_name: test_abi_debug_only_in_debug_mode_raw_impl,
 	java_class: "com/example/TestNativeAbiCheck.java",
 	methods: |class| &[
@@ -231,13 +231,9 @@ fn test_abi_debug_only_in_debug_mode_raw() {
 	// Run the fixture test that has UnsafeDebugOnly ABI check on a raw function.
 	// The ABI check should detect the mismatch and abort the process in debug builds.
 
-	let mut cmd = std::process::Command::new(env!("CARGO"));
-	cmd.arg("test")
-		.arg("--features=invocation")
-		.arg("--test")
-		.arg("native_methods_abi_check")
-		.arg("--")
-		.arg("--include-ignored")
+	let executable: std::path::PathBuf = std::env::current_exe().expect("locate test executable");
+	let mut cmd = std::process::Command::new(executable);
+	cmd.arg("--include-ignored")
 		.arg("--exact")
 		.arg("test_abi_debug_only_in_debug_mode_raw_impl")
 		.arg("--nocapture");

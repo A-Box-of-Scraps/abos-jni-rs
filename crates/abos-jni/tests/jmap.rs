@@ -3,8 +3,9 @@
 #![cfg(feature = "invocation")]
 
 use abos_jni::{
+	errors::Error,
 	jni_sig, jni_str,
-	objects::{JMap, JObject, JString},
+	objects::{JMap, JMapIter, JObject, JString},
 };
 
 mod util;
@@ -52,4 +53,45 @@ fn jmap_push_and_iterate() {
 		Ok(())
 	})
 	.expect("attached JNI callback succeeds");
+}
+
+#[test]
+fn jmap_iterator_concurrent_modification() {
+	attach_current_thread(|env| {
+		let object: JObject<'_> = env.new_object(jni_str!("java/util/LinkedHashMap"), jni_sig!("()V"), &[])?;
+		let map: JMap<'_> = JMap::cast_local(env, object)?;
+		let first: JString<'_> = env.new_string("first")?;
+		let second: JString<'_> = env.new_string("second")?;
+		map.put(env, &first, &first)?;
+		let mut iter: JMapIter<'_> = map.iter(env)?;
+		map.put(env, &second, &second)?;
+
+		assert!(matches!(iter.next(env), Err(Error::JavaException)));
+		assert!(env.exception_check());
+		assert!(matches!(
+			env.exception_catch(),
+			Err(Error::CaughtJavaException { name, .. }) if name == "java.util.ConcurrentModificationException"
+		));
+		assert!(!env.exception_check());
+		assert_eq!(map.size(env)?, 2);
+		Ok(())
+	})
+	.expect("map iterator failures remain catchable");
+}
+
+#[test]
+fn jmap_iterator_rejects_non_entry() {
+	let fixtures: std::path::PathBuf = util::java_fixtures();
+	attach_current_thread(|env| {
+		util::load_test_class(env, &fixtures, "TestMalformedMap")?;
+		let object: JObject<'_> = env.new_object(jni_str!("com/example/TestMalformedMap"), jni_sig!("()V"), &[])?;
+		let map: JMap<'_> = JMap::cast_local(env, object)?;
+		let mut iter: JMapIter<'_> = map.iter(env)?;
+
+		assert!(matches!(iter.next(env), Err(Error::WrongObjectType)));
+		assert!(!env.exception_check());
+		assert!(iter.next(env)?.is_none());
+		Ok(())
+	})
+	.expect("malformed map entries are rejected without a Java exception");
 }

@@ -6,6 +6,6 @@ license = "MIT"
 publish = false
 
 [dependencies]
-windows-bindgen = "0.65"
+windows-bindgen = "0.100.0"
 
 [workspace]

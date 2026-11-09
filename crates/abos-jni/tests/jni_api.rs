@@ -59,5 +59,10 @@ mod fields;
 mod identity;
 #[path = "jni_api/references.rs"]
 mod references;
+#[path = "jni_api/reflection.rs"]
+mod reflection;
+
+#[path = "jni_api/shared_env.rs"]
+mod shared_env;
 
 use exception_assertions::*;

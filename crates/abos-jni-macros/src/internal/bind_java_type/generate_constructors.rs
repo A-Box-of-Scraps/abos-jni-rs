@@ -69,20 +69,17 @@ pub(super) fn generate_constructor_method_ids(
 	Ok(generate_id_fields_and_inits(lookups, jni))
 }
 
-/// Convert a `JavaType` to a Rust native method trait argument type with lifetime
-/// This variant does NOT use `AsRef` - it takes reference types by value
+/// Convert a `SigType` to a native trait argument, taking reference types by value.
 pub(super) fn sig_type_to_rust_native_trait_arg_type(
 	sig_type: &SigType,
 	lifetime: &TokenStream,
 	type_mappings: &TypeMappings,
 	jni: &syn::Path,
 ) -> TokenStream {
-	// For native trait methods, use the concrete type directly without AsRef
 	sig_type_to_rust_type_core(sig_type, lifetime, type_mappings, jni)
 }
 
-/// Convert a `JavaType` to a Rust method argument type with lifetime
-/// This variant uses impl `AsRef` for object and array types
+/// Convert a `SigType` to a Rust argument, using `impl AsRef` for objects and arrays.
 pub(super) fn sig_type_to_rust_arg_type(
 	sig_type: &SigType,
 	lifetime: &TokenStream,
@@ -99,7 +96,7 @@ pub(super) fn sig_type_to_rust_arg_type(
 	quote! { impl AsRef<#concrete_type> }
 }
 
-/// Convert a `JavaType` to a Rust method return type with lifetime
+/// Convert a `SigType` to a Rust return type with a lifetime.
 pub(super) fn sig_type_to_rust_return_type(
 	sig_type: &SigType,
 	lifetime: &TokenStream,

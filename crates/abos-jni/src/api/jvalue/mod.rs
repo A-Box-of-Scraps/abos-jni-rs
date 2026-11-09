@@ -9,7 +9,7 @@ use crate::{
 	errors::{CharToJavaError, Error, Result},
 	objects::JObject,
 	signature::Primitive,
-	sys::{JNI_TRUE, jboolean, jbyte, jchar, jdouble, jfloat, jint, jlong, jshort, jvalue},
+	sys::{jboolean, jbyte, jchar, jdouble, jfloat, jint, jlong, jshort, jvalue},
 };
 
 #[cfg(doc)]

@@ -17,7 +17,8 @@ pub(super) fn generate_jni_get_field_call(
 			return quote! { Ok(()) };
 		}
 		let call_fn: proc_macro2::Ident = format_ident!("{}{}Field", call_prefix, prim.jni_name());
-		(quote! {}, call_fn, quote! { ret })
+		let value: TokenStream = super::calls::primitive_return(&prim, field_type, type_mappings, jni);
+		(quote! {}, call_fn, value)
 	} else {
 		let call_fn: proc_macro2::Ident = format_ident!("{}ObjectField", call_prefix);
 		let return_type_tokens: TokenStream =
@@ -25,12 +26,18 @@ pub(super) fn generate_jni_get_field_call(
 		(
 			quote! { env.assert_top(); },
 			call_fn,
-			quote! { unsafe { <#return_type_tokens>::from_raw(env, ret) } },
+			quote! {
+				{
+					// The declared Java type may resolve through a different class loader
+					// than the mapped Rust wrapper's cached class.
+					let object = unsafe { #jni::objects::JObject::from_raw(env, ret) };
+					env.cast_local::<#return_type_tokens>(object)?
+				}
+			},
 		)
 	};
 
-	// The JNI spec asserts that `Get<Type>Field` _must_ not be called with a `null` object reference
-	// Note: we assume that the class will never be null when getting static fields
+	// JNI instance field access requires a non-null receiver; cached static classes are non-null.
 	let null_check: TokenStream = super::calls::generate_receiver_null_check(
 		is_static,
 		this_or_class,
@@ -64,52 +71,18 @@ pub(super) fn generate_jni_set_field_call(
 ) -> TokenStream {
 	let call_prefix: &str = if is_static { "SetStatic" } else { "Set" };
 
-	let (call_fn, val_cast) = if let Some(prim) = field_type.try_as_primitive(type_mappings) {
-		match prim {
-			PrimitiveType::Void => {
-				// Void fields don't make sense but we handle them for completeness
-				return quote! { Ok(()) };
-			}
-			PrimitiveType::Boolean => {
-				let call_fn: proc_macro2::Ident = format_ident!("{}BooleanField", call_prefix);
-				(call_fn, quote! { #val as #jni::sys::jboolean })
-			}
-			PrimitiveType::Byte => {
-				let call_fn: proc_macro2::Ident = format_ident!("{}ByteField", call_prefix);
-				(call_fn, quote! { #val as #jni::sys::jbyte })
-			}
-			PrimitiveType::Char => {
-				let call_fn: proc_macro2::Ident = format_ident!("{}CharField", call_prefix);
-				(call_fn, quote! { #val as #jni::sys::jchar })
-			}
-			PrimitiveType::Short => {
-				let call_fn: proc_macro2::Ident = format_ident!("{}ShortField", call_prefix);
-				(call_fn, quote! { #val as #jni::sys::jshort })
-			}
-			PrimitiveType::Int => {
-				let call_fn: proc_macro2::Ident = format_ident!("{}IntField", call_prefix);
-				(call_fn, quote! { #val as #jni::sys::jint })
-			}
-			PrimitiveType::Long => {
-				let call_fn: proc_macro2::Ident = format_ident!("{}LongField", call_prefix);
-				(call_fn, quote! { #val as #jni::sys::jlong })
-			}
-			PrimitiveType::Float => {
-				let call_fn: proc_macro2::Ident = format_ident!("{}FloatField", call_prefix);
-				(call_fn, quote! { #val as #jni::sys::jfloat })
-			}
-			PrimitiveType::Double => {
-				let call_fn: proc_macro2::Ident = format_ident!("{}DoubleField", call_prefix);
-				(call_fn, quote! { #val as #jni::sys::jdouble })
-			}
+	let (call_fn, val_conversion) = if let Some(prim) = field_type.try_as_primitive(type_mappings) {
+		if prim == PrimitiveType::Void {
+			return quote! { Ok(()) };
 		}
+		let call_fn: proc_macro2::Ident = format_ident!("{}{}Field", call_prefix, prim.jni_name());
+		(call_fn, quote! { (#val).into() })
 	} else {
 		let call_fn: proc_macro2::Ident = format_ident!("{}ObjectField", call_prefix);
 		(call_fn, quote! { #val.as_raw() })
 	};
 
-	// The JNI spec asserts that `Set<Type>Field` _must_ not be called with a `null` object reference
-	// Note: we assume that the class will never be null when setting static fields
+	// JNI instance field access requires a non-null receiver; cached static classes are non-null.
 	let null_check: TokenStream = super::calls::generate_receiver_null_check(
 		is_static,
 		this_or_class,
@@ -119,6 +92,8 @@ pub(super) fn generate_jni_set_field_call(
 
 	quote! {
 		{
+			// Run user conversions before the exception check guarding the JNI call.
+			let jni_value = #val_conversion;
 			// JNI field setters must not run with a pending exception.
 			if env.exception_check() {
 				return Err(#jni::errors::Error::JavaException);
@@ -134,7 +109,7 @@ pub(super) fn generate_jni_set_field_call(
 					env_ptr,
 					#this_or_class.as_raw(),
 					#field_id,
-					#val_cast
+					jni_value
 				);
 			}
 

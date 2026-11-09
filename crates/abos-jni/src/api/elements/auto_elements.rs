@@ -48,7 +48,7 @@ where
 	///
 	/// `len` must be the correct length (number of elements) of the given `array`
 	unsafe fn new_with_len(env: &Env<'_>, array: TArrayRef, len: usize, mode: ReleaseMode) -> Result<Self> {
-		let mut is_copy: jboolean = true;
+		let mut is_copy: jboolean = sys::JNI_TRUE;
 		// SAFETY: The typed array has element type T; is_copy is valid writable storage and the guard retains the array.
 		let ptr: *mut T = unsafe { T::get_elements(env, array.as_ref().as_raw(), &mut is_copy) }?;
 		Ok(AutoElements {

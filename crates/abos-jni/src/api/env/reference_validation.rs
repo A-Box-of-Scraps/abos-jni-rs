@@ -34,7 +34,7 @@ impl Env<'_> {
 					ToReflectedMethod,
 					class.as_raw(),
 					method,
-					is_static
+					sys::jboolean::from(is_static)
 				)?;
 				JObject::from_raw(env, raw)
 			};
@@ -86,7 +86,7 @@ impl Env<'_> {
 					ToReflectedField,
 					class.as_raw(),
 					field,
-					is_static
+					sys::jboolean::from(is_static)
 				)?;
 				JObject::from_raw(env, raw)
 			};

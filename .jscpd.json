@@ -6,5 +6,5 @@
   "maxLines": 100000,
   "maxSize": "10mb",
   "path": ["."],
-  "ignore": ["**/target/**", "**/Cargo.lock"]
+  "ignore": ["**/target/**", "**/Cargo.lock","**/tests/android-test-activity/gradlew.bat"]
 }

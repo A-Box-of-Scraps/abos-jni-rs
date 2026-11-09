@@ -1,7 +1,6 @@
 use super::{ConcreteType, PrimitiveType, Result, SigType, Span, TokenStream, TypeMappings, lit_cstr_mutf8, quote};
 
-/// Helper function to validate that a type can be used as an array element
-/// Returns an error if the element type is void
+/// Reject void and unknown aliases as array element types.
 pub(super) fn validate_array_element_type(elem_type: &SigType, type_mappings: &TypeMappings, span: Span) -> Result<()> {
 	if let SigType::Alias(name) = elem_type {
 		match type_mappings.map_alias(name) {
@@ -21,8 +20,7 @@ pub(super) fn validate_array_element_type(elem_type: &SigType, type_mappings: &T
 	Ok(())
 }
 
-/// Core function to convert a `JavaType` to a concrete Rust type with lifetime
-/// Returns the type WITHOUT any `AsRef` wrapper
+/// Convert a `SigType` to a concrete Rust type with a lifetime, without an `AsRef` wrapper.
 pub fn sig_type_to_rust_type_core(
 	java_type: &SigType,
 	lifetime: &TokenStream,
@@ -121,21 +119,14 @@ fn array_element_type(
 			},
 		),
 		SigType::Array(_inner_element_type, _dimensions) => {
-			// An array of arrays should be represented via `Array(_, dimensions > 1)`, not by nesting
-			// ArgType::Array as the element type.
+			// Multiple dimensions use `SigType::Array(_, dimensions)`, not nested array variants.
 			unreachable!("Multi-dimensional arrays should not be represented by nesting ArgType::Array")
 		}
 	}
 }
 
-/// Generate assertions that type mappings are correct
-///
-/// - Generates assertions to verify the Java class names match at runtime.
-/// - Generates compile-time assertions to verify primitive type sizes and alignments match.
-///
-/// Skips checks for the built-in jni crate types that are assumed to be correct.
-/// (note that we will still generate a compile-time error if attempting to map
-/// a built-in Rust type to a different Java type)
+/// Validate custom mappings with runtime class-name checks and compile-time primitive
+/// size and alignment checks. Built-in mappings do not need these assertions.
 pub fn generate_type_mapping_checks(type_mappings: &TypeMappings, jni: &syn::Path) -> TokenStream {
 	let mut type_checks: Vec<TokenStream> = Vec::new();
 
@@ -151,8 +142,7 @@ pub fn generate_type_mapping_checks(type_mappings: &TypeMappings, jni: &syn::Pat
 
 		type_checks.push(quote! {
 			{
-				// Safety: we have compile-time encoded the name of the Java class as MUTF8
-				// and therefore know it's safe to cast as a JNIStr
+				// SAFETY: The class name was encoded as modified UTF-8 at compile time.
 				let expected_class_name = unsafe {
 					#jni::strings::JNIStr::from_cstr_unchecked(#java_class_cstr)
 				};

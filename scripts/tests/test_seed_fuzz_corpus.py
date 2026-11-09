@@ -1,18 +1,19 @@
 import contextlib
 import importlib.util
 import io
-from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
 import tomllib
 import unittest
+from pathlib import Path
 from unittest.mock import patch
-
 
 SCRIPT = Path(__file__).resolve().parents[1] / "seed-fuzz-corpus.py"
 SPEC = importlib.util.spec_from_file_location("seed_fuzz_corpus", SCRIPT)
+if SPEC is None or SPEC.loader is None:
+    raise ImportError(f"Unable to load script: {SCRIPT}")
 seeder = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(seeder)
 
@@ -79,8 +80,11 @@ class SeedFuzzCorpusTests(unittest.TestCase):
         script.parent.mkdir()
         shutil.copyfile(SCRIPT, script)
         result = subprocess.run(
-            [sys.executable, "-B", str(script)], cwd=script.parent,
-            capture_output=True, text=True, check=False,
+            [sys.executable, "-B", str(script)],
+            cwd=script.parent,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
@@ -90,9 +94,11 @@ class SeedFuzzCorpusTests(unittest.TestCase):
 
     def test_main_reports_filesystem_errors(self):
         output = io.StringIO()
-        with patch.object(seeder, "seed_corpus", side_effect=PermissionError("corpus")):
-            with contextlib.redirect_stderr(output):
-                self.assertEqual(seeder.main(), 1)
+        with (
+            patch.object(seeder, "seed_corpus", side_effect=PermissionError("corpus")),
+            contextlib.redirect_stderr(output),
+        ):
+            self.assertEqual(seeder.main(), 1)
         self.assertIn("Unable to seed fuzz corpus:", output.getvalue())
 
     def test_mise_task_uses_script_from_project_root(self):

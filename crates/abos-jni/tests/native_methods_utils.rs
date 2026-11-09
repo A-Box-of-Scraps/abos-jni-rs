@@ -4,38 +4,8 @@
 //! Utilities for testing the `native_method!` macro.
 //!
 //! This module provides helper functions and macros to simplify writing tests for
-//! the `native_method!` macro, particularly for runtime tests that need to compile
-//! Java classes, register native methods, and call them through JNI.
-
-/// Compile a test Java class and return the output directory.
-///
-/// This helper compiles the specified Java file and returns the path to the
-/// output directory containing the compiled .class files.
-#[allow(
-	dead_code,
-	reason = "Shared test and example helpers are used by different subsets of binaries."
-)]
-#[must_use]
-///
-/// # Panics
-///
-/// Panics if preparing the output directory or compiling the Java fixture fails.
-pub fn compile_test_class(test_name: &str, java_file: &str) -> std::path::PathBuf {
-	let out_dir: std::path::PathBuf = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
-		.join("jni_macros_tests")
-		.join(test_name);
-
-	match std::fs::remove_dir_all(&out_dir) {
-		Ok(()) => {}
-		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-		Err(error) => panic!("Failed to remove previous test output: {error}"),
-	}
-	std::fs::create_dir_all(&out_dir).expect("Failed to create test output directory");
-
-	let _classes: Vec<std::path::PathBuf> = abos_javac::Build::new().file(java_file).output_dir(&out_dir).compile();
-
-	out_dir
-}
+//! the `native_method!` macro, particularly for runtime tests that load Java
+//! fixtures, register native methods, and call them through JNI.
 
 /// Load a test class from the output directory into the JVM.
 ///
@@ -80,7 +50,7 @@ pub fn load_test_class<'local>(
 /// Macro to simplify native method tests that manually register methods.
 ///
 /// This macro reduces boilerplate for tests that need to:
-/// 1. Compile a Java class
+/// 1. Reuse compiled Java fixtures
 /// 2. Set up the JVM
 /// 3. Load the class
 /// 4. Register native methods
@@ -142,10 +112,7 @@ macro_rules! native_method_test {
             $(#[$attribute])*
             fn $test_name() {
                 #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
-                let out_dir = $crate::native_methods_utils::compile_test_class(
-                    stringify!($test_name),
-                    concat!("tests/java/", $java_class)
-                );
+                let out_dir = $crate::util::java_fixtures();
 
                 #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                 $crate::util::attach_current_thread(|$env| {
@@ -184,10 +151,7 @@ macro_rules! native_method_test {
             $(#[$attribute])*
             fn $test_name() {
                 #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
-                let out_dir = $crate::native_methods_utils::compile_test_class(
-                    stringify!($test_name),
-                    concat!("tests/java/", $java_class)
-                );
+                let out_dir = $crate::util::java_fixtures();
 
                 #[allow(clippy::crate_in_macro_def, reason = "The test helper resolves the utility module in the invoking test crate.")]
                 let result = $crate::util::attach_current_thread(|$env| {

@@ -1,5 +1,7 @@
 pub mod sdk;
-use crate::internal::{bytecode, generator, java_parser};
+use crate::internal::{
+	bytecode, generator, generator::names::core_jni_type, inputs::validate_class_patterns, java_parser,
+};
 use crate::{AndroidSdk, BindgenOptions, ClassInfo, Error, HiddenApiFilter, ModuleBinding, Result, TypeMap};
 use std::{
 	collections::HashMap,
@@ -17,6 +19,7 @@ pub fn generate_android_bindings(
 	options: &BindgenOptions,
 	extra_type_map: Vec<(String, String)>,
 ) -> Result<Vec<ModuleBinding>> {
+	validate_class_patterns(patterns)?;
 	let sdk: crate::AndroidSdk = AndroidSdk::from_env(api_level)?;
 
 	// Parse android.jar (bytecode) for actual implementation
@@ -27,7 +30,7 @@ pub fn generate_android_bindings(
 	let stubs_jar: std::path::PathBuf = sdk.get_stubs_src_jar()?;
 	let classpath: Vec<std::path::PathBuf> = sdk.get_classpath()?;
 	let stub_classes: std::collections::HashMap<String, crate::ClassInfo> =
-		parse_source_stubs(&stubs_jar, &classpath, patterns)?;
+		parse_source_stubs(&stubs_jar, &android_jar, &classpath, patterns)?;
 
 	let mut filtered_classes: Vec<crate::ClassInfo> = intersect_classes(jar_classes, &stub_classes);
 
@@ -36,6 +39,7 @@ pub fn generate_android_bindings(
 		filtered_classes = filter_hidden_apis(filtered_classes, &hidden_apis);
 	}
 
+	filtered_classes.retain(|class| core_jni_type(&class.class_name).is_none());
 	filtered_classes.sort_by(|left, right| left.class_name.cmp(&right.class_name));
 
 	let mut type_map: crate::TypeMap = TypeMap::from_classes(filtered_classes.iter(), options)?;
@@ -75,6 +79,7 @@ pub(super) fn parse_jar_classes(jar_path: &Path, patterns: &[String]) -> Result<
 /// Parse source stubs from android-stubs-src.jar
 pub(super) fn parse_source_stubs(
 	stubs_jar: &Path,
+	android_jar: &Path,
 	classpath: &[PathBuf],
 	patterns: &[String],
 ) -> Result<HashMap<String, ClassInfo>> {
@@ -85,7 +90,7 @@ pub(super) fn parse_source_stubs(
 	};
 
 	let classes: Vec<crate::ClassInfo> =
-		java_parser::parse_java_sources(&[stubs_jar.to_path_buf()], classpath, &pattern_str)?;
+		java_parser::parse_android_sources(&[stubs_jar.to_path_buf()], classpath, &pattern_str, android_jar)?;
 
 	let mut result: std::collections::HashMap<String, crate::ClassInfo> = HashMap::new();
 	for class_info in classes {

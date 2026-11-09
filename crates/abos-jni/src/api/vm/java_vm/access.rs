@@ -284,22 +284,14 @@ impl JavaVM {
 	/// - `Global`
 	/// - `Weak`
 	/// - `MUTF8Chars`
-	/// - `JMap`
 	///
 	/// ## Invalid `JavaVM` on return
 	///
-	/// After `destroy()` returns then the `JavaVM` will be in an undefined
-	/// state and must be dropped (e.g. via `std::mem::drop()`) to avoid
-	/// undefined behaviour.
+	/// After successful destruction, this handle and every copy of it are invalid for
+	/// further JNI calls. Dropping a `JavaVM` handle does not call JNI or destroy the VM.
 	///
-	/// This method doesn't take ownership of the `JavaVM` before it is
-	/// destroyed because the `JavaVM` may have been shared (E.g. via an `Arc`)
-	/// between all the threads that have not yet necessarily exited before this
-	/// is called.
-	///
-	/// So although the `JavaVM` won't necessarily be solely owned by this
-	/// thread when `destroy()` is first called it will conceptually own the
-	/// `JavaVM` before `destroy()` returns.
+	/// This method borrows rather than consumes the handle, so the caller must ensure
+	/// that no other copy, including the cached singleton, is used after destruction.
 	///
 	/// [destroy]:
 	///     https://docs.oracle.com/en/java/javase/12/docs/specs/jni/invocation.html#unloading-the-vm

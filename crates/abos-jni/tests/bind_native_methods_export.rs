@@ -93,7 +93,7 @@ native_method_test! {
 
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
-			let ret = Java_com_example_TestNativeExports_primitiveArgs__IJZ(unowned, obj, 10, 20, true as jboolean);
+			let ret = Java_com_example_TestNativeExports_primitiveArgs__IJZ(unowned, obj, 10, 20, abos_jni::sys::JNI_TRUE);
 			assert_eq!(ret, 31);
 		}
 		Ok(())
@@ -522,12 +522,7 @@ impl TestInnerClassNativeInterface for TestInnerClassAPI {
 rusty_fork::rusty_fork_test! {
 	#[test]
 	fn test_export_inner_class() {
-		let out_dir = util::setup_test_output("test_export_inner_class");
-
-		let _classes = abos_javac::Build::new()
-			.file("tests/java/com/example/TestNativeExports.java")
-			.output_dir(&out_dir)
-			.compile();
+		let out_dir: std::path::PathBuf = util::java_fixtures();
 
 		util::attach_current_thread(|env| {
 			// Load both outer and inner class

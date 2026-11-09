@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Copy checked-in fuzz seeds into corpus directories without replacing files."""
 
-from pathlib import Path
 import shutil
 import sys
-
+from pathlib import Path
 
 SEED_SOURCES = {
     "cafebabe_parse_class": "cafebabe_parse_class",

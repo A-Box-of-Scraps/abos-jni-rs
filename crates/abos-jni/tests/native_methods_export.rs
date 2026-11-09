@@ -115,7 +115,7 @@ native_method_test! {
 		unsafe {
 			let unowned = EnvUnowned::from_raw(env.get_raw());
 			let ret = Java_com_example_TestNativeExports_primitiveArgs__IJZ(
-				unowned, obj, 10, 20, true as jboolean
+				unowned, obj, 10, 20, abos_jni::sys::JNI_TRUE
 			);
 			assert_eq!(ret, 31);
 		}

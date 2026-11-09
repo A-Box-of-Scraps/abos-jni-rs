@@ -71,9 +71,6 @@ impl<'local> Env<'local> {
 		Ok(())
 	}
 
-	// FIXME: this API shouldn't need a `&mut self` reference since it doesn't return a local reference
-	// (currently it just needs the `&mut self` for the sake of `Desc<JClass>::lookup`)
-	//
 	/// Bind function pointers to native methods of class according to method name and signature.
 	///
 	/// For details see
@@ -103,6 +100,8 @@ impl<'local> Env<'local> {
 	/// does not match the signature, so incorrect function pointers may lead to crashes or
 	/// undefined behaviour.
 	///
+	/// Use [`Self::register_native_methods_from_class`] with an already-resolved class and a shared environment.
+	///
 	/// # Errors
 	///
 	/// Returns an error if the class cannot be resolved or the JVM rejects a native method name or signature.
@@ -111,6 +110,26 @@ impl<'local> Env<'local> {
 		T: Desc<'local, JClass<'other_local>>,
 	{
 		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
+		// SAFETY: The caller guarantees the native method contracts; the descriptor stays live.
+		unsafe { self.register_native_methods_from_class(class.as_ref(), methods) }
+	}
+
+	/// Registers native methods on an already-resolved class using a shared environment.
+	///
+	/// # Safety
+	///
+	/// The caller must satisfy the function-pointer, signature, and static/instance
+	/// requirements of [`Self::register_native_methods`].
+	///
+	/// # Errors
+	///
+	/// Returns an error if the class is null, JNI rejects the methods, or a Java exception is pending.
+	pub unsafe fn register_native_methods_from_class(
+		&self,
+		class: &JClass<'_>,
+		methods: &[NativeMethod],
+	) -> Result<()> {
+		let class: &JClass<'_> = null_check!(class, "register_native_methods_from_class class")?;
 		// Safety:
 		//  - NativeMethod is a #[transparent] / repr(C)] wrapper around sys::JNINativeMethod
 		//  - NativeMethod only has an `unsafe` constructor that requires the caller to ensure that
@@ -128,14 +147,11 @@ impl<'local> Env<'local> {
 				self,
 				v1_1,
 				RegisterNatives,
-				class.as_ref().as_raw(),
+				class.as_raw(),
 				methods.as_ptr().cast::<sys::JNINativeMethod>().cast_mut(),
 				jint::try_from(methods.len()).map_err(|_| Error::JniCall(JniError::InvalidArguments))?
 			)?
 		};
-
-		// Ensure that `class` isn't dropped before the JNI call returns.
-		drop(class);
 
 		jni_error_code_to_result(res)
 	}
@@ -144,14 +160,16 @@ impl<'local> Env<'local> {
 	///
 	/// # Errors
 	///
-	/// Returns an error if the class cannot be resolved, unregistration fails, or a Java exception is pending.
+	/// Returns an error if the class is null or cannot be resolved, unregistration fails, or a Java exception is pending.
 	pub fn unregister_native_methods<'other_local, T>(&mut self, class: T) -> Result<()>
 	where
 		T: Desc<'local, JClass<'other_local>>,
 	{
 		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
-		// SAFETY: The class descriptor remains live during UnregisterNatives.
-		let res: i32 = unsafe { jni_call_post_check_ex!(self, v1_1, UnregisterNatives, class.as_ref().as_raw())? };
+		let resolved_class: &JClass<'_> = class.as_ref();
+		let resolved_class: &JClass<'_> = null_check!(resolved_class, "unregister_native_methods class argument")?;
+		// SAFETY: The class is non-null and its descriptor remains live during UnregisterNatives.
+		let res: i32 = unsafe { jni_call_post_check_ex!(self, v1_1, UnregisterNatives, resolved_class.as_raw())? };
 
 		// Ensure that `class` isn't dropped before the JNI call returns.
 		drop(class);

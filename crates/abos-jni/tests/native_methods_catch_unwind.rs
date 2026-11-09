@@ -16,7 +16,7 @@
 //!
 //! Testing `catch_unwind = false` is tricky because the native method
 //! represents an extern "system" FFI boundary which panics cannot cross without
-//! aborting the process. To work around this, we spawn a separate `cargo test`
+//! aborting the process. To work around this, we spawn a separate test-executable
 //! process to run the code that can abort so we can check the exit status.
 
 mod native_methods_utils;
@@ -32,7 +32,7 @@ use std::panic;
 
 // This test is designed to abort when run
 native_method_test! {
-	#[ignore = "This is run in a separate cargo process by test_catch_unwind_false_causes_abort"]
+	#[ignore = "This is run in a separate test process by test_catch_unwind_false_causes_abort"]
 	test_name: test_catch_unwind_false_causes_abort_impl,
 	java_class: "com/example/TestNativeCatchUnwind.java",
 	methods: |class| &[
@@ -81,13 +81,9 @@ fn test_catch_unwind_false_causes_abort() {
 	// The panic should cause the process to abort because it tries to
 	// escape through an extern "system" FFI boundary that cannot unwind.
 
-	let mut cmd = std::process::Command::new(env!("CARGO"));
-	cmd.arg("test")
-		.arg("--features=invocation")
-		.arg("--test")
-		.arg("native_methods_catch_unwind")
-		.arg("--")
-		.arg("--include-ignored")
+	let executable: std::path::PathBuf = std::env::current_exe().expect("locate test executable");
+	let mut cmd = std::process::Command::new(executable);
+	cmd.arg("--include-ignored")
 		.arg("--exact")
 		.arg("test_catch_unwind_false_causes_abort_impl")
 		.arg("--nocapture");

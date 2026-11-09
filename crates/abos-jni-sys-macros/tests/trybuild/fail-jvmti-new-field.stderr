@@ -1,0 +1,15 @@
+error[E0609]: no field `modules` on type `Table_1_2`
+  --> tests/trybuild/fail-jvmti-new-field.rs:17:22
+   |
+17 |     let _ = baseline.modules;
+   |                      ^^^^^^^ unknown field
+   |
+   = note: available fields are: `baseline`, `reserved2`, `existing`
+
+error[E0609]: no field `sampling` on type `Table_1_2`
+  --> tests/trybuild/fail-jvmti-new-field.rs:18:22
+   |
+18 |     let _ = baseline.sampling;
+   |                      ^^^^^^^^ unknown field
+   |
+   = note: available fields are: `baseline`, `reserved2`, `existing`

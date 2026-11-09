@@ -1,7 +1,7 @@
 use super::{jboolean, jint};
 
-pub const JNI_FALSE: jboolean = false;
-pub const JNI_TRUE: jboolean = true;
+pub const JNI_FALSE: jboolean = 0;
+pub const JNI_TRUE: jboolean = 1;
 
 pub const JNI_OK: jint = 0;
 pub const JNI_ERR: jint = -1;

@@ -110,14 +110,6 @@ fn thread_detaches_for_scoped_attachment() {
 }
 
 rusty_fork_test! {
-// TODO: check nested scope guards and that we don't register TLS guards if already attached
-#[test]
-fn thread_detaches_for_outer_scoped_attachment() {
-
-}
-}
-
-rusty_fork_test! {
 #[test]
 fn threads_explicit_detach_error_for_scoped_attachment() {
 	// A newly created VM will be attached

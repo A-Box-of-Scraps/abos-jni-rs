@@ -1,0 +1,15 @@
+[package]
+name = "abos-jvmti-sys"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Raw Rust definitions corresponding jvmti.h."
+
+[lints]
+workspace = true
+
+[dependencies]
+abos-jni-sys.workspace = true
+abos-jni-sys-macros.workspace = true

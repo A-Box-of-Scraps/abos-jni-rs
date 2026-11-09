@@ -32,7 +32,17 @@ impl Probe {
 				self.measure(&name.to_string(), &name.to_string(), &quote!(i64::from(sys::#name)));
 			}
 			Item::Struct(record) if record.attrs.iter().any(|attr| attr.path().is_ident("jni_to_union")) => {
-				self.table(&record);
+				self.table(&record, "jni_added", (1, 1));
+			}
+			Item::Struct(record)
+				if record.attrs.iter().any(|attr| {
+					attr.path()
+						.segments
+						.last()
+						.is_some_and(|segment| segment.ident == "jvmti_versions")
+				}) =>
+			{
+				self.table(&record, "jvmti_added", (1, 2));
 			}
 			Item::Struct(record) => self.record(&record.ident, record.fields.iter()),
 			Item::Union(record) => self.record(&record.ident, record.fields.named.iter()),
@@ -74,38 +84,46 @@ impl Probe {
 
 	fn alias(&mut self, alias: &syn::ItemType) {
 		let name = &alias.ident;
-		if name == "va_list" {
-			// Rust intentionally uses an opaque pointer for va_list arguments. Its C object
-			// representation is platform-specific, so a sizeof comparison would be misleading.
-			return;
-		}
 		self.layout(name, &name.to_string());
-		// JNI permits only 0 and 1 for jboolean; Rust bool and C unsigned char differ in
-		// type identity. Check its layout and JNI_FALSE/JNI_TRUE, not C type identity.
-		if !(name == "jboolean" && matches!(alias.ty.as_ref(), Type::Path(path) if path.path.is_ident("bool"))) {
-			self.signature(&name.to_string(), &format!("({name})0"), &c_type(&alias.ty));
-		}
+		// Compare parameter types, allowing C array typedefs such as va_list to decay.
+		self.signature(
+			&name.to_string(),
+			&format!("(void (*)({name}))0"),
+			&format!("void (*)({})", c_type(&alias.ty)),
+		);
 	}
 
 	fn record<'a>(&mut self, name: &Ident, fields: impl Iterator<Item = &'a Field>) {
 		let c_record = c_name(&name.to_string());
 		self.layout(name, &c_record);
-		for field in fields {
+		// Private storage (for example C bitfields) is checked separately by
+		// cross-language round trips, while the record still gets layout checks.
+		for field in fields.filter(|field| matches!(field.vis, syn::Visibility::Public(_))) {
 			self.field_type(&c_record, field);
 			self.field_offset(name, &c_record, field);
 		}
 	}
 
-	fn table(&mut self, table: &ItemStruct) {
+	fn table(&mut self, table: &ItemStruct, attribute: &str, baseline: Version) {
 		let name = &table.ident;
 		let c_record = c_name(&name.to_string());
 		self.layout(name, &c_record);
-		let fields: Vec<(&Field, Version)> = table.fields.iter().map(|field| (field, version(field))).collect();
+		let fields: Vec<(&Field, Version)> = table
+			.fields
+			.iter()
+			.map(|field| (field, version(field, attribute, baseline)))
+			.collect();
 		let views: BTreeMap<Version, String> = fields.iter().map(|(_, version)| (*version, suffix(*version))).collect();
 		for field in &table.fields {
 			self.field_type(&c_record, field);
+			if attribute == "jvmti_added" {
+				self.field_offset(name, &c_record, field);
+			}
 		}
 		for (version, suffix) in views {
+			if attribute == "jvmti_added" && version == RESERVED {
+				continue;
+			}
 			let view = format_ident!("{name}_{suffix}");
 			let last = fields
 				.iter()
@@ -138,6 +156,15 @@ impl Probe {
 
 	fn field_type(&mut self, c_record: &str, field: &Field) {
 		let name = field.ident.as_ref().expect("named field");
+		if let Type::Array(array) = &field.ty {
+			let length = &array.len;
+			let member = format!("(({c_record} *)0)->{name}");
+			self.measure(
+				&format!("lengthof({c_record}.{name})"),
+				&format!("sizeof({member}) / sizeof({member}[0])"),
+				&quote!({ let length: usize = #length; i64::try_from(length).expect("array length fits i64") }),
+			);
+		}
 		self.signature(
 			&format!("{c_record}.{name}"),
 			&format!("(({c_record} *)0)->{name}"),
@@ -176,9 +203,9 @@ impl Probe {
 	}
 }
 
-fn version(field: &Field) -> Version {
-	let Some(attribute) = field.attrs.iter().find(|attr| attr.path().is_ident("jni_added")) else {
-		return (1, 1);
+fn version(field: &Field, name: &str, baseline: Version) -> Version {
+	let Some(attribute) = field.attrs.iter().find(|attr| attr.path().is_ident(name)) else {
+		return baseline;
 	};
 	let value = attribute.parse_args::<LitStr>().expect("JNI version").value();
 	if value == "reserved" {

@@ -97,7 +97,7 @@ test_auto_array_read_write!(get_long_array_elements, jlong, new_long_array, 0, 1
 
 test_auto_array_read_write!(get_byte_array_elements, jbyte, new_byte_array, 0, 1);
 
-test_auto_array_read_write!(get_boolean_array_elements, jboolean, new_boolean_array, true, false);
+test_auto_array_read_write!(get_boolean_array_elements, jboolean, new_boolean_array, 1, 0);
 
 test_auto_array_read_write!(get_char_array_elements, jchar, new_char_array, 0, 1);
 
@@ -213,7 +213,7 @@ pub fn new_primitive_array_ok() {
 	attach_current_thread(|env| {
 		const SIZE: usize = 16;
 
-		let result: std::result::Result<abos_jni::objects::JPrimitiveArray<'_, bool>, abos_jni::errors::Error> =
+		let result: std::result::Result<abos_jni::objects::JPrimitiveArray<'_, jboolean>, abos_jni::errors::Error> =
 			env.new_boolean_array(SIZE);
 		assert!(!result.expect("test operation succeeds").is_null());
 

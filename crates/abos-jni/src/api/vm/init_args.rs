@@ -309,7 +309,7 @@ impl<'a> InitArgsBuilder<'a> {
 		Ok(InitArgs {
 			inner: JavaVMInitArgs {
 				version: self.version.into(),
-				ignoreUnrecognized: self.ignore_unrecognized as _,
+				ignoreUnrecognized: self.ignore_unrecognized.into(),
 				options: opts.as_ptr().cast_mut(),
 				nOptions: option_count,
 			},

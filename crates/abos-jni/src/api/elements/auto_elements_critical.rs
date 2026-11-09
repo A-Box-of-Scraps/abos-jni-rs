@@ -40,7 +40,7 @@ where
 	///
 	/// `len` must be the correct length (number of elements) of the given `array`
 	pub(crate) unsafe fn new_with_len(env: &Env<'_>, array: TArrayRef, len: usize, mode: ReleaseMode) -> Result<Self> {
-		let mut is_copy: jboolean = true;
+		let mut is_copy: jboolean = sys::JNI_TRUE;
 
 		// We use jni_call_no_post_check_ex! (not jni_call_with_catch_and_null_check!)
 		// because once GetPrimitiveArrayCritical succeeds we're immediately in a

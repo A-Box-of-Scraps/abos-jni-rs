@@ -71,8 +71,8 @@ fn emits_scalar_record_constant_and_exported_function_checks() {
 	probe.add_source(
 		r#"
         pub type jint = i32;
-        pub type jboolean = bool;
-        pub type va_list = *mut c_void;
+        pub type jboolean = u8;
+        pub type va_list<'a> = core::ffi::VaList<'a>;
         pub const JNI_OK: jint = 0;
         pub struct JavaVMOption { pub optionString: *mut c_char }
         pub union jvalue { pub i: jint }
@@ -80,14 +80,72 @@ fn emits_scalar_record_constant_and_exported_function_checks() {
         unsafe extern "system" { pub fn JNI_GetDefaultJavaVMInitArgs(args: *mut c_void) -> jint; }
     "#,
 	);
-	assert!(probe.signatures.contains("int32_t: 1"));
-	assert!(!probe.signatures.contains("_Bool: 1"));
+	assert!(probe.signatures.contains("void (*)(int32_t): 1"));
+	assert!(probe.signatures.contains("void (*)(uint8_t): 1"));
+	assert!(probe.signatures.contains("void (*)(va_list): 1"));
 	assert!(probe.signatures.contains("&JNI_GetDefaultJavaVMInitArgs"));
 	assert!(probe.signatures.contains("jint (JNICALL *)(void *)"));
 	assert!(probe.measurements.contains("sizeof(jboolean)"));
-	assert!(!probe.measurements.contains("sizeof(va_list)"));
+	assert!(probe.measurements.contains("sizeof(va_list)"));
+	assert!(probe.measurements.contains("_Alignof(va_list)"));
 	assert!(probe.measurements.contains("(int64_t)(JNI_OK)"));
 	assert!(probe.measurements.contains("(int64_t)(JNIInvalidRefType)"));
 	assert!(probe.measurements.contains("offsetof(JavaVMOption, optionString)"));
 	assert!(probe.measurements.contains("offsetof(jvalue, i)"));
+}
+
+#[test]
+fn incorrect_boolean_and_va_list_aliases_are_not_silently_substituted() {
+	let mut probe = generate::Probe::default();
+	probe.add_source("pub type jboolean = bool; pub type va_list = *mut c_void;");
+	assert!(probe.signatures.contains("void (*)(_Bool): 1"));
+	assert!(probe.signatures.contains("void (*)(void *): 1"));
+	assert!(probe.measurements.contains("sizeof(va_list)"));
+}
+
+#[test]
+fn va_list_parameters_keep_the_c_type_and_accept_only_lifetimes() {
+	let ty: Type = parse_quote!(unsafe extern "system" fn(args: va_list<'_>));
+	assert_eq!(types::c_type(&ty), "void (JNICALL *)(va_list)");
+}
+
+#[test]
+#[should_panic(expected = "va_list requires exactly one lifetime argument")]
+fn rejects_va_list_type_arguments() {
+	types::c_type(&parse_quote!(va_list<u8>));
+}
+
+#[test]
+fn nullable_callback_types_preserve_the_function_signature() {
+	let ty: Type = parse_quote!(Option<unsafe extern "system" fn(*mut jvmtiEnv, *mut JNIEnv)>);
+	assert_eq!(types::c_type(&ty), "void (JNICALL *)(jvmtiEnv *, JNIEnv *)");
+}
+
+#[test]
+#[should_panic(expected = "Only nullable function pointers")]
+fn rejects_options_without_a_guaranteed_c_niche() {
+	types::c_type(&parse_quote!(Option<jint>));
+}
+
+#[test]
+fn opaque_bitfield_storage_still_gets_record_layout_checks() {
+	let mut probe = generate::Probe::default();
+	probe.add_source("pub struct jvmtiCapabilities { words: [u32; 4] }");
+	let expected = probe.expected.to_string();
+	assert!(expected.contains("sizeof(jvmtiCapabilities)"));
+	assert!(expected.contains("alignof(jvmtiCapabilities)"));
+	assert_eq!(probe.signatures, "");
+}
+
+#[test]
+fn fixed_arrays_check_element_type_and_length_before_decay() {
+	let mut probe = generate::Probe::default();
+	probe.add_source("pub struct Example { pub message: [c_char; 50] }");
+	assert!(probe.signatures.contains("char *: 1"));
+	assert!(
+		probe
+			.measurements
+			.contains("sizeof(((Example *)0)->message) / sizeof(((Example *)0)->message[0])")
+	);
+	assert!(probe.expected.to_string().contains("lengthof(Example.message)"));
 }

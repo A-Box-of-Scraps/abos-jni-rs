@@ -1,8 +1,4 @@
-//! Thread Local Storage (TLS) implementation for thread attachment tracking on non-Windows platforms.
-//!
-//! This module provides the default thread attachment mechanism using Rust's standard thread-local
-//! storage. On non-Windows platforms, TLS destructors are safe to use for automatic thread detachment
-//! without the loader lock issues that affect Windows.
+//! Thread attachment tracking with automatic detachment through non-Windows TLS destructors.
 
 use std::{
 	cell::RefCell,
@@ -25,17 +21,11 @@ thread_local! {
 
 /// Data stored in TLS for automatic thread detachment.
 ///
-/// Note: We don't store the env pointer because we consider the possibility that external code
-/// may manually detach the thread so long as there are no active `AttachGuards`. In that case,
-/// the env pointer can become invalid before the TLS destructor runs.
+/// Environment pointers are not retained: external code may detach the thread when no
+/// `AttachGuard`s are active, invalidating the pointer before the TLS destructor runs.
 #[derive(Debug)]
 struct TLSAttachGuard {
-	/// A call `std::thread::current()` function can panic in case the local data has been destroyed
-	/// before the thread local variables. The possibility of this happening depends on the platform
-	/// implementation of the `sys_common::thread_local_dtor::register_dtor_fallback`.
-	///
-	/// Since this struct will be saved as a thread-local variable, we capture the thread meta-data
-	/// during creation
+	/// Captured at attachment because `thread::current()` can panic during TLS destruction.
 	thread: Thread,
 }
 
@@ -43,8 +33,7 @@ impl TLSAttachGuard {
 	/// Detach the current thread after checking there are no active [`AttachGuard`]s
 	///
 	/// # Safety
-	/// Since this is used in the implementation of `Drop` you must make sure
-	/// to not let `Drop` run if this is called explicitly.
+	/// The caller must prevent `Drop` from running after an explicit detach.
 	unsafe fn detach_impl(&self) -> Result<()> {
 		// SAFETY: The caller prevents a second detach, and this thread-local guard belongs to the current thread.
 		unsafe { sys_detach_current_thread(None, &self.thread) }
@@ -65,17 +54,13 @@ impl Drop for TLSAttachGuard {
 	}
 }
 
-/// Attach the current thread to the Java VM using TLS for automatic cleanup.
+/// Attach the current thread to the JVM and register TLS cleanup for thread termination.
 ///
-/// This function stores attachment information in thread-local storage so that when the thread
-/// terminates, the TLS destructor will automatically detach the thread from the JVM.
-///
-/// Note: This function assumes that the caller has already used `GetEnv` to check if the thread
-/// is already attached, and only calls this function if it is not attached.
+/// The caller must first use `GetEnv` to confirm that the thread is detached.
 ///
 /// # Panics
 ///
-/// This function will panic if called while there are active `AttachGuard`s.
+/// Panics if any `AttachGuard`s are active.
 pub unsafe fn tls_attach_current_thread<'local>(
 	java_vm: &JavaVM,
 	config: &AttachConfig,
@@ -102,9 +87,9 @@ pub unsafe fn tls_attach_current_thread<'local>(
 	Ok(unsafe { AttachGuard::from_unowned(env) })
 }
 
-/// Detach a thread before the thread terminates **IFF** it was previously attached via
-/// [`JavaVM::attach_current_thread`] **AND** there is no active [`AttachGuard`] in use
-/// for this thread.
+/// Detach the current thread if it has a TLS attachment guard.
+///
+/// Returns `Error::ThreadAttachmentGuarded` if any `AttachGuard`s are active.
 pub fn tls_detach_current_thread() -> Result<()> {
 	if JavaVM::thread_attach_guard_level() != 0 {
 		return Err(Error::ThreadAttachmentGuarded);
@@ -114,8 +99,7 @@ pub fn tls_detach_current_thread() -> Result<()> {
 		f.borrow_mut().take().map_or_else(
 			|| Ok(()),
 			|guard| {
-				// Safety: we use `std::mem::forget` to ensure we don't also
-				// run the `Drop` implementation
+				// SAFETY: Forgetting the guard below prevents a second detach through `Drop`.
 				let res: std::result::Result<(), crate::errors::Error> = unsafe { guard.detach_impl() };
 				std::mem::forget(guard);
 				res

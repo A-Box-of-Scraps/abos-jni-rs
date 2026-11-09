@@ -1,11 +1,7 @@
 use super::names::java_name_to_rust;
 use std::fmt::Write as _;
-///
-/// This takes a Javadoc comment string and converts it to Rustdoc format.
-/// - Converts `@param` tags to parameter documentation
-/// - Converts `@return` tags to Returns section
-/// - Strips HTML tags
-/// - Formats as `///` style comments
+/// Convert Javadoc to Rustdoc comments with parameter and return sections.
+/// Removes paragraph and line-break tags, decodes basic HTML entities, and skips other Javadoc tags.
 pub fn format_javadoc_as_rustdoc(javadoc: &str) -> String {
 	let mut output = String::new();
 	let mut in_param_section = false;
@@ -51,7 +47,7 @@ pub fn format_javadoc_as_rustdoc(javadoc: &str) -> String {
 		if trimmed.starts_with("@throws") || trimmed.starts_with("@exception") {
 			in_param_section = false;
 			in_return_section = false;
-			continue; // Skip for now, could add Errors section
+			continue;
 		}
 
 		if trimmed.starts_with('@') {

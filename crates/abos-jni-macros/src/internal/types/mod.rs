@@ -342,12 +342,7 @@ enum RustTypeTarget {
 		is_builtin: bool,
 		/// The primitive type
 		primitive: PrimitiveType,
-		/// The name or full path for the primitive type (e.g., "i32" or "`abos_jni::sys::jint`")
-		///
-		/// If the jni crate is renamed, this path will reflect the renamed crate path.
-		///
-		/// If this represents a Rust primitive type, such as `i32`, then this will match
-		/// that type name.
+		/// Rust primitive name or JNI type path, honoring the crate-path override.
 		path: String,
 	},
 	Reference {
@@ -424,16 +419,8 @@ impl RustType {
 pub enum ConcreteType {
 	Primitive {
 		primitive: PrimitiveType,
-		/// The full path for the primitive type (e.g., "`abos_jni::sys::jint`")
-		///
-		/// If the jni crate is renamed, this path will reflect the renamed
-		/// crate path.
-		///
-		/// If the lookup was done using a Rust type alias such as `i32` then
-		/// this will correspond to that alias.
-		///
-		/// If the lookup was done using a Java type alias such as `int`, then
-		/// this will correspond to the canonical `abos_jni::sys` type path.
+		/// Resolved Rust path, honoring the crate-path override. Rust aliases such as `i32`
+		/// retain their spelling; Java aliases such as `int` resolve to the JNI type path.
 		path: String,
 		/// Whether this is a built-in primitive type mapping or a user-defined one
 		is_builtin: bool,
@@ -484,3 +471,6 @@ mod mappings;
 pub use mappings::*;
 mod conversion;
 pub use conversion::*;
+
+mod boolean;
+pub use boolean::{is_rust_bool, native_argument, native_return, native_type};

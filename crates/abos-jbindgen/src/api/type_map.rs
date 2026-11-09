@@ -1,6 +1,6 @@
 use crate::internal::generator::{
 	identifiers::rust_identifier,
-	names::{builtin_jni_types, canonical_java_name, derive_rust_type_name},
+	names::{canonical_java_name, core_jni_type, derive_rust_type_name},
 	symbols::GeneratedSymbols,
 };
 use crate::{BindgenOptions, ClassInfo, Result};
@@ -27,6 +27,11 @@ impl TypeMap {
 		for class_info in classes {
 			// Build the Java type name using class_name which has the full binary name with $ for inner classes
 			let java_type: String = canonical_java_name(&class_info.class_name).into_owned();
+
+			// Leave core references to the macro's built-in wrappers, without reserving symbols.
+			if core_jni_type(&java_type).is_some() {
+				continue;
+			}
 
 			// Get the simple Rust type name
 			let rust_name: String = derive_rust_type_name(
@@ -61,11 +66,7 @@ impl TypeMap {
 		for (rust_type, java_type) in extra_mappings {
 			let java_type: String = canonical_java_name(&java_type).into_owned();
 			// Check if this is a core builtin type that cannot be remapped
-			let is_core: bool = builtin_jni_types()
-				.iter()
-				.any(|b| b.java_name == java_type && b.is_core);
-
-			if is_core {
+			if core_jni_type(&java_type).is_some() {
 				log::warn!("Ignoring attempt to remap core type '{java_type}' to '{rust_type}'");
 				continue;
 			}
@@ -107,11 +108,7 @@ impl TypeMap {
 			java_type
 		};
 		// Check if this is a core builtin type that cannot be remapped
-		let is_core: bool = builtin_jni_types()
-			.iter()
-			.any(|b| b.java_name == java_type && b.is_core);
-
-		if !is_core {
+		if core_jni_type(&java_type).is_none() {
 			self.map.insert(java_type, rust_type);
 		}
 	}

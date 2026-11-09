@@ -3,8 +3,7 @@ use super::{
 	sig_type_to_rust_arg_type, sig_type_to_rust_return_type,
 };
 
-/// Generate JNI call arguments processing data for a method/constructor
-/// This consolidates the common logic for processing parameters into jvalue arrays
+/// Generate `jvalue` array entries for method or constructor arguments.
 pub(super) fn generate_jni_call_args(
 	parameters: &[crate::internal::signature::Parameter],
 	type_mappings: &TypeMappings,
@@ -113,22 +112,24 @@ pub(super) fn generate_jni_call_for_return_type(
 			(
 				quote! { env.assert_top(); },
 				call_fn,
-				quote! { unsafe { <#return_type_tokens>::from_raw(env, ret) } },
+				quote! {
+					{
+						// The declared Java type may resolve through a different class loader
+						// than the mapped Rust wrapper's cached class.
+						let object = unsafe { #jni::objects::JObject::from_raw(env, ret) };
+						env.cast_local::<#return_type_tokens>(object)?
+					}
+				},
 			)
 		},
 		|prim| {
 			let call_fn: Ident = format_ident!("{}{}MethodA", call_prefix, prim.jni_name());
-			let value: TokenStream = if prim == PrimitiveType::Void {
-				quote! { () }
-			} else {
-				quote! { ret }
-			};
+			let value: TokenStream = primitive_return(&prim, return_type, type_mappings, jni);
 			(quote! {}, call_fn, value)
 		},
 	);
 
-	// The JNI spec asserts that `Call<Type>MethodA` _must_ not be called with a `null` object reference
-	// Note: we assume that the class will never be null when calling static methods
+	// JNI instance calls require a non-null receiver; cached static classes are non-null.
 	let null_check: TokenStream = generate_receiver_null_check(
 		is_static,
 		this_or_class,
@@ -143,6 +144,22 @@ pub(super) fn generate_jni_call_for_return_type(
 		&quote! { #null_check #top_check },
 		&return_tokens,
 	)
+}
+
+/// Convert raw JNI method and field results into the declared Rust primitive type.
+pub(super) fn primitive_return(
+	primitive: &PrimitiveType,
+	ty: &SigType,
+	type_mappings: &TypeMappings,
+	jni: &syn::Path,
+) -> TokenStream {
+	if *primitive == PrimitiveType::Void {
+		quote! { () }
+	} else if crate::internal::types::is_rust_bool(ty, type_mappings) {
+		quote! { ret != #jni::sys::JNI_FALSE }
+	} else {
+		quote! { ret.into() }
+	}
 }
 
 /// Generate method implementations (instance or static methods)
