@@ -1,4 +1,8 @@
 /// Access flags shared by the class, field and method metadata.
+///
+/// Only selected flags have named constants. All bits are preserved in the public
+/// tuple field (`flags.0`), including flags without a named constant. Interpret
+/// those bits according to whether the flags belong to a class, field or method.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AccessFlags(pub u16);
 
