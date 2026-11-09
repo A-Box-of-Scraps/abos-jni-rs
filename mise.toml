@@ -156,6 +156,8 @@ depends = [
   "fuzz:smoke:jni-mutf8",
   "fuzz:smoke:jni-signatures",
   "fuzz:smoke:jni-string-roundtrip",
+  "fuzz:smoke:jvmti-compiled-method",
+  "fuzz:smoke:jvmti-returned-data",
 ]
 
 [tasks."fuzz:smoke:cafebabe"]
@@ -187,6 +189,16 @@ run = "cargo fuzz run jni_signatures -- -max_total_time=60 -max_len=65536 -timeo
 depends = ["fuzz:seed"]
 dir = "fuzz"
 run = "cargo fuzz run jni_string_roundtrip -- -max_total_time=60 -max_len=65536 -timeout=5 -rss_limit_mb=2048"
+
+[tasks."fuzz:smoke:jvmti-compiled-method"]
+depends = ["fuzz:seed"]
+dir = "fuzz"
+run = "cargo fuzz run jvmti_compiled_method -- -max_total_time=60 -max_len=65536 -timeout=5 -rss_limit_mb=2048"
+
+[tasks."fuzz:smoke:jvmti-returned-data"]
+depends = ["fuzz:seed"]
+dir = "fuzz"
+run = "cargo fuzz run jvmti_returned_data -- -max_total_time=60 -max_len=65536 -timeout=5 -rss_limit_mb=2048"
 
 [tasks."generate:abos-jni:windows-bindings"]
 run = "cargo run --locked --manifest-path tools/abos-jni-gen-windows-bindings/Cargo.toml -q"

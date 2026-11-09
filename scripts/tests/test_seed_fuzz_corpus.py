@@ -29,6 +29,8 @@ class SeedFuzzCorpusTests(unittest.TestCase):
             "descriptors": b"(I)V",
             "jni_mutf8": b"\xc0\x80",
             "jni_string_roundtrip": b"hello\x00world",
+            "jvmti_compiled_method": b"\x01\x00\x00\x00\x63",
+            "jvmti_returned_data": bytes(8),
         }
         for source, content in self.sources.items():
             directory = self.fuzz / "seeds" / source
@@ -44,6 +46,8 @@ class SeedFuzzCorpusTests(unittest.TestCase):
             "jni_mutf8": "jni_mutf8",
             "jni_signatures": "descriptors",
             "jni_string_roundtrip": "jni_string_roundtrip",
+            "jvmti_compiled_method": "jvmti_compiled_method",
+            "jvmti_returned_data": "jvmti_returned_data",
         }
         self.assertEqual({path.name for path in (self.fuzz / "corpus").iterdir()}, set(expected))
         for target, source in expected.items():

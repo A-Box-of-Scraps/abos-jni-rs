@@ -55,6 +55,7 @@ dependencies = [
  "abos-cafebabe",
  "abos-jbindgen",
  "abos-jni",
+ "abos-jvmti",
  "libfuzzer-sys",
 ]
 
@@ -84,6 +85,22 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.10",
+]
+
+[[package]]
+name = "abos-jvmti"
+version = "0.1.0"
+dependencies = [
+ "abos-jni",
+ "abos-jvmti-sys",
+]
+
+[[package]]
+name = "abos-jvmti-sys"
+version = "0.1.0"
+dependencies = [
+ "abos-jni-sys",
+ "abos-jni-sys-macros",
 ]
 
 [[package]]

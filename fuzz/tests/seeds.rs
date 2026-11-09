@@ -153,3 +153,45 @@ fn modified_utf8_seeds() {
 	}
 	assert_eq!(JNIStr::from_cstr(c"").expect("empty string is valid").to_str(), "");
 }
+
+#[test]
+fn jvmti_compiled_method_seeds() {
+	for (_, bytes) in seed_files("jvmti_compiled_method") {
+		// Shortened seeds also exercise zero-filled defaults and partial graphs.
+		for length in 0..=bytes.len() {
+			abos_jni_fuzz::jvmti_compiled_method::run(&bytes[..length]);
+		}
+	}
+}
+
+#[test]
+fn jvmti_returned_data_seeds() {
+	for (_, bytes) in seed_files("jvmti_returned_data") {
+		abos_jni_fuzz::jvmti_returned_data::run(&bytes);
+	}
+	abos_jni_fuzz::jvmti_returned_data::run(&[]);
+}
+
+fn check_cleanup_failure_positions(kind: u8, mode: u8, action: u8) {
+	// Eight local-variable entries own up to 24 strings plus the outer array.
+	// Cover every possible failure position, including one beyond the last free.
+	for missing in 0..3 {
+		for fail_at in 0..=26 {
+			for optional in [0, 255] {
+				let bytes = [kind, mode, action, missing, fail_at, 7, 3, optional, b'x', 0, 255];
+				abos_jni_fuzz::jvmti_returned_data::run(&bytes);
+			}
+		}
+	}
+}
+
+#[test]
+fn jvmti_cleanup_failure_matrix() {
+	for kind in 0..3 {
+		for mode in 0..7 {
+			for action in 0..3 {
+				check_cleanup_failure_positions(kind, mode, action);
+			}
+		}
+	}
+}
