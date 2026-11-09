@@ -189,6 +189,11 @@ define the available API. Generate the full Rust reference locally with:
 cargo doc --package abos-jni-sys --no-deps --open
 ```
 
+## Changelog
+
+All notable changes to this crate are documented
+[HERE](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jni-sys/CHANGELOG.md).
+
 ## License
 
 Licensed under the [MIT License](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/LICENSE) by A Box of Scraps.

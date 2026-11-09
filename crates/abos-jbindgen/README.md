@@ -268,6 +268,11 @@ Include the tree's `mod.rs` under the configured root module. The CLI imports ex
 the library accepts individual `(Rust type path, Java binary name)` mappings through `.type_mapping(...)`. Use
 `write_pub_type_map(...)` when exported mappings need a different public Rust root path.
 
+## Changelog
+
+All notable changes to this crate are documented
+[HERE](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jbindgen/CHANGELOG.md).
+
 ## License
 
 Licensed under the [MIT License](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/LICENSE) by A Box of Scraps.

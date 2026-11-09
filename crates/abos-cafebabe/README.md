@@ -92,6 +92,11 @@ fn print_native_methods(class: &ClassFile) {
 
 Only selected flags have named constants. All bits are preserved and accessible through `AccessFlags.0`.
 
+## Changelog
+
+All notable changes to this crate are documented
+[HERE](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-cafebabe/CHANGELOG.md).
+
 ## License
 
 Licensed under the [MIT License](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/LICENSE) by A Box of Scraps.

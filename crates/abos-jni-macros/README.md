@@ -233,6 +233,11 @@ cargo run --package abos-jni --features invocation --example bind_java_type
 These JVM examples compile Java fixtures and require an installed JDK. The string and signature examples can run without
 a JVM, although their Cargo example targets also require the `invocation` feature to be enabled.
 
+## Changelog
+
+All notable changes to this crate are documented
+[HERE](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jni-macros/CHANGELOG.md).
+
 ## License
 
 Licensed under the [MIT License](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/LICENSE) by A Box of Scraps.

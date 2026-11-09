@@ -289,6 +289,11 @@ cargo doc --package abos-jni --features invocation --open
 | Mutable-borrow errors involving `env`              | Create reference arguments before the call rather than nesting another mutable `env` operation inside it. Shadow outer `env` variables when entering a new frame. |
 | A local reference cannot escape a callback         | Return owned Rust data, a global reference, or use an API designed to return a local reference into the caller's frame.                                           |
 
+## Changelog
+
+All notable changes to this crate are documented
+[HERE](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jni/CHANGELOG.md).
+
 ## License
 
 Licensed under the [MIT License](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/LICENSE) by A Box of Scraps.
