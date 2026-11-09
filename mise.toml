@@ -18,7 +18,10 @@ task.output = "interleave"
 task.quiet = true
 
 [tasks."bench:abos-jni"]
-run = "cargo bench --locked --package abos-jni --features invocation --bench api_calls"
+run = "cargo bench --locked --package abos-jni --features invocation --bench api_calls --bench rust_utilities"
+
+[tasks."bench:abos-jni:rust"]
+run = "cargo bench --locked --package abos-jni --bench rust_utilities"
 
 [tasks.check]
 depends = ["fmt:check", "lint", "check:duplicates", "test"]

@@ -17,8 +17,16 @@ use std::hint::black_box;
 use std::rc::Rc;
 use std::sync::{Arc, LazyLock};
 
+#[path = "api_calls/arrays.rs"]
+mod arrays;
 #[path = "api_calls/calls.rs"]
 mod calls;
+#[path = "api_calls/comparisons.rs"]
+mod comparisons;
+#[path = "support/strings.rs"]
+mod string_inputs;
+#[path = "api_calls/strings.rs"]
+mod strings;
 use calls::{
 	jni_abs_safe, jni_hash_safe, jni_int_call_static_unchecked, jni_int_call_unchecked, jni_local_date_time_of_safe,
 	jni_object_call_static_unchecked, native_abs,
@@ -506,7 +514,12 @@ criterion_group!(
 	jni_new_string_with_repeat_scoped_thread_attachments,
 	jni_new_string_with_repeat_permanent_thread_attachments,
 	native_arc,
-	native_rc
+	native_rc,
+	strings::strings,
+	arrays::arrays,
+	comparisons::calls,
+	comparisons::references,
+	comparisons::attachment
 );
 
 criterion_main!(benches);
