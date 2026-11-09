@@ -19,18 +19,24 @@ fn fixture(name: &str) -> PathBuf {
 
 fn sdk(stub: &Path) -> TestResult<TempDir> {
 	let root: TempDir = tempfile::tempdir()?;
+	let classes_dir: PathBuf = root.path().join("classes");
+	let mut sources: Vec<PathBuf> = abos_jbindgen_annotations::write_sources(root.path().join("annotations"))?;
+	sources.push(fixture("java/android/platform/bytecode/PlatformProbe.java"));
 	let classes: Vec<PathBuf> = abos_javac::Build::new()
-		.file(fixture("java/android/platform/bytecode/PlatformProbe.java"))
+		.files(sources)
 		.release("8")
-		.output_dir(root.path().join("classes"))
+		.output_dir(&classes_dir)
 		.cargo_metadata(false)
 		.try_compile()?;
 	let platform: PathBuf = root.path().join("platforms/android-35");
 	fs::create_dir_all(&platform)?;
 	let mut bytecode: ZipWriter<fs::File> = ZipWriter::new(fs::File::create(platform.join("android.jar"))?);
 	android_platform::add_core_classes(&mut bytecode)?;
-	bytecode.start_file("com/example/PlatformProbe.class", SimpleFileOptions::default())?;
-	bytecode.write_all(&fs::read(&classes[0])?)?;
+	for class in classes {
+		let name: String = class.strip_prefix(&classes_dir)?.to_string_lossy().replace('\\', "/");
+		bytecode.start_file(name, SimpleFileOptions::default())?;
+		bytecode.write_all(&fs::read(class)?)?;
+	}
 	bytecode.finish()?;
 	let mut stubs: ZipWriter<fs::File> = ZipWriter::new(fs::File::create(platform.join("android-stubs-src.jar"))?);
 	for (name, source) in [
@@ -63,13 +69,46 @@ fn handles_platform_packages_and_documentation_only_annotations() -> TestResult 
 	let output: Output = generate(root.path())?;
 	assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
 	let code: String = String::from_utf8(output.stdout)?;
-	assert!(code.contains("fn value(documented_key: JString) -> JString"), "{code}");
+	assert!(code.contains("fn documented_value {"), "{code}");
+	assert!(code.contains("sig = (documented_key: JString) -> JString"), "{code}");
 	assert!(code.contains("#[deprecated]"), "{code}");
 	assert!(
 		code.contains("Keeps documentation mentioning @android.annotation.NonNull."),
 		"{code}"
 	);
 	assert!(!code.contains("pub AndroidFont"), "{code}");
+	Ok(())
+}
+
+#[test]
+fn imported_android_annotations_match_fully_qualified_annotations() -> TestResult {
+	let qualified: TempDir = sdk(&fixture("cases/android/platform/documentation/PlatformProbe.java"))?;
+	let imported: TempDir = sdk(&fixture("cases/android/platform/imported/PlatformProbe.java"))?;
+	let expected: Output = generate(qualified.path())?;
+	let actual: Output = generate(imported.path())?;
+	assert!(
+		expected.status.success(),
+		"{}",
+		String::from_utf8_lossy(&expected.stderr)
+	);
+	assert!(actual.status.success(), "{}", String::from_utf8_lossy(&actual.stderr));
+	assert_eq!(String::from_utf8(actual.stdout)?, String::from_utf8(expected.stdout)?);
+	Ok(())
+}
+
+#[test]
+fn retains_imports_used_by_api_types_and_other_annotations() -> TestResult {
+	for (case, package) in [
+		("imported_api_type", "android.annotation"),
+		("other_annotation", "example.annotations"),
+	] {
+		let root: TempDir = sdk(&fixture(&format!("cases/android/platform/{case}/PlatformProbe.java")))?;
+		let output: Output = generate(root.path())?;
+		assert!(!output.status.success(), "{case} unexpectedly compiled");
+		assert!(output.stdout.is_empty(), "partial bindings were written to stdout");
+		let error: String = String::from_utf8(output.stderr)?;
+		assert!(error.contains(&format!("package {package} does not exist")), "{error}");
+	}
 	Ok(())
 }
 

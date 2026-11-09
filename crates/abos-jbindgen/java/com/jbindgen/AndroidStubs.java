@@ -22,11 +22,27 @@ final class AndroidStubs {
         List<JavaFileObject> result = new ArrayList<>();
         for (CompilationUnitTree tree : task.parse()) {
             StringBuilder content = new StringBuilder(tree.getSourceFile().getCharContent(true));
+            Map<String, String> importedNames = new HashMap<>();
+            for (ImportTree node : tree.getImports()) {
+                String name = node.getQualifiedIdentifier().toString();
+                String simpleName = name.substring(name.lastIndexOf('.') + 1);
+                if (!simpleName.equals("*")) {
+                    importedNames.put(simpleName, name);
+                }
+            }
             Set<String> identifiers = new HashSet<>();
             new TreeScanner<Void, Void>() {
                 @Override
                 public Void visitAnnotation(AnnotationTree node, Void p) {
                     String name = node.getAnnotationType().toString();
+                    // Resolve explicit imports before filtering, including imported
+                    // enclosing types used in qualified nested annotation names.
+                    int separator = name.indexOf('.');
+                    String firstName = separator < 0 ? name : name.substring(0, separator);
+                    String importedName = importedNames.get(firstName);
+                    if (importedName != null) {
+                        name = importedName + (separator < 0 ? "" : name.substring(separator));
+                    }
                     // SDK documentation retains these annotations even when android.jar
                     // omits them or makes them package-private. They do not affect JNI
                     // signatures. Keep Java annotations (especially Deprecated) and
