@@ -8,7 +8,7 @@ use std::{
 	sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
-use abos_jvmti::{Allocation, Env, Error, Result, sys};
+use abos_jvmti::{Allocation, Env, Error, JvmtiVersion, Result, sys};
 
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
 static FAILED: AtomicBool = AtomicBool::new(false);
@@ -36,7 +36,7 @@ fn callback(body: impl FnOnce() -> Result<()>) {
 
 unsafe extern "system" fn vm_init(raw: *mut sys::jvmtiEnv, _jni: *mut sys::JNIEnv, _thread: sys::jthread) {
 	callback(|| {
-		// SAFETY: This callback receives the agent's JVMTI 25 environment on an
+		// SAFETY: This callback receives the agent's JVMTI environment on an
 		// attached thread in the live phase. All handles and allocations remain local.
 		unsafe {
 			let env: Env<'_> = Env::from_raw(raw)?;
@@ -46,7 +46,7 @@ unsafe extern "system" fn vm_init(raw: *mut sys::jvmtiEnv, _jni: *mut sys::JNIEn
 			let mut bytes: Allocation<'_, '_> = env.allocate(16)?;
 			bytes.copy_from_slice(b"JVMTI allocation");
 			drop(bytes);
-			report(format_args!("JVMTI_VM_INIT version={:#x}", env.version()?));
+			report(format_args!("JVMTI_VM_INIT version={:#x}", env.version().as_raw()));
 		}
 		INITIALIZED.store(true, Ordering::SeqCst);
 		Ok(())
@@ -104,6 +104,30 @@ unsafe fn configure(env: Env<'_>) -> Result<()> {
 	Ok(())
 }
 
+unsafe fn verify_connections(vm: *mut sys::JavaVM, primary: Env<'_>) -> Result<()> {
+	// SAFETY: Called during OnLoad with a live VM. Each successful constructor
+	// creates its own connection; the secondary connection has no callbacks.
+	unsafe {
+		let secondary: Env<'_> = Env::from_raw_vm_with_version(vm, JvmtiVersion::V1_2)?;
+		let independent: bool = secondary.as_raw() != primary.as_raw() && !secondary.capabilities()?.can_tag_objects();
+		secondary.dispose()?;
+		if !independent {
+			return Err(Error::Jvmti(sys::JVMTI_ERROR_INTERNAL));
+		}
+		let future: JvmtiVersion = JvmtiVersion::from_raw(0x3fff_0000)?;
+		match Env::from_raw_vm_with_version(vm, future) {
+			Err(Error::Jni(sys::JNI_EVERSION)) => {}
+			Ok(unexpected) => {
+				unexpected.dispose()?;
+				return Err(Error::Jvmti(sys::JVMTI_ERROR_INTERNAL));
+			}
+			Err(error) => return Err(error),
+		}
+	}
+	report(format_args!("JVMTI_COMPAT_OK version={}", primary.version()));
+	Ok(())
+}
+
 /// Initializes the example agent when the JVM loads the native library.
 ///
 /// # Safety
@@ -120,7 +144,7 @@ pub unsafe extern "system" fn Agent_OnLoad(
 		// users exist on setup failure; successful setup leaves the environment alive.
 		unsafe {
 			let env: Env<'_> = Env::from_raw_vm(vm)?;
-			if let Err(error) = configure(env) {
+			if let Err(error) = configure(env).and_then(|()| verify_connections(vm, env)) {
 				let _cleanup: Result<()> = env.dispose();
 				return Err(error);
 			}

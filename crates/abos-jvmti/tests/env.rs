@@ -6,7 +6,7 @@ use std::{
 	sync::atomic::{AtomicUsize, Ordering},
 };
 
-use abos_jvmti::{Allocation, Env, Error, sys};
+use abos_jvmti::{Allocation, Env, Error, JvmtiVersion, sys};
 
 static_assertions::assert_impl_all!(Env<'static>: Send, Sync);
 static_assertions::assert_not_impl_any!(Allocation<'static, 'static>: Send, Sync, Clone, Copy);
@@ -14,7 +14,8 @@ static_assertions::assert_not_impl_any!(Allocation<'static, 'static>: Send, Sync
 fn with_env(table: &sys::jvmtiInterface_1_, test: impl FnOnce(Env<'_>)) {
 	let mut raw: sys::jvmtiEnv = table;
 	// SAFETY: The full initialized table and environment live until the closure returns.
-	let env: Env<'_> = unsafe { Env::from_raw(&raw mut raw) }.expect("valid mock environment");
+	let env: Env<'_> =
+		unsafe { Env::from_raw_with_version(&raw mut raw, JvmtiVersion::V25) }.expect("valid mock environment");
 	test(env);
 }
 
@@ -43,7 +44,7 @@ fn absent_functions_are_reported_without_calling_null() {
 	with_env(&sys::jvmtiInterface_1_::default(), |env| {
 		// SAFETY: The mock interface is alive; no native function is called.
 		unsafe {
-			assert_eq!(env.version(), Err(Error::MissingFunction("GetVersionNumber")));
+			assert_eq!(env.version(), JvmtiVersion::V25);
 			assert_eq!(env.phase(), Err(Error::MissingFunction("GetPhase")));
 			assert_eq!(
 				env.allocate(1).expect_err("operation must fail"),
@@ -79,20 +80,20 @@ fn values_and_native_errors_are_preserved() {
 		|env| {
 			// SAFETY: The initialized mock functions accept this context and their output slots.
 			unsafe {
-				assert_eq!(env.version(), Ok(sys::JVMTI_VERSION));
+				assert_eq!(env.version(), JvmtiVersion::V25);
 				assert_eq!(env.phase(), Err(Error::Jvmti(sys::JVMTI_ERROR_WRONG_PHASE)));
 			}
 		},
 	);
-	with_env(
-		&sys::jvmtiInterface_1_ {
-			GetVersionNumber: Some(unknown_error),
-			..Default::default()
-		},
-		|env| {
-			// SAFETY: The mock returns an intentionally unknown but valid integer error code.
-			assert_eq!(unsafe { env.version() }, Err(Error::Jvmti(0xfedc_ba98)));
-		},
+	let table = sys::jvmtiInterface_1_ {
+		GetVersionNumber: Some(unknown_error),
+		..Default::default()
+	};
+	let mut raw: sys::jvmtiEnv = &raw const table;
+	assert_eq!(
+		// SAFETY: The initialized mock returns an intentionally unknown integer error code.
+		unsafe { Env::from_raw(&raw mut raw) }.expect_err("query fails"),
+		Error::Jvmti(0xfedc_ba98)
 	);
 }
 

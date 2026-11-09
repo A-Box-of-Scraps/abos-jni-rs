@@ -1,11 +1,16 @@
 import importlib.util
+import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / "generate-jvmti.py"
 SPEC = importlib.util.spec_from_file_location("generate_jvmti", SCRIPT)
+if SPEC is None or SPEC.loader is None:
+    raise ImportError(f"Cannot load generator module from {SCRIPT}")
 GENERATOR = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(GENERATOR)
+with patch.object(sys, "path", [str(SCRIPT.parent), *sys.path]):
+    SPEC.loader.exec_module(GENERATOR)
 
 
 class JvmtiGeneratorTests(unittest.TestCase):
@@ -35,6 +40,26 @@ class JvmtiGeneratorTests(unittest.TestCase):
         header = "enum { JVMTI_VERSION = 0x30000000 + (25 * 0x10000) };"
         with self.assertRaisesRegex(ValueError, "Missing or unsupported jvmtiCapabilities declaration"):
             GENERATOR.generate(header)
+
+    def test_version_annotations_cover_new_functions_and_reject_new_slots(self):
+        table = (SCRIPT.parent.parent / "crates/abos-jvmti-sys/src/api/interface.rs").read_text()
+        annotated = GENERATOR.jvmti_versions.annotate_table(table)
+        for name, version in [
+            ("GetAllModules", "9"),
+            ("SetHeapSamplingInterval", "11"),
+            ("SuspendAllVirtualThreads", "21"),
+            ("ClearAllFramePops", "25"),
+        ]:
+            self.assertIn(f'#[jvmti_added("{version}")]\npub {name}:', annotated)
+        with self.assertRaisesRegex(ValueError, "function-version metadata"):
+            GENERATOR.jvmti_versions.annotate_table(table.replace("reserved105", "NewFunction"))
+
+    def test_capability_versions_are_checked_newest_first(self):
+        output = "\n".join(GENERATOR.jvmti_versions.required_version(GENERATOR.jvmti_versions.CAPABILITIES, "()"))
+        self.assertLess(output.index("JVMTI_VERSION_21"), output.index("JVMTI_VERSION_11"))
+        self.assertLess(output.index("JVMTI_VERSION_11"), output.index("JVMTI_VERSION_9"))
+        self.assertIn("self.can_generate_early_vmstart() || self.can_generate_early_class_hook_events()", output)
+        self.assertTrue(output.endswith("JVMTI_VERSION_1_2\n}"))
 
     def test_unknown_declarations_fail(self):
         for field in ["int flags: 3", "jint values[4]"]:

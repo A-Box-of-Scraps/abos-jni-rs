@@ -1,4 +1,4 @@
-use crate::sys;
+use crate::{JvmtiVersion, sys};
 
 /// Result of a JVMTI operation.
 pub type Result<T> = core::result::Result<T, Error>;
@@ -7,6 +7,15 @@ pub type Result<T> = core::result::Result<T, Error>;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
+	/// An invalid interface-version identifier, such as a JNI version.
+	InvalidVersion(sys::jint),
+	/// The environment does not provide the required interface version.
+	UnsupportedVersion {
+		/// Minimum required version.
+		required: JvmtiVersion,
+		/// Version provided by the environment or supplied to a constructor.
+		actual: JvmtiVersion,
+	},
 	/// A JNI invocation error, such as `JNI_EVERSION` from `GetEnv`.
 	Jni(sys::jint),
 	/// A JVMTI error code. Unknown and vendor-specific values are preserved.

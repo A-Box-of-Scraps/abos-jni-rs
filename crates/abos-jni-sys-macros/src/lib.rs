@@ -1,6 +1,6 @@
 #![allow(
 	missing_docs,
-	reason = "Internal macro implementing the raw JNI table representation."
+	reason = "Internal macros implementing versioned JNI and JVMTI table representations."
 )]
 
 mod api;
@@ -12,4 +12,10 @@ use proc_macro::TokenStream;
 #[proc_macro_attribute]
 pub fn jni_to_union(attr: TokenStream, item: TokenStream) -> TokenStream {
 	api::jni_to_union(&attr, item)
+}
+
+/// Retains a raw JVMTI table and generates historical views from `jvmti_added` attributes.
+#[proc_macro_attribute]
+pub fn jvmti_versions(attr: TokenStream, item: TokenStream) -> TokenStream {
+	api::jvmti_versions(&attr, item)
 }

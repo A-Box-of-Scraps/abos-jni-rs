@@ -3,7 +3,9 @@
 //! JNI types are shared with [`abos_jni_sys`]. Function pointers and callbacks
 //! are nullable. Reserved slots must not be called. Obtain an environment using
 //! `JavaVM::GetEnv` with [`JVMTI_VERSION`]; older environments need not support
-//! every function or event represented here.
+//! every function or event represented here. Historical function-table views start
+//! at [`jvmtiInterface_1__1_2`]; only access a view after establishing its required
+//! version. Never form a full JDK 25 table reference over a shorter older table.
 //!
 //! These declarations do not enforce VM phases, capabilities, callback safety,
 //! thread attachment, or the lifetimes of environments and JNI references.

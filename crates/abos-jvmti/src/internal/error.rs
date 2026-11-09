@@ -5,6 +5,8 @@ use crate::{Error, Result, sys};
 impl fmt::Display for Error {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
+			Self::InvalidVersion(version) => write!(f, "invalid JVMTI version {version:#x}"),
+			Self::UnsupportedVersion { required, actual } => write!(f, "JVMTI {required} required, got {actual}"),
 			Self::Jni(code) => write!(f, "JNI invocation failed with code {code}"),
 			Self::Jvmti(code) => write!(f, "JVMTI operation failed with code {code}"),
 			Self::MissingFunction(name) => write!(f, "JVMTI function {name} is unavailable"),

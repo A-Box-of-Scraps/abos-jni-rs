@@ -43,3 +43,29 @@ fn macro_diagnostics() {
 	cases.pass("tests/trybuild/pass.rs");
 	cases.compile_fail("tests/trybuild/fail-*.rs");
 }
+
+#[abos_jni_sys_macros::jvmti_versions]
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ToolTable {
+	pub baseline: Option<unsafe extern "system" fn()>,
+	#[jvmti_added("9")]
+	pub modules: Option<unsafe extern "system" fn()>,
+	pub existing: Option<unsafe extern "system" fn()>,
+	#[jvmti_added("11")]
+	pub sampling: Option<unsafe extern "system" fn()>,
+}
+
+#[test]
+fn jvmti_keeps_the_full_struct_and_adds_bounded_views() {
+	let slot: usize = size_of::<*const ()>();
+	let table: ToolTable = ToolTable::default();
+	assert!(table.modules.is_none());
+	assert_eq!(size_of::<ToolTable>(), 4 * slot);
+	assert_eq!(size_of::<ToolTable_1_2>(), 3 * slot);
+	assert_eq!(size_of::<ToolTable_9>(), 3 * slot);
+	assert_eq!(size_of::<ToolTable_11>(), 4 * slot);
+	assert_eq!(offset_of!(ToolTable_1_2, reserved2), slot);
+	assert_eq!(offset_of!(ToolTable_1_2, existing), 2 * slot);
+	assert_eq!(offset_of!(ToolTable_9, modules), slot);
+}

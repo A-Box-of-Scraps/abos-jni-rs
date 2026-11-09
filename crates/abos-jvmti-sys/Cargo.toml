@@ -12,3 +12,4 @@ workspace = true
 
 [dependencies]
 abos-jni-sys.workspace = true
+abos-jni-sys-macros.workspace = true

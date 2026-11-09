@@ -1,8 +1,10 @@
-use core::{ffi::c_void, marker::PhantomData, ptr::NonNull};
+use core::{marker::PhantomData, ptr::NonNull};
 
-use crate::{Error, Result, internal::error::check, sys};
+use crate::{Error, JvmtiVersion, Result, internal::error::check, sys};
 
-/// A borrowed JVMTI 25 environment, usable across threads.
+mod construction;
+
+/// A borrowed JVMTI 1.2-or-newer environment, usable across threads.
 ///
 /// This handle neither attaches threads nor disposes the environment on drop.
 /// Copies refer to the same environment, including its capabilities and callbacks.
@@ -12,6 +14,7 @@ use crate::{Error, Result, internal::error::check, sys};
 pub struct Env<'vm> {
 	raw: NonNull<sys::jvmtiEnv>,
 	lifetime: PhantomData<&'vm sys::jvmtiEnv>,
+	version: JvmtiVersion,
 }
 
 // SAFETY: JVMTI environments are cross-thread. Every native call is unsafe and
@@ -21,102 +24,29 @@ unsafe impl Send for Env<'_> {}
 // its environment state; agent-owned callback state must be synchronized by callers.
 unsafe impl Sync for Env<'_> {}
 
-impl<'vm> Env<'vm> {
-	/// Borrows an existing environment without taking ownership.
-	///
-	/// # Errors
-	/// Returns [`Error::NullPointer`] for a null environment or function table.
-	///
-	/// # Safety
-	/// A non-null pointer must reference an initialized JVMTI 25 environment and
-	/// its full function table. Both must remain valid and the table immutable
-	/// for `'vm`, even when handles are sent to other threads. The environment
-	/// must not be disposed and the VM must not be destroyed during that lifetime.
-	pub unsafe fn from_raw(raw: *mut sys::jvmtiEnv) -> Result<Self> {
-		let raw: NonNull<sys::jvmtiEnv> = NonNull::new(raw).ok_or(Error::NullPointer)?;
-		// SAFETY: The caller guarantees that the environment pointer is readable.
-		if unsafe { *raw.as_ptr() }.is_null() {
-			return Err(Error::NullPointer);
-		}
-		Ok(Self {
-			raw,
-			lifetime: PhantomData,
-		})
-	}
-
-	/// Creates an independent JVMTI 25 environment using an existing JNI VM.
-	///
-	/// # Errors
-	/// Returns a JNI version/availability error or a null-interface error.
-	///
-	/// # Safety
-	/// The VM must remain alive for `'vm`. Call only in the `OnLoad` or live phase,
-	/// on a thread permitted to call `GetEnv`. The returned environment must not
-	/// be disposed while any borrowed handle or allocation is in use.
-	pub unsafe fn from_vm(vm: &'vm abos_jni::JavaVM) -> Result<Self> {
-		// SAFETY: JavaVM guarantees its pointer's layout; remaining rules are the caller's.
-		unsafe { Self::from_raw_vm(vm.get_raw()) }
-	}
-
-	/// Creates an independent JVMTI 25 environment from an agent's raw VM pointer.
-	///
-	/// The environment is not automatically disposed, allowing callbacks to use
-	/// it after `Agent_OnLoad` returns. Use [`Self::dispose`] when appropriate.
-	///
-	/// # Errors
-	/// Returns the `GetEnv` JNI error or [`Error::NullPointer`].
-	///
-	/// # Safety
-	/// The VM pointer must be valid and support JNI 1.2 or newer. The VM must
-	/// remain alive for `'vm`. The phase, attachment, and environment lifetime
-	/// requirements of [`Self::from_vm`] also apply.
-	pub unsafe fn from_raw_vm(vm: *mut sys::JavaVM) -> Result<Self> {
-		if vm.is_null() {
-			return Err(Error::NullPointer);
-		}
-		// SAFETY: The caller guarantees a readable VM pointer and JNI 1.2 table.
-		let table: *const sys::JNIInvokeInterface_ = unsafe { *vm };
-		if table.is_null() {
-			return Err(Error::NullPointer);
-		}
-		let mut raw: *mut c_void = core::ptr::null_mut();
-		// SAFETY: GetEnv is in the JNI 1.2 view; the output pointer is writable.
-		let code: sys::jint = unsafe { ((*table).v1_2.GetEnv)(vm, &raw mut raw, sys::JVMTI_VERSION) };
-		if code != sys::JNI_OK {
-			return Err(Error::Jni(code));
-		}
-		// SAFETY: A successful JVMTI 25 GetEnv returns the requested interface.
-		unsafe { Self::from_raw(raw.cast()) }
-	}
-
+impl Env<'_> {
 	/// Returns the borrowed native environment pointer.
 	#[must_use]
 	pub const fn as_raw(self) -> *mut sys::jvmtiEnv {
 		self.raw.as_ptr()
 	}
 
-	pub(crate) fn table(&self) -> &sys::jvmtiInterface_1_ {
-		// SAFETY: Construction requires a live immutable full table for the handle lifetime.
-		unsafe { &**self.raw.as_ptr() }
+	pub(crate) fn table(&self) -> &sys::jvmtiInterface_1__1_2 {
+		// SAFETY: Construction validates JVMTI >= 1.2. Borrow only the baseline
+		// table, which ends before slots appended in later versions.
+		unsafe { &*(*self.raw.as_ptr()).cast::<sys::jvmtiInterface_1__1_2>() }
 	}
 
-	/// Returns the environment's interface version.
+	pub(crate) fn ensure_version(&self, required: JvmtiVersion) -> Result<()> {
+		construction::require_version(self.version, required)
+	}
+
+	/// Returns the actual interface version retained at construction.
 	///
-	/// # Errors
-	/// Returns the native JVMTI error or a missing-function error.
-	///
-	/// # Safety
-	/// The current thread must satisfy JVMTI's thread-attachment requirements.
-	/// This operation is callback-safe and permitted in any phase.
-	pub unsafe fn version(&self) -> Result<sys::jint> {
-		let function: unsafe extern "system" fn(*mut sys::jvmtiEnv, *mut sys::jint) -> sys::jvmtiError = self
-			.table()
-			.GetVersionNumber
-			.ok_or(Error::MissingFunction("GetVersionNumber"))?;
-		let mut value: sys::jint = 0;
-		// SAFETY: The context is guaranteed by the caller; value is writable.
-		check(unsafe { function(self.as_raw(), &raw mut value) })?;
-		Ok(value)
+	/// Makes no JVM call and can be used in restricted callbacks.
+	#[must_use]
+	pub const fn version(&self) -> JvmtiVersion {
+		self.version
 	}
 
 	/// Returns the current VM phase.
@@ -126,7 +56,7 @@ impl<'vm> Env<'vm> {
 	///
 	/// # Safety
 	/// The current thread must satisfy JVMTI's thread-attachment requirements.
-	/// This operation is callback-safe and permitted in any phase.
+	/// This operation is permitted in any phase but is not callback-safe.
 	pub unsafe fn phase(&self) -> Result<sys::jvmtiPhase> {
 		let function: unsafe extern "system" fn(*mut sys::jvmtiEnv, *mut sys::jvmtiPhase) -> sys::jvmtiError =
 			self.table().GetPhase.ok_or(Error::MissingFunction("GetPhase"))?;
@@ -176,12 +106,14 @@ impl<'vm> Env<'vm> {
 	/// Acquires the requested capabilities for this environment.
 	///
 	/// # Errors
-	/// Returns the native JVMTI error, including unavailable capabilities.
+	/// Returns an unsupported-version error for newer capability bits, or the native
+	/// JVMTI error for capabilities unavailable in this VM or phase.
 	///
 	/// # Safety
 	/// The context requirements of [`Self::capabilities`] apply. Reserved bits
 	/// must be zero. Coordinate capability changes with other users of this environment.
 	pub unsafe fn add_capabilities(&self, capabilities: &sys::jvmtiCapabilities) -> Result<()> {
+		self.ensure_version(JvmtiVersion::from_raw(capabilities.required_version())?)?;
 		let function: unsafe extern "system" fn(*mut sys::jvmtiEnv, *const sys::jvmtiCapabilities) -> sys::jvmtiError =
 			self.table()
 				.AddCapabilities
@@ -193,7 +125,8 @@ impl<'vm> Env<'vm> {
 	/// Replaces all event callbacks. The VM copies the table before returning.
 	///
 	/// # Errors
-	/// Returns the native JVMTI error or a missing-function error.
+	/// Returns an unsupported-version error for newer callbacks, a native JVMTI
+	/// error, or a missing-function error. Unsupported callbacks are not silently dropped.
 	///
 	/// # Safety
 	/// The context requirements of [`Self::capabilities`] apply. Reserved slots
@@ -201,12 +134,10 @@ impl<'vm> Env<'vm> {
 	/// be reentrant, obey their JVMTI/JNI context rules, and never unwind into the VM.
 	/// Replacing callbacks does not wait for already-running callbacks to finish.
 	pub unsafe fn set_event_callbacks(&self, callbacks: &sys::jvmtiEventCallbacks) -> Result<()> {
-		#[allow(
-			clippy::cast_possible_truncation,
-			clippy::cast_possible_wrap,
-			reason = "A 39-pointer callback table fits jint on supported targets."
-		)]
-		const SIZE: sys::jint = size_of::<sys::jvmtiEventCallbacks>() as sys::jint;
+		self.ensure_version(JvmtiVersion::from_raw(callbacks.required_version())?)?;
+		let size: sys::jint = sys::jvmtiEventCallbacks::size_for_version(self.version.as_raw())
+			.and_then(|size| size.try_into().ok())
+			.ok_or(Error::InvalidVersion(self.version.as_raw()))?;
 		let function: unsafe extern "system" fn(
 			*mut sys::jvmtiEnv,
 			*const sys::jvmtiEventCallbacks,
@@ -215,19 +146,23 @@ impl<'vm> Env<'vm> {
 			.table()
 			.SetEventCallbacks
 			.ok_or(Error::MissingFunction("SetEventCallbacks"))?;
-		// SAFETY: The table is readable for SIZE bytes; caller upholds callback contracts.
-		check(unsafe { function(self.as_raw(), callbacks, SIZE) })
+		// SAFETY: The table is readable for the version-appropriate size; caller upholds callback contracts.
+		check(unsafe { function(self.as_raw(), callbacks, size) })
 	}
 
 	/// Enables or disables an event globally for this environment.
 	///
 	/// # Errors
-	/// Returns the native JVMTI error, including invalid events or missing capabilities.
+	/// Returns an unsupported-version error for newer events, or a native JVMTI
+	/// error for invalid events or missing capabilities.
 	///
 	/// # Safety
 	/// The context requirements of [`Self::capabilities`] apply. Registered callbacks
 	/// must be ready to run concurrently before an event is enabled.
 	pub unsafe fn set_event_enabled(&self, event: sys::jvmtiEvent, enabled: bool) -> Result<()> {
+		let required: sys::jint =
+			sys::jvmti_event_version(event).ok_or(Error::Jvmti(sys::JVMTI_ERROR_INVALID_EVENT_TYPE))?;
+		self.ensure_version(JvmtiVersion::from_raw(required)?)?;
 		let function: unsafe extern "C" fn(
 			*mut sys::jvmtiEnv,
 			sys::jvmtiEventMode,

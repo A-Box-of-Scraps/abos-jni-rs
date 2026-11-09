@@ -23,6 +23,7 @@ name = "abos-jvmti-sys"
 version = "0.1.0"
 dependencies = [
  "abos-jni-sys",
+ "abos-jni-sys-macros",
 ]
 
 [[package]]

@@ -32,7 +32,17 @@ impl Probe {
 				self.measure(&name.to_string(), &name.to_string(), &quote!(i64::from(sys::#name)));
 			}
 			Item::Struct(record) if record.attrs.iter().any(|attr| attr.path().is_ident("jni_to_union")) => {
-				self.table(&record);
+				self.table(&record, "jni_added", (1, 1));
+			}
+			Item::Struct(record)
+				if record.attrs.iter().any(|attr| {
+					attr.path()
+						.segments
+						.last()
+						.is_some_and(|segment| segment.ident == "jvmti_versions")
+				}) =>
+			{
+				self.table(&record, "jvmti_added", (1, 2));
 			}
 			Item::Struct(record) => self.record(&record.ident, record.fields.iter()),
 			Item::Union(record) => self.record(&record.ident, record.fields.named.iter()),
@@ -94,16 +104,26 @@ impl Probe {
 		}
 	}
 
-	fn table(&mut self, table: &ItemStruct) {
+	fn table(&mut self, table: &ItemStruct, attribute: &str, baseline: Version) {
 		let name = &table.ident;
 		let c_record = c_name(&name.to_string());
 		self.layout(name, &c_record);
-		let fields: Vec<(&Field, Version)> = table.fields.iter().map(|field| (field, version(field))).collect();
+		let fields: Vec<(&Field, Version)> = table
+			.fields
+			.iter()
+			.map(|field| (field, version(field, attribute, baseline)))
+			.collect();
 		let views: BTreeMap<Version, String> = fields.iter().map(|(_, version)| (*version, suffix(*version))).collect();
 		for field in &table.fields {
 			self.field_type(&c_record, field);
+			if attribute == "jvmti_added" {
+				self.field_offset(name, &c_record, field);
+			}
 		}
 		for (version, suffix) in views {
+			if attribute == "jvmti_added" && version == RESERVED {
+				continue;
+			}
 			let view = format_ident!("{name}_{suffix}");
 			let last = fields
 				.iter()
@@ -174,9 +194,9 @@ impl Probe {
 	}
 }
 
-fn version(field: &Field) -> Version {
-	let Some(attribute) = field.attrs.iter().find(|attr| attr.path().is_ident("jni_added")) else {
-		return (1, 1);
+fn version(field: &Field, name: &str, baseline: Version) -> Version {
+	let Some(attribute) = field.attrs.iter().find(|attr| attr.path().is_ident(name)) else {
+		return baseline;
 	};
 	let value = attribute.parse_args::<LitStr>().expect("JNI version").value();
 	if value == "reserved" {

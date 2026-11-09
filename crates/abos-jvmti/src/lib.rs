@@ -1,4 +1,9 @@
-//! Utilities for JDK 25 JVMTI agents, interoperable with [`abos_jni`].
+//! Utilities for JVMTI 1.2-or-newer agents (Java 8+), interoperable with [`abos_jni`].
+//!
+//! Default constructors request the 1.2 baseline once; explicit-version constructors
+//! can require newer interfaces. [`Env::version`] retains the actual version without
+//! a native call. Newer callbacks, events, and capabilities are version-checked,
+//! but availability and execution-context requirements still come from the VM.
 //!
 //! [`Env`] is a borrowed, cross-thread environment handle, not a JNI attachment
 //! guard. JVM calls remain unsafe: callers must satisfy their JVMTI phase,
