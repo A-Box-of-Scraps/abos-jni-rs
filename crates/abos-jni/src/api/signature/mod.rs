@@ -49,9 +49,9 @@ impl fmt::Display for Primitive {
 /// since there would be a cost to tracking those strings and handling variable array dimensions
 /// while JNI generally only needs to differentiate between primitive types and reference types.
 ///
-/// In the past this did use to track object names and array details, but it proved to have a
-/// significant hidden cost that was redundant while those details were never used (at least
-/// internally).
+/// Use [`MethodSignature::sig`] or [`FieldSignature::sig`] for the complete descriptor,
+/// including class names and array dimensions. `Display` only emits a category marker
+/// for references (`L;` or `[`), not a complete object or array descriptor.
 #[allow(
 	missing_docs,
 	reason = "Signature representations expose JNI type names and their component data."

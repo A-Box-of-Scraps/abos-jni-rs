@@ -41,7 +41,7 @@ use super::{Env, JThrowable, Result, THREAD_ATTACHMENT, THREAD_GUARD_NEST_LEVEL,
 ///
 /// If you know that at least one [`AttachGuard`] has ever existed (which is
 /// implied if you have a [`Env`] reference) you can assume that
-/// [`JavaVM::singleton()`] will return `Some(JavaVM)`.
+/// [`JavaVM::singleton()`] will return `Ok(JavaVM)`.
 ///
 /// This can be useful if you need to access JNI from something like a Drop
 /// implementation, without needing to explicitly copy `JavaVM` pointers. In
@@ -153,7 +153,7 @@ impl<'local> AttachGuard<'local> {
 		};
 
 		// Guarantee that if you have an `AttachGuard` then
-		// `JavaVM::singleton()` will always return `Some(JavaVM)`
+		// `JavaVM::singleton()` will always return `Ok(JavaVM)`
 		let _vm: std::result::Result<crate::JavaVM, crate::errors::Error> = guard.env.get_java_vm();
 
 		guard
@@ -189,7 +189,7 @@ impl<'local> AttachGuard<'local> {
 		};
 
 		// Guarantee that if you have an `AttachGuard` then
-		// `JavaVM::singleton()` will always return `Some(JavaVM)`
+		// `JavaVM::singleton()` will always return `Ok(JavaVM)`
 		let _vm: std::result::Result<crate::JavaVM, crate::errors::Error> = guard.env.get_java_vm();
 
 		guard

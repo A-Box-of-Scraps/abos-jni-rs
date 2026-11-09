@@ -8,7 +8,7 @@
 pub struct ClassInfo {
 	/// Fully qualified class name (e.g., "com/example/MyClass")
 	pub class_name: String,
-	/// Package name parts (e.g., `com.example`)
+	/// Package segments (e.g., `["com", "example"]`).
 	pub package: Vec<String>,
 	/// Simple class name (e.g., "`MyClass`")
 	pub simple_name: String,
@@ -61,7 +61,7 @@ pub struct MethodInfo {
 	pub is_native: bool,
 	/// Whether this method is marked as deprecated
 	pub is_deprecated: bool,
-	/// Whether this method is public (default: true for backwards compatibility)
+	/// Whether the Java declaration has public visibility.
 	pub is_public: bool,
 }
 

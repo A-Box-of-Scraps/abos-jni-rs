@@ -266,13 +266,8 @@ use crate::{jni_str, objects::JThread, strings::JNIString};
 /// to `new_object`, but also needing to borrow it as mutable for the call to
 /// `example_function`.
 ///
-/// In the past we used to recommend here that you could avoid this by
-/// reordering the parameters so that `Env` comes last, but in practice this led
-/// to very inconsistent APIs where some functions had `Env` first and some had
-/// it last, which was confusing.
-///
-/// Now the recommendation is to just make sure that reference type arguments
-/// are derived before the call:
+/// Create reference arguments before the call so their construction does not overlap
+/// the mutable borrow of `Env`:
 ///
 /// ```rust,no_run
 /// # use abos_jni::{jni_sig, jni_str, errors::Result, Env, objects::JObject};
@@ -306,10 +301,11 @@ use crate::{jni_str, objects::JThread, strings::JNIString};
 /// perform some checks to ensure the validity of provided signatures, names and
 /// arguments, and then call the corresponding unchecked method.
 ///
-/// Checked methods are more flexible as they allow passing class names and
-/// method/field descriptors as strings and may perform lookups of class objects
-/// and method/field ids for you, also performing all the needed precondition
-/// checks. However, these lookup operations are expensive, so if you need to
+/// Checked methods accept class and member names as modified UTF-8 strings, and
+/// signatures as [`crate::signature::MethodSignature`] or [`crate::signature::FieldSignature`]
+/// values. Use [`jni_sig!`] for compile-time signatures, or the runtime signature parsers
+/// for dynamically supplied descriptors. These methods resolve classes and member IDs
+/// and validate arguments. However, these lookup operations are expensive, so if you need to
 /// call the same method (or access the same field) multiple times, it is
 /// [recommended](https://docs.oracle.com/en/java/javase/11/docs/specs/jni/design.html#accessing-fields-and-methods)
 /// to cache the instance of the class and the method/field id, e.g.

@@ -26,51 +26,30 @@ pub enum AttachmentExceptionPolicy {
 	/// side effects of external code.
 	Ignore,
 
-	/// Pending exceptions are caught before running any attachment closure and
-	/// re-thrown afterwards, returning [`Error::JavaException`]
+	/// Temporarily clears a pre-existing exception before running the attachment closure,
+	/// then restores it afterwards without changing the closure's return value.
 	///
-	/// If an exception is thrown by the attachment closure then this will
-	/// _always_ be caught and returned via [`Error::CaughtJavaException`].
+	/// If the closure leaves a new exception pending, that exception is caught and returned
+	/// as [`Error::CaughtJavaException`] instead of the closure's result. If both a saved
+	/// exception and a new exception exist, the saved exception is restored and the new one
+	/// is returned. The restored exception remains pending, but does not itself cause an
+	/// [`Error::JavaException`] return value.
 	///
-	/// If a pending exception was caught **and** an exception is thrown by the
-	/// attachment closure then:
-	/// 1. The new exception (from the closure) will be caught
-	/// 2. The original exception will be re-thrown
-	/// 3. The new exception will be returned via [`Error::CaughtJavaException`]
+	/// If the callback panics and unwinds, the saved exception is restored before the
+	/// original Rust panic resumes, replacing any Java exception raised by the callback.
 	///
-	/// Beware: that in this case the original exception will be pending after
-	/// returning, but this will not be indicated via a [`Error::JavaException`]
-	/// return value. The assumption in this case is that the caller is already
-	/// aware of this pending exception.
-	///
-	/// If the callback panics and unwinds, the saved exception is restored before
-	/// the original Rust panic resumes, replacing any Java exception raised by
-	/// the callback.
-	///
-	/// This is intended to make the best default trade off between avoiding
-	/// side effects and consistently running orthogonal code within an
-	/// attachment closure.
-	///
-	/// This prioritizes consistency for the attachment closure:
-	/// - It will *always run*, regardless of unexpected pending exceptions
-	///   associated with the current thread.
-	/// - Any new exception thrown by the closure will be *always be caught* and
-	///   returned via [`Error::CaughtJavaException`] - regardless of whether
-	///   some other exception was previously pending.
-	///
-	/// A pre-existing exception _may_ represent an oversight with handling an
-	/// exception in code that is unrelated to the attachment closure, **or** it
-	/// could also easily arise if `Drop` is used to release resources via JNI
-	/// because these may automatically run while unwinding a stack (perhaps due
-	/// to an [`Error::JavaException`] that the caller knows about).
+	/// A pending exception alone does not prevent the callback from running; attachment
+	/// and local-frame setup must still succeed. This is the default policy for independent
+	/// JNI work, including cleanup in `Drop`, that must preserve an external exception
+	/// while reporting any new exception left by the closure.
 	#[default]
 	PreReThrowPostCatch,
 
 	/// [`Error::JavaException`] is immediately returned if there is a pending
 	/// exception and the attachment closure is not run.
 	///
-	/// If any exception is thrown by the attachment closure then this will be
-	/// caught and returned via [`Error::CaughtJavaException`]
+	/// If the attachment closure leaves an exception pending, it is caught and
+	/// returned via [`Error::CaughtJavaException`].
 	///
 	/// This is similar to the behaviour of other `jni` APIs that are not
 	/// exception-safe and will immediately return with an error if called
@@ -99,7 +78,8 @@ impl<'a> AttachConfig<'a> {
 	/// that the thread will be automatically detached when the attachment guard
 	/// is dropped.
 	///
-	/// The default is `false`, so the thread will be attached permanently.
+	/// The default is `false`, requesting a permanent attachment. This setting only
+	/// applies when attaching a detached thread; an existing attachment is not changed.
 	///
 	/// It is normally best to attach permanently because it can reduce the cost
 	/// of repeatedly attaching and detaching threads.

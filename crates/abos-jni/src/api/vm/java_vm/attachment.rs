@@ -16,8 +16,9 @@ impl JavaVM {
 	/// If the thread was not already attached then a new attachment is made which will be
 	/// automatically detached when the current thread terminates.
 	///
-	/// Calling this in a thread that is already attached is cheap since it will only need to check
-	/// thread local storage without making a JNI call.
+	/// When an `AttachGuard` is already active, attachment state is reused from thread-local
+	/// storage. Otherwise, JNI `GetEnv` checks whether the thread is still attached, even if
+	/// a permanent attachment was recorded earlier.
 	///
 	/// This API requests to permanently attach the current thread but since pre-existing
 	/// attachments aren't affected by this API, it should not be assumed that the thread will
@@ -39,8 +40,8 @@ impl JavaVM {
 	/// never affects the return value). The original exception is also restored if the callback
 	/// panics and unwinds.
 	///
-	/// If your callback throws an exception this will be caught and returned as an
-	/// [`Error::CaughtJavaException`].
+	/// If your callback leaves an exception pending, it is caught and returned as
+	/// [`Error::CaughtJavaException`] instead of the callback's result.
 	///
 	/// The exception handling policy can be changed via [`AttachConfig::exceptions_policy`] and
 	/// using [`JavaVM::attach_current_thread_with_config`].
@@ -67,8 +68,9 @@ impl JavaVM {
 	/// If the thread was not already attached, the thread will be detached when the callback
 	/// returns.
 	///
-	/// Calling this in a thread that is already attached is cheap since it will only need to check
-	/// thread local storage without making a JNI call.
+	/// When an `AttachGuard` is already active, attachment state is reused from thread-local
+	/// storage. Otherwise, JNI `GetEnv` checks whether the thread is still attached, even if
+	/// a permanent attachment was recorded earlier.
 	///
 	/// Attaching a thread is an expensive operation if it was not already attached, so it's
 	/// generally recommended that you should use [`Self::attach_current_thread()`] (requesting to
@@ -84,8 +86,8 @@ impl JavaVM {
 	/// never affects the return value). The original exception is also restored if the callback
 	/// panics and unwinds.
 	///
-	/// If your callback throws an exception this will be caught and returned as an
-	/// [`Error::CaughtJavaException`].
+	/// If your callback leaves an exception pending, it is caught and returned as
+	/// [`Error::CaughtJavaException`] instead of the callback's result.
 	///
 	/// The exception handling policy can be changed via [`AttachConfig::exceptions_policy`] and
 	/// using [`JavaVM::attach_current_thread_with_config`].

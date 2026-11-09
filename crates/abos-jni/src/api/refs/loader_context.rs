@@ -131,13 +131,13 @@ impl LoaderContext<'_, '_> {
 		self.load_class(env, &internal_name, initialize)
 	}
 
-	/// Loads the class associated with the `JObjectRef` type `T`, using the given loader context.
+	/// Loads the class associated with the [`Reference`] type `T`, using the given loader context.
 	///
 	/// `initialize` indicates whether a newly loaded class should be initialized (has no effect
 	/// on already initialized classes).
 	///
-	/// Returns a local reference to the loaded class, or a [`Error::ClassNotFound`] error if the
-	/// class could not be found.
+	/// Returns a local reference to the loaded class, or [`Error::NoClassDefFound`] if the
+	/// class could not be found, matching [`Self::load_class`].
 	///
 	/// The strategy for loading the class depends on the loader context (See [Self]).
 	///

@@ -82,9 +82,6 @@ impl ::std::ops::Deref for JNIString {
 impl PartialEq<JNIString> for &JNIStr {
 	#[inline]
 	fn eq(&self, other: &JNIString) -> bool {
-		// PartialEq<&CStr> was only added in Rust 1.90 which is currently higher
-		// than our MSRV, so we compare by bytes to also avoid clippy warnings
-		// with newer Rust versions.
 		self.internal.to_bytes() == other.internal.to_bytes()
 	}
 }
@@ -353,7 +350,6 @@ impl JNIStr {
 	/// [Modified UTF-8]: https://docs.oracle.com/en/java/javase/11/docs/specs/jni/types.html#modified-utf-8-strings
 	#[must_use]
 	pub const unsafe fn from_cstr_unchecked(cstr: &CStr) -> &Self {
-		// The reason we don't just use `from_ptr` here is that `CStr::from_ptr` is not yet a `const fn`.
 		// SAFETY: The caller guarantees modified UTF-8 and JNIStr is transparent over CStr.
 		unsafe { &*(std::ptr::from_ref::<CStr>(cstr) as *const Self) }
 	}

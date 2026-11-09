@@ -333,8 +333,7 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 		unsafe { T::get_region(env, self.as_raw() as jarray, start, buf) }
 	}
 
-	/// Copy the contents of the `buf` slice to the java byte array at the
-	/// `start` index.
+	/// Copy the contents of the `buf` slice into this primitive array at the `start` index.
 	///
 	/// # Errors
 	///

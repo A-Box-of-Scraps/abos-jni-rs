@@ -89,7 +89,7 @@ impl<'local> Env<'local> {
 		Ok(array)
 	}
 
-	/// Construct a new array holding objects with of type `E`.
+	/// Construct a new array holding objects of type `E`.
 	///
 	/// All elements are initially set to `initial_element`.
 	///
@@ -161,12 +161,10 @@ impl<'local> Env<'local> {
 		Ok(bytes)
 	}
 
-	/// Converts a java byte array to a rust vector of bytes.
+	/// Copies a Java byte array into a Rust vector, preserving each byte's bit pattern.
 	///
-	/// Returns [`Error::IndexOutOfBounds`] if one of the calculated indexes in the region is not
-	/// valid (in case the array length is changed concurrently).
-	///
-	/// This API catches exceptions internally and is not expected to return [`Error::JavaException`]
+	/// Exceptions raised while copying are caught and mapped to Rust errors. An exception
+	/// already pending on entry returns [`Error::JavaException`] without being cleared.
 	///
 	/// # Errors
 	///

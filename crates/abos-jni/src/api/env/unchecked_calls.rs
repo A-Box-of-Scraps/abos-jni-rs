@@ -15,8 +15,10 @@ impl<'local> Env<'local> {
 	///
 	/// # Safety
 	///
-	/// The provided `JMethodID` must be valid, and match the types and number of arguments, and return type.
-	/// If these are incorrect, the JVM may crash. The `JMethodID` must also match the passed type.
+	/// The resolved class must be non-null, and the `JStaticMethodID` must be valid for it.
+	/// The argument count and types and the return type must match the method's signature.
+	/// Reference arguments must be valid JNI references (or null) assignable to their
+	/// declared parameter types. Violations can cause undefined behavior or crash the JVM.
 	///
 	/// # Errors
 	///

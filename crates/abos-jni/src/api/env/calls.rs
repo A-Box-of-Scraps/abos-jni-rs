@@ -97,7 +97,7 @@ impl<'local> Env<'local> {
 	/// Calls a static method safely. This comes with a number of
 	/// lookups/checks. It
 	///
-	/// * Looks up the [`JMethodID`] for the class/name/signature combination
+	/// * Looks up the [`JStaticMethodID`] for the class/name/signature combination
 	/// * Checks primitive argument types and reference assignability to the resolved parameter classes
 	/// * Calls [`Self::call_static_method_unchecked`] with the verified safe arguments.
 	///
@@ -254,9 +254,13 @@ impl<'local> Env<'local> {
 	///
 	/// # Safety
 	///
-	/// The provided `JMethodID` must be valid, and match the types and number of arguments, as well as return type
-	/// (always an Object for a constructor). If these are incorrect, the JVM may crash.  The `JMethodID` must also match
-	/// the passed type.
+	/// The resolved class must be non-null, and `ctor_id` must identify a valid `<init>`
+	/// constructor for that class. Constructor descriptors have a `void` (`V`) return type,
+	/// even though this function returns the newly allocated object.
+	///
+	/// `ctor_args` must match the constructor's argument count and types. Reference arguments
+	/// must be valid JNI references (or null) assignable to their declared parameter types.
+	/// Violating these requirements can cause undefined behavior or crash the JVM.
 	///
 	/// # Errors
 	///
