@@ -192,6 +192,15 @@ run = "ruff check --fix ."
 [tasks."lint:tools:windows-bindings"]
 run = "cargo clippy --manifest-path tools/abos-jni-gen-windows-bindings/Cargo.toml --all-targets --all-features --locked -q -- -D warnings"
 
+[tasks."profile:abos-jni"]
+description = "Profile a JNI benchmark with flamegraph (Linux, Windows, macOS)"
+tools = { "cargo:flamegraph" = "0.6.15" }
+usage = '''
+arg "[filter]" help="Criterion benchmark filter" default="^jni_call_static_abs_method_safe$"
+flag "--seconds <seconds>" help="Profiling duration per matching benchmark" default="15"
+'''
+run = "python scripts/profile-abos-jni.py"
+
 [tasks."setup:android"]
 raw = true
 run = "python tests/android-test-activity/tests/android_env.py setup"

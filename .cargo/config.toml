@@ -1,7 +1,7 @@
-# Use mold as the linker on GNU/Linux.
+# Use mold as the linker on GNU/Linux, with segments compatible with perf stack unwinding.
 
 [target.x86_64-unknown-linux-gnu]
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+rustflags = ["-C", "link-arg=-fuse-ld=mold", "-C", "link-arg=-Wl,--no-rosegment"]
 
 [target.aarch64-unknown-linux-gnu]
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+rustflags = ["-C", "link-arg=-fuse-ld=mold", "-C", "link-arg=-Wl,--no-rosegment"]
