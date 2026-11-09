@@ -34,6 +34,8 @@ AGENTS.md
 Cargo.lock
 Cargo.toml
 clippy.toml
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
 dprint.json
 LICENSE
 mise.toml
