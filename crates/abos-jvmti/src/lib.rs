@@ -10,6 +10,29 @@
 //! callback-context, and thread-attachment requirements. Environments are not
 //! automatically disposed, since disposal invalidates callbacks and other handles.
 //!
+//! # Agent operations
+//!
+//! [`Env`] wraps class retransformation/redefinition, owned method bytecodes,
+//! breakpoints and per-thread stepping, typed local-variable reads/writes, stack
+//! traces, thread suspension/resumption, tags, synchronous heap traversal, event
+//! filtering, capability relinquishment, and agent-owned environment storage.
+//! These are available at the JVMTI 1.2 baseline. Bulk virtual-thread suspension
+//! and resumption require JVMTI 21 and are checked before borrowing newer slots.
+//!
+//! [`ClassDefinition`] borrows complete replacement class files. Stack traces
+//! use Rust-owned vectors; bytecodes use [`JvmtiArray`]. Returned object locals
+//! remain independently managed JNI references. Heap callbacks borrow their
+//! arguments and must obey restricted callback rules, without unwinding.
+//!
+//! [`RawMonitor`] owns a recursive native monitor; [`RawMonitorGuard`] owns one
+//! entry and cannot leave the acquiring thread. Explicit `destroy` and `unlock`
+//! report failures; drop attempts cleanup once. Neither raw-monitor locking nor
+//! environment storage automatically establishes safe Rust data synchronization.
+//!
+//! Every operation documents its capability, phase, callback, attachment, and
+//! ownership contract. Native availability errors are preserved rather than
+//! prechecked with additional calls that could race capability/phase changes.
+//!
 //! # Returned-data ownership
 //!
 //! [`JvmtiArray`] adopts initialized flat buffers, [`JvmtiString`] owns modified

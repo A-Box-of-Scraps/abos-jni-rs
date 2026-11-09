@@ -22,10 +22,10 @@ pub enum Error {
 	Jvmti(sys::jvmtiError),
 	/// A required function pointer is absent from the interface.
 	MissingFunction(&'static str),
-	/// An environment, table, or nonempty allocation pointer was null.
+	/// An environment, table, resource, or nonempty allocation pointer was null.
 	NullPointer,
-	/// The requested allocation cannot be represented by a Rust slice or `jlong`.
+	/// An allocation size or input count cannot fit a Rust slice, `jint`, or `jlong`.
 	AllocationTooLarge,
-	/// A successful native operation returned a negative element count.
+	/// A successful native operation returned a negative or out-of-bounds element count.
 	InvalidCount(sys::jint),
 }

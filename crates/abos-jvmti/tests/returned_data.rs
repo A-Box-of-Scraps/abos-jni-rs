@@ -244,3 +244,41 @@ fn queries_do_not_allocate_when_cleanup_is_unavailable() {
 		assert!(context.calls.borrow().is_empty());
 	});
 }
+
+#[test]
+fn bytecodes_own_only_successful_outputs_and_free_once() {
+	for mode in [
+		Mode::Normal,
+		Mode::Empty,
+		Mode::EmptyAllocated,
+		Mode::Negative,
+		Mode::NativeError,
+		Mode::NullOutput,
+	] {
+		with_env(|context, env| {
+			context.mode.set(mode);
+			// SAFETY: Mock ignores the method and returns tracked allocations or undefined error outputs.
+			let result: Result<JvmtiArray<'_, '_, u8>> = unsafe { env.bytecodes(ptr::null_mut()) };
+			match mode {
+				Mode::Normal => {
+					let bytes: JvmtiArray<'_, '_, u8> = result.expect("bytecodes");
+					assert_eq!(&*bytes, &[0x2a, 0xb1]);
+					bytes.free().expect("cleanup");
+				}
+				Mode::Empty | Mode::EmptyAllocated => assert!(result.expect("empty").is_empty()),
+				Mode::Negative => assert_eq!(result.expect_err("count"), Error::InvalidCount(-1)),
+				Mode::NativeError => assert_eq!(
+					result.expect_err("native"),
+					Error::Jvmti(sys::JVMTI_ERROR_OUT_OF_MEMORY)
+				),
+				Mode::NullOutput => assert_eq!(result.expect_err("pointer"), Error::NullPointer),
+				Mode::NullChild => unreachable!(),
+			}
+			assert_eq!(
+				context.calls.borrow().len(),
+				usize::from(matches!(mode, Mode::Normal | Mode::EmptyAllocated | Mode::Negative))
+			);
+			assert_eq!(context.live(), 0);
+		});
+	}
+}

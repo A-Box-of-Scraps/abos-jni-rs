@@ -28,17 +28,17 @@
 
 ## 3. Missing Rust wrapper features
 
-These operations are available through raw bindings but need higher-level wrappers.
+Higher-level wrappers are implemented alongside the raw bindings.
 
-- [ ] **Instrumentation:** class retransformation, class redefinition, and bytecode retrieval.
-- [ ] **Debugging:** breakpoints, per-thread stepping configuration, and local-variable access and modification.
-- [ ] **Threads:** stack traces, suspension and resumption, and virtual-thread operations.
-- [ ] **Heap:** object tags, heap traversal, and reference following.
-- [ ] **Synchronization:** raw-monitor creation, destruction, locking, waiting, and notification.
-- [ ] **Agent management:** environment-local storage, capability relinquishment, and per-thread event enabling.
-- [ ] Document each wrapper's version, capability, phase, callback-safety, thread, and ownership requirements; retain
+- [x] **Instrumentation:** class retransformation, class redefinition, and bytecode retrieval.
+- [x] **Debugging:** breakpoints, per-thread stepping configuration, and local-variable access and modification.
+- [x] **Threads:** stack traces, suspension and resumption, and virtual-thread operations.
+- [x] **Heap:** object tags, heap traversal, and reference following.
+- [x] **Synchronization:** raw-monitor creation, destruction, locking, waiting, and notification.
+- [x] **Agent management:** environment-local storage, capability relinquishment, and per-thread event enabling.
+- [x] Document each wrapper's version, capability, phase, callback-safety, thread, and ownership requirements; retain
       `unsafe` where these cannot be enforced.
-- [ ] Add real-JVM integration tests for each feature area, including error handling and resource cleanup.
+- [x] Add real-JVM integration tests for each feature area, including error handling and resource cleanup.
 
 ## 4. `jvmticmlr.h` support
 

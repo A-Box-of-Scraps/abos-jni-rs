@@ -1,8 +1,12 @@
-//! A minimal JVMTI event agent for VM initialization and platform-thread events.
+//! A JVMTI event agent with optional instrumentation and resource-lifecycle exercises.
+//!
+//! The `features` agent option enables native methods for the bundled Java test
+//! fixtures. Without that option the agent only observes VM and thread events
+//! and checks environment construction and allocation ownership.
 #![allow(unsafe_code, reason = "Agent exports and callbacks are native JVMTI entry points.")]
 
 use std::{
-	ffi::{c_char, c_void},
+	ffi::{CStr, c_char, c_void},
 	io::Write,
 	panic::{AssertUnwindSafe, catch_unwind},
 	sync::atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -11,6 +15,10 @@ use std::{
 use abos_jni::jni_str;
 use abos_jvmti::{Allocation, Env, Error, JvmtiString, JvmtiStringList, JvmtiVersion, Result, sys};
 
+#[path = "events_agent/features.rs"]
+mod features;
+
+static FEATURE_TESTS: AtomicBool = AtomicBool::new(false);
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
 static FAILED: AtomicBool = AtomicBool::new(false);
 static STARTED: AtomicUsize = AtomicUsize::new(0);
@@ -35,12 +43,15 @@ fn callback(body: impl FnOnce() -> Result<()>) {
 	}
 }
 
-unsafe extern "system" fn vm_init(raw: *mut sys::jvmtiEnv, _jni: *mut sys::JNIEnv, _thread: sys::jthread) {
+unsafe extern "system" fn vm_init(raw: *mut sys::jvmtiEnv, jni: *mut sys::JNIEnv, _thread: sys::jthread) {
 	callback(|| {
 		// SAFETY: This callback receives the agent's JVMTI environment on an
 		// attached thread in the live phase. All handles and allocations remain local.
 		unsafe {
 			let env: Env<'_> = Env::from_raw(raw)?;
+			if FEATURE_TESTS.load(Ordering::SeqCst) {
+				features::register(env, jni)?;
+			}
 			if env.phase()? != sys::JVMTI_PHASE_LIVE || !env.capabilities()?.can_tag_objects() {
 				return Err(Error::Jvmti(sys::JVMTI_ERROR_INTERNAL));
 			}
@@ -96,12 +107,17 @@ unsafe fn configure(env: Env<'_>) -> Result<()> {
 		}
 		let mut requested: sys::jvmtiCapabilities = sys::jvmtiCapabilities::default();
 		requested.set_can_tag_objects(true);
+		if FEATURE_TESTS.load(Ordering::SeqCst) {
+			features::request_capabilities(env, &mut requested);
+		}
 		env.add_capabilities(&requested)?;
 		let callbacks = sys::jvmtiEventCallbacks {
 			VMInit: Some(vm_init),
 			VMDeath: Some(vm_death),
 			ThreadStart: Some(thread_start),
 			ThreadEnd: Some(thread_end),
+			Breakpoint: Some(features::breakpoint),
+			SingleStep: Some(features::single_step),
 			..Default::default()
 		};
 		env.set_event_callbacks(&callbacks)?;
@@ -145,17 +161,20 @@ unsafe fn verify_connections(vm: *mut sys::JavaVM, primary: Env<'_>) -> Result<(
 ///
 /// # Safety
 /// The JVM must supply a valid VM pointer in the `OnLoad` phase, and keep the agent
-/// library loaded until callbacks can no longer execute.
+/// library loaded until callbacks can no longer execute. Non-null options must
+/// point to a readable, null-terminated string.
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Agent_OnLoad(
 	vm: *mut sys::JavaVM,
-	_options: *mut c_char,
+	options: *mut c_char,
 	_reserved: *mut c_void,
 ) -> sys::jint {
 	let result: std::thread::Result<Result<()>> = catch_unwind(|| {
 		// SAFETY: This export is called by the JVM in the `OnLoad` phase. No environment
 		// users exist on setup failure; successful setup leaves the environment alive.
 		unsafe {
+			let feature_tests: bool = !options.is_null() && CStr::from_ptr(options) == c"features";
+			FEATURE_TESTS.store(feature_tests, Ordering::SeqCst);
 			let env: Env<'_> = Env::from_raw_vm(vm)?;
 			if let Err(error) = configure(env).and_then(|()| verify_connections(vm, env)) {
 				let _cleanup: Result<()> = env.dispose();

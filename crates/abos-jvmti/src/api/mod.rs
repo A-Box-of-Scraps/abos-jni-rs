@@ -15,3 +15,7 @@ mod strings;
 pub use array::JvmtiArray;
 pub use local_variables::{LocalVariable, LocalVariableTable};
 pub use strings::{JvmtiString, JvmtiStringList};
+
+mod monitor;
+pub use env::instrumentation::ClassDefinition;
+pub use monitor::{RawMonitor, RawMonitorGuard};

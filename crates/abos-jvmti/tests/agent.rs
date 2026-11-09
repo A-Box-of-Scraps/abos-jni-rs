@@ -42,6 +42,8 @@ fn agent_receives_vm_and_thread_events() -> Result<(), Box<dyn std::error::Error
 		.args(["-source", "8", "-target", "8", "-d"])
 		.arg(directory.path())
 		.arg(manifest.join("tests/java/AgentSmoke.java"))
+		.arg(manifest.join("tests/java/AgentFeatures.java"))
+		.arg(manifest.join("tests/java/FeatureTarget.java"))
 		.output()?;
 	assert!(
 		compilation.status.success(),
@@ -55,12 +57,13 @@ fn agent_receives_vm_and_thread_events() -> Result<(), Box<dyn std::error::Error
 		"JVMTI_TEST_JAVA_HOMES must contain at least one runtime"
 	);
 	for home in homes {
-		run_agent(&home, &agent, directory.path())?;
+		run_agent(&home, &agent, directory.path(), false)?;
+		run_agent(&home, &agent, directory.path(), true)?;
 	}
 	Ok(())
 }
 
-fn run_agent(home: &Path, agent: &Path, classes: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn run_agent(home: &Path, agent: &Path, classes: &Path, features: bool) -> Result<(), Box<dyn std::error::Error>> {
 	let java: PathBuf = home.join("bin").join(format!("java{}", std::env::consts::EXE_SUFFIX));
 	let directory: tempfile::TempDir = tempfile::tempdir()?;
 	let log_path: PathBuf = directory.path().join("agent.log");
@@ -69,10 +72,15 @@ fn run_agent(home: &Path, agent: &Path, classes: &Path) -> Result<(), Box<dyn st
 	// contains any JVM crash reports. The child timeout bounds native-agent failures.
 	let mut child: std::process::Child = Command::new(java)
 		.arg("-Xcheck:jni")
-		.arg(format!("-agentpath:{}", agent.display()))
+		.arg(format!(
+			"-agentpath:{}{}",
+			agent.display(),
+			if features { "=features" } else { "" }
+		))
 		.arg("-cp")
 		.arg(classes)
 		.arg("AgentSmoke")
+		.args(features.then_some("features"))
 		.current_dir(directory.path())
 		.stdout(Stdio::from(log.try_clone()?))
 		.stderr(Stdio::from(log))
@@ -100,7 +108,23 @@ fn run_agent(home: &Path, agent: &Path, classes: &Path) -> Result<(), Box<dyn st
 	] {
 		assert!(output.contains(marker), "missing {marker}:\n{output}");
 	}
+	if features {
+		for marker in [
+			"JVMTI_INSTRUMENTATION_OK",
+			"JVMTI_DEBUGGING_OK",
+			"JVMTI_THREADS_OK",
+			"JVMTI_HEAP_OK",
+			"JVMTI_MONITORS_OK",
+			"JVMTI_MANAGEMENT_OK",
+		] {
+			assert!(output.contains(marker), "missing {marker}:\n{output}");
+		}
+		assert!(
+			output.contains("JVMTI_VIRTUAL_THREADS_OK") || output.contains("JVMTI_VIRTUAL_THREADS_UNAVAILABLE"),
+			"missing virtual-thread result:\n{output}"
+		);
+	}
 	assert!(!output.contains("JVMTI_AGENT_ERROR"), "{output}");
-	println!("JVMTI runtime {}:\n{output}", home.display());
+	println!("JVMTI runtime {} (features={features}):\n{output}", home.display());
 	Ok(())
 }

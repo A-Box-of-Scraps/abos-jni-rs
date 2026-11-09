@@ -3,7 +3,13 @@ use core::{marker::PhantomData, ptr::NonNull};
 use crate::{Error, JvmtiVersion, Result, internal::error::check, sys};
 
 mod construction;
+mod debugging;
+mod heap;
+pub(super) mod instrumentation;
+mod locals;
+mod management;
 mod returned_data;
+mod threads;
 
 /// A borrowed JVMTI 1.2-or-newer environment, usable across threads.
 ///
@@ -161,22 +167,8 @@ impl Env<'_> {
 	/// The context requirements of [`Self::capabilities`] apply. Registered callbacks
 	/// must be ready to run concurrently before an event is enabled.
 	pub unsafe fn set_event_enabled(&self, event: sys::jvmtiEvent, enabled: bool) -> Result<()> {
-		let required: sys::jint =
-			sys::jvmti_event_version(event).ok_or(Error::Jvmti(sys::JVMTI_ERROR_INVALID_EVENT_TYPE))?;
-		self.ensure_version(JvmtiVersion::from_raw(required)?)?;
-		let function: unsafe extern "C" fn(
-			*mut sys::jvmtiEnv,
-			sys::jvmtiEventMode,
-			sys::jvmtiEvent,
-			sys::jthread,
-			...
-		) -> sys::jvmtiError = self
-			.table()
-			.SetEventNotificationMode
-			.ok_or(Error::MissingFunction("SetEventNotificationMode"))?;
-		let mode: sys::jvmtiEventMode = if enabled { sys::JVMTI_ENABLE } else { sys::JVMTI_DISABLE };
-		// SAFETY: A null thread selects global notification; standard events need no varargs.
-		check(unsafe { function(self.as_raw(), mode, event, core::ptr::null_mut()) })
+		// SAFETY: The caller supplies the event context; null selects global delivery.
+		unsafe { self.set_thread_event_enabled(core::ptr::null_mut(), event, enabled) }
 	}
 
 	/// Disposes the native environment. Dropping an ordinary handle does not do this.

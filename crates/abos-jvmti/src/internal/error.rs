@@ -10,9 +10,9 @@ impl fmt::Display for Error {
 			Self::Jni(code) => write!(f, "JNI invocation failed with code {code}"),
 			Self::Jvmti(code) => write!(f, "JVMTI operation failed with code {code}"),
 			Self::MissingFunction(name) => write!(f, "JVMTI function {name} is unavailable"),
-			Self::NullPointer => f.write_str("null native interface or allocation pointer"),
-			Self::InvalidCount(count) => write!(f, "negative JVMTI element count {count}"),
-			Self::AllocationTooLarge => f.write_str("JVMTI allocation is too large"),
+			Self::NullPointer => f.write_str("null native interface, resource, or allocation pointer"),
+			Self::InvalidCount(count) => write!(f, "invalid JVMTI element count {count}"),
+			Self::AllocationTooLarge => f.write_str("JVMTI allocation or input count is too large"),
 		}
 	}
 }

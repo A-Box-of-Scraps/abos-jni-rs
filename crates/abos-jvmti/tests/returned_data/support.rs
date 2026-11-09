@@ -63,6 +63,7 @@ pub fn table() -> sys::jvmtiInterface_1_ {
 		GetSystemProperties: Some(properties),
 		GetSystemProperty: Some(property),
 		GetLineNumberTable: Some(lines),
+		GetBytecodes: Some(bytecodes),
 		GetLocalVariableTable: Some(locals),
 		..Default::default()
 	}
@@ -230,4 +231,14 @@ unsafe extern "system" fn locals(
 		}
 		output(context, &entries, count, pointer)
 	}
+}
+
+unsafe extern "system" fn bytecodes(
+	env: *mut sys::jvmtiEnv,
+	_method: sys::jmethodID,
+	count: *mut sys::jint,
+	pointer: *mut *mut u8,
+) -> sys::jvmtiError {
+	// SAFETY: The live context owns output allocations; wrapper supplies writable output slots.
+	unsafe { output(context(env), &[0x2a, 0xb1], count, pointer) }
 }
