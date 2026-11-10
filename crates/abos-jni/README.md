@@ -44,9 +44,12 @@ On Android, use the application's existing VM. Starting a new VM through `JavaVM
 In a Rust binary crate with `invocation` enabled, put this in `src/main.rs`:
 
 ```rust
+# #[cfg(feature = "invocation")]
 use abos_jni::vm::{InitArgsBuilder, JavaVM};
+# #[cfg(feature = "invocation")]
 use abos_jni::{JNIVersion, JValue, jni_sig, jni_str};
 
+# #[cfg(feature = "invocation")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = InitArgsBuilder::new()
         .version(JNIVersion::V1_8)
@@ -67,6 +70,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+# #[cfg(not(feature = "invocation"))]
+# fn main() {}
 ```
 
 Run it with `cargo run`. This uses the standard Java `Math.abs(int)` method, so no Java source compilation or custom

@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchains
+        run: |
+          rustup show
+          (cd lints && rustup show)
+
+      - name: Set up mise and mold
+        uses: jdx/mise-action@v5
+        with:
+          install_args: mold
+          # Include tools installed by the following step, even if checks fail.
+          cache_save_post: true
+          # Invalidate caches that only contain mold.
+          cache_key_prefix: mise-v2
+
+      # Cargo-based tools need the linker configured in .cargo/config.toml.
+      - name: Install remaining tools
+        run: mise exec mold -- mise install
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          # Include the JDK and other tools used by build scripts in the cache key.
+          key: ${{ hashFiles('mise.toml', 'lints/rust-toolchain.toml') }}
+          cache-on-failure: true
+          workspaces: |
+            .
+            lints
+            tests/abos-jni-sys-systest
+            tests/abos-jvmti-sys-systest
+            crates/abos-jbindgen/tests/runtime
+            tools/abos-jni-gen-windows-bindings
+
+      - name: Run checks
+        run: mise run check

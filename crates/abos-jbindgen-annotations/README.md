@@ -154,11 +154,9 @@ responsibility; the annotation does not establish them.
 Use the constants when integrating with an existing source-generation or packaging pipeline:
 
 ```rust
-fn main() {
-    println!("package: {}", abos_jbindgen_annotations::PACKAGE);
-    for &(name, source) in abos_jbindgen_annotations::ANNOTATION_FILES {
-        println!("{name}: {} bytes", source.len());
-    }
+println!("package: {}", abos_jbindgen_annotations::PACKAGE);
+for &(name, source) in abos_jbindgen_annotations::ANNOTATION_FILES {
+    println!("{name}: {} bytes", source.len());
 }
 ```
 

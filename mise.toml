@@ -268,6 +268,51 @@ flag "--seconds <seconds>" help="Profiling duration per matching benchmark" defa
 '''
 run = "python scripts/profile-abos-jni.py --package abos-jvmti"
 
+[tasks.publish]
+# Keep these sequential: dependent crates need their dependencies in the registry.
+run = [
+  "mise run publish:abos-javac",
+  "mise run publish:abos-cafebabe",
+  "mise run publish:abos-jbindgen-annotations",
+  "mise run publish:abos-jni-sys-macros",
+  "mise run publish:abos-jni-sys",
+  "mise run publish:abos-jni-macros",
+  "mise run publish:abos-jni",
+  "mise run publish:abos-jbindgen",
+  "mise run publish:abos-jvmti-sys",
+  "mise run publish:abos-jvmti",
+]
+
+[tasks."publish:abos-cafebabe"]
+run = "cargo publish --locked --package abos-cafebabe"
+
+[tasks."publish:abos-javac"]
+run = "cargo publish --locked --package abos-javac"
+
+[tasks."publish:abos-jbindgen"]
+run = "cargo publish --locked --package abos-jbindgen"
+
+[tasks."publish:abos-jbindgen-annotations"]
+run = "cargo publish --locked --package abos-jbindgen-annotations"
+
+[tasks."publish:abos-jni"]
+run = "cargo publish --locked --package abos-jni"
+
+[tasks."publish:abos-jni-macros"]
+run = "cargo publish --locked --package abos-jni-macros"
+
+[tasks."publish:abos-jni-sys"]
+run = "cargo publish --locked --package abos-jni-sys"
+
+[tasks."publish:abos-jni-sys-macros"]
+run = "cargo publish --locked --package abos-jni-sys-macros"
+
+[tasks."publish:abos-jvmti"]
+run = "cargo publish --locked --package abos-jvmti"
+
+[tasks."publish:abos-jvmti-sys"]
+run = "cargo publish --locked --package abos-jvmti-sys"
+
 [tasks."setup:android"]
 raw = true
 run = "python tests/android-test-activity/tests/android_env.py setup"

@@ -86,6 +86,38 @@ class MiseConfigTests(unittest.TestCase):
         self.assertFalse(benchmark["harness"])
         self.assertEqual(benchmark["required-features"], ["invocation"])
 
+    def test_publish_tasks_cover_workspace_crates_in_dependency_order(self):
+        tasks = tomllib.loads(CONFIG.read_text())["tasks"]
+        manifests = [tomllib.loads(path.read_text()) for path in (CONFIG.parent / "crates").glob("*/Cargo.toml")]
+        crates = {manifest["package"]["name"]: manifest for manifest in manifests}
+        commands = tasks["publish"]["run"]
+        order = []
+        for command in commands:
+            args = shlex.split(command)
+            self.assertEqual(args[:2], ["mise", "run"])
+            self.assertEqual(len(args), 3)
+            self.assertTrue(args[2].startswith("publish:"))
+            order.append(args[2].removeprefix("publish:"))
+        self.assertCountEqual(order, crates)
+        self.assertCountEqual(
+            [name for name in tasks if name.startswith("publish:")],
+            [f"publish:{name}" for name in crates],
+        )
+        for name, manifest in crates.items():
+            with self.subTest(crate=name):
+                task = tasks[f"publish:{name}"]
+                self.assertEqual(task["run"], f"cargo publish --locked --package {name}")
+                self.assertNotIn("depends", task)
+                tables = [manifest, *manifest.get("target", {}).values()]
+                for table in tables:
+                    for kind in ("dependencies", "build-dependencies", "dev-dependencies"):
+                        for alias, dependency in table.get(kind, {}).items():
+                            dependency_name = (
+                                dependency.get("package", alias) if isinstance(dependency, dict) else alias
+                            )
+                            if dependency_name in crates:
+                                self.assertLess(order.index(dependency_name), order.index(name))
+
     def test_task_dependencies_exist(self):
         tasks = tomllib.loads(CONFIG.read_text())["tasks"]
         for name, task in tasks.items():
