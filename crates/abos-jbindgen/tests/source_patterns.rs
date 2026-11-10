@@ -8,6 +8,7 @@ use std::{
 	io::Write,
 	path::{Path, PathBuf},
 	process::{Command, Output},
+	thread,
 };
 use tempfile::TempDir;
 use zip::{ZipWriter, write::SimpleFileOptions};
@@ -176,26 +177,43 @@ fn all_input_modes_select_the_same_classes() -> TestResult {
 		(&["com.example.PatternOuter+*"], &[]),
 		(&["", " , "], &[]),
 	];
-	for (patterns, expected) in cases {
-		for (kind, builder) in [
-			(
-				"source",
-				Builder::new().input_sources(fixtures.sources.clone(), Vec::new(), Vec::new()),
-			),
-			(
-				"source jar",
-				Builder::new().input_sources(vec![fixtures.source_jar.clone()], Vec::new(), Vec::new()),
-			),
-			("jar", Builder::new().input_jar(&fixtures.jar)),
-		] {
-			let bindings: Bindings = builder.patterns(patterns.iter().copied()).generate()?;
-			assert_eq!(class_names(&bindings), *expected, "{kind}: {patterns:?}");
+	// Bound concurrent Java processes while sharing the immutable fixtures.
+	let workers: usize = thread::available_parallelism().map_or(1, |count| count.get().min(4));
+	thread::scope(|scope| {
+		for chunk in cases.chunks(cases.len().div_ceil(workers)) {
+			let fixtures: &Fixtures = &fixtures;
+			let all: &[&str] = &all;
+			scope.spawn(move || check_cases(fixtures, chunk, all));
 		}
-		assert_eq!(
-			android_class_names(fixtures.root.path(), patterns, &all)?,
-			*expected,
-			"android: {patterns:?}"
-		);
+	});
+	Ok(())
+}
+
+fn check_cases(fixtures: &Fixtures, cases: &[(&[&str], &[&str])], all: &[&str]) {
+	for (patterns, expected) in cases {
+		check_case(fixtures, patterns, expected, all).unwrap_or_else(|error| panic!("patterns {patterns:?}: {error}"));
 	}
+}
+
+fn check_case(fixtures: &Fixtures, patterns: &[&str], expected: &[&str], all: &[&str]) -> TestResult {
+	for (kind, builder) in [
+		(
+			"source",
+			Builder::new().input_sources(fixtures.sources.clone(), Vec::new(), Vec::new()),
+		),
+		(
+			"source jar",
+			Builder::new().input_sources(vec![fixtures.source_jar.clone()], Vec::new(), Vec::new()),
+		),
+		("jar", Builder::new().input_jar(&fixtures.jar)),
+	] {
+		let bindings: Bindings = builder.patterns(patterns.iter().copied()).generate()?;
+		assert_eq!(class_names(&bindings), expected, "{kind}: {patterns:?}");
+	}
+	assert_eq!(
+		android_class_names(fixtures.root.path(), patterns, all)?,
+		expected,
+		"android: {patterns:?}"
+	);
 	Ok(())
 }

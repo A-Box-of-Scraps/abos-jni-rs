@@ -42,5 +42,19 @@ jobs:
       - name: Install remaining tools
         run: mise exec mold -- mise install
 
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          # Include the JDK and other tools used by build scripts in the cache key.
+          key: ${{ hashFiles('mise.toml', 'lints/rust-toolchain.toml') }}
+          cache-on-failure: true
+          workspaces: |
+            .
+            lints
+            tests/abos-jni-sys-systest
+            tests/abos-jvmti-sys-systest
+            crates/abos-jbindgen/tests/runtime
+            tools/abos-jni-gen-windows-bindings
+
       - name: Run checks
         run: mise run check
