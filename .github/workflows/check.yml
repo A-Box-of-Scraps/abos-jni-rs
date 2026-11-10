@@ -14,7 +14,6 @@ concurrency:
 
 jobs:
   check:
-    name: Format, lint, duplicates, and tests
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -34,6 +33,10 @@ jobs:
         uses: jdx/mise-action@v5
         with:
           install_args: mold
+          # Include tools installed by the following step, even if checks fail.
+          cache_save_post: true
+          # Invalidate caches that only contain mold.
+          cache_key_prefix: mise-v2
 
       # Cargo-based tools need the linker configured in .cargo/config.toml.
       - name: Install remaining tools
