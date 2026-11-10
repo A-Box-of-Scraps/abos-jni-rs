@@ -3,7 +3,6 @@ resolver = "3"
 members = ["crates/*"]
 exclude = [
   "fuzz",
-  "lints",
   "tests/android-test-activity",
   "tests/abos-jni-sys-systest",
   "tests/abos-jvmti-sys-systest",
@@ -53,12 +52,10 @@ windows-link = "0.100"
 windows-sys = "0.61"
 zip = { version = "9", default-features = false, features = ["deflate"] }
 
-[workspace.metadata.dylint]
-libraries = [
-  { path = "lints/explicit_binding_types" },
-  { path = "lints/file_length" },
-  { path = "lints/tests_outside_src" },
-]
+[[workspace.metadata.dylint.libraries]]
+git = "https://github.com/A-Box-of-Scraps/abos-dylint-rules"
+rev = "2eb1cc27102ea7d9225cb90eab4929ae7f443ee2"
+pattern = ["explicit_binding_types", "file_length", "tests_outside_src"]
 
 [workspace.lints.rust]
 missing_docs = "warn"

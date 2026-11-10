@@ -32,7 +32,6 @@ crates/
   abos-jvmti-sys/
 fuzz/
 licenses/
-lints/
 scripts/
 tests/
 tools/

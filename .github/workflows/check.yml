@@ -24,10 +24,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install pinned Rust toolchains
-        run: |
-          rustup show
-          (cd lints && rustup show)
+      - name: Install pinned Rust toolchain
+        run: rustup show
 
       - name: Set up mise and mold
         uses: jdx/mise-action@v5
@@ -46,11 +44,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           # Include the JDK and other tools used by build scripts in the cache key.
-          key: ${{ hashFiles('mise.toml', 'lints/rust-toolchain.toml') }}
+          key: ${{ hashFiles('mise.toml', 'Cargo.toml') }}
           cache-on-failure: true
           workspaces: |
             .
-            lints
             tests/abos-jni-sys-systest
             tests/abos-jvmti-sys-systest
             crates/abos-jbindgen/tests/runtime

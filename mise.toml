@@ -101,7 +101,6 @@ run = [
   "cargo fmt --manifest-path tests/android-test-activity/Cargo.toml -q",
   "cargo fmt --manifest-path tests/abos-jni-sys-systest/Cargo.toml -q",
   "cargo fmt --manifest-path tests/abos-jvmti-sys-systest/Cargo.toml -q",
-  "cd lints && cargo fmt --all -q",
   "dprint fmt --log-level warn",
 ]
 
@@ -116,7 +115,6 @@ run = [
   "cargo fmt --manifest-path tests/android-test-activity/Cargo.toml --check -q",
   "cargo fmt --manifest-path tests/abos-jni-sys-systest/Cargo.toml --check -q",
   "cargo fmt --manifest-path tests/abos-jvmti-sys-systest/Cargo.toml --check -q",
-  "cd lints && cargo fmt --all --check -q",
   "dprint check --log-level warn",
 ]
 
@@ -327,7 +325,6 @@ depends = [
   "test:abos-jni-sys:systest",
   "test:abos-jvmti-sys:systest",
   "test:android-runner",
-  "test:lints",
   "test:scripts",
   "test:workspace",
 ]
@@ -418,10 +415,6 @@ run = "python tests/android-test-activity/tests/run.py --suite smoke"
 [tasks."test:fuzz-seeds"]
 dir = "fuzz"
 run = "cargo test --locked --test seeds -q"
-
-[tasks."test:lints"]
-dir = "lints"
-run = "cargo test --locked --workspace -q"
 
 [tasks."test:scripts"]
 run = "python -B -m unittest discover --start-directory scripts/tests --quiet"

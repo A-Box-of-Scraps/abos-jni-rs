@@ -28,11 +28,20 @@ class MiseConfigTests(unittest.TestCase):
                 "test:abos-jni-sys:systest",
                 "test:abos-jvmti-sys:systest",
                 "test:android-runner",
-                "test:lints",
                 "test:scripts",
                 "test:workspace",
             ],
         )
+
+    def test_dylint_uses_all_three_rules_from_a_pinned_git_revision(self):
+        manifest = tomllib.loads((CONFIG.parent / "Cargo.toml").read_text())
+        libraries = manifest["workspace"]["metadata"]["dylint"]["libraries"]
+        self.assertEqual(len(libraries), 1)
+        library = libraries[0]
+        self.assertEqual(library["git"], "https://github.com/A-Box-of-Scraps/abos-dylint-rules")
+        self.assertRegex(library["rev"], r"^[0-9a-f]{40}$")
+        self.assertCountEqual(library["pattern"], ["explicit_binding_types", "file_length", "tests_outside_src"])
+        self.assertNotIn("path", library)
 
     def test_workspace_tests_cover_all_features_default_jni_and_ignored_jvm(self):
         tasks = tomllib.loads(CONFIG.read_text())["tasks"]
