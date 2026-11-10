@@ -269,7 +269,6 @@ flag "--seconds <seconds>" help="Profiling duration per matching benchmark" defa
 run = "python scripts/profile-abos-jni.py --package abos-jvmti"
 
 [tasks.publish]
-description = "Publish all workspace crates in dependency order"
 # Keep these sequential: dependent crates need their dependencies in the registry.
 run = [
   "mise run publish:abos-javac",
@@ -285,43 +284,33 @@ run = [
 ]
 
 [tasks."publish:abos-cafebabe"]
-description = "Publish abos-cafebabe"
 run = "cargo publish --locked --package abos-cafebabe"
 
 [tasks."publish:abos-javac"]
-description = "Publish abos-javac"
 run = "cargo publish --locked --package abos-javac"
 
 [tasks."publish:abos-jbindgen"]
-description = "Publish abos-jbindgen"
 run = "cargo publish --locked --package abos-jbindgen"
 
 [tasks."publish:abos-jbindgen-annotations"]
-description = "Publish abos-jbindgen-annotations"
 run = "cargo publish --locked --package abos-jbindgen-annotations"
 
 [tasks."publish:abos-jni"]
-description = "Publish abos-jni"
 run = "cargo publish --locked --package abos-jni"
 
 [tasks."publish:abos-jni-macros"]
-description = "Publish abos-jni-macros"
 run = "cargo publish --locked --package abos-jni-macros"
 
 [tasks."publish:abos-jni-sys"]
-description = "Publish abos-jni-sys"
 run = "cargo publish --locked --package abos-jni-sys"
 
 [tasks."publish:abos-jni-sys-macros"]
-description = "Publish abos-jni-sys-macros"
 run = "cargo publish --locked --package abos-jni-sys-macros"
 
 [tasks."publish:abos-jvmti"]
-description = "Publish abos-jvmti"
 run = "cargo publish --locked --package abos-jvmti"
 
 [tasks."publish:abos-jvmti-sys"]
-description = "Publish abos-jvmti-sys"
 run = "cargo publish --locked --package abos-jvmti-sys"
 
 [tasks."setup:android"]
