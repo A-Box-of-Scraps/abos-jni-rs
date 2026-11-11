@@ -12,7 +12,7 @@ from pathlib import Path
 
 WORKFLOW_FILE = "cross-platform.yml"
 WORKFLOW_PATH = f".github/workflows/{WORKFLOW_FILE}"
-RUNS_PER_PAGE = 100
+ITEMS_PER_PAGE = 100
 DEBUG_DIRECTORY = "target/debug"
 INCREMENTAL_DIRECTORY = f"{DEBUG_DIRECTORY}/incremental"
 
@@ -36,31 +36,56 @@ def select_matrix(target):
     }
 
 
-def previous_scheduled_sha():
-    """Find the preceding scheduled run, including failures and skipped matrices."""
+def github_items(path, key, **filters):
+    """Read all pages of a GitHub Actions collection, failing visibly on API errors."""
     api = os.environ.get("GITHUB_API_URL", "https://api.github.com")
     repository = os.environ["GITHUB_REPOSITORY"]
-    run_number = int(os.environ["GITHUB_RUN_NUMBER"])
-    url = f"{api}/repos/{repository}/actions/workflows/{WORKFLOW_FILE}/runs"
+    url = f"{api}/repos/{repository}/actions/{path}"
     headers = {
         "Accept": "application/vnd.github+json",
         "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
         "X-GitHub-Api-Version": "2022-11-28",
     }
-    branch = os.environ["GITHUB_REF_NAME"]
     page = 1
     while True:
-        query = urllib.parse.urlencode({"event": "schedule", "branch": branch, "per_page": RUNS_PER_PAGE, "page": page})
+        query = urllib.parse.urlencode({**filters, "per_page": ITEMS_PER_PAGE, "page": page})
         request = urllib.request.Request(f"{url}?{query}", headers=headers)
-        # API errors must fail visibly, not masquerade as an empty run history.
         with urllib.request.urlopen(request, timeout=30) as response:
-            runs = json.load(response)["workflow_runs"]
-        for run in runs:
-            if run["run_number"] < run_number:
-                return run["head_sha"]
-        if len(runs) < RUNS_PER_PAGE:
-            return None
+            items = json.load(response)[key]
+        yield from items
+        if len(items) < ITEMS_PER_PAGE:
+            return
         page += 1
+
+
+def has_successful_scheduled_build(sha):
+    """Require a completed matrix, not just a green workflow with skipped jobs."""
+    run_number = int(os.environ["GITHUB_RUN_NUMBER"])
+    runs = github_items(
+        f"workflows/{WORKFLOW_FILE}/runs",
+        "workflow_runs",
+        event="schedule",
+        branch=os.environ["GITHUB_REF_NAME"],
+        head_sha=sha,
+        status="success",
+    )
+    # Keep these names aligned with the check-build job in cross-platform.yml.
+    expected_jobs = {f"Check and build ({target})" for target in RUNNERS}
+    for run in runs:
+        if (
+            run["run_number"] >= run_number
+            or run["head_sha"] != sha
+            or run["status"] != "completed"
+            or run["conclusion"] != "success"
+        ):
+            continue
+        jobs = github_items(f"runs/{run['id']}/jobs", "jobs", filter="latest")
+        successful_jobs = {
+            job["name"] for job in jobs if job["status"] == "completed" and job["conclusion"] == "success"
+        }
+        if expected_jobs <= successful_jobs:
+            return True
+    return False
 
 
 def should_run(sha):
@@ -70,7 +95,7 @@ def should_run(sha):
     workflow = os.environ["GITHUB_WORKFLOW_REF"].split("@", 1)[0]
     if workflow != f"{os.environ['GITHUB_REPOSITORY']}/{WORKFLOW_PATH}":
         return True
-    return previous_scheduled_sha() != sha
+    return not has_successful_scheduled_build(sha)
 
 
 def write_output(name, value):
