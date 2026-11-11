@@ -113,7 +113,9 @@ jobs:
       - name: Cache Rust builds
         uses: Swatinem/rust-cache@v2
         with:
-          key: cross-platform-${{ matrix.target }}-${{ hashFiles('mise.toml', 'Cargo.toml') }}
+          # Linux AMD64 shares with check.yml; other platforms remain isolated.
+          # Include tool versions here because shared-key replaces the separate key.
+          shared-key: native-${{ matrix.target }}-${{ hashFiles('mise.toml', 'Cargo.toml') }}
           cache-on-failure: true
           workspaces: |
             .

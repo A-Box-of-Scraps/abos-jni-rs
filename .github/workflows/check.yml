@@ -34,7 +34,8 @@ jobs:
         with:
           install_args: mold
           cache_save_post: true
-          cache_key_prefix: mise-v2
+          # Share installed tools with the Linux AMD64 cross-platform job.
+          cache_key_prefix: mise-cross-platform-v1-linux-amd64
 
       - name: Install remaining tools
         run: mise exec mold -- mise install
@@ -44,8 +45,9 @@ jobs:
       - name: Cache Rust builds
         uses: Swatinem/rust-cache@v2
         with:
-          # Include the JDK and other tools used by build scripts in the cache key.
-          key: ${{ hashFiles('mise.toml', 'Cargo.toml') }}
+          # Share with cross-platform; shared-key replaces both the job ID and key.
+          # Keep the JDK and other build-script tools in the shared key.
+          shared-key: native-linux-amd64-${{ hashFiles('mise.toml', 'Cargo.toml') }}
           cache-on-failure: true
           workspaces: |
             .
