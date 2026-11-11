@@ -1,0 +1,156 @@
+name: Cross-platform
+
+on:
+  schedule:
+    - cron: '30 3 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Platform to check and build
+        type: choice
+        default: all
+        options:
+          - all
+          - linux-amd64
+          - linux-arm64
+          - windows-amd64
+          - windows-arm64
+          - macos-amd64
+          - macos-arm64
+  workflow_call:
+    inputs:
+      target:
+        description: Platform to check and build, or all
+        type: string
+        default: all
+      ref:
+        description: Commit SHA or ref to check out (defaults to the triggering commit)
+        type: string
+        default: ''
+    outputs:
+      sha:
+        description: Commit checked and built
+        value: ${{ jobs.prepare.outputs.sha }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-platform-${{ github.workflow }}-${{ github.event_name }}-${{ inputs.ref || github.ref }}-${{ inputs.target || 'all' }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      matrix: ${{ steps.prepare.outputs.matrix }}
+      should-run: ${{ steps.prepare.outputs.should-run }}
+      sha: ${{ steps.prepare.outputs.sha }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+
+      - name: Select platforms and check scheduled history
+        id: prepare
+        run: python scripts/ci-cross-platform.py prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_TARGET: ${{ inputs.target || 'all' }}
+
+  check-build:
+    name: Check and build (${{ matrix.target }})
+    needs: prepare
+    if: needs.prepare.outputs.should-run == 'true'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+
+      - name: Set up Python for CI helpers
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Install pinned Rust toolchain
+        run: rustup show
+
+      - name: Set up mise
+        uses: jdx/mise-action@v5
+        with:
+          install: false
+          cache_save_post: true
+          cache_key_prefix: mise-cross-platform-v1-${{ matrix.target }}
+
+      # Cargo-based tool installation uses the linker from .cargo/config.toml.
+      - name: Install mold on Linux
+        if: runner.os == 'Linux'
+        run: mise install mold
+        env:
+          MISE_GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Install remaining tools on Linux
+        if: runner.os == 'Linux'
+        run: mise exec mold -- mise install
+        env:
+          MISE_GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Install tools on Windows and macOS
+        if: runner.os != 'Linux'
+        run: mise install
+        env:
+          MISE_GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: cross-platform-${{ matrix.target }}-${{ hashFiles('mise.toml', 'Cargo.toml') }}
+          cache-on-failure: true
+          workspaces: |
+            .
+            tests/abos-jni-sys-systest
+            tests/abos-jvmti-sys-systest
+            crates/abos-jbindgen/tests/runtime
+            tools/abos-jni-gen-windows-bindings
+
+      - name: Run checks
+        id: checks
+        run: mise run check
+
+      - name: Build debug artifacts
+        if: ${{ !cancelled() && steps.checks.outcome != 'skipped' }}
+        run: mise run build
+
+      - name: Archive available debug outputs
+        id: archive
+        if: ${{ !cancelled() }}
+        run: python scripts/ci-cross-platform.py archive
+        env:
+          CI_TARGET: ${{ matrix.target }}
+          CI_SHA: ${{ needs.prepare.outputs.sha }}
+
+      - name: Upload debug artifacts
+        if: ${{ !cancelled() && steps.archive.outputs.path != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: debug-${{ matrix.target }}-${{ needs.prepare.outputs.sha }}-attempt-${{ github.run_attempt }}
+          path: ${{ steps.archive.outputs.path }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
