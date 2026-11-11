@@ -5,6 +5,7 @@ import datetime
 import hashlib
 import io
 import json
+import math
 import os
 import re
 import subprocess
@@ -12,8 +13,12 @@ import tarfile
 import time
 import urllib.error
 import urllib.request
+from email.utils import parsedate_to_datetime
 from graphlib import TopologicalSorter
 from pathlib import Path
+
+MAX_PUBLISH_ATTEMPTS = 10
+PUBLISH_RETRY_SECONDS = 60
 
 SEMVER = re.compile(
     r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
@@ -167,6 +172,47 @@ def save_release(state, path, text):
     temporary.replace(journal)
 
 
+def publish_retry_delay(output):
+    match = re.search(r"try again after ([^\r\n]+? GMT)\b", output, re.IGNORECASE)
+    if match is not None:
+        try:
+            retry_at = parsedate_to_datetime(match[1])
+            remaining = (retry_at - datetime.datetime.now(datetime.UTC)).total_seconds()
+            return max(PUBLISH_RETRY_SECONDS, math.ceil(remaining))
+        except (TypeError, ValueError, OverflowError):
+            pass
+    return PUBLISH_RETRY_SECONDS
+
+
+def publish_with_retry(name, version):
+    for attempt in range(1, MAX_PUBLISH_ATTEMPTS + 1):
+        result = subprocess.run(
+            ["cargo", "publish", "--locked", "--registry", "crates-io", "--package", name, "--allow-dirty"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        output = result.stdout or ""
+        print(output, end="", flush=True)
+        if result.returncode == 0 or not re.search(r"429 Too Many Requests|status 429\b", output, re.IGNORECASE):
+            return result
+        if attempt == MAX_PUBLISH_ATTEMPTS:
+            raise RuntimeError(f"{name} {version}: crates.io still rate-limited publishing after {attempt} attempts")
+        delay = publish_retry_delay(output)
+        print(
+            f"{name} {version}: crates.io rate limit; waiting {delay}s before attempt "
+            f"{attempt + 1}/{MAX_PUBLISH_ATTEMPTS}",
+            flush=True,
+        )
+        time.sleep(delay)
+        # Cargo may have uploaded successfully before encountering a rate-limited index request.
+        # Let the caller verify the published archive instead of attempting a duplicate upload.
+        if any(entry["vers"] == version for entry in registry_versions(name)):
+            return result
+    raise RuntimeError("Publishing requires at least one attempt")
+
+
 def publish_package(package, state):
     name, version = package["name"], package["version"]
     path = (Path(package["manifest_path"]).parent / "CHANGELOG.md").relative_to(Path.cwd())
@@ -189,10 +235,7 @@ def publish_package(package, state):
     print(f"Publishing {name} {version}", flush=True)
     path.write_text(prepared, encoding="utf-8")
     try:
-        result = subprocess.run(
-            ["cargo", "publish", "--locked", "--registry", "crates-io", "--package", name, "--allow-dirty"],
-            check=False,
-        )
+        result = publish_with_retry(name, version)
         if result.returncode == 0:
             # Cargo confirmed the upload, even if our subsequent index request fails.
             save_release(state, path, prepared)

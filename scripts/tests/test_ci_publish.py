@@ -1,3 +1,4 @@
+import datetime
 import hashlib
 import importlib.util
 import io
@@ -180,6 +181,68 @@ class OrderTests(unittest.TestCase):
             self.assertEqual([item["name"] for item in ci.workspace_packages()], ["member"])
 
 
+class PublishRetryTests(unittest.TestCase):
+    def setUp(self):
+        self.run_mock = self.enterContext(patch.object(ci.subprocess, "run"))
+        self.sleep = self.enterContext(patch.object(ci.time, "sleep"))
+        self.versions = self.enterContext(patch.object(ci, "registry_versions", return_value=[]))
+        self.limited = subprocess.CompletedProcess([], 101, stdout="error: status 429 Too Many Requests\n")
+        self.success = subprocess.CompletedProcess([], 0, stdout="Published demo\n")
+
+    def test_rate_limit_retries_after_a_minute(self):
+        self.run_mock.side_effect = [self.limited, self.success]
+        self.assertEqual(ci.publish_with_retry("demo", "1.0.0"), self.success)
+        self.sleep.assert_called_once_with(60)
+        self.assertEqual(self.run_mock.call_count, 2)
+        self.versions.assert_called_once_with("demo")
+
+    def test_repeated_rate_limits_have_bounded_retries(self):
+        self.run_mock.return_value = self.limited
+        with self.assertRaisesRegex(RuntimeError, "rate-limited publishing after 10 attempts"):
+            ci.publish_with_retry("demo", "1.0.0")
+        self.assertEqual(self.run_mock.call_count, 10)
+        self.assertEqual(self.sleep.call_count, 9)
+        self.assertTrue(all(call.args == (60,) for call in self.sleep.call_args_list))
+
+    def test_other_failures_are_not_retried(self):
+        for output in ["error: status 403 Forbidden", "error: could not compile demo"]:
+            result = subprocess.CompletedProcess([], 101, stdout=output)
+            self.run_mock.return_value = result
+            self.assertEqual(ci.publish_with_retry("demo", "1.0.0"), result)
+        self.assertEqual(self.run_mock.call_count, 2)
+        self.sleep.assert_not_called()
+
+    def test_success_does_not_wait_or_retry(self):
+        self.run_mock.return_value = self.success
+        self.assertEqual(ci.publish_with_retry("demo", "1.0.0"), self.success)
+        self.run_mock.assert_called_once()
+        self.sleep.assert_not_called()
+        self.versions.assert_not_called()
+
+    def test_already_uploaded_version_is_not_uploaded_again(self):
+        self.run_mock.return_value = self.limited
+        self.versions.return_value = [{"vers": "1.0.0"}]
+        self.assertEqual(ci.publish_with_retry("demo", "1.0.0"), self.limited)
+        self.run_mock.assert_called_once()
+        self.sleep.assert_called_once_with(60)
+
+    def test_server_retry_date_is_honored(self):
+        output = "Please try again after Wed, 11 Nov 2026 15:07:03 GMT and see the rate limits."
+        now = datetime.datetime(2026, 11, 11, 15, 0, tzinfo=datetime.UTC)
+        with patch.object(ci, "datetime") as clock:
+            clock.datetime.now.return_value = now
+            self.assertEqual(ci.publish_retry_delay(output), 423)
+            self.limited.stdout = f"status 429: {output}"
+            self.run_mock.side_effect = [self.limited, self.success]
+            ci.publish_with_retry("demo", "1.0.0")
+        self.sleep.assert_called_once_with(423)
+
+    def test_missing_malformed_and_past_dates_wait_at_least_a_minute(self):
+        for output in ["status 429", "try again after invalid GMT", "try again after Wed, 01 Jan 2020 00:00:00 GMT"]:
+            with self.subTest(output=output):
+                self.assertEqual(ci.publish_retry_delay(output), 60)
+
+
 class PublicationTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
@@ -242,6 +305,18 @@ class PublicationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "not uploaded"):
             ci.publish_package(self.pkg, self.state)
         self.assertFalse((self.state / "releases.json").exists())
+        self.assertEqual(self.path.read_text(), CHANGES)
+
+    def test_exhausted_rate_limit_retries_preserve_earlier_releases(self):
+        ci.publish_package(self.pkg, self.state)
+        earlier = self.journal()
+        self.pkg["version"] = "1.0.1"
+        self.run_mock.return_value = subprocess.CompletedProcess([], 101, stdout="status 429 Too Many Requests")
+        self.wait.reset_mock()
+        with patch.object(ci.time, "sleep"), self.assertRaisesRegex(RuntimeError, "rate-limited"):
+            ci.publish_package(self.pkg, self.state)
+        self.wait.assert_not_called()
+        self.assertEqual(self.journal(), earlier)
         self.assertEqual(self.path.read_text(), CHANGES)
 
     def test_success_is_recorded_even_if_registry_poll_fails(self):
