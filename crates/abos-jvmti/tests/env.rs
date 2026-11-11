@@ -8,6 +8,9 @@ use std::{
 
 use abos_jvmti::{Allocation, Env, Error, JvmtiVersion, sys};
 
+// Preserve the high-bit error pattern for both signed and unsigned native enums.
+const UNKNOWN_ERROR: sys::jvmtiError = sys::jvmtiError::from_ne_bytes(0xfedc_ba98_u32.to_ne_bytes());
+
 static_assertions::assert_impl_all!(Env<'static>: Send, Sync);
 static_assertions::assert_not_impl_any!(Allocation<'static, 'static>: Send, Sync, Clone, Copy);
 
@@ -66,7 +69,7 @@ const unsafe extern "system" fn wrong_phase(_env: *mut sys::jvmtiEnv, _value: *m
 }
 
 const unsafe extern "system" fn unknown_error(_env: *mut sys::jvmtiEnv, _value: *mut sys::jint) -> sys::jvmtiError {
-	0xfedc_ba98
+	UNKNOWN_ERROR
 }
 
 #[test]
@@ -93,7 +96,7 @@ fn values_and_native_errors_are_preserved() {
 	assert_eq!(
 		// SAFETY: The initialized mock returns an intentionally unknown integer error code.
 		unsafe { Env::from_raw(&raw mut raw) }.expect_err("query fails"),
-		Error::Jvmti(0xfedc_ba98)
+		Error::Jvmti(UNKNOWN_ERROR)
 	);
 }
 
