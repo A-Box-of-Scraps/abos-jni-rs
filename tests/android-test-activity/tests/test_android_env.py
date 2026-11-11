@@ -58,15 +58,31 @@ class EnvironmentTests(unittest.TestCase):
             with (
                 self.subTest(system=system),
                 patch.object(environment.platform, "system", return_value=system),
+                patch.object(Path, "home", side_effect=RuntimeError("No home directory")) as home,
                 patch.dict(os.environ, {variable: str(base)}, clear=True),
             ):
                 self.assertEqual(environment.sdk_root(), base / "abos/android-sdk")
+                home.assert_not_called()
         with (
             patch.object(environment.platform, "system", return_value="Darwin"),
             patch.object(Path, "home", return_value=self.root),
             patch.dict(os.environ, {}, clear=True),
         ):
             self.assertEqual(environment.sdk_root(), self.root / "Library/Application Support/abos/android-sdk")
+
+    def test_default_sdk_roots_fall_back_to_home(self):
+        for system, relative in [
+            ("Windows", "AppData/Local/abos/android-sdk"),
+            ("Linux", ".local/share/abos/android-sdk"),
+            ("Darwin", "Library/Application Support/abos/android-sdk"),
+        ]:
+            with (
+                self.subTest(system=system),
+                patch.object(environment.platform, "system", return_value=system),
+                patch.object(Path, "home", return_value=self.root),
+                patch.dict(os.environ, {}, clear=True),
+            ):
+                self.assertEqual(environment.sdk_root(), self.root / relative)
 
     def test_configure_selects_pinned_ndk_and_sdk_for_children(self):
         with patch.dict(os.environ, {}, clear=True):

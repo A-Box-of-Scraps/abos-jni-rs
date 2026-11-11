@@ -80,8 +80,12 @@ fn emits_scalar_record_constant_and_exported_function_checks() {
         unsafe extern "system" { pub fn JNI_GetDefaultJavaVMInitArgs(args: *mut c_void) -> jint; }
     "#,
 	);
-	assert!(probe.signatures.contains("void (*)(int32_t): 1"));
-	assert!(probe.signatures.contains("void (*)(uint8_t): 1"));
+	assert!(probe.signatures.contains("int: sizeof(int) == sizeof(int32_t)"));
+	assert!(
+		probe
+			.signatures
+			.contains("unsigned char: sizeof(unsigned char) == sizeof(uint8_t)")
+	);
 	assert!(probe.signatures.contains("void (*)(va_list): 1"));
 	assert!(probe.signatures.contains("&JNI_GetDefaultJavaVMInitArgs"));
 	assert!(probe.signatures.contains("jint (JNICALL *)(void *)"));
@@ -92,6 +96,24 @@ fn emits_scalar_record_constant_and_exported_function_checks() {
 	assert!(probe.measurements.contains("(int64_t)(JNIInvalidRefType)"));
 	assert!(probe.measurements.contains("offsetof(JavaVMOption, optionString)"));
 	assert!(probe.measurements.contains("offsetof(jvalue, i)"));
+}
+
+#[test]
+fn integer_aliases_check_width_and_sign_without_requiring_identical_c_typedefs() {
+	let mut probe = generate::Probe::default();
+	probe.add_source("pub type jlong = i64; pub type unsigned_word = u64;");
+	let signed = probe.signatures.lines().next().expect("signed alias assertion");
+	assert!(signed.contains("_Generic((jlong)0"));
+	assert!(signed.contains("long: sizeof(long) == sizeof(int64_t)"));
+	assert!(signed.contains("long long: sizeof(long long) == sizeof(int64_t)"));
+	assert!(!signed.contains("unsigned"));
+	let unsigned = probe.signatures.lines().nth(1).expect("unsigned alias assertion");
+	assert!(unsigned.contains("unsigned long: sizeof(unsigned long) == sizeof(uint64_t)"));
+	assert!(unsigned.contains("unsigned long long: sizeof(unsigned long long) == sizeof(uint64_t)"));
+	assert!(signed.contains("default: 0"));
+	assert!(unsigned.contains("default: 0"));
+	assert!(probe.measurements.contains("sizeof(jlong)"));
+	assert!(probe.measurements.contains("_Alignof(jlong)"));
 }
 
 #[test]

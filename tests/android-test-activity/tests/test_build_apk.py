@@ -86,7 +86,7 @@ class PackageTests(unittest.TestCase):
         first, second = [call.args for call in execute.call_args_list]
         self.assertEqual(first[1:6], ("-c", "-P", "16", "-v", "4"))
         self.assertEqual(second[:2], ("java.exe", "-jar"))
-        self.assertTrue(str(second[2]).endswith("lib/apksigner.jar"))
+        self.assertEqual(second[2], self.root / f"build-tools/{environment.BUILD_TOOLS}/lib/apksigner.jar")
         self.assertEqual(second[3:5], ("verify", "--verbose"))
 
     def test_package_uses_isolated_native_input_and_publishes_only_after_validation(self):

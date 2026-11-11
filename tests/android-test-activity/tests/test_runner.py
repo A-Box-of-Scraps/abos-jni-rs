@@ -57,6 +57,7 @@ class AndroidRunnerTests(unittest.TestCase):
         env = {"ANDROID_HOME": "/sdk", "ANDROID_TEST_SERIAL": "device"} if environment is None else environment
         with (
             patch.dict(os.environ, env, clear=True),
+            patch.object(Path, "home", return_value=runner.PROJECT),
             patch("sys.argv", ["run.py", *extra]),
             patch.object(runner, "run", side_effect=execute),
             patch.object(runner.uuid, "uuid4") as uuid,

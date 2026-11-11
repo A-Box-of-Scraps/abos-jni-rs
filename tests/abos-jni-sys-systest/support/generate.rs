@@ -85,12 +85,40 @@ impl Probe {
 	fn alias(&mut self, alias: &syn::ItemType) {
 		let name = &alias.ident;
 		self.layout(name, &name.to_string());
-		// Compare parameter types, allowing C array typedefs such as va_list to decay.
-		self.signature(
-			&name.to_string(),
-			&format!("(void (*)({name}))0"),
-			&format!("void (*)({})", c_type(&alias.ty)),
-		);
+		let expected = c_type(&alias.ty);
+		let integer_types: Option<&[&str]> = match expected.as_str() {
+			"int8_t" | "int16_t" | "int32_t" | "int64_t" => Some(&["signed char", "short", "int", "long", "long long"]),
+			"uint8_t" | "uint16_t" | "uint32_t" | "uint64_t" => Some(&[
+				"unsigned char",
+				"unsigned short",
+				"unsigned int",
+				"unsigned long",
+				"unsigned long long",
+			]),
+			_ => None,
+		};
+		if let Some(integer_types) = integer_types {
+			// JNI and stdint may use different C types with the same integer ABI
+			// (for example, long and long long on macOS). Check kind, sign and width;
+			// the layout measurements above also verify alignment against Rust.
+			let cases: Vec<String> = integer_types
+				.iter()
+				.map(|ty| format!("{ty}: sizeof({ty}) == sizeof({expected})"))
+				.collect();
+			let cases = cases.join(", ");
+			writeln!(
+				self.signatures,
+				"_Static_assert(_Generic(({name})0, {cases}, default: 0), \"{name}\");"
+			)
+			.expect("write integer type assertion");
+		} else {
+			// Compare parameter types, allowing C array typedefs such as va_list to decay.
+			self.signature(
+				&name.to_string(),
+				&format!("(void (*)({name}))0"),
+				&format!("void (*)({expected})"),
+			);
+		}
 	}
 
 	fn record<'a>(&mut self, name: &Ident, fields: impl Iterator<Item = &'a Field>) {

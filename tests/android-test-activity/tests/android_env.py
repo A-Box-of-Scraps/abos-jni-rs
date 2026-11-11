@@ -61,11 +61,13 @@ def sdk_root(explicit=None):
     if configured_root:
         return Path(configured_root).expanduser().resolve()
     if platform.system() == "Windows":
-        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        base = Path(local_app_data) if local_app_data else Path.home() / "AppData/Local"
     elif platform.system() == "Darwin":
         base = Path.home() / "Library/Application Support"
     else:
-        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
+        data_home = os.environ.get("XDG_DATA_HOME")
+        base = Path(data_home) if data_home else Path.home() / ".local/share"
     return (base / "abos/android-sdk").resolve()
 
 
