@@ -1,4 +1,6 @@
-use crate::internal::{discovery::parse_version, output::parse_classes, prepared::quote_source};
+use crate::internal::{
+	command::validate_classpath, discovery::parse_version, output::parse_classes, prepared::quote_source,
+};
 use std::path::{Path, PathBuf};
 
 #[test]
@@ -69,5 +71,31 @@ fn rejects_release_on_legacy_jdk_before_creating_output() -> crate::Result<()> {
 	};
 	assert!(matches!(command(&compiler), Err(crate::Error::Unsupported(_))));
 	assert!(!output.exists());
+	Ok(())
+}
+
+#[test]
+fn rejects_java_classpath_separators_on_both_platforms() {
+	for (separator, entry) in [(b';', "invalid;entry"), (b':', "invalid:entry")] {
+		let paths: [PathBuf; 1] = [PathBuf::from(entry)];
+		assert!(matches!(
+			validate_classpath(&paths, separator),
+			Err(crate::Error::InvalidClasspath(_))
+		));
+	}
+}
+
+#[test]
+fn preserves_drive_letters_spaces_and_other_platforms_separators() -> crate::Result<()> {
+	let windows: [PathBuf; 2] = [
+		PathBuf::from(r"C:\dependencies with spaces"),
+		PathBuf::from(r"D:\library.jar"),
+	];
+	validate_classpath(&windows, b';')?;
+	let unix: [PathBuf; 2] = [
+		PathBuf::from("/dependencies;with;semicolons"),
+		PathBuf::from("/with spaces/library.jar"),
+	];
+	validate_classpath(&unix, b':')?;
 	Ok(())
 }

@@ -79,7 +79,7 @@ class MiseConfigTests(unittest.TestCase):
         self.assertEqual(
             tasks["test:workspace"]["run"],
             [
-                "cargo test --locked --workspace --all-features -q",
+                "cargo test --locked --workspace --all-features --no-fail-fast -q",
                 tasks["test:abos-jni"]["run"],
                 tasks["test:abos-jni-sys:jvm"]["run"],
             ],

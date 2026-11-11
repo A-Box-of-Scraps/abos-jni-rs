@@ -427,7 +427,7 @@ run = "python -B -m unittest discover --start-directory scripts/tests --quiet"
 
 [tasks."test:workspace"]
 run = [
-  "cargo test --locked --workspace --all-features -q",
+  "cargo test --locked --workspace --all-features --no-fail-fast -q",
   "cargo test --locked --package abos-jni -q",
   "cargo test --locked --package abos-jni-sys --test invocation -q -- --ignored",
 ]

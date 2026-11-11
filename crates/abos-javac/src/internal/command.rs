@@ -1,6 +1,6 @@
 use super::{config::Config, prepared::Prepared};
 use crate::{Error, Result};
-use std::{env, ffi::OsString, fs, process::Command};
+use std::{env, ffi::OsString, fs, path::PathBuf, process::Command};
 
 pub fn command(compiler: &Prepared) -> Result<Command> {
 	if compiler.sources.is_empty() {
@@ -24,6 +24,7 @@ pub fn command(compiler: &Prepared) -> Result<Command> {
 		.arg("-s")
 		.arg(&compiler.output_src_dir);
 	if !config.classpath.is_empty() {
+		validate_classpath(&config.classpath, if cfg!(windows) { b';' } else { b':' })?;
 		let classpath: OsString =
 			env::join_paths(&config.classpath).map_err(|error| Error::InvalidClasspath(error.to_string()))?;
 		command.arg("-classpath").arg(classpath);
@@ -63,4 +64,18 @@ pub fn command(compiler: &Prepared) -> Result<Command> {
 	fs::create_dir_all(&compiler.output_dir)?;
 	fs::create_dir_all(&compiler.output_src_dir)?;
 	Ok(command)
+}
+
+pub fn validate_classpath(paths: &[PathBuf], separator: u8) -> Result<()> {
+	// Windows PATH quoting does not make a Java classpath separator part of a filename.
+	if paths
+		.iter()
+		.any(|path| path.as_os_str().as_encoded_bytes().contains(&separator))
+	{
+		return Err(Error::InvalidClasspath(format!(
+			"entry contains separator '{}'",
+			char::from(separator)
+		)));
+	}
+	Ok(())
 }
