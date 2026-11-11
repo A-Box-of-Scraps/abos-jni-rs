@@ -44,7 +44,7 @@ fn event_and_capability_introduction_versions_are_independent() {
 		sys::jvmti_event_version(sys::JVMTI_EVENT_VIRTUAL_THREAD_END),
 		Some(sys::JVMTI_VERSION_21)
 	);
-	for event in [0, 49, 72, 77, 78, 79, 85, 89, u32::MAX] {
+	for event in [0, 49, 72, 77, 78, 79, 85, 89, sys::jvmtiEvent::MAX] {
 		assert_eq!(sys::jvmti_event_version(event), None);
 	}
 	let mut caps: sys::jvmtiCapabilities = sys::jvmtiCapabilities::default();

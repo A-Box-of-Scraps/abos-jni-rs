@@ -64,7 +64,7 @@ fn mixed_records_decode_frames_and_copy_nested_storage() {
 			message: [65; 50],
 		};
 		dummy.header.next = &raw mut inline.header;
-		let mut unknown: sys::jvmtiCompiledMethodLoadRecordHeader = header(u32::MAX);
+		let mut unknown: sys::jvmtiCompiledMethodLoadRecordHeader = header(sys::jvmtiCMLRKind::MAX);
 		unknown.next = &raw mut dummy.header;
 		// A recognized kind with an unsupported version has only a header. Reading
 		// its inline payload would be out of bounds, so version checks must come first.
@@ -75,7 +75,7 @@ fn mixed_records_decode_frames_and_copy_nested_storage() {
 		unsafe { copy((&raw const unsupported).cast()) }.expect("valid records")
 	};
 	assert!(matches!(owned[0], OwnedCompiledMethodRecord::UnsupportedVersion(h) if h.major == 2));
-	assert!(matches!(owned[1], OwnedCompiledMethodRecord::Unknown(h) if h.kind == u32::MAX));
+	assert!(matches!(owned[1], OwnedCompiledMethodRecord::Unknown(h) if h.kind == sys::jvmtiCMLRKind::MAX));
 	assert_eq!(owned[2], OwnedCompiledMethodRecord::Dummy([65; 50]));
 	let OwnedCompiledMethodRecord::Inline(pcs) = &owned[3] else {
 		panic!("inline record")
