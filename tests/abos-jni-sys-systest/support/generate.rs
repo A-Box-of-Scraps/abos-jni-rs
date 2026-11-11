@@ -111,14 +111,18 @@ impl Probe {
 			// JNI and stdint may use different C types with the same integer ABI
 			// (for example, long and long long on macOS). Check kind, sign and width;
 			// the layout measurements above also verify alignment against Rust.
+			// MSVC can leave enums unmatched by integer _Generic cases. Try integer
+			// promotion as a fallback, but check the original width so narrow
+			// unsigned integers cannot pass as signed int after promotion.
 			let cases: Vec<String> = integer_types
 				.iter()
 				.map(|ty| format!("{ty}: sizeof({ty}) == sizeof({expected})"))
 				.collect();
 			let cases = cases.join(", ");
+			let promoted = format!("_Generic(+({name})0, {cases}, default: 0)");
 			writeln!(
 				self.signatures,
-				"_Static_assert(_Generic(({name})0, {cases}, default: 0), \"{name}\");"
+				"_Static_assert(sizeof({name}) == sizeof({expected}) && _Generic(({name})0, {cases}, default: {promoted}), \"{name}\");"
 			)
 			.expect("write integer type assertion");
 		} else {
