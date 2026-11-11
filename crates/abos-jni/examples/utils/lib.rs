@@ -46,15 +46,15 @@ fn java_target_dir() -> PathBuf {
 	let Some(output) = option_env!("OUT_DIR") else {
 		return PathBuf::from("target");
 	};
-	let mut path: PathBuf = PathBuf::from(output);
-	while path.file_name().is_some_and(|name| name != "target") {
-		path.pop();
-	}
-	assert!(
-		Path::exists(&path.join("CACHEDIR.TAG")),
-		"Couldn't find 'target' directory from OUT_DIR"
-	);
-	path
+	target_dir_from_output(Path::new(output))
+}
+
+pub fn target_dir_from_output(output: &Path) -> PathBuf {
+	// Restored target directories need not contain Cargo's optional CACHEDIR.TAG.
+	output
+		.ancestors()
+		.find(|path| path.file_name().is_some_and(|name| name == "target"))
+		.map_or_else(|| PathBuf::from("target"), Path::to_path_buf)
 }
 
 fn jni_macros_dir() -> PathBuf {

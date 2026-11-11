@@ -26,17 +26,23 @@ fn check_alias(label: &str, declaration: &str, rust_type: &str, should_compile: 
 		format!("#include <stdint.h>\n{declaration}\n{}", probe.signatures),
 	)
 	.expect("write C fixture");
-	let output = Command::new(compiler)
+	// These fixtures only check declarations and must never invoke a linker.
+	let syntax_only = if cfg!(target_env = "msvc") {
+		"/Zs"
+	} else {
+		"-fsyntax-only"
+	};
+	let mut command = Command::new(compiler);
+	command
 		.args(flags)
-		.arg("-c")
+		.arg(syntax_only)
 		.arg(&source)
-		.current_dir(&directory)
-		.output()
-		.expect("run native C compiler");
+		.current_dir(&directory);
+	let output = command.output().expect("run native C compiler");
 	assert_eq!(
 		output.status.success(),
 		should_compile,
-		"{label}:\n{}\n{}",
+		"{label} ({command:?}):\n{}\n{}",
 		String::from_utf8_lossy(&output.stdout),
 		String::from_utf8_lossy(&output.stderr)
 	);

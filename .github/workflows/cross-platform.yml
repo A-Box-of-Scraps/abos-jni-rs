@@ -75,6 +75,7 @@ jobs:
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     env:
       CARGO_TERM_COLOR: always
+      MISE_HTTP_TIMEOUT: 300s
       CARGO_INCREMENTAL: '0'
       MISE_DISABLE_TOOLS: >-
         android-cli,cargo:cargo-ndk,cargo:cargo-fuzz${{ matrix.target != 'linux-amd64' && ',cargo:jscpd,dprint,maven,ruff' || '' }}
@@ -155,6 +156,8 @@ jobs:
           CI_SHA: ${{ needs.prepare.outputs.sha }}
 
       - name: Upload debug artifacts
+        id: upload
+        continue-on-error: true
         if: ${{ !cancelled() && steps.archive.outputs.path != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -163,3 +166,14 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
+
+      - name: Retry debug artifact upload
+        if: ${{ !cancelled() && steps.upload.outcome == 'failure' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: debug-${{ matrix.target }}-${{ needs.prepare.outputs.sha }}-attempt-${{ github.run_attempt }}
+          path: ${{ steps.archive.outputs.path }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+          overwrite: true
