@@ -1,3 +1,6 @@
+#[path = "include_paths.rs"]
+mod include_paths;
+
 use std::{env, ffi::OsStr, fs, path::Path};
 
 pub fn write(build: &cc::Build, out: &Path) {
@@ -13,7 +16,7 @@ pub fn write(build: &cc::Build, out: &Path) {
 			.map(|(_, value)| value.to_owned())
 			.or_else(|| env::var_os("INCLUDE"));
 		if let Some(include) = include {
-			arguments.extend(env::split_paths(&include).map(|path| format!("/I{}", path.display())));
+			arguments.extend(include_paths::arguments(&include));
 		}
 	}
 	arguments.push("-c".to_owned());
