@@ -1,6 +1,7 @@
 # abos-jni
 
 [![github](https://img.shields.io/badge/github-A--Box--of--Scraps/abos--jni-EE7C37?style=for-the-badge&labelColor=555555&logo=github)](https://github.com/A-Box-of-Scraps/abos-jni-rs/tree/HEAD/crates/abos-jni)
+[![crates.io](https://img.shields.io/crates/v/abos-jni?style=for-the-badge&labelColor=555555&color=00599C)](https://crates.io/crates/abos-jni)
 [![MIT license](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge&labelColor=555555)](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/A-Box-of-Scraps/abos-jni-rs/cross-platform.yml?style=for-the-badge&labelColor=555555&label=CI)](https://github.com/A-Box-of-Scraps/abos-jni-rs/actions/workflows/cross-platform.yml)
 
