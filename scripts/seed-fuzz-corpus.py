@@ -18,12 +18,16 @@ SEED_SOURCES = {
 
 
 def seed_corpus(fuzz_root):
+    seeds_by_source = {}
     for target, source in SEED_SOURCES.items():
         corpus = fuzz_root / "corpus" / target
         corpus.mkdir(parents=True, exist_ok=True)
-        for seed in sorted((fuzz_root / "seeds" / source).iterdir()):
-            if not seed.is_file():
-                continue
+        # Several targets share a source; scan it only once per invocation.
+        if source not in seeds_by_source:
+            seeds_by_source[source] = sorted(
+                seed for seed in (fuzz_root / "seeds" / source).iterdir() if seed.is_file()
+            )
+        for seed in seeds_by_source[source]:
             destination = corpus / seed.name
             try:
                 # Exclusive creation also protects files created by another seed run.

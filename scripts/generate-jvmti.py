@@ -104,9 +104,10 @@ def generate(header):
         if alias:
             constants.append(f"pub type {alias} = {'i32' if signed else 'u32'};")
         for entry in body.split(","):
-            if not entry.strip():
+            entry = entry.strip()
+            if not entry:
                 continue
-            name, value = entry.strip().split("=", 1)
+            name, value = entry.split("=", 1)
             constants.append(f"pub const {name.strip()}: {ty} = {value.strip()};")
     callbacks = []
     for result, name, args in re.findall(r"typedef\s+(\w+)\s*\(JNICALL\s*\*(\w+)\)\s*\((.*?)\)\s*;", source, re.DOTALL):
@@ -116,17 +117,19 @@ def generate(header):
         raise ValueError(f"Unexpected header shape: {len(declarations)} records, {len(callbacks)} callbacks")
     table = declarations.pop("jvmtiInterface_1_")
     event_table = declarations.pop("jvmtiEventCallbacks")
-    fields = re.findall(r"unsigned int\s+(\w*)\s*:\s*(\d+)\s*;", capabilities[1])
-    if sum(int(width) for _, width in fields) != 128:
+    fields = [
+        (name, int(width)) for name, width in re.findall(r"unsigned int\s+(\w*)\s*:\s*(\d+)\s*;", capabilities[1])
+    ]
+    if sum(width for _, width in fields) != 128:
         raise ValueError("Unexpected capabilities layout")
     methods = []
     bit = 0
     for name, width in fields:
         if name:
-            if width != "1":
+            if width != 1:
                 raise ValueError("Only boolean capabilities are supported")
             methods.append(f"capability!({name}, set_{name}, {bit});")
-        bit += int(width)
+        bit += width
     return {
         "api/constants.rs": (
             "#![allow(clippy::unreadable_literal, clippy::identity_op, clippy::erasing_op, "
@@ -147,9 +150,10 @@ def main():
     parser.add_argument("--header", type=Path, default=Path(os.environ.get("JAVA_HOME", "")) / "include/jvmti.h")
     parser.add_argument("--check", action="store_true", help="Check that the committed declarations are up to date")
     args = parser.parse_args()
+    rustfmt = ["rustfmt", "--edition", "2024", "--config-path", str(ROOT / "rustfmt.toml")]
     for name, content in generate(args.header.read_text()).items():
         formatted = subprocess.run(
-            ["rustfmt", "--edition", "2024", "--config-path", str(ROOT / "rustfmt.toml")],
+            rustfmt,
             input=NOTICE + content + "\n",
             text=True,
             capture_output=True,

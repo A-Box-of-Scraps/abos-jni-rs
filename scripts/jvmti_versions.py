@@ -7,6 +7,10 @@ JVMTI 19 changed semantics but did not add table slots, events, or capability bi
 
 import re
 
+BASELINE_VERSION = "1.2"
+CURRENT_VERSION = "25"
+FIELD_PATTERN = re.compile(r"pub (\w+):")
+
 FUNCTIONS = {
     "GetAllModules": "9",
     "GetNamedModule": "9",
@@ -35,11 +39,11 @@ CAPABILITIES = {
 
 
 def constant(version):
-    return "JVMTI_VERSION" if version == "25" else "JVMTI_VERSION_" + version.replace(".", "_")
+    return "JVMTI_VERSION" if version == CURRENT_VERSION else "JVMTI_VERSION_" + version.replace(".", "_")
 
 
 def annotate_table(table):
-    names = re.findall(r"pub (\w+):", table)
+    names = FIELD_PATTERN.findall(table)
     reserved = {name for name in names if name.startswith("reserved")}
     if (
         len(names) != 156
@@ -47,15 +51,19 @@ def annotate_table(table):
         or not FUNCTIONS.keys() <= set(names)
     ):
         raise ValueError("Update JVMTI function-version metadata for this table")
-    for name in names:
-        if name in FUNCTIONS or name.startswith("reserved"):
+
+    def annotate(match):
+        name = match[1]
+        if name in FUNCTIONS or name in reserved:
             version = FUNCTIONS.get(name, "reserved")
-            table = table.replace(f"pub {name}:", f'#[jvmti_added("{version}")]\npub {name}:')
-    return "#[abos_jni_sys_macros::jvmti_versions]\n" + table
+            return f'#[jvmti_added("{version}")]\n{match[0]}'
+        return match[0]
+
+    return "#[abos_jni_sys_macros::jvmti_versions]\n" + FIELD_PATTERN.sub(annotate, table)
 
 
 def compatibility(event_table, capability_names):
-    events = re.findall(r"pub (\w+):", event_table)
+    events = FIELD_PATTERN.findall(event_table)
     if (
         len(capability_names) != 45
         or len(events) != 39
@@ -74,7 +82,11 @@ def compatibility(event_table, capability_names):
             "pub const fn size_for_version(version: jint) -> Option<usize> {",
         ]
     )
-    for version, last in [("21", "VirtualThreadEnd"), ("11", "SampledObjectAlloc"), ("1.2", "VMObjectAlloc")]:
+    for version, last in [
+        ("21", "VirtualThreadEnd"),
+        ("11", "SampledObjectAlloc"),
+        (BASELINE_VERSION, "VMObjectAlloc"),
+    ]:
         lines.append(
             f"if version >= {constant(version)} {{ return Some(core::mem::offset_of!(Self, {last}) + core::mem::size_of::<jvmtiEvent{last}>()); }}"
         )
@@ -94,7 +106,7 @@ def compatibility(event_table, capability_names):
         if not name.startswith("reserved"):
             words = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name)
             words = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", words)
-            groups.setdefault(EVENTS.get(name, "1.2"), []).append("JVMTI_EVENT_" + words.upper())
+            groups.setdefault(EVENTS.get(name, BASELINE_VERSION), []).append("JVMTI_EVENT_" + words.upper())
     for version, names in groups.items():
         lines.append(f"{' | '.join(names)} => Some({constant(version)}),")
     lines.extend(["_ => None,", "}", "}"])
@@ -112,5 +124,5 @@ def required_version(entries, accessor):
     ]
     for version in sorted(groups, reverse=True):
         lines.append(f"if {' || '.join(groups[version])} {{ return {constant(str(version))}; }}")
-    lines.extend(["JVMTI_VERSION_1_2", "}"])
+    lines.extend([constant(BASELINE_VERSION), "}"])
     return lines

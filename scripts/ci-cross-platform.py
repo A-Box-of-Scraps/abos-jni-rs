@@ -10,6 +10,12 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+WORKFLOW_FILE = "cross-platform.yml"
+WORKFLOW_PATH = f".github/workflows/{WORKFLOW_FILE}"
+RUNS_PER_PAGE = 100
+DEBUG_DIRECTORY = "target/debug"
+INCREMENTAL_DIRECTORY = f"{DEBUG_DIRECTORY}/incremental"
+
 RUNNERS = {
     "linux-amd64": "ubuntu-24.04",
     "linux-arm64": "ubuntu-24.04-arm",
@@ -35,26 +41,24 @@ def previous_scheduled_sha():
     api = os.environ.get("GITHUB_API_URL", "https://api.github.com")
     repository = os.environ["GITHUB_REPOSITORY"]
     run_number = int(os.environ["GITHUB_RUN_NUMBER"])
+    url = f"{api}/repos/{repository}/actions/workflows/{WORKFLOW_FILE}/runs"
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    branch = os.environ["GITHUB_REF_NAME"]
     page = 1
     while True:
-        query = urllib.parse.urlencode(
-            {"event": "schedule", "branch": os.environ["GITHUB_REF_NAME"], "per_page": 100, "page": page}
-        )
-        request = urllib.request.Request(
-            f"{api}/repos/{repository}/actions/workflows/cross-platform.yml/runs?{query}",
-            headers={
-                "Accept": "application/vnd.github+json",
-                "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-        )
+        query = urllib.parse.urlencode({"event": "schedule", "branch": branch, "per_page": RUNS_PER_PAGE, "page": page})
+        request = urllib.request.Request(f"{url}?{query}", headers=headers)
         # API errors must fail visibly, not masquerade as an empty run history.
         with urllib.request.urlopen(request, timeout=30) as response:
             runs = json.load(response)["workflow_runs"]
         for run in runs:
             if run["run_number"] < run_number:
                 return run["head_sha"]
-        if len(runs) < 100:
+        if len(runs) < RUNS_PER_PAGE:
             return None
         page += 1
 
@@ -64,7 +68,7 @@ def should_run(sha):
     if os.environ["GITHUB_EVENT_NAME"] != "schedule" or int(os.environ.get("GITHUB_RUN_ATTEMPT", "1")) > 1:
         return True
     workflow = os.environ["GITHUB_WORKFLOW_REF"].split("@", 1)[0]
-    if workflow != f"{os.environ['GITHUB_REPOSITORY']}/.github/workflows/cross-platform.yml":
+    if workflow != f"{os.environ['GITHUB_REPOSITORY']}/{WORKFLOW_PATH}":
         return True
     return previous_scheduled_sha() != sha
 
@@ -90,7 +94,7 @@ def archive_debug(root, destination, target, sha):
         raise ValueError(f"Unknown artifact target: {target!r}")
     if len(sha) != 40 or any(character not in "0123456789abcdef" for character in sha):
         raise ValueError(f"Invalid commit SHA: {sha!r}")
-    debug = root / "target" / "debug"
+    debug = root / DEBUG_DIRECTORY
     if not debug.is_dir():
         return None
     destination.mkdir(parents=True, exist_ok=True)
@@ -100,12 +104,12 @@ def archive_debug(root, destination, target, sha):
         info = tarfile.TarInfo("build-info.json")
         info.size = len(metadata)
         bundle.addfile(info, io.BytesIO(metadata))
-        bundle.add(debug, arcname="target/debug", filter=exclude_incremental)
+        bundle.add(debug, arcname=DEBUG_DIRECTORY, filter=exclude_incremental)
     return archive
 
 
 def exclude_incremental(member):
-    if member.name == "target/debug/incremental" or member.name.startswith("target/debug/incremental/"):
+    if member.name == INCREMENTAL_DIRECTORY or member.name.startswith(INCREMENTAL_DIRECTORY + "/"):
         return None
     return member
 
@@ -127,7 +131,7 @@ def main():
             write_output("path", str(archive))
             print(f"Archived debug outputs: {archive}")
         else:
-            print("No target/debug directory to archive.")
+            print(f"No {DEBUG_DIRECTORY} directory to archive.")
 
 
 if __name__ == "__main__":

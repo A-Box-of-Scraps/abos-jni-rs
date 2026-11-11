@@ -10,6 +10,12 @@ import sys
 import tempfile
 from pathlib import Path
 
+DEFAULT_PACKAGE = "abos-jni"
+DEFAULT_FILTERS = {
+    "abos-jni": "^jni_call_static_abs_method_safe$",
+    "abos-jvmti": "^jvmti/phase/wrapper$",
+}
+
 
 def positive_seconds(value):
     seconds = int(value)
@@ -36,14 +42,15 @@ def backend_options(env):
             if shutil.which("xcrun") is None:
                 raise RuntimeError("xctrace requires Xcode and its selected developer tools (xcrun).")
             result = subprocess.run(["xcrun", "--find", "xctrace"], capture_output=True, text=True, check=False)
-            if result.returncode or not result.stdout.strip():
+            xctrace = result.stdout.strip()
+            if result.returncode or not xctrace:
                 raise RuntimeError("xctrace was not found. Install Xcode and select its developer directory.")
-            env["XCTRACE"] = result.stdout.strip()
+            env["XCTRACE"] = xctrace
         return []
     raise RuntimeError(f"Unsupported profiling platform: {system}. Supported platforms: Linux, Windows, macOS.")
 
 
-def profile(root, benchmark_filter, seconds, package="abos-jni"):
+def profile(root, benchmark_filter, seconds, package=DEFAULT_PACKAGE):
     env = os.environ.copy()
     env["CARGO_PROFILE_BENCH_DEBUG"] = "true"
     options = backend_options(env)
@@ -77,7 +84,7 @@ def profile(root, benchmark_filter, seconds, package="abos-jni"):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--package", choices=["abos-jni", "abos-jvmti"], default="abos-jni")
+    parser.add_argument("--package", choices=DEFAULT_FILTERS, default=DEFAULT_PACKAGE)
     parser.add_argument(
         "filter",
         nargs="?",
@@ -92,7 +99,7 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
     if args.filter is None:
-        args.filter = "^jvmti/phase/wrapper$" if args.package == "abos-jvmti" else "^jni_call_static_abs_method_safe$"
+        args.filter = DEFAULT_FILTERS[args.package]
     root = Path(__file__).resolve().parent.parent
     try:
         return profile(root, args.filter, args.seconds, package=args.package)

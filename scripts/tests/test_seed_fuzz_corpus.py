@@ -56,6 +56,15 @@ class SeedFuzzCorpusTests(unittest.TestCase):
                 self.assertEqual(list(corpus.iterdir()), [corpus / "seed with spaces"])
                 self.assertEqual((corpus / "seed with spaces").read_bytes(), self.sources[source])
 
+    def test_shared_sources_are_scanned_once_per_run(self):
+        iterdir = Path.iterdir
+        with patch.object(Path, "iterdir", autospec=True, side_effect=iterdir) as scan:
+            seeder.seed_corpus(self.fuzz)
+        self.assertCountEqual(
+            [call.args[0] for call in scan.call_args_list],
+            [self.fuzz / "seeds" / source for source in self.sources],
+        )
+
     def test_repeated_runs_preserve_existing_files_and_add_new_seeds(self):
         seeder.seed_corpus(self.fuzz)
         corpus = self.fuzz / "corpus" / "jni_mutf8"

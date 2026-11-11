@@ -54,6 +54,22 @@ class JvmtiGeneratorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "function-version metadata"):
             GENERATOR.jvmti_versions.annotate_table(table.replace("reserved105", "NewFunction"))
 
+    def test_table_annotation_preserves_other_fields_and_text(self):
+        versions = GENERATOR.jvmti_versions
+        reserved = ["reserved1", "reserved105", "reserved113", "reserved117", "reserved141"]
+        names = [*reserved, *versions.FUNCTIONS]
+        names.extend(f"Baseline{index}" for index in range(156 - len(names)))
+        fields = [f"pub {name}: jint," for name in names]
+        table = "pub struct Table {\n" + "\n".join(fields) + "\n}"
+        expected_fields = []
+        for name, field in zip(names, fields):
+            if name in reserved or name in versions.FUNCTIONS:
+                version = versions.FUNCTIONS.get(name, "reserved")
+                field = f'#[jvmti_added("{version}")]\n{field}'
+            expected_fields.append(field)
+        expected = "#[abos_jni_sys_macros::jvmti_versions]\npub struct Table {\n" + "\n".join(expected_fields) + "\n}"
+        self.assertEqual(versions.annotate_table(table), expected)
+
     def test_capability_versions_are_checked_newest_first(self):
         output = "\n".join(GENERATOR.jvmti_versions.required_version(GENERATOR.jvmti_versions.CAPABILITIES, "()"))
         self.assertLess(output.index("JVMTI_VERSION_21"), output.index("JVMTI_VERSION_11"))

@@ -10,6 +10,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+CLONE_DEPTH = "5"
+
 REVISIONS = {
     "javac": "8dcbc94481d5bdf003895957dd010486e95bf20e",
     "jbindgen": "b331bcc2c24ff03fbd64cc5ee833c9bc21aa30c1",
@@ -53,7 +55,7 @@ def clone_reference(name, reference_root):
                 "clone",
                 "--quiet",
                 "--depth",
-                "5",
+                CLONE_DEPTH,
                 "--single-branch",
                 "--no-tags",
                 f"https://github.com/jni-rs/{name}.git",
@@ -69,7 +71,7 @@ def clone_reference(name, reference_root):
         )
         # The pinned commit may be outside the default branch's shallow history.
         if available.returncode != 0:
-            subprocess.run([*git, "fetch", "--quiet", "--depth", "5", "origin", revision], check=True)
+            subprocess.run([*git, "fetch", "--quiet", "--depth", CLONE_DEPTH, "origin", revision], check=True)
         subprocess.run([*git, "reset", "--quiet", "--hard", revision], check=True)
         destination = reference_root / name
         remove_path(destination)
