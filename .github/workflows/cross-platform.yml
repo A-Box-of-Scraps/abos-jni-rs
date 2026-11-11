@@ -95,26 +95,16 @@ jobs:
       - name: Set up mise
         uses: jdx/mise-action@v5
         with:
-          install: false
+          # The action only registers cache saving when tool installation is enabled.
+          install: true
+          install_args: ${{ runner.os == 'Linux' && 'mold' || '' }}
           add_shims_to_path: false
           cache_save_post: true
           cache_key_prefix: mise-cross-platform-v1-${{ matrix.target }}
 
-      - name: Install mold on Linux
-        if: runner.os == 'Linux'
-        run: mise install mold
-        env:
-          MISE_GITHUB_TOKEN: ${{ github.token }}
-
       - name: Install remaining tools on Linux
         if: runner.os == 'Linux'
         run: mise exec mold -- mise install
-        env:
-          MISE_GITHUB_TOKEN: ${{ github.token }}
-
-      - name: Install tools on Windows and macOS
-        if: runner.os != 'Linux'
-        run: mise install
         env:
           MISE_GITHUB_TOKEN: ${{ github.token }}
 
