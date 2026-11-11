@@ -167,7 +167,20 @@ fn follows_linked_libraries_without_looping() -> io::Result<()> {
 	Ok(())
 }
 
-#[cfg(unix)]
+#[test]
+fn supports_unicode_java_home() -> io::Result<()> {
+	let root: TempDir = tempfile::tempdir()?;
+	let home: PathBuf = root.path().join("JDK 日本語");
+	let expected: PathBuf = create_library(&home, "lib/server")?;
+	assert_eq!(
+		locate_with(Some(home.into_os_string()), || panic!("unexpected fallback"))?,
+		expected
+	);
+	Ok(())
+}
+
+// macOS filesystems reject invalid UTF-8 filenames before discovery can run.
+#[cfg(all(unix, not(target_os = "macos")))]
 #[test]
 fn supports_non_utf8_java_home() -> io::Result<()> {
 	use std::os::unix::ffi::OsStringExt;

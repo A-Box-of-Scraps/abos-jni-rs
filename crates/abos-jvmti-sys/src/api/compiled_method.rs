@@ -13,6 +13,9 @@ pub const JVMTI_CMLR_MAJOR_VERSION: jint = 1;
 pub const JVMTI_CMLR_MINOR_VERSION: jint = 0;
 
 // An integer, rather than a Rust enum, preserves unknown implementation kinds.
+#[cfg(target_env = "msvc")]
+pub type jvmtiCMLRKind = i32;
+#[cfg(not(target_env = "msvc"))]
 pub type jvmtiCMLRKind = u32;
 pub const JVMTI_CMLR_DUMMY: jvmtiCMLRKind = 1;
 pub const JVMTI_CMLR_INLINE_INFO: jvmtiCMLRKind = 2;

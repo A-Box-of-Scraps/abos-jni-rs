@@ -89,6 +89,15 @@ def records(source):
     return result
 
 
+def enum_alias(name, signed):
+    if signed:
+        return f"pub type {name} = i32;"
+    # MSVC uses signed int for these enums; GCC and Clang's non-MSVC ABI use unsigned int.
+    return (
+        f'#[cfg(target_env = "msvc")]\npub type {name} = i32;\n#[cfg(not(target_env = "msvc"))]\npub type {name} = u32;'
+    )
+
+
 def generate(header):
     source = re.sub(r"/\*.*?\*/", "", header, flags=re.DOTALL)
     version = re.search(r"JVMTI_VERSION\s*=\s*0x30000000\s*\+\s*\((\d+)\s*\*", source)
@@ -102,7 +111,7 @@ def generate(header):
         signed = bool(re.search(r"=\s*-", body))
         ty = alias or "jint"
         if alias:
-            constants.append(f"pub type {alias} = {'i32' if signed else 'u32'};")
+            constants.append(enum_alias(alias, signed))
         for entry in body.split(","):
             entry = entry.strip()
             if not entry:

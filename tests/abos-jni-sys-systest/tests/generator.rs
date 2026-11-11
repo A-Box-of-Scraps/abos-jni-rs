@@ -171,3 +171,40 @@ fn fixed_arrays_check_element_type_and_length_before_decay() {
 	);
 	assert!(probe.expected.to_string().contains("lengthof(Example.message)"));
 }
+
+#[test]
+fn conditional_aliases_check_only_the_native_abi() {
+	let mut probe = generate::Probe::default();
+	probe.add_source(
+		r#"
+        #[cfg(target_env = "msvc")]
+        pub type Kind = i32;
+        #[cfg(not(target_env = "msvc"))]
+        pub type Kind = u32;
+    "#,
+	);
+	assert_eq!(probe.signatures.lines().count(), 1);
+	assert_eq!(probe.measurements.lines().count(), 2);
+	let expected = if cfg!(target_env = "msvc") {
+		"sizeof(int32_t)"
+	} else {
+		"sizeof(uint32_t)"
+	};
+	assert!(probe.signatures.contains(expected));
+}
+
+#[test]
+#[should_panic(expected = "Unsupported alias cfg predicate")]
+fn unsupported_alias_cfg_is_not_silently_ignored() {
+	let mut probe = generate::Probe::default();
+	probe.add_source("#[cfg(unknown)] pub type Kind = u32;");
+}
+
+#[test]
+fn reserved_callback_preserves_the_headers_unprototyped_parameter_list() {
+	let mut probe = generate::Probe::default();
+	probe.add_source(r#"pub type jvmtiReservedCallback = Option<unsafe extern "system" fn() -> jint>;"#);
+	assert!(probe.signatures.contains("void (*)(jint (JNICALL *)()): 1"));
+	probe.add_source(r#"pub type OtherCallback = Option<unsafe extern "system" fn() -> jint>;"#);
+	assert!(probe.signatures.contains("void (*)(jint (JNICALL *)(void)): 1"));
+}

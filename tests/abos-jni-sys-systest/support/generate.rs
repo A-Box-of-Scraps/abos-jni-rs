@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, fmt::Write};
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{Field, FnArg, ForeignItem, Ident, Item, ItemStruct, LitStr, Type, TypeFnPtr};
+use syn::{Field, FnArg, ForeignItem, Ident, Item, ItemStruct, LitStr, Meta, Type, TypeFnPtr};
 
 use crate::types::{c_name, c_type, function_type};
 
@@ -83,9 +83,19 @@ impl Probe {
 	}
 
 	fn alias(&mut self, alias: &syn::ItemType) {
+		for attribute in alias.attrs.iter().filter(|attr| attr.path().is_ident("cfg")) {
+			if !enabled_on_host(&attribute.parse_args().expect("alias cfg predicate")) {
+				return;
+			}
+		}
 		let name = &alias.ident;
 		self.layout(name, &name.to_string());
-		let expected = c_type(&alias.ty);
+		let mut expected = c_type(&alias.ty);
+		if name == "jvmtiReservedCallback" {
+			// The JDK declares this reserved callback with (), not (void).
+			// MSVC distinguishes these forms in _Generic checks.
+			expected = expected.replace("(void)", "()");
+		}
 		let integer_types: Option<&[&str]> = match expected.as_str() {
 			"int8_t" | "int16_t" | "int32_t" | "int64_t" => Some(&["signed char", "short", "int", "long", "long long"]),
 			"uint8_t" | "uint16_t" | "uint32_t" | "uint64_t" => Some(&[
@@ -251,5 +261,25 @@ fn suffix(version: Version) -> String {
 		RESERVED => "reserved".to_owned(),
 		(major, 0) => major.to_string(),
 		(major, minor) => format!("{major}_{minor}"),
+	}
+}
+
+// ABI probes require HOST == TARGET, so the build script's ABI is the probed ABI.
+fn enabled_on_host(predicate: &Meta) -> bool {
+	match predicate {
+		Meta::NameValue(value) if value.path.is_ident("target_env") => {
+			let syn::Expr::Lit(expression) = &value.value else {
+				panic!("target_env must be a string literal")
+			};
+			let syn::Lit::Str(value) = &expression.lit else {
+				panic!("target_env must be a string literal")
+			};
+			assert_eq!(value.value(), "msvc", "Unsupported target_env predicate");
+			cfg!(target_env = "msvc")
+		}
+		Meta::List(list) if list.path.is_ident("not") => {
+			!enabled_on_host(&list.parse_args().expect("one cfg predicate"))
+		}
+		_ => panic!("Unsupported alias cfg predicate: {}", quote!(#predicate)),
 	}
 }

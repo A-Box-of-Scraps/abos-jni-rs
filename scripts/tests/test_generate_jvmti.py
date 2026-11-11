@@ -30,6 +30,13 @@ class JvmtiGeneratorTests(unittest.TestCase):
             'Option<unsafe extern "C" fn(*mut jvmtiEnv, ...) -> jvmtiError>',
         )
 
+    def test_enum_aliases_follow_the_target_c_abi_not_the_generator_host(self):
+        self.assertEqual(
+            GENERATOR.enum_alias("Kind", False),
+            '#[cfg(target_env = "msvc")]\npub type Kind = i32;\n#[cfg(not(target_env = "msvc"))]\npub type Kind = u32;',
+        )
+        self.assertEqual(GENERATOR.enum_alias("SignedKind", True), "pub type SignedKind = i32;")
+
     def test_records_preserve_reserved_slots_and_aliases(self):
         records = dict(GENERATOR.records("typedef struct table { void* reserved; jint (JNICALL *Get)(void); } alias;"))
         self.assertIn("pub reserved: *mut c_void,", records["table"])
