@@ -76,7 +76,6 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       CARGO_INCREMENTAL: '0'
-      # Native checks/builds do not use Android SDK or fuzzing tools.
       MISE_DISABLE_TOOLS: android-cli,cargo:cargo-ndk,cargo:cargo-fuzz
     steps:
       - name: Check out repository
@@ -97,13 +96,10 @@ jobs:
         uses: jdx/mise-action@v5
         with:
           install: false
-          # Checks use mise run; keep artifact helpers on setup-python's interpreter
-          # even when tool installation fails.
           add_shims_to_path: false
           cache_save_post: true
           cache_key_prefix: mise-cross-platform-v1-${{ matrix.target }}
 
-      # Cargo-based tool installation uses the linker from .cargo/config.toml.
       - name: Install mold on Linux
         if: runner.os == 'Linux'
         run: mise install mold
