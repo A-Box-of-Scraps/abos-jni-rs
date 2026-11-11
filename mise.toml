@@ -72,6 +72,10 @@ depends = ["fmt:check", "lint", "check:duplicates", "test"]
 [tasks."check:android-env"]
 run = "python tests/android-test-activity/tests/android_env.py check"
 
+[tasks."check:ci"]
+description = "Run native Rust checks and tests without platform-independent quality checks"
+depends = ["lint:rust", "test"]
+
 [tasks."check:duplicates"]
 run = "jscpd --fail-on-empty --no-tips"
 
@@ -208,19 +212,7 @@ run = "python scripts/generate-jvmti.py"
 run = "python scripts/generate-compile-commands.py"
 
 [tasks.lint]
-depends = [
-  "lint:abos-jbindgen:runtime",
-  "lint:abos-jni-sys:systest",
-  "lint:abos-jvmti-sys:systest",
-  "lint:docs",
-  "lint:python",
-  "lint:tools:windows-bindings",
-]
-env = { DYLINT_RUSTFLAGS = "-D warnings" }
-run = [
-  "cargo clippy --locked --workspace --all-targets --all-features -q -- -D warnings",
-  "cargo dylint --all --workspace --fail-on-no-libraries -q -- --all-targets --all-features --locked -q",
-]
+depends = ["lint:python", "lint:rust"]
 
 [tasks."lint:abos-jbindgen:runtime"]
 run = "cargo clippy --manifest-path crates/abos-jbindgen/tests/runtime/Cargo.toml --all-targets --all-features --locked -q -- -D warnings"
@@ -244,6 +236,20 @@ run = "ruff check ."
 
 [tasks."lint:python:fix"]
 run = "ruff check --fix ."
+
+[tasks."lint:rust"]
+depends = [
+  "lint:abos-jbindgen:runtime",
+  "lint:abos-jni-sys:systest",
+  "lint:abos-jvmti-sys:systest",
+  "lint:docs",
+  "lint:tools:windows-bindings",
+]
+env = { DYLINT_RUSTFLAGS = "-D warnings" }
+run = [
+  "cargo clippy --locked --workspace --all-targets --all-features -q -- -D warnings",
+  "cargo dylint --all --workspace --fail-on-no-libraries -q -- --all-targets --all-features --locked -q",
+]
 
 [tasks."lint:tools:windows-bindings"]
 run = "cargo clippy --manifest-path tools/abos-jni-gen-windows-bindings/Cargo.toml --all-targets --all-features --locked -q -- -D warnings"

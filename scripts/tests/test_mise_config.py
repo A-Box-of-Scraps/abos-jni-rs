@@ -14,10 +14,41 @@ class MiseConfigTests(unittest.TestCase):
                 keys = list(config[section])
                 self.assertEqual(keys, sorted(keys))
 
-    def test_check_is_the_single_non_mutating_validation_gate(self):
+    def test_check_remains_the_full_validation_gate(self):
         tasks = tomllib.loads(CONFIG.read_text())["tasks"]
-        self.assertNotIn("check:ci", tasks)
         self.assertCountEqual(tasks["check"]["depends"], ["fmt:check", "lint", "check:duplicates", "test"])
+
+    def test_ci_checks_keep_native_validation_without_platform_independent_tasks(self):
+        tasks = tomllib.loads(CONFIG.read_text())["tasks"]
+        self.assertCountEqual(tasks["check:ci"]["depends"], ["lint:rust", "test"])
+        self.assertCountEqual(tasks["lint"]["depends"], ["lint:python", "lint:rust"])
+        self.assertCountEqual(
+            tasks["lint:rust"]["depends"],
+            [
+                "lint:abos-jbindgen:runtime",
+                "lint:abos-jni-sys:systest",
+                "lint:abos-jvmti-sys:systest",
+                "lint:docs",
+                "lint:tools:windows-bindings",
+            ],
+        )
+        self.assertEqual(
+            tasks["lint:rust"]["run"],
+            [
+                "cargo clippy --locked --workspace --all-targets --all-features -q -- -D warnings",
+                "cargo dylint --all --workspace --fail-on-no-libraries -q -- --all-targets --all-features --locked -q",
+            ],
+        )
+        self.assertEqual(tasks["lint:rust"]["env"], {"DYLINT_RUSTFLAGS": "-D warnings"})
+        dependencies = set()
+        pending = ["check:ci"]
+        while pending:
+            name = pending.pop()
+            if name not in dependencies:
+                dependencies.add(name)
+                pending.extend(tasks[name].get("depends", []))
+        self.assertTrue(set(tasks["test"]["depends"]).issubset(dependencies))
+        self.assertTrue({"fmt:check", "check:duplicates", "lint:python"}.isdisjoint(dependencies))
 
     def test_global_tests_include_examples_and_standalone_suites(self):
         tasks = tomllib.loads(CONFIG.read_text())["tasks"]
@@ -154,7 +185,8 @@ class MiseConfigTests(unittest.TestCase):
     def test_lint_includes_the_standalone_windows_bindings_generator(self):
         tasks = tomllib.loads(CONFIG.read_text())["tasks"]
         name = "lint:tools:windows-bindings"
-        self.assertIn(name, tasks["lint"]["depends"])
+        self.assertIn("lint:rust", tasks["lint"]["depends"])
+        self.assertIn(name, tasks["lint:rust"]["depends"])
         args = shlex.split(tasks[name]["run"])
         self.assertEqual(args[:2], ["cargo", "clippy"])
         self.assertEqual(args[args.index("--manifest-path") + 1], "tools/abos-jni-gen-windows-bindings/Cargo.toml")
