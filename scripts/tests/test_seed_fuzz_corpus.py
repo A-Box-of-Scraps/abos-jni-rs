@@ -1,6 +1,7 @@
 import contextlib
 import importlib.util
 import io
+import ntpath
 import shutil
 import subprocess
 import sys
@@ -36,6 +37,12 @@ class SeedFuzzCorpusTests(unittest.TestCase):
             directory = self.fuzz / "seeds" / source
             directory.mkdir(parents=True)
             (directory / "seed with spaces").write_bytes(content)
+
+    def test_committed_seed_paths_are_valid_on_windows(self):
+        seeds = SCRIPT.parent.parent / "fuzz" / "seeds"
+        for path in seeds.rglob("*"):
+            with self.subTest(path=path.relative_to(seeds)):
+                self.assertFalse(ntpath.isreserved(str(path.relative_to(seeds))))
 
     def test_copies_binary_seeds_to_all_targets(self):
         seeder.seed_corpus(self.fuzz)

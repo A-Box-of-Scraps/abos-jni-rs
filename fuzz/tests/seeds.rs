@@ -144,7 +144,7 @@ fn modified_utf8_seeds() {
 			let decoded = validated.to_str();
 			assert_eq!(JNIString::new(&decoded).to_str(), decoded);
 			match name.as_str() {
-				"nul" => assert_eq!(decoded, "before\0after"),
+				"embedded-nul" => assert_eq!(decoded, "before\0after"),
 				"surrogate-pair" => assert_eq!(decoded, "𐐀"),
 				"unpaired-surrogate" => assert!(decoded.contains('\u{fffd}')),
 				_ => assert_eq!(decoded, "java/lang/String"),
