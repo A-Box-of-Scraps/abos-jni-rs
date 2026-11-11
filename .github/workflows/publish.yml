@@ -1,0 +1,85 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  cross-platform:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/cross-platform.yml
+    with:
+      target: all
+      ref: ${{ github.sha }}
+
+  publish:
+    needs: cross-platform
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      CARGO_TERM_COLOR: always
+      MISE_HTTP_TIMEOUT: 300s
+    steps:
+      - name: Check out tested commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.cross-platform.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare release journal
+        run: echo "RELEASE_STATE_DIR=$RUNNER_TEMP/publish-state" >> "$GITHUB_ENV"
+
+      - name: Set up Python for publishing
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Install pinned Rust toolchain
+        run: rustup show
+
+      - name: Set up Java and mold
+        uses: jdx/mise-action@v5
+        with:
+          install_args: java mold
+          add_shims_to_path: false
+
+      - name: Publish new crate versions
+        id: publish
+        run: mise exec java mold -- python scripts/ci-publish.py publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      # A later crate failing must not discard earlier successful releases.
+      - name: Commit published changelogs
+        if: ${{ always() && steps.publish.outcome != 'skipped' }}
+        run: |
+          python scripts/ci-publish.py commit
+          if test -s "$RELEASE_STATE_DIR/release.patch"; then
+            git -c credential.helper= \
+              -c 'credential.helper=!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; }; f' \
+              push origin "HEAD:refs/heads/$DEFAULT_BRANCH"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+
+      - name: Preserve release recovery data
+        if: ${{ always() && steps.publish.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: publish-state-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/publish-state
+          if-no-files-found: ignore
+          retention-days: 30
