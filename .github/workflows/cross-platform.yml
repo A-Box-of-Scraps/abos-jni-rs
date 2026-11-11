@@ -121,6 +121,23 @@ jobs:
             crates/abos-jbindgen/tests/runtime
             tools/abos-jni-gen-windows-bindings
 
+      - name: Cache Maven dependencies
+        if: matrix.target == 'linux-amd64'
+        uses: actions/cache@v6
+        with:
+          path: ~/.m2/repository
+          key: maven-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pom.xml', 'mise.toml') }}
+          restore-keys: maven-v1-${{ runner.os }}-${{ runner.arch }}-
+
+      # Save Dylint's nested build outputs before rust-cache performs its cleanup.
+      - name: Cache Dylint builds
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.dylint_drivers
+            target/dylint/libraries
+          key: dylint-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.toml', 'mise.toml', 'rust-toolchain.toml', '.cargo/config.toml') }}
+
       - name: Run checks
         id: checks
         run: mise run ${{ matrix.target == 'linux-amd64' && 'check' || 'check:ci' }}
