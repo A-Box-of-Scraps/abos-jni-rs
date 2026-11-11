@@ -9,7 +9,7 @@ use std::{
 	process::{Command, Output},
 };
 use tempfile::TempDir;
-use zip::{ZipWriter, write::SimpleFileOptions};
+use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -77,7 +77,8 @@ fn sdk(failure: Failure) -> TestResult<TempDir> {
 	for class in compiled {
 		let entry: &Path = class.strip_prefix(&classes)?;
 		if entry.starts_with("io") {
-			bytecode.start_file(entry.to_string_lossy(), SimpleFileOptions::default())?;
+			// JAR entry names use forward slashes on every host platform.
+			bytecode.start_file(entry.to_string_lossy().replace('\\', "/"), SimpleFileOptions::default())?;
 			bytecode.write_all(&fs::read(class)?)?;
 		}
 	}
@@ -120,6 +121,18 @@ fn assert_failure(command: &mut Command, failure: Failure) -> TestResult<Output>
 		}
 	}
 	Ok(output)
+}
+
+#[test]
+fn sdk_annotations_use_portable_jar_entry_names() -> TestResult {
+	let root: TempDir = sdk(Failure::Generation)?;
+	let mut archive: ZipArchive<fs::File> =
+		ZipArchive::new(fs::File::open(root.path().join("platforms/android-35/android.jar"))?)?;
+	for name in archive.file_names() {
+		assert!(!name?.contains('\\'));
+	}
+	assert!(archive.by_name("io/github/jni_rs/jbindgen/RustPrimitive.class")?.size() > 0);
+	Ok(())
 }
 
 #[test]

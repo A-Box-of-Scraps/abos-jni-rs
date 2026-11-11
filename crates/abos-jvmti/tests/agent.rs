@@ -67,6 +67,7 @@ fn agents_receive_vm_thread_and_compiled_method_events() -> Result<(), Box<dyn s
 	for home in homes {
 		run_agent(&home, &agent, directory.path(), false)?;
 		run_agent(&home, &agent, directory.path(), true)?;
+		let markers: [&str; 3] = ["JVMTI_COMPILED", "JVMTI_INLINE", "PROFILE_TARGET_OK"];
 		let output: String = run_java(
 			&home,
 			&profiler,
@@ -74,8 +75,9 @@ fn agents_receive_vm_thread_and_compiled_method_events() -> Result<(), Box<dyn s
 			"=hotspot",
 			"ProfileTarget",
 			&["-Xbatch", "-XX:-TieredCompilation", "-XX:CompileThreshold=100"],
+			&markers,
 		)?;
-		for marker in ["JVMTI_COMPILED", "JVMTI_INLINE", "PROFILE_TARGET_OK"] {
+		for marker in markers {
 			assert!(output.contains(marker), "missing {marker}:\n{output}");
 		}
 		assert!(!output.contains("JVMTI_PROFILE_ERROR"), "{output}");
@@ -90,6 +92,7 @@ fn run_java(
 	options: &str,
 	class: &str,
 	vm_args: &[&str],
+	completion_markers: &[&str],
 ) -> Result<String, Box<dyn std::error::Error>> {
 	let java: PathBuf = home.join("bin").join(format!("java{}", std::env::consts::EXE_SUFFIX));
 	let directory: tempfile::TempDir = tempfile::tempdir()?;
@@ -106,6 +109,11 @@ fn run_java(
 		.arg(class)
 		.args((options == "=features").then_some("features"))
 		.current_dir(directory.path())
+		.stdin(if completion_markers.is_empty() {
+			Stdio::null()
+		} else {
+			Stdio::piped()
+		})
 		.stdout(Stdio::from(log.try_clone()?))
 		.stderr(Stdio::from(log))
 		.spawn()?;
@@ -118,6 +126,13 @@ fn run_java(
 			child.kill()?;
 			child.wait()?;
 			panic!("agent exceeded 60 seconds:\n{}", fs::read_to_string(&log_path)?);
+		}
+		if child.stdin.is_some() {
+			let output: String = fs::read_to_string(&log_path)?;
+			if completion_markers.iter().all(|marker| output.contains(marker)) {
+				// Release the target only after the asynchronous profiling callbacks arrive.
+				drop(child.stdin.take());
+			}
 		}
 		thread::sleep(Duration::from_millis(20));
 	};
@@ -133,6 +148,7 @@ fn run_agent(home: &Path, agent: &Path, classes: &Path, features: bool) -> Resul
 		classes,
 		if features { "=features" } else { "" },
 		"AgentSmoke",
+		&[],
 		&[],
 	)?;
 	for marker in [
