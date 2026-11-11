@@ -78,8 +78,13 @@ pub fn compile_fixtures(sources: &Path, cache: &Path) -> FixtureResult<PathBuf> 
 		.open(cache.join(format!("{key}.lock")))?;
 	// A process-local OnceLock cannot coordinate rusty-fork children or other test binaries.
 	lock.lock()?;
-	if !output.is_dir() {
+	// Rust cache cleanup can leave directories after deleting their class files.
+	if !output.join(".complete").is_file() {
+		if output.is_dir() {
+			fs::remove_dir_all(&output)?;
+		}
 		compiler.try_compile()?;
+		fs::write(classes.join(".complete"), [])?;
 		// Publish only complete output. Failed compilations leave no reusable cache entry.
 		fs::rename(&classes, &output)?;
 	}

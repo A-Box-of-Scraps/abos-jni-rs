@@ -66,6 +66,23 @@ fn reuses_classes_and_invalidates_changed_added_and_removed_sources() -> TestRes
 }
 
 #[test]
+fn rebuilds_cache_directories_left_without_class_files() -> TestResult {
+	let root: tempfile::TempDir = tempfile::tempdir()?;
+	let sources: PathBuf = source_root(root.path())?;
+	let cache: PathBuf = root.path().join("cache");
+	let output: PathBuf = fixtures::compile_fixtures(&sources, &cache)?;
+	// Rust cache cleanup removes non-Cargo files but can leave their directories.
+	for entry in fs::read_dir(&output)? {
+		fs::remove_file(entry?.path())?;
+	}
+	assert_eq!(fixtures::compile_fixtures(&sources, &cache)?, output);
+	for name in ["Example", "Example$Inner"] {
+		assert!(fs::read(output.join(format!("{name}.class")))?.starts_with(&[0xca, 0xfe, 0xba, 0xbe]));
+	}
+	Ok(())
+}
+
+#[test]
 fn failed_compilation_does_not_publish_classes() -> TestResult {
 	let root: tempfile::TempDir = tempfile::tempdir()?;
 	let sources: PathBuf = source_root(root.path())?;

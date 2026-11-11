@@ -17,7 +17,7 @@ class EnvironmentTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="android tests ")
         self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
+        self.root = Path(temporary.name).resolve()
         self.sdk = self.root / "SDK with spaces"
 
     def installed(self):
@@ -142,6 +142,7 @@ class EnvironmentTests(unittest.TestCase):
             environment.check_environment(self.sdk)
         with (
             patch.object(environment, "check_host"),
+            patch.object(environment, "supported_host", return_value="linux-x86_64"),
             patch.object(environment, "require_file"),
             patch.object(tools, "PROJECT", self.root),
             patch.object(tools, "execute", return_value=""),
@@ -151,6 +152,7 @@ class EnvironmentTests(unittest.TestCase):
         (self.root / "local.properties").write_text("sdk.dir=C\\:\\other\n", encoding="utf-8")
         with (
             patch.object(environment, "check_host"),
+            patch.object(environment, "supported_host", return_value="linux-x86_64"),
             patch.object(environment, "require_file"),
             patch.object(tools, "PROJECT", self.root),
             patch.object(tools, "execute", return_value=environment.DEFAULT_TARGET),
