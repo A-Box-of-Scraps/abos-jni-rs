@@ -1,3 +1,8 @@
+#![expect(
+	non_camel_case_types,
+	reason = "Generated bindings preserve Android's Build.VERSION_CODES class name."
+)]
+
 include!(concat!(env!("OUT_DIR"), "/os_build_bindings.rs"));
 
 use crate::test_error::{TestResult, require};

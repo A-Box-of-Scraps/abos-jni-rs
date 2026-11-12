@@ -25,3 +25,28 @@ fn generates_bundle_from_installed_api_35() -> Result<(), Box<dyn std::error::Er
 	assert_eq!(String::from_utf8(output.stdout)?.trim_end(), code.trim_end());
 	Ok(())
 }
+
+#[test]
+#[ignore = "requires ANDROID_HOME or ANDROID_SDK_ROOT with platforms;android-35"]
+fn skips_hidden_time_utils_constructor_from_sdk_stubs() -> Result<(), Box<dyn std::error::Error>> {
+	let sdk: AndroidSdk = AndroidSdk::from_env(35)?;
+	let builder: Builder = Builder::new()
+		.input_jar(sdk.get_android_jar()?)
+		.patterns(["android.util.TimeUtils"]);
+	let unfiltered: String = builder.clone().generate()?.to_string();
+	assert!(unfiltered.contains("fn new()"), "{unfiltered}");
+	let filtered: String = builder
+		.skip_signature("Landroid/util/TimeUtils;-><init>()V")
+		.generate()?
+		.to_string();
+	assert!(!filtered.contains("constructors {"), "{filtered}");
+	assert!(
+		filtered.contains("pub TimeUtils => \"android.util.TimeUtils\""),
+		"{filtered}"
+	);
+	assert!(
+		filtered.contains("static fn get_time_zone_database_version() -> JString"),
+		"{filtered}"
+	);
+	Ok(())
+}

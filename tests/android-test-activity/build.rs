@@ -28,7 +28,8 @@ fn main() -> BuildResult {
 			"util_time_utils",
 			&["android.util.TimeUtils", "android.icu.util.TimeZone"][..],
 			None,
-			None,
+			// The SDK stub includes this package-private constructor, but ART blocks JNI access.
+			Some("Landroid/util/TimeUtils;-><init>()V"),
 		),
 		(
 			"SDK_OS_BUILD",
@@ -71,8 +72,8 @@ fn main() -> BuildResult {
 		}
 		let mut builder = Builder::new()
 			.root_path(format!("crate::sdk::{module}"))
-			// The platform JAR already defines the public SDK surface. Runtime tests
-			// do not need source documentation or hidden-API filtering.
+			// These tests use the platform JAR without source documentation. Explicit
+			// skips exclude stub members that Android blocks at runtime.
 			.input_jar(&android_jar)
 			.patterns(patterns.iter().copied())
 			.generate_native_interfaces(false);
