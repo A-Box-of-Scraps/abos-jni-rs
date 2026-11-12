@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-SCRIPT = Path(__file__).resolve().parents[2] / "profile-abos-jni.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "profile_abos_jni.py"
 SPEC = importlib.util.spec_from_file_location("profile_abos_jni", SCRIPT)
 if SPEC is None or SPEC.loader is None:
     raise ImportError(f"Unable to load script: {SCRIPT}")

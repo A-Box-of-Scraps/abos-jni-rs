@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-SCRIPT = Path(__file__).resolve().parents[2] / "generate-jvmti.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "generate_jvmti.py"
 SPEC = importlib.util.spec_from_file_location("generate_jvmti", SCRIPT)
 if SPEC is None or SPEC.loader is None:
     raise ImportError(f"Cannot load generator module from {SCRIPT}")

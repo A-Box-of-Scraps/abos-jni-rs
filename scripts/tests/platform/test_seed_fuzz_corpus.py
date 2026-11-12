@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-SCRIPT = Path(__file__).resolve().parents[2] / "seed-fuzz-corpus.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "seed_fuzz_corpus.py"
 SPEC = importlib.util.spec_from_file_location("seed_fuzz_corpus", SCRIPT)
 if SPEC is None or SPEC.loader is None:
     raise ImportError(f"Unable to load script: {SCRIPT}")
@@ -123,7 +123,7 @@ class SeedFuzzCorpusTests(unittest.TestCase):
 
     def test_mise_task_uses_script_from_project_root(self):
         config = tomllib.loads((SCRIPT.parent.parent / "mise.toml").read_text())
-        self.assertEqual(config["tasks"]["fuzz:seed"], {"run": "python scripts/seed-fuzz-corpus.py"})
+        self.assertEqual(config["tasks"]["fuzz:seed"], {"run": "python scripts/seed_fuzz_corpus.py"})
 
 
 if __name__ == "__main__":

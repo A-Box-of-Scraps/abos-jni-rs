@@ -12,7 +12,7 @@ SOURCE_FILE = "source"
 ORIGINAL_CONTENT = "original"
 REPLACEMENT_CONTENT = "replacement"
 
-SCRIPT = Path(__file__).resolve().parents[2] / "clone-reference.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "clone_reference.py"
 SPEC = importlib.util.spec_from_file_location("clone_reference", SCRIPT)
 if SPEC is None or SPEC.loader is None:
     raise ImportError(f"Unable to load script: {SCRIPT}")
@@ -71,7 +71,7 @@ class CloneReferenceTests(unittest.TestCase):
         self.assertEqual(list(tasks), sorted(tasks))
         self.assertEqual(tasks["clone:all"]["depends"], [f"clone:{name}" for name in sorted(clone.REVISIONS)])
         for name in clone.REVISIONS:
-            self.assertEqual(tasks[f"clone:{name}"]["run"], f"python scripts/clone-reference.py {name}")
+            self.assertEqual(tasks[f"clone:{name}"]["run"], f"python scripts/clone_reference.py {name}")
 
     def test_fetches_revision_outside_shallow_history(self):
         self.missing_revision = True

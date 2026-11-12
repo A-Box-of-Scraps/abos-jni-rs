@@ -3,6 +3,7 @@ import json
 import tempfile
 import unittest
 import urllib.error
+from email.message import Message
 from pathlib import Path
 from unittest.mock import call, patch
 
@@ -76,7 +77,9 @@ class DownloadsTests(unittest.TestCase):
     def test_api_failure_does_not_produce_a_partial_badge(self):
         self.add_crate("a", "crate-a")
         self.add_crate("b", "crate-b")
-        error = self.enterContext(urllib.error.HTTPError("https://crates.io", 503, "Unavailable", None, io.BytesIO()))
+        error = self.enterContext(
+            urllib.error.HTTPError("https://crates.io", 503, "Unavailable", Message(), io.BytesIO())
+        )
         with (
             patch.object(ci, "fetch_downloads", side_effect=[10, error]),
             patch.object(ci.time, "sleep"),

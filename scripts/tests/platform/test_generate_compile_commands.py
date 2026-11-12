@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-SCRIPT = Path(__file__).resolve().parents[2] / "generate-compile-commands.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "generate_compile_commands.py"
 SPEC = importlib.util.spec_from_file_location("generate_compile_commands", SCRIPT)
 if SPEC is None or SPEC.loader is None:
     raise ImportError(f"Unable to load script: {SCRIPT}")
@@ -112,7 +112,7 @@ class CompileCommandsTests(unittest.TestCase):
     def test_generation_task_and_ignore_rule(self):
         root = SCRIPT.parent.parent
         tasks = tomllib.loads((root / "mise.toml").read_text())["tasks"]
-        self.assertEqual(tasks["generate:compile-commands"]["run"], "python scripts/generate-compile-commands.py")
+        self.assertEqual(tasks["generate:compile-commands"]["run"], "python scripts/generate_compile_commands.py")
         self.assertIn("/compile_commands.json", (root / ".gitignore").read_text().splitlines())
 
 

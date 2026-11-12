@@ -3,6 +3,7 @@ import sys
 import tomllib
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 CONFIG = Path(__file__).resolve().parents[3] / "mise.toml"
 
@@ -24,11 +25,20 @@ def discovered_modules(suite):
         if isinstance(test, unittest.TestSuite):
             modules.update(discovered_modules(test))
         else:
-            modules.add(Path(sys.modules[type(test).__module__].__file__).resolve())
+            module = sys.modules[type(test).__module__]
+            filename = module.__file__
+            if filename is None:
+                raise AssertionError(f"Test module {module.__name__} has no source file")
+            modules.add(Path(filename).resolve())
     return modules
 
 
 class MiseConfigTests(unittest.TestCase):
+    def test_python_script_filenames_use_snake_case(self):
+        for path in (CONFIG.parent / "scripts").rglob("*.py"):
+            with self.subTest(path=path.relative_to(CONFIG.parent)):
+                self.assertRegex(path.name, r"^[a-z_][a-z0-9_]*\.py$")
+
     def test_tools_and_tasks_are_alphabetically_ordered(self):
         config = tomllib.loads(CONFIG.read_text())
         for section in ["tools", "tasks"]:
@@ -83,6 +93,13 @@ class MiseConfigTests(unittest.TestCase):
         dependencies = task_dependencies(tasks, "test")
         self.assertTrue(set(tasks["test:platform"]["depends"]).issubset(dependencies))
         self.assertIn("test:shared", dependencies)
+
+    def test_discovered_modules_reject_modules_without_source_files(self):
+        with (
+            patch.object(sys.modules[__name__], "__file__", None),
+            self.assertRaisesRegex(AssertionError, "has no source file"),
+        ):
+            discovered_modules(unittest.TestSuite([self]))
 
     def test_script_groups_discover_every_module_exactly_once(self):
         tasks = tomllib.loads(CONFIG.read_text())["tasks"]
@@ -162,7 +179,7 @@ class MiseConfigTests(unittest.TestCase):
                     tasks[f"bench:abos-jni{suffix}"]["run"].replace("abos-jni", "abos-jvmti"),
                 )
         self.assertEqual(tasks["profile:abos-jvmti"]["tools"], tasks["profile:abos-jni"]["tools"])
-        self.assertEqual(tasks["profile:abos-jvmti"]["run"], "python scripts/profile-abos-jni.py --package abos-jvmti")
+        self.assertEqual(tasks["profile:abos-jvmti"]["run"], "python scripts/profile_abos_jni.py --package abos-jvmti")
 
     def test_jvmti_lifecycle_benchmark_is_opt_in_and_requires_a_jvm(self):
         tasks = tomllib.loads(CONFIG.read_text())["tasks"]

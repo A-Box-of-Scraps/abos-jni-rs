@@ -205,7 +205,7 @@ cargo test --locked --manifest-path tests/abos-jvmti-sys-systest/Cargo.toml
 The checked-in declarations can also be checked against the local JDK 25 header with Python and `rustfmt` installed:
 
 ```sh
-python scripts/generate-jvmti.py --check
+python scripts/generate_jvmti.py --check
 ```
 
 See the
