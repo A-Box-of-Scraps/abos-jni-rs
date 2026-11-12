@@ -8,7 +8,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 USER_AGENT = "abos-jni-rs-downloads (https://github.com/A-Box-of-Scraps/abos-jni-rs)"
 
 

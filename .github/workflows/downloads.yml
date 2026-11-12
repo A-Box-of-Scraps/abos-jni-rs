@@ -30,7 +30,7 @@ jobs:
           python-version: '3.13'
 
       - name: Generate combined downloads badge
-        run: python scripts/ci-downloads.py "$RUNNER_TEMP/downloads-site/downloads.json"
+        run: python -m scripts.ci.downloads "$RUNNER_TEMP/downloads-site/downloads.json"
 
       - name: Upload Pages site
         uses: actions/upload-pages-artifact@v5

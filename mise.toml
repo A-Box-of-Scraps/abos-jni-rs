@@ -72,12 +72,12 @@ depends = ["fmt:check", "lint", "check:duplicates", "test"]
 [tasks."check:android-env"]
 run = "python tests/android-test-activity/tests/android_env.py check"
 
-[tasks."check:ci"]
-description = "Run native Rust checks and tests without platform-independent quality checks"
-depends = ["lint:rust", "test"]
-
 [tasks."check:duplicates"]
 run = "jscpd --fail-on-empty --no-tips"
+
+[tasks."check:platform"]
+description = "Run Rust checks and platform-sensitive tests without shared validation"
+depends = ["lint:rust", "test:platform"]
 
 [tasks."clone:all"]
 depends = ["clone:javac", "clone:jbindgen", "clone:jni-rs", "clone:jni-sys"]
@@ -326,14 +326,8 @@ dir = "fuzz"
 run = ["mise install cargo:cargo-fuzz", "rustup show active-toolchain"]
 
 [tasks.test]
-depends = [
-  "test:abos-jni:examples",
-  "test:abos-jni-sys:systest",
-  "test:abos-jvmti-sys:systest",
-  "test:android-runner",
-  "test:scripts",
-  "test:workspace",
-]
+description = "Run the complete default test suite, including platform-sensitive and shared tests"
+depends = ["test:platform", "test:shared"]
 
 [tasks."test:abos-cafebabe"]
 run = "cargo test --locked --package abos-cafebabe -q"
@@ -422,8 +416,33 @@ run = "python tests/android-test-activity/tests/run.py --suite smoke"
 dir = "fuzz"
 run = "cargo test --locked --test seeds -q"
 
+[tasks."test:platform"]
+description = "Run tests that exercise native code, JVM integration, and host tooling on each platform"
+depends = [
+  "test:abos-jni:examples",
+  "test:abos-jni-sys:systest",
+  "test:abos-jvmti-sys:systest",
+  "test:android-runner",
+  "test:scripts:platform",
+  "test:workspace",
+]
+
 [tasks."test:scripts"]
-run = "python -B -m unittest discover --start-directory scripts/tests --quiet"
+depends = ["test:scripts:platform", "test:shared"]
+
+[tasks."test:scripts:platform"]
+description = "Test host-dependent filesystem, process, and archive behavior on each platform"
+run = [
+  "python -B -m unittest discover --start-directory scripts/ci/tests/platform --top-level-directory . --quiet",
+  "python -B -m unittest discover --start-directory scripts/tests/platform --top-level-directory . --quiet",
+]
+
+[tasks."test:shared"]
+description = "Test configuration, generator fixtures, and Linux-only CI orchestration once per matrix"
+run = [
+  "python -B -m unittest discover --start-directory scripts/ci/tests/shared --top-level-directory . --quiet",
+  "python -B -m unittest discover --start-directory scripts/tests/shared --top-level-directory . --quiet",
+]
 
 [tasks."test:workspace"]
 run = [

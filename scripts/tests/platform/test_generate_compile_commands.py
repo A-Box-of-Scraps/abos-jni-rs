@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-SCRIPT = Path(__file__).resolve().parents[1] / "generate-compile-commands.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "generate-compile-commands.py"
 SPEC = importlib.util.spec_from_file_location("generate_compile_commands", SCRIPT)
 if SPEC is None or SPEC.loader is None:
     raise ImportError(f"Unable to load script: {SCRIPT}")

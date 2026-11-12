@@ -1,4 +1,3 @@
-import importlib.util
 import io
 import json
 import tempfile
@@ -7,12 +6,7 @@ import urllib.error
 from pathlib import Path
 from unittest.mock import call, patch
 
-SCRIPT = Path(__file__).resolve().parents[1] / "ci-downloads.py"
-SPEC = importlib.util.spec_from_file_location("ci_downloads", SCRIPT)
-if SPEC is None or SPEC.loader is None:
-    raise ImportError(f"Unable to load script: {SCRIPT}")
-ci = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(ci)
+from scripts.ci import downloads as ci
 
 
 class DownloadsTests(unittest.TestCase):
@@ -20,6 +14,10 @@ class DownloadsTests(unittest.TestCase):
         self.directory = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.crates = self.directory / "crates"
         self.crates.mkdir()
+
+    def test_repository_root_is_independent_of_the_package_location(self):
+        self.assertEqual(ci.ROOT, Path(__file__).resolve().parents[4])
+        self.assertTrue((ci.ROOT / "Cargo.toml").is_file())
 
     def add_crate(self, directory, name, extra=""):
         crate = self.crates / directory
@@ -90,7 +88,7 @@ class DownloadsTests(unittest.TestCase):
         output = self.directory / "site" / "downloads.json"
         badge = {"schemaVersion": 1, "label": "downloads", "message": "0"}
         with (
-            patch("sys.argv", [str(SCRIPT), str(output)]),
+            patch("sys.argv", [ci.__file__, str(output)]),
             patch.object(ci, "build_badge", return_value=badge) as build,
         ):
             ci.main()
@@ -101,7 +99,7 @@ class DownloadsTests(unittest.TestCase):
         output = self.directory / "downloads.json"
         output.write_text("previous badge", encoding="utf-8")
         with (
-            patch("sys.argv", [str(SCRIPT), str(output)]),
+            patch("sys.argv", [ci.__file__, str(output)]),
             patch.object(ci, "build_badge", side_effect=ValueError("API failure")),
             self.assertRaises(ValueError),
         ):

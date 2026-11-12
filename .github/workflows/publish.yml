@@ -57,7 +57,7 @@ jobs:
 
       - name: Publish new crate versions
         id: publish
-        run: mise exec java mold -- python scripts/ci-publish.py publish
+        run: mise exec java mold -- python -m scripts.ci.publish publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
@@ -65,7 +65,7 @@ jobs:
       - name: Commit published changelogs
         if: ${{ always() && steps.publish.outcome != 'skipped' }}
         run: |
-          python scripts/ci-publish.py commit
+          python -m scripts.ci.publish commit
           if test -s "$RELEASE_STATE_DIR/release.patch"; then
             git -c credential.helper= \
               -c 'credential.helper=!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; }; f' \

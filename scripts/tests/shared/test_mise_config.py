@@ -1,9 +1,31 @@
 import shlex
+import sys
 import tomllib
 import unittest
 from pathlib import Path
 
-CONFIG = Path(__file__).resolve().parents[2] / "mise.toml"
+CONFIG = Path(__file__).resolve().parents[3] / "mise.toml"
+
+
+def task_dependencies(tasks, root):
+    dependencies = set()
+    pending = [root]
+    while pending:
+        name = pending.pop()
+        if name not in dependencies:
+            dependencies.add(name)
+            pending.extend(tasks[name].get("depends", []))
+    return dependencies
+
+
+def discovered_modules(suite):
+    modules = set()
+    for test in suite:
+        if isinstance(test, unittest.TestSuite):
+            modules.update(discovered_modules(test))
+        else:
+            modules.add(Path(sys.modules[type(test).__module__].__file__).resolve())
+    return modules
 
 
 class MiseConfigTests(unittest.TestCase):
@@ -18,9 +40,9 @@ class MiseConfigTests(unittest.TestCase):
         tasks = tomllib.loads(CONFIG.read_text())["tasks"]
         self.assertCountEqual(tasks["check"]["depends"], ["fmt:check", "lint", "check:duplicates", "test"])
 
-    def test_ci_checks_keep_native_validation_without_platform_independent_tasks(self):
+    def test_platform_checks_keep_native_validation_without_shared_tasks(self):
         tasks = tomllib.loads(CONFIG.read_text())["tasks"]
-        self.assertCountEqual(tasks["check:ci"]["depends"], ["lint:rust", "test"])
+        self.assertCountEqual(tasks["check:platform"]["depends"], ["lint:rust", "test:platform"])
         self.assertCountEqual(tasks["lint"]["depends"], ["lint:python", "lint:rust"])
         self.assertCountEqual(
             tasks["lint:rust"]["depends"],
@@ -40,28 +62,57 @@ class MiseConfigTests(unittest.TestCase):
             ],
         )
         self.assertEqual(tasks["lint:rust"]["env"], {"DYLINT_RUSTFLAGS": "-D warnings"})
-        dependencies = set()
-        pending = ["check:ci"]
-        while pending:
-            name = pending.pop()
-            if name not in dependencies:
-                dependencies.add(name)
-                pending.extend(tasks[name].get("depends", []))
-        self.assertTrue(set(tasks["test"]["depends"]).issubset(dependencies))
-        self.assertTrue({"fmt:check", "check:duplicates", "lint:python"}.isdisjoint(dependencies))
+        dependencies = task_dependencies(tasks, "check:platform")
+        self.assertTrue(set(tasks["test:platform"]["depends"]).issubset(dependencies))
+        self.assertTrue({"fmt:check", "check:duplicates", "lint:python", "test:shared"}.isdisjoint(dependencies))
 
-    def test_global_tests_include_examples_and_standalone_suites(self):
+    def test_global_tests_include_platform_and_shared_suites(self):
         tasks = tomllib.loads(CONFIG.read_text())["tasks"]
+        self.assertCountEqual(tasks["test"]["depends"], ["test:platform", "test:shared"])
         self.assertCountEqual(
-            tasks["test"]["depends"],
+            tasks["test:platform"]["depends"],
             [
                 "test:abos-jni:examples",
                 "test:abos-jni-sys:systest",
                 "test:abos-jvmti-sys:systest",
                 "test:android-runner",
-                "test:scripts",
+                "test:scripts:platform",
                 "test:workspace",
             ],
+        )
+        dependencies = task_dependencies(tasks, "test")
+        self.assertTrue(set(tasks["test:platform"]["depends"]).issubset(dependencies))
+        self.assertIn("test:shared", dependencies)
+
+    def test_script_groups_discover_every_module_exactly_once(self):
+        tasks = tomllib.loads(CONFIG.read_text())["tasks"]
+        groups = ["test:scripts:platform", "test:shared"]
+        self.assertCountEqual(tasks["test:scripts"]["depends"], groups)
+        modules = []
+        for name in groups:
+            with self.subTest(task=name):
+                self.assertNotIn("dir", tasks[name])
+                group = name.rsplit(":", 1)[1]
+                directories = []
+                for command in tasks[name]["run"]:
+                    args = shlex.split(command)
+                    self.assertEqual(args[:6], ["python", "-B", "-m", "unittest", "discover", "--start-directory"])
+                    self.assertEqual(args[7:], ["--top-level-directory", ".", "--quiet"])
+                    directory = args[6]
+                    directories.append(directory)
+                    loader = unittest.TestLoader()
+                    suite = loader.discover(str(CONFIG.parent / directory), top_level_dir=str(CONFIG.parent))
+                    self.assertEqual(loader.errors, [])
+                    self.assertGreater(suite.countTestCases(), 0)
+                    modules.extend(discovered_modules(suite))
+                self.assertCountEqual(directories, [f"scripts/ci/tests/{group}", f"scripts/tests/{group}"])
+        self.assertCountEqual(modules, list((CONFIG.parent / "scripts").rglob("test_*.py")))
+
+    def test_cross_platform_workflow_runs_shared_checks_only_on_linux_amd64(self):
+        workflow = (CONFIG.parent / ".github/workflows/cross-platform.yml").read_text()
+        self.assertIn(
+            "run: mise run ${{ matrix.target == 'linux-amd64' && 'check' || 'check:platform' }}",
+            workflow,
         )
 
     def test_dylint_uses_all_three_rules_from_a_pinned_git_revision(self):

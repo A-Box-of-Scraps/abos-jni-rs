@@ -1,36 +1,17 @@
-"""Select CI targets, skip unchanged daily runs, and archive debug outputs."""
+"""Select CI targets and skip unchanged successful daily builds."""
 
 import argparse
-import io
 import json
 import os
 import subprocess
-import tarfile
 import urllib.parse
 import urllib.request
-from pathlib import Path
+
+from .common import NATIVE_RUNNERS, TARGETS, write_output
 
 WORKFLOW_FILE = "cross-platform.yml"
 WORKFLOW_PATH = f".github/workflows/{WORKFLOW_FILE}"
 ITEMS_PER_PAGE = 100
-DEBUG_DIRECTORY = "target/debug"
-ANDROID_PROJECT = "tests/android-test-activity"
-ANDROID_DIRECTORIES = (
-    f"{ANDROID_PROJECT}/target/aarch64-linux-android/debug",
-    f"{ANDROID_PROJECT}/target/x86_64-linux-android/debug",
-    f"{ANDROID_PROJECT}/build/test-apks",
-    f"{ANDROID_PROJECT}/build/ci-logs",
-)
-
-NATIVE_RUNNERS = {
-    "linux-amd64": "ubuntu-24.04",
-    "linux-arm64": "ubuntu-24.04-arm",
-    "windows-amd64": "windows-2025",
-    "windows-arm64": "windows-11-arm",
-    "macos-amd64": "macos-15-intel",
-    "macos-arm64": "macos-15",
-}
-TARGETS = (*NATIVE_RUNNERS, "android")
 
 
 def select_matrix(target):
@@ -108,11 +89,6 @@ def should_run(sha):
     return not has_successful_scheduled_build(sha)
 
 
-def write_output(name, value):
-    with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
-        output.write(f"{name}={value}\n")
-
-
 def prepare():
     target = os.environ.get("CI_TARGET", "all")
     matrix = select_matrix(target)
@@ -125,52 +101,10 @@ def prepare():
     print(f"{'Checking' if run else 'Skipping unchanged scheduled commit'} {sha}")
 
 
-def archive_debug(root, destination, target, sha):
-    """Preserve symbols, libraries, tests and permissions, but not incremental caches."""
-    if target not in TARGETS:
-        raise ValueError(f"Unknown artifact target: {target!r}")
-    if len(sha) != 40 or any(character not in "0123456789abcdef" for character in sha):
-        raise ValueError(f"Invalid commit SHA: {sha!r}")
-    directories = ANDROID_DIRECTORIES if target == "android" else (DEBUG_DIRECTORY,)
-    available = [directory for directory in directories if (root / directory).is_dir()]
-    if not available:
-        return None
-    destination.mkdir(parents=True, exist_ok=True)
-    archive = destination / f"debug-{target}-{sha}.tar.gz"
-    metadata = json.dumps({"target": target, "sha": sha, "profile": "debug"}, indent=2).encode("utf-8")
-    with tarfile.open(archive, "w:gz", compresslevel=1) as bundle:
-        info = tarfile.TarInfo("build-info.json")
-        info.size = len(metadata)
-        bundle.addfile(info, io.BytesIO(metadata))
-        for directory in available:
-            bundle.add(root / directory, arcname=directory, filter=exclude_incremental)
-    return archive
-
-
-def exclude_incremental(member):
-    if "incremental" in Path(member.name).parts:
-        return None
-    return member
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["prepare", "archive"])
-    args = parser.parse_args()
-    if args.command == "prepare":
-        prepare()
-    else:
-        archive = archive_debug(
-            Path.cwd(),
-            Path(os.environ["RUNNER_TEMP"]) / "cross-platform-artifacts",
-            os.environ["CI_TARGET"],
-            os.environ["CI_SHA"],
-        )
-        if archive is not None:
-            write_output("path", str(archive))
-            print(f"Archived debug outputs: {archive}")
-        else:
-            print(f"No debug outputs to archive for {os.environ['CI_TARGET']}.")
+    parser.parse_args()
+    prepare()
 
 
 if __name__ == "__main__":

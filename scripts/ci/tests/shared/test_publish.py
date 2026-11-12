@@ -1,6 +1,5 @@
 import datetime
 import hashlib
-import importlib.util
 import io
 import json
 import os
@@ -14,12 +13,8 @@ from graphlib import CycleError
 from pathlib import Path
 from unittest.mock import patch
 
-SCRIPT = Path(__file__).resolve().parents[1] / "ci-publish.py"
-SPEC = importlib.util.spec_from_file_location("ci_publish", SCRIPT)
-if SPEC is None or SPEC.loader is None:
-    raise ImportError(f"Unable to load script: {SCRIPT}")
-ci = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(ci)
+from scripts.ci import publish as ci
+
 EMPTY = "# Changelog\n\n## [Unreleased]\n"
 CHANGES = EMPTY + "\n### Added\n\n- New API.\n"
 DATE = "2026-01-02"

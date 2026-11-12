@@ -12,7 +12,7 @@ SOURCE_FILE = "source"
 ORIGINAL_CONTENT = "original"
 REPLACEMENT_CONTENT = "replacement"
 
-SCRIPT = Path(__file__).resolve().parents[1] / "clone-reference.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "clone-reference.py"
 SPEC = importlib.util.spec_from_file_location("clone_reference", SCRIPT)
 if SPEC is None or SPEC.loader is None:
     raise ImportError(f"Unable to load script: {SCRIPT}")

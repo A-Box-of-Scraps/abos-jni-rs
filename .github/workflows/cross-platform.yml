@@ -62,7 +62,7 @@ jobs:
       - name: Select platforms and check scheduled history
         id: prepare
         # Selection only needs the runner's Python, not the project toolchain.
-        run: python scripts/ci-cross-platform.py prepare
+        run: python -m scripts.ci.cross_platform.prepare
         env:
           GH_TOKEN: ${{ github.token }}
           CI_TARGET: ${{ inputs.target || 'all' }}
@@ -142,7 +142,7 @@ jobs:
 
       - name: Run checks
         id: checks
-        run: mise run ${{ matrix.target == 'linux-amd64' && 'check' || 'check:ci' }}
+        run: mise run ${{ matrix.target == 'linux-amd64' && 'check' || 'check:platform' }}
 
       - name: Build debug artifacts
         if: ${{ !cancelled() && steps.checks.outcome != 'skipped' }}
@@ -151,7 +151,7 @@ jobs:
       - name: Archive available debug outputs
         id: archive
         if: ${{ !cancelled() }}
-        run: mise exec python -- python scripts/ci-cross-platform.py archive
+        run: mise exec python -- python -m scripts.ci.cross_platform.archive
         env:
           CI_TARGET: ${{ matrix.target }}
           CI_SHA: ${{ needs.prepare.outputs.sha }}
@@ -268,7 +268,7 @@ jobs:
       - name: Archive available Android debug outputs
         id: archive
         if: ${{ !cancelled() }}
-        run: mise exec python -- python scripts/ci-cross-platform.py archive
+        run: mise exec python -- python -m scripts.ci.cross_platform.archive
         env:
           CI_TARGET: android
           CI_SHA: ${{ needs.prepare.outputs.sha }}
