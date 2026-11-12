@@ -32,10 +32,13 @@ class MatrixTests(unittest.TestCase):
         )
         self.assertEqual(len({entry["runner"] for entry in matrix}), 6)
 
-    def test_each_target_selects_one_runner(self):
-        for target, runner in ci.RUNNERS.items():
+    def test_each_native_target_selects_one_runner(self):
+        for target, runner in ci.NATIVE_RUNNERS.items():
             with self.subTest(target=target):
                 self.assertEqual(ci.select_matrix(target), {"include": [{"target": target, "runner": runner}]})
+
+    def test_android_uses_a_separate_job_without_native_runners(self):
+        self.assertEqual(ci.select_matrix("android"), {"include": []})
 
     def test_invalid_target_fails(self):
         with self.assertRaises(ValueError):
@@ -76,7 +79,7 @@ class ScheduleTests(unittest.TestCase):
     def successful_jobs(self):
         return [
             {"name": f"Check and build ({target})", "status": "completed", "conclusion": "success"}
-            for target in ci.RUNNERS
+            for target in ci.TARGETS
         ]
 
     def test_first_schedule_runs(self):
@@ -112,8 +115,13 @@ class ScheduleTests(unittest.TestCase):
         )
         self.assertTrue(ci.should_run(SHA))
 
+    def test_native_only_success_does_not_suppress_android_coverage(self):
+        jobs = [job for job in self.successful_jobs() if job["name"] != "Check and build (android)"]
+        self.respond({"workflow_runs": [self.scheduled_run()]}, {"jobs": jobs})
+        self.assertTrue(ci.should_run(SHA))
+
     def test_each_platform_must_succeed(self):
-        for index, target in enumerate(ci.RUNNERS):
+        for index, target in enumerate(ci.TARGETS):
             for conclusion in ["failure", "cancelled", "skipped", None]:
                 with self.subTest(target=target, conclusion=conclusion):
                     jobs = self.successful_jobs()
@@ -230,19 +238,22 @@ class ScheduleTests(unittest.TestCase):
                     with self.assertRaises(urllib.error.HTTPError):
                         ci.should_run(SHA)
 
-    def test_prepare_writes_single_line_action_outputs(self):
-        with tempfile.TemporaryDirectory() as directory:
-            output = Path(directory) / "output"
-            with (
-                patch.dict(os.environ, {"GITHUB_OUTPUT": str(output), "CI_TARGET": "windows-arm64"}),
-                patch.object(ci.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, SHA + "\n")),
-                patch.object(ci, "should_run", return_value=False),
-            ):
-                ci.prepare()
-            values = dict(line.split("=", 1) for line in output.read_text().splitlines())
-            self.assertEqual(values["sha"], SHA)
-            self.assertEqual(values["should-run"], "false")
-            self.assertEqual(json.loads(values["matrix"]), ci.select_matrix("windows-arm64"))
+    def test_prepare_selects_native_and_android_jobs(self):
+        for target in ["all", *ci.TARGETS]:
+            for run in [True, False]:
+                with self.subTest(target=target, run=run), tempfile.TemporaryDirectory() as directory:
+                    output = Path(directory) / "output"
+                    with (
+                        patch.dict(os.environ, {"GITHUB_OUTPUT": str(output), "CI_TARGET": target}),
+                        patch.object(ci.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, SHA + "\n")),
+                        patch.object(ci, "should_run", return_value=run),
+                    ):
+                        ci.prepare()
+                    values = dict(line.split("=", 1) for line in output.read_text().splitlines())
+                    self.assertEqual(values["sha"], SHA)
+                    self.assertEqual(values["run-native"], str(run and target != "android").lower())
+                    self.assertEqual(values["run-android"], str(run and target in {"all", "android"}).lower())
+                    self.assertEqual(json.loads(values["matrix"]), ci.select_matrix(target))
 
 
 class ArchiveTests(unittest.TestCase):
@@ -291,6 +302,55 @@ class ArchiveTests(unittest.TestCase):
                 json.load(metadata),
                 {"target": "linux-amd64", "sha": SHA, "profile": "debug"},
             )
+
+    def test_android_archive_includes_both_abis_apks_and_logs(self):
+        files = [
+            "target/aarch64-linux-android/debug/libtestactivity.so",
+            "target/x86_64-linux-android/debug/libtestactivity.so",
+            "build/test-apks/arm64-v8a/app-debug.apk",
+            "build/test-apks/x86_64/app-debug.apk",
+            "build/ci-logs/logcat.txt",
+        ]
+        excluded = [
+            "target/aarch64-linux-android/debug/incremental/cache",
+            "target/x86_64-linux-android/debug/incremental/cache",
+            "target/debug/host-tool",
+            "build/jni-temporary/libtestactivity.so",
+        ]
+        for name in [*files, *excluded]:
+            path = self.root / ci.ANDROID_PROJECT / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(name)
+        archive = ci.archive_debug(self.root, self.destination, "android", SHA)
+        assert archive is not None
+        self.assertEqual(archive.name, f"debug-android-{SHA}.tar.gz")
+        with tarfile.open(archive) as bundle:
+            names = bundle.getnames()
+            for name in files:
+                self.assertIn(f"{ci.ANDROID_PROJECT}/{name}", names)
+            for name in excluded:
+                self.assertNotIn(f"{ci.ANDROID_PROJECT}/{name}", names)
+            self.assertFalse(any("incremental" in Path(name).parts for name in names))
+            metadata = bundle.extractfile("build-info.json")
+            assert metadata is not None
+            self.assertEqual(json.load(metadata), {"target": "android", "sha": SHA, "profile": "debug"})
+
+    def test_android_partial_build_or_failure_logs_are_archived(self):
+        for directory in ci.ANDROID_DIRECTORIES:
+            with self.subTest(directory=directory), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                output = root / directory / "output"
+                output.parent.mkdir(parents=True)
+                output.write_text("partial output")
+                archive = ci.archive_debug(root, self.destination, "android", SHA)
+                assert archive is not None
+                with tarfile.open(archive) as bundle:
+                    self.assertIn(f"{directory}/output", bundle.getnames())
+
+    def test_android_does_not_archive_unrelated_native_outputs(self):
+        (self.root / ci.DEBUG_DIRECTORY).mkdir(parents=True)
+        self.assertIsNone(ci.archive_debug(self.root, self.destination, "android", SHA))
+        self.assertFalse(self.destination.exists())
 
     def test_rejects_unsafe_archive_names(self):
         for target, sha in [("../outside", SHA), ("linux-amd64", "../outside")]:

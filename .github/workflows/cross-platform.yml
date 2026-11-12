@@ -11,6 +11,7 @@ on:
         default: all
         options:
           - all
+          - android
           - linux-amd64
           - linux-arm64
           - windows-amd64
@@ -48,7 +49,8 @@ jobs:
       actions: read
     outputs:
       matrix: ${{ steps.prepare.outputs.matrix }}
-      should-run: ${{ steps.prepare.outputs.should-run }}
+      run-native: ${{ steps.prepare.outputs.run-native }}
+      run-android: ${{ steps.prepare.outputs.run-android }}
       sha: ${{ steps.prepare.outputs.sha }}
     steps:
       - name: Check out repository
@@ -59,6 +61,7 @@ jobs:
 
       - name: Select platforms and check scheduled history
         id: prepare
+        # Selection only needs the runner's Python, not the project toolchain.
         run: python scripts/ci-cross-platform.py prepare
         env:
           GH_TOKEN: ${{ github.token }}
@@ -67,7 +70,7 @@ jobs:
   check-build:
     name: Check and build (${{ matrix.target }})
     needs: prepare
-    if: needs.prepare.outputs.should-run == 'true'
+    if: needs.prepare.outputs.run-native == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     strategy:
@@ -86,11 +89,6 @@ jobs:
           ref: ${{ needs.prepare.outputs.sha }}
           persist-credentials: false
 
-      - name: Set up Python for CI helpers
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.13'
-
       - name: Install pinned Rust toolchain
         run: rustup show
 
@@ -104,6 +102,7 @@ jobs:
           cache_save_post: true
           cache_key_prefix: mise-cross-platform-v1-${{ matrix.target }}
 
+      # Cargo-installed tools need mold on PATH for the repository's linker configuration.
       - name: Install remaining tools on Linux
         if: runner.os == 'Linux'
         run: mise exec mold -- mise install
@@ -152,7 +151,7 @@ jobs:
       - name: Archive available debug outputs
         id: archive
         if: ${{ !cancelled() }}
-        run: python scripts/ci-cross-platform.py archive
+        run: mise exec python -- python scripts/ci-cross-platform.py archive
         env:
           CI_TARGET: ${{ matrix.target }}
           CI_SHA: ${{ needs.prepare.outputs.sha }}
@@ -174,6 +173,123 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: debug-${{ matrix.target }}-${{ needs.prepare.outputs.sha }}-attempt-${{ github.run_attempt }}
+          path: ${{ steps.archive.outputs.path }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+          overwrite: true
+
+  android:
+    name: Check and build (android)
+    needs: prepare
+    if: needs.prepare.outputs.run-android == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: '0'
+      MISE_HTTP_TIMEOUT: 300s
+      MISE_DISABLE_TOOLS: cargo:cargo-dylint,cargo:cargo-fuzz,cargo:dylint-link,cargo:jscpd,dprint,fd,maven,ruff
+      ANDROID_TEST_LOGS: ${{ github.workspace }}/tests/android-test-activity/build/ci-logs
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        run: rustup show
+
+      - name: Set up mise and mold
+        uses: jdx/mise-action@v5
+        with:
+          install: true
+          install_args: mold
+          add_shims_to_path: false
+          cache_save_post: true
+          cache_key_prefix: mise-cross-platform-v1-android
+
+      - name: Install remaining tools
+        run: mise exec mold -- mise install
+        env:
+          MISE_GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: android-${{ hashFiles('mise.toml', 'Cargo.toml') }}
+          cache-on-failure: true
+          workspaces: tests/android-test-activity
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-android-v1-${{ hashFiles('mise.toml', 'tests/android-test-activity/**/*.gradle', 'tests/android-test-activity/gradle.properties', 'tests/android-test-activity/gradle/**') }}
+          restore-keys: gradle-android-v1-
+
+      - name: Set up pinned Android build environment
+        id: android-setup
+        env:
+          # The emulator action updates its SDK. Keep our pinned build SDK separate.
+          ANDROID_BUILD_SDK_ROOT: ${{ runner.temp }}/android-build-sdk
+        run: |
+          echo "ANDROID_BUILD_SDK_ROOT=$ANDROID_BUILD_SDK_ROOT" >> "$GITHUB_ENV"
+          mkdir -p "$ANDROID_TEST_LOGS"
+          mise run setup:android -- --accept-licenses --sdk-root "$ANDROID_BUILD_SDK_ROOT" \
+            --target aarch64-linux-android --target x86_64-linux-android
+
+      - name: Build and validate ARM64 APK
+        run: mise run test:android:package -- --sdk-root "$ANDROID_BUILD_SDK_ROOT" --target aarch64-linux-android
+
+      - name: Enable KVM for the Android emulator
+        if: ${{ !cancelled() && steps.android-setup.outcome == 'success' }}
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Build and test x86_64 APK on Android API 35
+        if: ${{ !cancelled() && steps.android-setup.outcome == 'success' }}
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          disable-linux-hw-accel: false
+          # The action stops the emulator before subsequent steps, so collect logs here.
+          script: >-
+            trap 'adb -s "$ANDROID_SERIAL" logcat -d > "$ANDROID_TEST_LOGS/logcat.txt" 2>&1 || true' EXIT;
+            mise run test:android -- --sdk-root "$ANDROID_BUILD_SDK_ROOT" --serial "$ANDROID_SERIAL" --suite full
+
+      - name: Archive available Android debug outputs
+        id: archive
+        if: ${{ !cancelled() }}
+        run: mise exec python -- python scripts/ci-cross-platform.py archive
+        env:
+          CI_TARGET: android
+          CI_SHA: ${{ needs.prepare.outputs.sha }}
+
+      - name: Upload Android debug artifacts
+        id: upload
+        continue-on-error: true
+        if: ${{ !cancelled() && steps.archive.outputs.path != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: debug-android-${{ needs.prepare.outputs.sha }}-attempt-${{ github.run_attempt }}
+          path: ${{ steps.archive.outputs.path }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Retry Android debug artifact upload
+        if: ${{ !cancelled() && steps.upload.outcome == 'failure' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: debug-android-${{ needs.prepare.outputs.sha }}-attempt-${{ github.run_attempt }}
           path: ${{ steps.archive.outputs.path }}
           if-no-files-found: error
           compression-level: 0
