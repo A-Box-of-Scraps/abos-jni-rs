@@ -50,7 +50,13 @@ Environment and agent utilities for the Java Virtual Machine Tool Interface.
 
 Raw Rust definitions corresponding to jvmti.h.
 
-## Supported platforms
+## Supported
+
+### Java Versions
+
+We support Java 8 through 25.
+
+### Platforms
 
 We currently support the following platforms:
 
@@ -60,6 +66,7 @@ We currently support the following platforms:
 - Windows ARM64
 - macOS AMD64
 - macOS ARM64
+- Android
 
 ## Contributing
 
