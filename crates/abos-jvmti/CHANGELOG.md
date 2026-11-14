@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-14
+
 ### Added
 
 - Add an example-only shutdown protocol and runnable `shutdown_agent`: atomically close callback admission, disable

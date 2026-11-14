@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-14
+
 ### Changed
 
 - Streamline the crate README and explicitly allow opaque FFI handle enums in Clippy.

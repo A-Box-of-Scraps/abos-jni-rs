@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-14
+
 ### Added
 
 - Add unsafe `InitArgsBuilder` option methods accepting JNI `extraInfo` pointers, with callback ABI and lifetime

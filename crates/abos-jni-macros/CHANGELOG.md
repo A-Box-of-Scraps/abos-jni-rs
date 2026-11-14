@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-14
+
 ### Fixed
 
 - Confirm optional member absence before caching it, so initializer-thrown `NoSuchMethodError` and `NoSuchFieldError`

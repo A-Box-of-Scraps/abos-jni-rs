@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-14
+
 ### Changed
 
 - Streamline documentation and internal code without changing binding generation behavior. Update the JNI dependency to
