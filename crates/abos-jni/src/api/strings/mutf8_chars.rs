@@ -1,6 +1,11 @@
 use abos_jni_sys::{JNI_TRUE, jboolean};
 use std::{borrow::Cow, marker::PhantomData, os::raw::c_char};
 
+#[cfg(any(target_os = "android", test))]
+use std::cell::OnceCell;
+#[cfg(any(target_os = "android", test, doc))]
+use std::ffi::CStr;
+
 use log::warn;
 
 use crate::{
@@ -12,10 +17,7 @@ use crate::{
 };
 
 #[cfg(doc)]
-use ::{
-	std::ffi::{CStr, CString},
-	std::string::ToString as _,
-};
+use ::{std::ffi::CString, std::string::ToString as _};
 
 /// Borrows the contents of a `java.lang.String` object, in Java's [modified
 /// UTF-8] encoding.
@@ -28,6 +30,12 @@ use ::{
 /// a global string), cleanup temporarily attaches the current thread. Dropping
 /// the guard while still attached avoids that extra attachment cost. Cleanup
 /// leaves any pending Java exception unchanged.
+///
+/// On Android, ART may encode supplementary characters as four-byte UTF-8
+/// sequences. These are lazily copied into strict MUTF-8 before exposing a
+/// [`JNIStr`]. Encoded NULs and unpaired UTF-16 surrogates are preserved. Buffers
+/// already in strict MUTF-8 are borrowed without allocating a normalization copy.
+/// The original JVM buffer is retained separately and released when dropped.
 ///
 /// This can be dereferenced to obtain a [`JNIStr`] which can in turn be
 /// converted to a utf8 Rust string. (See [`JNIStr::to_str`] or `to_string`).
@@ -67,6 +75,8 @@ where
 {
 	obj: StringRef,
 	chars: *const c_char,
+	#[cfg(any(target_os = "android", test))]
+	normalized: OnceCell<Option<JNIString>>,
 	is_copy: bool,
 	_lifetime: PhantomData<&'local ()>,
 }
@@ -97,7 +107,8 @@ where
 	///
 	/// The string will be `NULL` terminated and encoded as [Modified
 	/// UTF-8](https://en.wikipedia.org/wiki/UTF-8#Modified_UTF-8) /
-	/// [CESU-8](https://en.wikipedia.org/wiki/CESU-8).
+	/// [CESU-8](https://en.wikipedia.org/wiki/CESU-8), except for ART's four-byte
+	/// supplementary characters, which are normalized on first access.
 	///
 	/// The implementation may either create a copy of the character array for
 	/// the given `String` or it may pin it to avoid it being collected by the
@@ -123,6 +134,8 @@ where
 			Ok(Self {
 				obj,
 				chars: ptr,
+				#[cfg(any(target_os = "android", test))]
+				normalized: OnceCell::new(),
 				is_copy,
 				_lifetime: PhantomData,
 			})
@@ -132,11 +145,15 @@ where
 	/// Destroys the [`MUTF8Chars`] without freeing the underlying contents, and
 	/// returns a raw pointer to it.
 	///
-	/// The returned pointer is the same as the one returned by the
-	/// [`as_ptr`][JNIStr::as_ptr] method. It points to a null-terminated
-	/// string in [modified UTF-8] encoding (which is similar, but not
-	/// identical, to [CESU-8]). It is valid when returned by this method, and
-	/// will remain valid until freed (see below).
+	/// The returned pointer is the original one from `GetStringUTFChars`. It
+	/// points to a null-terminated string in [modified UTF-8] encoding (which
+	/// is similar, but not identical, to [CESU-8]), except that ART may use
+	/// four-byte UTF-8 sequences for supplementary characters. It remains
+	/// valid until released (see below).
+	///
+	/// On Android this pointer may differ from [`JNIStr::as_ptr`], which points
+	/// to the normalized MUTF-8 view. Any normalization copy is freed here;
+	/// only the original JVM pointer may be passed to `ReleaseStringUTFChars`.
 	///
 	/// [CESU-8]: https://en.wikipedia.org/wiki/CESU-8
 	/// [modified UTF-8]: https://en.wikipedia.org/wiki/UTF-8#Modified_UTF-8
@@ -150,7 +167,15 @@ where
 	/// [`MUTF8Chars::from_raw`] and then dropping it, or by passing the pointer
 	/// to the JNI function `ReleaseStringUTFChars`.
 	pub fn into_raw(self) -> (*const c_char, bool) {
-		let undropped_self: std::mem::ManuallyDrop<MUTF8Chars<'_, StringRef>> = std::mem::ManuallyDrop::new(self);
+		#[cfg(any(target_os = "android", test))]
+		let this: Self = {
+			let mut this: Self = self;
+			drop(this.normalized.take());
+			this
+		};
+		#[cfg(not(any(target_os = "android", test)))]
+		let this: Self = self;
+		let undropped_self: std::mem::ManuallyDrop<MUTF8Chars<'_, StringRef>> = std::mem::ManuallyDrop::new(this);
 		(undropped_self.chars, undropped_self.is_copy)
 	}
 
@@ -190,12 +215,16 @@ where
 		Self {
 			obj,
 			chars: ptr,
+			#[cfg(any(target_os = "android", test))]
+			normalized: OnceCell::new(),
 			is_copy,
 			_lifetime: PhantomData,
 		}
 	}
 
-	/// Returns whether the string was copied or not.
+	/// Returns whether the JVM copied the string buffer.
+	///
+	/// This does not include a Rust-side normalization copy on Android.
 	pub const fn is_copy(&self) -> bool {
 		self.is_copy
 	}
@@ -226,7 +255,17 @@ where
 	StringRef: AsRef<JString<'local>> + Reference,
 {
 	fn from(other: &'java_str MUTF8Chars<'local, StringRef>) -> &'java_str JNIStr {
-		// SAFETY: The character guard retains the terminated modified-UTF-8 buffer for this borrow.
+		#[cfg(any(target_os = "android", test))]
+		if let Some(normalized) = other.normalized.get_or_init(|| {
+			// SAFETY: The guard retains the original, terminated GetStringUTFChars buffer.
+			let chars: &CStr = unsafe { CStr::from_ptr(other.chars) };
+			// SAFETY: ART returns MUTF-8 code units, optionally mixed with four-byte UTF-8.
+			unsafe { super::android_chars::normalize(chars) }
+		}) {
+			return normalized;
+		}
+		// SAFETY: The guard retains this buffer. JNI specifies MUTF-8, and on Android
+		// the normalization check above excluded ART's four-byte sequences.
 		unsafe { JNIStr::from_ptr(other.chars) }
 	}
 }
@@ -303,3 +342,7 @@ where
 		self
 	}
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/api/strings/mutf8_chars.rs"]
+mod tests;

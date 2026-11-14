@@ -1,4 +1,7 @@
 // String types for sending to/from the jvm
+#[cfg(any(target_os = "android", test))]
+mod android_chars;
+
 mod ffi_str;
 pub use self::ffi_str::*;
 

@@ -61,3 +61,10 @@ fn valid_nuls_and_supplementary_characters_are_decoded() {
 		assert!(matches!(decoded, std::borrow::Cow::Owned(_)));
 	}
 }
+
+#[test]
+fn strict_mutf8_constructors_reject_four_byte_utf8() {
+	for input in [c"😀", c"\xC0\x80😀", c"😀\xC0\x80", c"\xF4\x8F\xBF\xBF"] {
+		assert!(JNIStr::from_cstr(input).is_none(), "input: {input:?}");
+	}
+}

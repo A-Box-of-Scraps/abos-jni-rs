@@ -1,6 +1,7 @@
 //! TestActivity JNI implementation
 use test_error::{TestError, TestResult};
 
+mod strings;
 mod test_error;
 
 pub mod sdk;
@@ -65,6 +66,7 @@ impl TestActivityNativeInterface for TestActivityAPI {
 		env: &mut abos_jni::Env<'local>,
 		_this: TestActivity<'local>,
 	) -> Result<abos_jni::objects::JString<'local>, Self::Error> {
+		strings::test_roundtrips(env)?;
 		Ok(abos_jni::objects::JString::from_str(env, "Message from Rust!")?)
 	}
 
