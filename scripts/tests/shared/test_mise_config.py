@@ -181,6 +181,18 @@ class MiseConfigTests(unittest.TestCase):
         self.assertEqual(tasks["profile:abos-jvmti"]["tools"], tasks["profile:abos-jni"]["tools"])
         self.assertEqual(tasks["profile:abos-jvmti"]["run"], "python scripts/profile_abos_jni.py --package abos-jvmti")
 
+    def test_jni_dynamic_benchmark_is_opt_in_and_requires_a_jvm(self):
+        tasks = tomllib.loads(CONFIG.read_text())["tasks"]
+        self.assertEqual(
+            tasks["bench:abos-jni:dynamic"]["run"],
+            "cargo bench --locked --package abos-jni --features invocation --bench dynamic_calls",
+        )
+        self.assertNotIn("dynamic_calls", tasks["bench:abos-jni"]["run"])
+        manifest = tomllib.loads((CONFIG.parent / "crates/abos-jni/Cargo.toml").read_text())
+        benchmark = next(bench for bench in manifest["bench"] if bench["name"] == "dynamic_calls")
+        self.assertFalse(benchmark["harness"])
+        self.assertEqual(benchmark["required-features"], ["invocation"])
+
     def test_jvmti_lifecycle_benchmark_is_opt_in_and_requires_a_jvm(self):
         tasks = tomllib.loads(CONFIG.read_text())["tasks"]
         command = tasks["bench:abos-jvmti:lifecycle"]["run"]

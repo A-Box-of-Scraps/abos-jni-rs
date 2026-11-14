@@ -1,8 +1,10 @@
 mod allocation;
+mod callback;
 mod env;
 mod error;
 
 pub use allocation::Allocation;
+pub use callback::{catch_callback, catch_callback_with};
 pub use env::Env;
 pub use error::{Error, Result};
 

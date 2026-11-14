@@ -20,9 +20,9 @@ use {
 impl JavaVM {
 	/// Launch a new `JavaVM` using the provided init args.
 	///
-	/// Unlike original JNI API, the main thread (the thread from which this method is called) will
-	/// not be attached to JVM. You must explicitly use `attach_current_thread…` methods (refer
-	/// to [Attaching Native Threads section](#attaching-native-threads)).
+	/// The calling thread remains attached and is tracked for automatic detachment.
+	/// Use [`Self::attach_current_thread`] to borrow an [`Env`] and create a local frame;
+	/// it reuses this attachment.
 	///
 	/// *This API requires the "invocation" feature to be enabled,
 	/// see [Launching JVM from Rust](struct.JavaVM.html#launching-jvm-from-rust).*
@@ -51,48 +51,18 @@ impl JavaVM {
 		}
 	}
 
-	/// Get a [`JavaVM`] for the global Java VM
+	/// Returns the process-wide VM registered by this copy of the crate.
 	///
-	/// If no [`JavaVM`] has been initialized, this will return [`Error::UninitializedJavaVM`].
+	/// [`JavaVM::new`], [`JavaVM::from_raw`], and acquiring an [`Env`] or [`AttachGuard`]
+	/// initialize the singleton. A [`JObject`] alone does not guarantee initialization:
+	/// it may be null or a native argument captured before [`env::EnvUnowned::with_env`].
 	///
-	/// If a [`JavaVM`] has previously been created, either via [`JavaVM::new()`] or
-	/// [`JavaVM::from_raw`] then that [`JavaVM`] will be accessible as a global singleton.
-	///
-	/// This is possible because JNI does not support fully destroying a Java VM and then
-	/// initializing a new one and so as soon as we have seen a Java VM pointer once, we know it's
-	/// the only VM that will ever exist and it will always be valid in safe code.
-	///
-	/// If your code observes a [`Env`] reference or an [`AttachGuard`] (from this crate version)
-	/// then you can assume that [`JavaVM::singleton()`] has been initialized.
-	///
-	/// Beware that the observation of reference types (such as [`crate::objects::JObject`]) only
-	/// imply that [`JavaVM::singleton()`] has been initialized if the references are non-null.
-	///
-	/// One other caveat is that native methods may capture reference type arguments, such as
-	/// [`JObject`], where their lifetime is _not_ tied to a real `Env`. (And so at the start of
-	/// a native method, [`JavaVM::singleton()`] may not be initialized even though we can observe
-	/// reference types).
-	///
-	/// In practice though, you can usually assume [`JavaVM::singleton()`] has been initialized
-	/// if you observe non-null reference types, based on the assumption that:
-	///
-	/// - Before any other `jni-rs` API is used, a native method is expected to use
-	///   [`env::EnvUnowned::with_env`] to get a `Env` reference, which will initialize
-	///   [`JavaVM::singleton()`].
-	/// - For any native method implementation to be safe, it must use `catch_unwind` (e.g. via
-	///   [`env::EnvUnowned::with_env`]) to ensure that panics can't unwind over an FFI boundary
-	///   (at least rendering an early miss-use of `JavaVM::singleton()` "safe").
-	///
-	/// Note: that other versions of `jni-rs` within the same application aren't able to share this
-	/// singleton state. So you should not make assumptions about this being initialized as a side
-	/// effect of other dependencies using `jni-rs` (unless you are using a re-exported version of
-	/// `jni-rs` from that dependency). For example the `android-activity` crate will initialize a
-	/// [`JavaVM`] before `android_main()` is called, but unless you are using the same version of
-	/// `jni-rs` as `android-activity` you can't immediately assume there is a [`JavaVM`] singleton.
+	/// Other versions or copies of the crate do not share this state. The singleton
+	/// assumes one VM per process and is not reset by [`JavaVM::destroy`].
 	///
 	/// # Errors
 	///
-	/// Returns `Error::UninitializedJavaVM` if no VM has been registered.
+	/// Returns [`Error::UninitializedJavaVM`] if no VM has been registered.
 	pub fn singleton() -> Result<Self> {
 		JAVA_VM_SINGLETON.get().cloned().ok_or(Error::UninitializedJavaVM)
 	}
@@ -124,18 +94,8 @@ impl JavaVM {
 		// SAFETY: Successful JNI_CreateJavaVM initialized the VM pointer.
 		let vm: Self = unsafe { Self::from_raw(ptr) };
 
-		// JNI_CreateJavaVM will implicitly attach the calling thread to the JVM.
-		//
-		// Since the JVM may attribute this thread with special significance as a "main" thread, we
-		// avoid detaching it.
-		//
-		// Instead we take ownership of that attachment by creating a `TLSAttachGuard` for it.
-		//
-		// Note: This will make a redundant `AttachCurrentThread` call via
-		// `sys_attach_current_thread` and the `Default` `config` is benign here because it will be
-		// ignored while the thread is already attached.
-		//
-		// This will track the new attachment in TLS/FLS
+		// Retain the VM-created main-thread attachment and track it in TLS/FLS.
+		// AttachCurrentThread is redundant here; the already-attached thread ignores its config.
 		#[cfg(use_tls_attach_guard)]
 		// SAFETY: JNI_CreateJavaVM has attached this thread; TLS tracking takes ownership without detaching it.
 		unsafe {
@@ -152,9 +112,9 @@ impl JavaVM {
 
 	/// Launch a new `JavaVM` using the provided init args, loading it from the given shared library file if it's not already loaded.
 	///
-	/// Unlike original JNI API, the main thread (the thread from which this method is called) will
-	/// not be attached to JVM. You must explicitly use `attach_current_thread…` methods (refer
-	/// to [Attaching Native Threads section](#attaching-native-threads)).
+	/// The calling thread remains attached and is tracked for automatic detachment.
+	/// Use [`Self::attach_current_thread`] to borrow an [`Env`] and create a local frame;
+	/// it reuses this attachment.
 	///
 	/// *This API requires the "invocation" feature to be enabled,
 	/// see [Launching JVM from Rust](struct.JavaVM.html#launching-jvm-from-rust).*
@@ -226,9 +186,9 @@ impl JavaVM {
 
 	/// Launch a new `JavaVM` using the provided init args, loading it from the given shared library file if it's not already loaded.
 	///
-	/// Unlike original JNI API, the main thread (the thread from which this method is called) will
-	/// not be attached to JVM. You must explicitly use `attach_current_thread…` methods (refer
-	/// to [Attaching Native Threads section](#attaching-native-threads)).
+	/// The calling thread remains attached and is tracked for automatic detachment.
+	/// Use [`Self::attach_current_thread`] to borrow an [`Env`] and create a local frame;
+	/// it reuses this attachment.
 	///
 	/// *This API requires the "invocation" feature to be enabled,
 	/// see [Launching JVM from Rust](struct.JavaVM.html#launching-jvm-from-rust).*

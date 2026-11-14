@@ -136,7 +136,8 @@ macro_rules! define_stub_type {
 			fn lookup_class<'caller>(
 				env: &Env<'_>,
 				loader_context: &jni2::refs::LoaderContext,
-			) -> jni2::errors::Result<impl std::ops::Deref<Target = jni2::refs::Global<JClass<'static>>> + 'caller> {
+			) -> jni2::errors::Result<impl std::ops::Deref<Target = jni2::refs::Global<JClass<'static>>> + 'caller>
+			{
 				static CLASS: std::sync::OnceLock<abos_jni::objects::Global<abos_jni::objects::JClass>> =
 					std::sync::OnceLock::new();
 

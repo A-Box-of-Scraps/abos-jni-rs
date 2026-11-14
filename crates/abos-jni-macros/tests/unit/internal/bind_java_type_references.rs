@@ -166,9 +166,9 @@ fn is_instance_of_generators_report_the_same_mapping_errors() {
 		("Invalid", "Invalid Rust type path: ()"),
 	] {
 		let entries: [IsInstanceOfEntry; 1] = [entry(alias, None)];
-		let checks =
+		let checks: syn::Result<TokenStream> =
 			generate_is_instance_of_assignable_checks(&type_name, "com.example.Example", &entries, &mappings, &jni);
-		let code = generate_is_instance_of_code(&type_name, &entries, &mappings, &jni);
+		let code: syn::Result<TokenStream> = generate_is_instance_of_code(&type_name, &entries, &mappings, &jni);
 		assert_eq!(checks.expect_err("invalid mapping").to_string(), expected);
 		assert_eq!(code.expect_err("invalid mapping").to_string(), expected);
 	}

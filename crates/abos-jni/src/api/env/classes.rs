@@ -26,8 +26,6 @@ impl<'local> Env<'local> {
 		buf_len: usize,
 	) -> Result<JClass<'local>> {
 		let buf_len: i32 = jsize::try_from(buf_len).map_err(|_| Error::JniCall(JniError::InvalidArguments))?;
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		// Safety:
 		// - DefineClass is 1.1 API that must be valid
@@ -230,8 +228,6 @@ impl<'local> Env<'local> {
 	where
 		S: AsRef<JNIStr>,
 	{
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let name: &JNIStr = name.as_ref();
 		// Safety:
@@ -284,74 +280,28 @@ impl<'local> Env<'local> {
 		}
 	}
 
-	/// Look up a class by its fully-qualified name without initializing it, via
-	/// `Class.forName(<name>, false, <loader>)`, trying the thread context class
-	/// loader first and then the system class loader.
+	/// Loads a class without initializing it, trying the thread context class loader
+	/// and then the system class loader through [`LoaderContext::None`].
 	///
-	/// This is a convenience wrapper around [`LoaderContext::load_class`] with
-	/// [`LoaderContext::None`].
+	/// Names use dots, unlike [`Self::find_class`]: `"java.lang.Number"` or
+	/// `"[Ljava.lang.Number;"` for an array.
 	///
-	/// `name` should be a binary name like `jni_str!("java.lang.Number")` or an
-	/// array descriptor like `jni_str!("[Ljava.lang.Number;")`.
-	///
-	/// **Note:** that unlike [`Env::find_class`], the name uses **dots instead of
-	/// slashes** and should conform to the format that `Class.getName()`
-	/// returns and that `Class.forName()` expects.
-	///
-	/// For example, lookup the class for
-	/// `java.lang.IllegalArgumentException`like this:
 	/// ```rust,no_run
 	/// # use abos_jni::{jni_str, errors::Result, Env, objects::JClass};
-	/// #
 	/// # fn example<'local>(env: &mut Env<'local>) -> Result<()> {
 	/// let class: JClass<'local> = env.load_class(jni_str!("java.lang.IllegalArgumentException"))?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	///
-	/// - Returns a reference to loaded class on success
-	/// - Returns [`Error::NoClassDefFound`] if a `NoClassDefFoundError` or
-	///   `ClassNotFoundException` exception occurs, indicating that no
-	///   definition for a requested class or interface can be found (most
-	///   common failure)
-	/// - Returns [`Error::ClassFormatError`] if a `ClassFormatError` exception
-	///   occurs, indicating that the class data does not specify a valid class.
-	/// - Returns [`Error::ClassCircularityError`] if a `ClassCircularityError`
-	///   exception occurs, indicating that a class or interface would be its
-	///   own superclass or superinterface.
-	/// - May Return [`Error::LinkageError`] for various failures to link the
-	///   requested class.
-	/// - May Return [`Error::ExceptionInInitializer`] if an exception occurs
-	///   during class initialization.
-	/// - Returns [`Error::JniCall`] + [`JniError::NoMemory`] if an
-	///   `OutOfMemoryError` exception occurs, indicating that the JVM reports
-	///   running out of memory.
-	/// - Returns [`Error::NullPtr`] for any other unknown error condition
-	///
-	/// *Note:* In order for this API to be consistent with
-	/// [`abos_jni::Env::find_class`], this API does _not_ directly return
-	/// [`Error::ClassNotFound`] errors that may come directly from the loader.
-	///
-	/// *Note:* Any [`Error::NoClassDefFound`], [`Error::LinkageError`] or
-	/// [`Error::ExceptionInInitializer`] errors include the original `cause`
-	/// exception if more details are needed.
-	///
-	/// # Android
-	///
-	/// This API will notably check the context class loader of the current
-	/// thread, which makes it possible to associate a thread with an
-	/// application class loader.
-	///
-	/// This may be particularly useful for native applications on Android
-	/// because native threads will not normally be able to find application
-	/// classes through `FindClass`.
-	///
-	/// If you use the `android-activity` crate, it may set up the context class
-	/// loader for you.
+	/// On Android or with custom loaders, set the thread context class loader or use
+	/// [`LoaderContext::Loader`] explicitly for application classes unavailable to `FindClass`.
 	///
 	/// # Errors
 	///
-	/// Returns an error if the class cannot be loaded or initialized, or a JNI call fails during loading.
+	/// Uses [`LoaderContext::load_class`]'s error mapping, including [`Error::NoClassDefFound`]
+	/// for `ClassNotFoundException`. An already pending exception is left unchanged and
+	/// returns [`Error::JavaException`].
 	pub fn load_class<S>(&mut self, name: S) -> Result<JClass<'local>>
 	where
 		S: AsRef<JNIStr>,
@@ -370,8 +320,6 @@ impl<'local> Env<'local> {
 	where
 		T: Desc<'local, JClass<'other_local>>,
 	{
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 		let class: &JClass<'_> = class.as_ref();

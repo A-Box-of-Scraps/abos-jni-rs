@@ -19,11 +19,11 @@ For the build-script workflow below, add these dependencies to your Cargo packag
 
 ```toml
 [dependencies]
-abos-jni = { version = "0.1.0", features = ["invocation"] }
+abos-jni = { version = "0.2.0", features = ["invocation"] }
 
 [build-dependencies]
-abos-javac = "0.1.0"
-abos-jbindgen = "0.1.0"
+abos-javac = "0.1.1"
+abos-jbindgen = "0.1.1"
 ```
 
 The `invocation` feature is needed here because the Rust application starts its own JVM. Use `abos-jbindgen` under
@@ -107,9 +107,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-Run the application with `cargo run`. Generating bindings does not compile or package Java classes for runtime use;
-`abos-javac` performs that separate compilation step in this example. The JVM classpath points to build output here. For
-distribution, package the classes or JARs separately and configure the runtime classpath accordingly.
+Run with `cargo run`. The generator does not compile or package runtime Java classes; this example uses `abos-javac` and
+points the JVM at its build output. For distribution, package the classes or JARs and adjust the runtime classpath.
 
 ## Command-line usage
 
@@ -190,9 +189,8 @@ The generated API combines platform bytecode with source stubs analyzed against 
 JDK's core classes. Optional `hiddenapi-flags.csv` filtering further restricts the selected API surface; it does not
 bypass Android's runtime access restrictions.
 
-Generation returns errors for invalid inputs, parsing failures, and conflicting generated declarations. Android
-selected-class failures retain their context and underlying cause; generation does not silently return partial bindings.
-Use class patterns or member skips to explicitly restrict the API surface.
+Invalid inputs, parsing failures, and conflicting declarations fail generation rather than producing partial bindings.
+Use class patterns or member skips to restrict the API surface.
 
 ## Examples
 

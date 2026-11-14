@@ -21,18 +21,10 @@ crate::bind_java_type! {
 	}
 }
 
-/// Display the contents of a `JString`
+/// Displays the string contents, temporarily attaching the thread if needed.
 ///
-/// This implementation relies on JNI (`GetStringUTFChars`) to retrieve the string contents for
-/// display.
-///
-/// If you try and format a null reference this will output `"<NULL>"`
-///
-/// In case you attempt to format a `JString` before [`JavaVM::singleton`] has been initialized then
-/// this will simply output `"<JNI Not Initialized>"` and log an error.
-///
-/// In case of any other unexpected JNI error, this will output `"<JNI Error>"` and log the error
-/// details.
+/// Null references display as `"<NULL>"`. JNI failures are logged and display as
+/// `"<JNI Not Initialized>"` if the VM singleton is unavailable, or `"<JNI Error>"` otherwise.
 impl std::fmt::Display for JString<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		#[derive(Error, Debug)]
@@ -46,29 +38,12 @@ impl std::fmt::Display for JString<'_> {
 			return write!(f, "<NULL>");
 		}
 
-		// The only way it's possible to have a `JString` while `JavaVM::singleton` is
-		// not initialized would be if the `JString` was used to capture a native method
-		// argument and `EnvUnowned::with_env` has not been called yet (and nothing
-		// else has initialized this crate already)
-		//
-		// I.e. it's highly unlikely that this should return an error.
+		// Native arguments can exist before EnvUnowned initializes the singleton.
 		JavaVM::singleton()
 			.map_err(FmtOrJniError::Jni)
 			.and_then(|vm| {
-				// In the common case we expect this attachment will be a NOOP.
-				//
-				// In the (unlikely) case that a `Global<JString>` is being formatted from an
-				// arbitrary thread that's not attached to the JVM then we create a scoped
-				// attachment so we avoid the side effect of attaching the current thread
-				// permanently.
+				// Formatting a global reference must not leave a new permanent attachment.
 				vm.attach_current_thread_for_scope(|env| -> std::result::Result<(), FmtOrJniError> {
-					// Since we have already checked for a null reference it should be highly
-					// unlikely for there to be any JNI errors.
-					//
-					// Note: there won't be any local reference created as a side effect.
-					// Note: there's no risk of side effects from an exception being thrown.
-					// A `GetStringUTFChars` failure may result in a `NullPtr` error that
-					// is handled below as a general JNI error.
 					let mutf8_chars: MUTF8Chars<'_, &JString<'_>> = self.mutf8_chars(env)?;
 					let s: std::borrow::Cow<'_, str> = mutf8_chars.to_str();
 					write!(f, "{s}")?;
@@ -83,7 +58,7 @@ impl std::fmt::Display for JString<'_> {
 						write!(f, "<JNI Not Initialized>")
 					}
 					FmtOrJniError::Jni(err) => {
-						// If we failed to get the string contents, just print the error
+						// JNI errors become placeholders rather than fmt::Error.
 						log::error!("error getting JString contents: {err:#?}");
 						write!(f, "<JNI Error>")
 					}
@@ -150,8 +125,6 @@ impl JString<'_> {
 		env: &mut Env<'env_local>,
 		from: impl AsRef<JNIStr>,
 	) -> Result<JString<'env_local>> {
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		env.assert_top();
 		let ffi_str: &JNIStr = from.as_ref();
 		// SAFETY: JNIStr supplies a terminated modified-UTF-8 string, and env owns the current local frame.

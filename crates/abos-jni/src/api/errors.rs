@@ -96,6 +96,11 @@ pub enum Error {
 		requested: String,
 		cause: Option<abos_jni::refs::Global<abos_jni::objects::JThrowable<'static>>>,
 	},
+	/// A generated binding's runtime requirement was not met, or an optional member was absent.
+	///
+	/// No JNI invocation or field access is attempted for an unavailable member.
+	#[error("Binding member is unavailable on this runtime: {name}")]
+	MemberUnavailable { name: &'static str },
 	#[error("Method not found: {name} {sig}")]
 	MethodNotFound { name: String, sig: String },
 	/// Represents a `NoSuchMethodError` exception
@@ -163,11 +168,17 @@ pub enum Error {
 	///
 	/// Unlike [`Error::JavaException`], this error indicates that the exception was caught and cleared by the JNI code,
 	/// rather than being left as a pending exception that may propagate back to the JVM.
-	#[error("Caught Java exception: {msg}\nStack trace:\n{stack}")]
+	///
+	/// The display includes the exception class name and uses `<no message>` for null or empty Java messages.
+	#[error(
+		"Caught Java exception: {name}: {message}\nStack trace:\n{stack}",
+		message = if .msg.is_empty() { "<no message>" } else { .msg.as_str() }
+	)]
 	#[non_exhaustive]
 	CaughtJavaException {
 		exception: abos_jni::refs::Global<abos_jni::objects::JThrowable<'static>>,
 		name: String,
+		/// The Java exception message, or an empty string if `Throwable.getMessage()` returned null.
 		msg: String,
 		stack: String,
 	},
@@ -308,3 +319,7 @@ pub struct CharToJavaError {
 	/// The character that could not be converted.
 	pub char: char,
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/api/errors.rs"]
+mod tests;

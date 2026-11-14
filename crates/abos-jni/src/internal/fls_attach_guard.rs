@@ -17,7 +17,7 @@ use std::{
 	thread::{Thread, current},
 };
 
-use log::{debug, error};
+use log::debug;
 
 use crate::{
 	AttachGuard, JavaVM,
@@ -71,15 +71,9 @@ unsafe extern "system" fn fls_callback(data: *const core::ffi::c_void) {
 	);
 
 	// No environment cross-check: another fiber may already have detached the thread.
+	// Logging here could access already-destroyed TLS, even when reporting an error.
 	// SAFETY: No attachment guards remain, as checked above; no environment is used after detaching.
-	if let Err(e) = unsafe { sys_detach_current_thread(None, &attach_data.thread) } {
-		error!(
-			"Error detaching thread in FLS callback: {:#?}\nThread {} id={:?}",
-			e,
-			attach_data.thread.name().unwrap_or_default(),
-			attach_data.thread.id(),
-		);
-	}
+	drop(unsafe { sys_detach_current_thread(None) });
 }
 
 /// Return the shared FLS index, allocating it if necessary.
@@ -193,10 +187,10 @@ pub fn fls_detach_current_thread() -> Result<()> {
 	assert_ne!(result, 0, "FATAL: Failed to clear FLS slot during detach");
 
 	// SAFETY: `data_ptr` is the boxed record retrieved from the cleared FLS slot.
-	let attach_data: Box<FlsAttachData> = unsafe { Box::from_raw(data_ptr.cast::<FlsAttachData>()) };
+	unsafe { drop(Box::from_raw(data_ptr.cast::<FlsAttachData>())) };
 
 	// No environment cross-check: FLS records outlive external detachment.
 	// SAFETY: No attachment guards remain, and the FLS slot was cleared before detaching.
-	unsafe { sys_detach_current_thread(None, &attach_data.thread)? };
+	unsafe { sys_detach_current_thread(None)? };
 	Ok(())
 }

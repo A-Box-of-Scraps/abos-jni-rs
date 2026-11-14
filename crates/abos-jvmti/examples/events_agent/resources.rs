@@ -1,7 +1,7 @@
 use std::{ffi::c_void, ptr};
 
 use abos_jni::jni_str;
-use abos_jvmti::{Env, Error, JvmtiVersion, RawMonitor, RawMonitorGuard, Result, sys};
+use abos_jvmti::{Env, Error, JvmtiVersion, RawMonitor, RawMonitorGuard, Result, catch_callback, sys};
 
 pub(super) unsafe fn threads(env: Env<'_>, worker: sys::jthread, virtual_thread: bool) -> Result<()> {
 	// SAFETY: Java keeps this worker alive, without holding locks needed here.
@@ -47,14 +47,16 @@ unsafe extern "system" fn visit_object(
 	_length: sys::jint,
 	data: *mut c_void,
 ) -> sys::jint {
-	// SAFETY: Synchronous heap traversal supplies a tag slot; data is our live counter.
-	unsafe {
-		if *tag == 12345 {
-			*data.cast::<usize>() += 1;
-			return sys::JVMTI_VISIT_ABORT;
+	catch_callback(sys::JVMTI_VISIT_ABORT, || {
+		// SAFETY: Synchronous heap traversal supplies a tag slot; data is our live counter.
+		unsafe {
+			if *tag == 12345 {
+				*data.cast::<usize>() += 1;
+				return sys::JVMTI_VISIT_ABORT;
+			}
 		}
-	}
-	0
+		0
+	})
 }
 
 unsafe extern "system" fn visit_reference(
@@ -68,16 +70,18 @@ unsafe extern "system" fn visit_reference(
 	_length: sys::jint,
 	data: *mut c_void,
 ) -> sys::jint {
-	// SAFETY: Synchronous traversal supplies the live counter, with no concurrent access.
-	unsafe {
-		*data.cast::<usize>() += 1;
-	}
-	sys::JVMTI_VISIT_ABORT
+	catch_callback(sys::JVMTI_VISIT_ABORT, || {
+		// SAFETY: Synchronous traversal supplies the live counter, with no concurrent access.
+		unsafe {
+			*data.cast::<usize>() += 1;
+		}
+		sys::JVMTI_VISIT_ABORT
+	})
 }
 
 pub(super) unsafe fn heap(env: Env<'_>, root: sys::jobject) -> Result<()> {
 	// SAFETY: Root is a local JNI object-array reference in this native call.
-	// Callbacks only read tags/update stack counters and never invoke JNI or panic.
+	// Callbacks only read tags/update stack counters, never invoke JNI, and abort on unwind.
 	unsafe {
 		assert_eq!(env.tag(root)?, 0);
 		env.set_tag(root, 12345)?;

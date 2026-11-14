@@ -33,8 +33,6 @@ impl<'local> Env<'local> {
 	/// It's recommended to use [`JObjectArray::new`] or [`Self::new_object_type_array`]
 	/// instead, which both support element type parameterization.
 	///
-	/// This API may be deprecated and removed in a future version.
-	///
 	/// # Errors
 	///
 	/// Returns [`Error::NullPtr`] if `element_class` is null.
@@ -51,8 +49,6 @@ impl<'local> Env<'local> {
 		T: Desc<'local, JClass<'other_local_2>>,
 		U: AsRef<JObject<'other_local_1>>,
 	{
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let class: <T as Desc<'_, JClass<'_>>>::Output = element_class.lookup(self)?;
 
@@ -202,8 +198,6 @@ impl<'local> Env<'local> {
 	///
 	/// It is recommended to use [`JBooleanArray::new`] instead.
 	///
-	/// This API may be deprecated and removed in a future version.
-	///
 	/// # Errors
 	///
 	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
@@ -214,8 +208,6 @@ impl<'local> Env<'local> {
 	/// Create a new [`JByteArray`] of supplied length.
 	///
 	/// It is recommended to use [`JByteArray::new`] instead.
-	///
-	/// This API may be deprecated and removed in a future version.
 	///
 	/// # Errors
 	///
@@ -228,8 +220,6 @@ impl<'local> Env<'local> {
 	///
 	/// It is recommended to use [`JCharArray::new`] instead.
 	///
-	/// This API may be deprecated and removed in a future version.
-	///
 	/// # Errors
 	///
 	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
@@ -240,8 +230,6 @@ impl<'local> Env<'local> {
 	/// Create a new [`JShortArray`] of supplied length.
 	///
 	/// It is recommended to use [`JShortArray::new`] instead.
-	///
-	/// This API may be deprecated and removed in a future version.
 	///
 	/// # Errors
 	///
@@ -254,8 +242,6 @@ impl<'local> Env<'local> {
 	///
 	/// It is recommended to use [`JIntArray::new`] instead.
 	///
-	/// This API may be deprecated and removed in a future version.
-	///
 	/// # Errors
 	///
 	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
@@ -266,8 +252,6 @@ impl<'local> Env<'local> {
 	/// Create a new [`JLongArray`] of supplied length.
 	///
 	/// It is recommended to use [`JLongArray::new`] instead.
-	///
-	/// This API may be deprecated and removed in a future version.
 	///
 	/// # Errors
 	///
@@ -280,8 +264,6 @@ impl<'local> Env<'local> {
 	///
 	/// It is recommended to use [`JFloatArray::new`] instead.
 	///
-	/// This API may be deprecated and removed in a future version.
-	///
 	/// # Errors
 	///
 	/// Returns an error if the array length is too large, class resolution or allocation fails, or a Java exception is pending.
@@ -292,8 +274,6 @@ impl<'local> Env<'local> {
 	/// Create a new [`JDoubleArray`] of supplied length.
 	///
 	/// It is recommended to use [`JDoubleArray::new`] instead.
-	///
-	/// This API may be deprecated and removed in a future version.
 	///
 	/// # Errors
 	///

@@ -312,6 +312,30 @@ fn test_env_throw_apis_return_java_exception_err() {
 }
 
 #[test]
+fn test_caught_exception_message_display() {
+	util::attach_current_thread(|env| {
+		for (java_message, expected) in [
+			(abos_jni::jni_str!(""), ""),
+			(abos_jni::jni_str!("<NULL>"), "<NULL>"),
+			(
+				abos_jni::jni_str!("détail 日本語\nsecond line"),
+				"détail 日本語\nsecond line",
+			),
+		] {
+			assert!(matches!(
+				env.throw_new(abos_jni::jni_str!("java/lang/Exception"), java_message),
+				Err(abos_jni::errors::Error::JavaException)
+			));
+			let catch: abos_jni::errors::Result<()> = env.exception_catch();
+			assert_caught_exception(&catch, "java.lang.Exception", Some(expected));
+			assert!(!env.exception_check());
+		}
+		Ok(())
+	})
+	.expect("caught exception diagnostics preserve literal messages");
+}
+
+#[test]
 fn test_no_attach_current_thread_side_effects() {
 	let jvm: &std::sync::Arc<abos_jni::JavaVM> = util::jvm();
 
@@ -400,13 +424,18 @@ fn assert_caught_exception<T: std::fmt::Debug>(
 	expected_name: &str,
 	expected_message: Option<&str>,
 ) {
-	let Err(abos_jni::errors::Error::CaughtJavaException { name, msg, .. }) = result else {
+	let Err(error @ abos_jni::errors::Error::CaughtJavaException { name, msg, stack, .. }) = result else {
 		panic!("Expected a caught Java exception, got {result:?}");
 	};
 	assert_eq!(name, expected_name);
-	if let Some(message) = expected_message {
-		assert_eq!(msg, message);
-	}
+	assert_eq!(msg, expected_message.unwrap_or_default());
+	let display_message: &str = expected_message
+		.filter(|message| !message.is_empty())
+		.unwrap_or("<no message>");
+	assert_eq!(
+		error.to_string(),
+		format!("Caught Java exception: {expected_name}: {display_message}\nStack trace:\n{stack}")
+	);
 }
 
 struct ExceptionOnAsRef<'a, 'local, T> {

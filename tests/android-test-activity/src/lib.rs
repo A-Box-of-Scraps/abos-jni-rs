@@ -1,6 +1,8 @@
 //! TestActivity JNI implementation
 use test_error::{TestError, TestResult};
 
+mod iterators;
+mod strings;
 mod test_error;
 
 pub mod sdk;
@@ -10,39 +12,43 @@ include!(concat!(env!("OUT_DIR"), "/test_activity_bindings.rs"));
 
 use io::github::jni_rs::jbindgen::testactivity::{TestActivity, TestActivityAPI, TestActivityNativeInterface};
 
-struct SdkTest {
+struct NativeTest {
 	name: &'static str,
 	runner: for<'local> fn(&mut abos_jni::Env<'local>) -> TestResult,
 }
 
-const SDK_TESTS: &[SdkTest] = &[
+const NATIVE_TESTS: &[NativeTest] = &[
+	NativeTest {
+		name: "jni_array_map_iterator",
+		runner: iterators::test_array_map,
+	},
 	#[cfg(feature = "sdk_util_time_utils")]
-	SdkTest {
+	NativeTest {
 		name: "sdk_util_time_utils",
 		runner: sdk::util_time_utils::test_time_utils,
 	},
 	#[cfg(feature = "sdk_os_build")]
-	SdkTest {
+	NativeTest {
 		name: "sdk_os_build",
 		runner: sdk::os_build::test_os_build,
 	},
 	#[cfg(feature = "sdk_os_binder")]
-	SdkTest {
+	NativeTest {
 		name: "sdk_os_binder_resolution",
 		runner: sdk::os_binder::test_os_binder,
 	},
 	#[cfg(feature = "sdk_bluetooth")]
-	SdkTest {
+	NativeTest {
 		name: "sdk_bluetooth_resolution",
 		runner: sdk::bluetooth::test_bluetooth,
 	},
 	#[cfg(feature = "sdk_content_intent")]
-	SdkTest {
+	NativeTest {
 		name: "sdk_content_intent",
 		runner: sdk::content_intent::test_content_intent,
 	},
 	#[cfg(feature = "sdk_net_uri")]
-	SdkTest {
+	NativeTest {
 		name: "sdk_net_uri",
 		runner: sdk::net_uri::test_net_uri,
 	},
@@ -65,6 +71,7 @@ impl TestActivityNativeInterface for TestActivityAPI {
 		env: &mut abos_jni::Env<'local>,
 		_this: TestActivity<'local>,
 	) -> Result<abos_jni::objects::JString<'local>, Self::Error> {
+		strings::test_roundtrips(env)?;
 		Ok(abos_jni::objects::JString::from_str(env, "Message from Rust!")?)
 	}
 
@@ -80,7 +87,7 @@ impl TestActivityNativeInterface for TestActivityAPI {
 		_env: &mut abos_jni::Env<'local>,
 		_this: TestActivity<'local>,
 	) -> Result<abos_jni::sys::jint, Self::Error> {
-		Ok(i32::try_from(SDK_TESTS.len()).expect("test registry fits in a Java int"))
+		Ok(i32::try_from(NATIVE_TESTS.len()).expect("test registry fits in a Java int"))
 	}
 
 	fn native_get_test_name<'local>(
@@ -101,22 +108,22 @@ impl TestActivityNativeInterface for TestActivityAPI {
 	}
 }
 
-fn test_at(index: i32) -> Result<&'static SdkTest, TestError> {
+fn test_at(index: i32) -> Result<&'static NativeTest, TestError> {
 	usize::try_from(index)
 		.ok()
-		.and_then(|index| SDK_TESTS.get(index))
-		.ok_or_else(|| TestError::Assertion(format!("invalid SDK test index: {index}")))
+		.and_then(|index| NATIVE_TESTS.get(index))
+		.ok_or_else(|| TestError::Assertion(format!("invalid native test index: {index}")))
 }
 
 #[cfg(test)]
 mod tests {
-	use super::{SDK_TESTS, test_at};
+	use super::{NATIVE_TESTS, test_at};
 
 	#[test]
 	fn rejects_invalid_indices_without_advancing_global_state() {
 		assert!(test_at(-1).is_err());
-		assert!(test_at(i32::try_from(SDK_TESTS.len()).expect("small registry")).is_err());
-		for (index, test) in SDK_TESTS.iter().enumerate() {
+		assert!(test_at(i32::try_from(NATIVE_TESTS.len()).expect("small registry")).is_err());
+		for (index, test) in NATIVE_TESTS.iter().enumerate() {
 			let index = i32::try_from(index).expect("small registry");
 			assert_eq!(test_at(index).expect("valid index").name, test.name);
 			assert_eq!(test_at(index).expect("same index remains valid").name, test.name);

@@ -94,7 +94,6 @@ fn parse_input_entry(
 	Ok(())
 }
 
-/// Parse a signature (method or field) from input
 pub(super) fn parse_signature(input: ParseStream, type_mappings: &TypeMappings) -> Result<Signature> {
 	// A dot distinguishes a Java field type name from a raw JNI signature.
 	if input.peek(syn::LitStr) || input.peek(syn::LitCStr) {
@@ -171,8 +170,6 @@ pub(super) fn parse_signature(input: ParseStream, type_mappings: &TypeMappings) 
 	}
 }
 
-/// Parse a raw JNI signature string into a Signature
-/// This parses strings like "(ILjava/lang/String;)V" or "[I" or "Ljava/lang/String;"
 pub(super) fn parse_raw_jni_signature(sig: &str) -> Result<Signature> {
 	if sig.starts_with('(') {
 		parse_raw_jni_method_signature(sig)
@@ -181,7 +178,6 @@ pub(super) fn parse_raw_jni_signature(sig: &str) -> Result<Signature> {
 	}
 }
 
-/// Parse a raw JNI method signature string
 pub(super) fn parse_raw_jni_method_signature(sig: &str) -> Result<Signature> {
 	if !sig.starts_with('(') {
 		return Err(syn::Error::new(
@@ -239,7 +235,6 @@ pub(super) fn parse_raw_jni_method_signature(sig: &str) -> Result<Signature> {
 	}))
 }
 
-/// Parse a raw JNI field signature string
 pub(super) fn parse_raw_jni_field_signature(sig: &str) -> Result<Signature> {
 	let (field_type, consumed) = parse_raw_jni_type(sig)?;
 	if consumed != sig.len() {
@@ -259,8 +254,7 @@ pub(super) fn parse_raw_jni_field_signature(sig: &str) -> Result<Signature> {
 	Ok(Signature::Field(FieldSignature { field_type }))
 }
 
-/// Parse a single JNI type descriptor from a string
-/// Returns the `JavaType` and the number of bytes consumed
+/// Parse one descriptor prefix, returning its `SigType` and byte length.
 pub(super) fn parse_raw_jni_type(s: &str) -> Result<(SigType, usize)> {
 	let bytes: &[u8] = s.as_bytes();
 	if bytes.is_empty() {

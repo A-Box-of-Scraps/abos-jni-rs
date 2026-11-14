@@ -1,4 +1,7 @@
-use super::{ConcreteType, PrimitiveType, Result, SigType, Span, TokenStream, TypeMappings, lit_cstr_mutf8, quote};
+use super::{
+	ConcreteType, JavaClassName, PrimitiveType, Result, RustType, SigType, Span, TokenStream, TypeMappings,
+	lit_cstr_mutf8, quote,
+};
 
 /// Reject void and unknown aliases as array element types.
 pub(super) fn validate_array_element_type(elem_type: &SigType, type_mappings: &TypeMappings, span: Span) -> Result<()> {
@@ -127,13 +130,19 @@ fn array_element_type(
 
 /// Validate custom mappings with runtime class-name checks and compile-time primitive
 /// size and alignment checks. Built-in mappings do not need these assertions.
+/// Checks are emitted in canonical Rust-path order within each group, independently
+/// of hash iteration order. Primitive kinds break ties for shared Rust paths.
 pub fn generate_type_mapping_checks(type_mappings: &TypeMappings, jni: &syn::Path) -> TokenStream {
 	let mut type_checks: Vec<TokenStream> = Vec::new();
 
-	for (rust_type, java_class) in type_mappings
+	let mut reference_mappings: Vec<(&RustType, &JavaClassName)> = type_mappings
 		.rust_to_java_iter()
 		.filter(|(rust_type, _)| !rust_type.is_builtin())
-	{
+		.map(|(rust_type, java_class)| (rust_type.as_ref(), java_class.as_ref()))
+		.collect();
+	reference_mappings.sort_unstable_by_key(|(rust_type, _)| rust_type.path());
+
+	for (rust_type, java_class) in reference_mappings {
 		let rust_path: syn::Path =
 			syn::parse_str(rust_type.path()).unwrap_or_else(|_| panic!("Invalid Rust type path: {}", rust_type.path()));
 
@@ -158,18 +167,18 @@ pub fn generate_type_mapping_checks(type_mappings: &TypeMappings, jni: &syn::Pat
 		});
 	}
 
-	for rust_type in type_mappings
+	let mut primitive_mappings: Vec<(&RustType, PrimitiveType)> = type_mappings
 		.rust_types()
-		.filter(|rt| rt.primitive().is_some())
-		.filter(|rt| !rt.is_builtin())
-	{
+		.filter(|rust_type| !rust_type.is_builtin())
+		.filter_map(|rust_type| rust_type.primitive().map(|primitive| (rust_type.as_ref(), primitive)))
+		.collect();
+	primitive_mappings.sort_unstable_by_key(|(rust_type, primitive)| (rust_type.path(), primitive.to_jni_descriptor()));
+
+	for (rust_type, primitive) in primitive_mappings {
 		let rust_path: syn::Path =
 			syn::parse_str(rust_type.path()).unwrap_or_else(|_| panic!("Invalid Rust type path: {}", rust_type.path()));
 
-		let jni_sys_prim: TokenStream = match rust_type
-			.primitive()
-			.expect("primitive mappings have a JNI primitive kind")
-		{
+		let jni_sys_prim: TokenStream = match primitive {
 			PrimitiveType::Void => {
 				unreachable!("Void type should not have a custom type mapping")
 			}
@@ -201,3 +210,7 @@ pub fn generate_type_mapping_checks(type_mappings: &TypeMappings, jni: &syn::Pat
 		}
 	}
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/internal/types_conversion.rs"]
+mod tests;

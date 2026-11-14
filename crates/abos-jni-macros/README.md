@@ -13,17 +13,16 @@ Most applications should use the macros re-exported by `abos-jni`:
 
 ```toml
 [dependencies]
-abos-jni = "0.1.0"
+abos-jni = "0.2.0"
 ```
 
 Import them from `abos_jni`, for example `use abos_jni::{jni_sig, jni_str};`. A separate dependency on this proc-macro
-crate is not required. When importing from `abos_jni_macros` directly, add `abos-jni-macros = "0.1.0"` as well;
+crate is not required. When importing from `abos_jni_macros` directly, add `abos-jni-macros = "0.2.0"` as well;
 expansions that use JNI runtime types still need `abos-jni`.
 
-The macros do not require a running JVM during compilation. Starting a desktop JVM from the resulting program requires
-`abos-jni`'s `invocation` feature; calling into an existing JVM does not. See the
-[abos-jni README](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jni/README.md) for complete
-runtime setup and examples in both call directions.
+Compilation requires no JVM. To start one at runtime, enable `abos-jni`'s `invocation` feature; existing-VM integrations
+do not need it. See [abos-jni](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jni/README.md) for
+setup.
 
 ## Quick Start
 
@@ -76,13 +75,58 @@ literals, not runtime variables; use `abos_jni::strings::JNIString` for dynamic 
 automatically generated declarations, use
 [abos-jbindgen](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jbindgen/README.md).
 
+### Runtime-optional members
+
+Members are required by default: a failed lookup prevents the binding's API from initializing. Add `requires` to a
+constructor, method, field, or native-method **property block** to make it runtime-dependent:
+
+```rust,ignore
+bind_java_type! {
+    Example => "com.example.Example",
+    constructors {
+        fn new(),
+        fn with_capacity { sig = (capacity: jint), requires = available },
+    },
+    methods {
+        fn newer_method { sig = () -> jint, requires = available },
+        fn library_feature { sig = () -> jint, requires = |env| supports_library_feature(env) },
+    },
+    fields {
+        newer_field { sig = jint, requires = available },
+    },
+    native_methods {
+        pub static fn newer_native { sig = (value: jint) -> jint, requires = available },
+    },
+}
+```
+
+- `requires = available` attempts member lookup and treats only `MethodNotFound` or `FieldNotFound` as absence. Native
+  methods are registered individually; only `NoSuchMethod` (including a non-native declaration) is treated as
+  unavailable. Other errors, including class initialization failures, still fail API initialization.
+- `requires = predicate` accepts a function or closure taking `&mut Env` and returning `errors::Result<bool>`. `false`
+  skips lookup or registration entirely; `true` requires success. Errors propagate. Predicates may query application
+  capabilities or runtime library versions. They must not leave a pending Java exception on success.
+- Calling an unavailable constructor, method, or field accessor returns `Error::MemberUnavailable`, without invoking the
+  member or using a missing JNI ID. An unavailable native is not registered; any generated Rust call wrapper returns the
+  same error. Rust signatures and native implementations are still compiled and type-checked.
+
+Availability is cached for the process lifetime. Predicates must describe stable capabilities and tolerate repeated
+evaluation during concurrent initialization or retries. They must not re-enter the same binding; native predicates must
+not initialize the target class before registration completes. Native call wrappers reuse the registration decision.
+
+Runtime-gated natives suppress default symbol exports, even with `native_methods_export = true`. Explicit `export`
+requests on gated natives are rejected: JNI symbol lookup would bypass the registration requirement. These natives must
+be reached through registration.
+
+`Env::version()` reports the JNI interface version, not the Android API level or Java library version. Use `requires =
+available` for member presence or a predicate that checks the relevant platform/library requirement.
+
 ## Scope and limitations
 
 ### Compile-time and runtime checks
 
-The macros validate supported syntax and generate Rust code. Class loading, member lookup, and Java assignability checks
-happen when the resulting bindings run. Compilation alone does not establish that the declarations match the Java API.
-These macros do not compile Java sources or package Java classes.
+Class loading, member lookup, and Java assignability checks happen at runtime. Successful macro expansion does not
+verify the Java API, compile Java sources, or package classes.
 
 ### Java names and string encoding
 
@@ -109,6 +153,26 @@ the native boundary explicitly.
 function, supplies or checks `extern "system"`, and does not validate the Rust parameter/return types against the
 supplied Java descriptor. You must use FFI-safe types such as `EnvUnowned`, not `Env`, and provide exception and panic
 handling. Prefer `native_method!` unless you need a handwritten entry point.
+
+### Native registration and library lifetime
+
+`bind_java_type!` registers required and enabled runtime-gated native methods during binding initialization, before Java
+class initialization. These registrations are not scoped to a Rust wrapper or descriptor. Earlier registrations are not
+rolled back if a later registration, hook, or member lookup fails, and initialization may retry registration. The macro
+does not unregister on drop or coordinate library unloading.
+
+The application must keep the generated wrappers and their implementations executable while the JVM can call them,
+including until all in-flight calls return. Use process-lifetime native code or independently keep the native library
+loaded. The cached global reference to the target class is **not** a general library keepalive: a different class loader
+may own the library. The macro neither identifies nor retains that owning loader or a native library handle.
+
+Unloadable-library integrations must prevent new calls and concurrent registration, remove registrations, and wait for
+in-flight calls before unloading. The binding cache provides neither teardown nor in-flight-call tracking; automatic
+registration does not support library unloading and reloading.
+
+`native_method!` generates a descriptor but does not register it or retain its library. The descriptor's string lifetime
+is unrelated to the executable code's lifetime. Explicit registration must satisfy the safety contract of
+`Env::register_native_methods`, including when using `register_native_methods_from_class`.
 
 ### Custom type mappings
 
@@ -200,7 +264,7 @@ When Cargo names the runtime dependency differently, configure it explicitly:
 
 ```toml
 [dependencies]
-jni_runtime = { package = "abos-jni", version = "0.1.0" }
+jni_runtime = { package = "abos-jni", version = "0.2.0" }
 ```
 
 Pass `jni = <path>` as the first property in string, signature, and binding macro invocations:

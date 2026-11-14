@@ -19,14 +19,12 @@ use crate::internal::{
 
 custom_keyword!(sig);
 
-/// Represents a method parameter
 #[derive(Debug, Clone)]
 pub struct Parameter {
 	pub name: Ident,
 	pub ty: SigType,
 }
 
-/// Represents a method signature
 #[derive(Debug, Clone)]
 pub struct MethodSignature {
 	pub parameters: Vec<Parameter>,
@@ -34,7 +32,6 @@ pub struct MethodSignature {
 }
 
 impl MethodSignature {
-	/// Convert to JNI method signature string
 	pub fn to_jni_signature(&self, type_mappings: &TypeMappings) -> Result<String> {
 		let mut result: String = String::from("(");
 
@@ -83,14 +80,12 @@ pub fn parse_method_sig(input: ParseStream, type_mappings: &TypeMappings) -> Res
 	})
 }
 
-/// Represents a field signature
 #[derive(Debug, Clone)]
 pub struct FieldSignature {
 	pub field_type: SigType,
 }
 
 impl FieldSignature {
-	/// Convert to JNI field signature string (just the type descriptor)
 	pub fn to_jni_signature(&self, type_mappings: &TypeMappings) -> Result<String> {
 		self.field_type.to_jni_descriptor(type_mappings)
 	}
@@ -104,7 +99,6 @@ pub fn parse_field_sig(input: ParseStream, type_mappings: &TypeMappings) -> Resu
 	Ok(FieldSignature { field_type })
 }
 
-/// Represents either a method or field signature
 #[derive(Debug, Clone)]
 pub enum Signature {
 	Method(MethodSignature),
@@ -112,7 +106,6 @@ pub enum Signature {
 }
 
 impl Signature {
-	/// Convert to JNI signature string
 	pub fn to_jni_signature(&self, type_mappings: &TypeMappings) -> Result<String> {
 		match self {
 			Self::Method(sig) => sig.to_jni_signature(type_mappings),
@@ -121,8 +114,7 @@ impl Signature {
 	}
 }
 
-/// Parse a parameter with an index for fallback naming: `name: type` or just `type`
-/// If only a type is provided, generates a fallback name like "arg0", "arg1", etc.
+/// Parse `name: type` or a bare type, naming unnamed parameters `arg{index}`.
 pub fn parse_parameter_with_index(input: ParseStream, index: usize, type_mappings: &TypeMappings) -> Result<Parameter> {
 	if input.peek(Ident) && input.peek2(Token![:]) {
 		let name: Ident = input.parse::<Ident>()?;
@@ -136,7 +128,6 @@ pub fn parse_parameter_with_index(input: ParseStream, index: usize, type_mapping
 	}
 }
 
-/// Represents the full macro input with named properties
 struct SignatureInput {
 	signature: Signature,
 	type_mappings: TypeMappings,

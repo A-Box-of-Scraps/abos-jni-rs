@@ -17,6 +17,10 @@ pub type jdouble = f64;
 pub type jsize = jint;
 
 #[derive(Debug)]
+#[allow(
+	clippy::empty_enums,
+	reason = "Opaque FFI handle tags must be distinct and cannot be instantiated."
+)]
 pub enum _jobject {}
 pub type jobject = *mut _jobject;
 pub type jclass = jobject;
@@ -49,9 +53,17 @@ pub union jvalue {
 }
 
 #[derive(Debug)]
+#[allow(
+	clippy::empty_enums,
+	reason = "Opaque FFI handle tags must be distinct and cannot be instantiated."
+)]
 pub enum _jfieldID {}
 pub type jfieldID = *mut _jfieldID;
 #[derive(Debug)]
+#[allow(
+	clippy::empty_enums,
+	reason = "Opaque FFI handle tags must be distinct and cannot be instantiated."
+)]
 pub enum _jmethodID {}
 pub type jmethodID = *mut _jmethodID;
 

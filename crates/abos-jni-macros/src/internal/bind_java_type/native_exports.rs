@@ -3,7 +3,12 @@ use super::{
 	format_ident, lit_cstr_mutf8, quote,
 };
 
-/// Generate the native methods registration code for `API::get()`
+/// Generate the native methods registration code for `API::get()`.
+///
+/// Required and gated registrations rely on the application's library-lifetime guarantee
+/// documented on `bind_java_type!`. Generated wrappers check the ABI, not the library lifetime.
+/// The cached target class need not belong to the loader that owns the native library.
+/// Earlier registrations remain installed if a later registration or API initialization fails.
 pub(super) fn generate_native_registration_code(
 	_api_name: &Ident,
 	native_methods: &[NativeMethod],
@@ -15,6 +20,7 @@ pub(super) fn generate_native_registration_code(
 	}
 
 	let mut native_method_descriptors: Vec<TokenStream> = Vec::new();
+	let mut gated_registrations: Vec<TokenStream> = Vec::new();
 
 	for method in native_methods {
 		let java_name: &String = &method.java_name;
@@ -36,30 +42,64 @@ pub(super) fn generate_native_registration_code(
 
 		let cfg_attrs: Vec<syn::Attribute> = extract_cfg_attrs(&method.attrs);
 
-		native_method_descriptors.push(quote! {
-			#(#cfg_attrs)*
+		let descriptor: TokenStream = quote! {
 			#jni::NativeMethod::from_raw_parts(
 				#jni::strings::JNIStr::from_cstr_unchecked(#name_cstr),
 				#jni::strings::JNIStr::from_cstr_unchecked(#sig_cstr),
 				#fn_ptr,
 			)
-		});
+		};
+		if method.requirement.is_required() {
+			native_method_descriptors.push(quote! { #(#cfg_attrs)* #descriptor });
+		} else {
+			let flag: Ident = super::Requirement::native_flag(rust_name);
+			let condition: TokenStream = method.requirement.condition();
+			let registration: TokenStream = quote! { env.register_native_methods(class, &[#descriptor]) };
+			let outcome: TokenStream = if matches!(method.requirement, super::Requirement::Available) {
+				quote! {
+					match #registration {
+						Ok(()) => true,
+						Err(#jni::errors::Error::NoSuchMethod(_)) => false,
+						Err(error) => return Err(error),
+					}
+				}
+			} else {
+				quote! { #registration?; true }
+			};
+			gated_registrations.push(quote! {
+				#(#cfg_attrs)*
+				#[allow(unused_variables, reason = "A native without a Rust call wrapper only needs the registration side effect.")]
+				let #flag = if #condition {
+					// Register one optional native at a time: a missing declaration must
+					// not prevent other natives from being registered before class initialization.
+					// SAFETY: Generated wrappers match the declared signatures and receivers.
+					// The application must keep their library loaded for all possible calls,
+					// including after a later initialization error (see bind_java_type! docs).
+					unsafe { #outcome }
+				} else { false };
+			});
+		}
 	}
 
 	Ok(quote! {
 		{
 			// SAFETY: Name and signature literals are validated and encoded as modified UTF-8 at compile time.
+			// Generated wrappers match the declared signatures and receivers. The application
+			// must keep their library loaded for all possible calls, including after a later
+			// initialization error (see bind_java_type! docs); the cached class is not sufficient.
 			unsafe {
 				let native_methods = &[
 					#(#native_method_descriptors),*
 				];
-				env.register_native_methods(class, native_methods)?;
+				if !native_methods.is_empty() {
+					env.register_native_methods(class, native_methods)?;
+				}
 			}
 		}
+		#(#gated_registrations)*
 	})
 }
 
-/// Generate exported native method functions for methods marked with export = true
 #[allow(
 	clippy::too_many_arguments,
 	reason = "Code generation needs the independent binding metadata and JNI paths."
@@ -77,13 +117,19 @@ pub(super) fn generate_native_exports(
 
 	for method in native_methods {
 		let should_export: bool = match &method.export {
-			NativeMethodExport::Default => global_native_methods_export,
+			NativeMethodExport::Default => global_native_methods_export && method.requirement.is_required(),
 			NativeMethodExport::No => false,
 			NativeMethodExport::WithAutoMangle | NativeMethodExport::WithName(_) => true,
 		};
 
 		if !should_export {
 			continue;
+		}
+		if !method.requirement.is_required() {
+			return Err(syn::Error::new(
+				method.rust_name.span(),
+				"Runtime-gated native methods cannot be exported: JNI symbol lookup bypasses registration requirements",
+			));
 		}
 
 		let export_name: Option<String> = match &method.export {
@@ -108,7 +154,6 @@ pub(super) fn generate_native_exports(
 	})
 }
 
-/// Generate a single exported native method function
 #[allow(
 	clippy::too_many_arguments,
 	reason = "Code generation needs the independent binding metadata and JNI paths."

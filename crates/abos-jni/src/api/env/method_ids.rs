@@ -21,8 +21,6 @@ impl<'local> Env<'local> {
 	where
 		T: Desc<'local, JClass<'other_local>>,
 	{
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 		// SAFETY: The descriptor resolves to a live class; the JNI allocator returns a local object reference.

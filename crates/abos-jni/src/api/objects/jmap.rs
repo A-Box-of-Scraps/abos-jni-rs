@@ -21,11 +21,17 @@ crate::bind_java_type! {
 		priv fn _get(key: JObject) -> JObject,
 		/// Get the value for a key, or return the default value if the key is not present
 		///
+		/// Returns `Error::MemberUnavailable` if this runtime does not provide the method.
+		/// Other `JMap` operations remain usable.
+		///
 		/// # Throws
 		///
 		/// - `ClassCastException` - if the key is of an inappropriate type for this map
 		/// - `NullPointerException` - if the key is null and this map does not allow null keys
-		fn get_or_default(key: JObject, default_value: JObject) -> JObject,
+		fn get_or_default {
+			sig = (key: JObject, default_value: JObject) -> JObject,
+			requires = available,
+		},
 		// Associates the specified value with the specified key in this map
 		priv fn _put(key: JObject, value: JObject) -> JObject,
 		/// Copies all of the mappings from the specified map to this map
@@ -39,13 +45,19 @@ crate::bind_java_type! {
 		fn put_all(other_map: JMap),
 		/// If the specified key is not already associated with a value, associate it with the given value.
 		///
+		/// Returns `Error::MemberUnavailable` if this runtime does not provide the method.
+		/// Other `JMap` operations remain usable.
+		///
 		/// # Throws
 		///
 		/// - `UnsupportedOperationException` - if the `putIfAbsent` operation is not supported by this map
 		/// - `ClassCastException` - if the key or value are of an inappropriate type for this map
 		/// - `NullPointerException` - if the key or value is null and this map does not allow null keys or values
 		/// - `IllegalArgumentException` - if some property of the key or value prevents it from being stored by this map
-		fn put_if_absent(key: JObject, value: JObject) -> JObject,
+		fn put_if_absent {
+			sig = (key: JObject, value: JObject) -> JObject,
+			requires = available,
+		},
 		/// Remove a mapping for a key from the map
 		priv fn _remove(key: JObject) -> JObject,
 		/// Removes the entry for the specified key only if it is currently mapped to the specified value
@@ -58,8 +70,12 @@ crate::bind_java_type! {
 		priv fn remove_value {
 			name = "remove",
 			sig = (key: JObject, value: JObject) -> bool,
+			requires = available,
 		},
 		/// Replaces the entry for the specified key only if it is currently mapped to some value
+		///
+		/// Returns `Error::MemberUnavailable` if this runtime does not provide the method.
+		/// Other `JMap` operations remain usable.
 		///
 		/// # Throws
 		///
@@ -67,8 +83,14 @@ crate::bind_java_type! {
 		/// - `ClassCastException` - if the key or value are of an inappropriate type for this map
 		/// - `NullPointerException` - if the key or value is null and this map does not allow null keys or values
 		/// - `IllegalArgumentException` - if some property of the value prevents it from being stored by this map
-		fn replace(key: JObject, value: JObject) -> JObject,
+		fn replace {
+			sig = (key: JObject, value: JObject) -> JObject,
+			requires = available,
+		},
 		/// Replaces the entry for the specified key only if currently mapped to a given value
+		///
+		/// Returns `Error::MemberUnavailable` if this runtime does not provide the method.
+		/// Other `JMap` operations remain usable.
 		///
 		/// # Throws
 		///
@@ -79,6 +101,7 @@ crate::bind_java_type! {
 		fn replace_value {
 			name = "replace",
 			sig = (key: JObject, old_value: JObject, new_value: JObject) -> bool,
+			requires = available,
 		},
 		/// Removes all of the mappings from this map
 		fn clear(),

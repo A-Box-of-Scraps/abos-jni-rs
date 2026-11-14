@@ -11,7 +11,7 @@ Raw Rust definitions corresponding to `jvmti.h`.
 
 ```toml
 [dependencies]
-abos-jvmti-sys = "0.1.0"
+abos-jvmti-sys = "0.1.1"
 ```
 
 This `no_std` crate provides the JVMTI 25 declaration set and shares/re-exports JNI types from `abos-jni-sys`. Normal
@@ -187,32 +187,13 @@ fn main() {
 A default callback table selects no callbacks. In an agent, populate the callbacks you need and use the environment's
 queried version rather than assuming that a constant proves runtime support.
 
-## Tests and API reference
-
-From a repository checkout, run the JDK-independent layout and compatibility checks:
-
-```sh
-cargo test --locked --package abos-jvmti-sys
-```
-
-For ABI validation against the JVMTI 25 headers, set `JAVA_HOME` to a host JDK 25 installation and provide a native C
-compiler. The standalone header probe is not a cross-compilation test:
-
-```sh
-cargo test --locked --manifest-path tests/abos-jvmti-sys-systest/Cargo.toml
-```
-
-The checked-in declarations can also be checked against the local JDK 25 header with Python and `rustfmt` installed:
-
-```sh
-python scripts/generate_jvmti.py --check
-```
+## API reference
 
 See the
 [interface declarations](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jvmti-sys/src/api/interface.rs),
 [callback declarations](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jvmti-sys/src/api/callbacks.rs),
-and [header probe](https://github.com/A-Box-of-Scraps/abos-jni-rs/tree/HEAD/tests/abos-jvmti-sys-systest) for the full
-API and ABI checks. Generate the Rust reference locally with:
+and [header probe](https://github.com/A-Box-of-Scraps/abos-jni-rs/tree/HEAD/tests/abos-jvmti-sys-systest) for
+declarations and ABI checks. Generate the Rust reference with:
 
 ```sh
 cargo doc --package abos-jvmti-sys --no-deps --open

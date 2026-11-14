@@ -8,7 +8,7 @@ use std::{
 };
 
 #[test]
-fn agents_receive_vm_thread_and_compiled_method_events() -> Result<(), Box<dyn std::error::Error>> {
+fn agents_receive_events_and_coordinate_shutdown() -> Result<(), Box<dyn std::error::Error>> {
 	let manifest: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 	let target: PathBuf = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("events-agent");
 	let build: Output = Command::new(env!("CARGO"))
@@ -23,6 +23,8 @@ fn agents_receive_vm_thread_and_compiled_method_events() -> Result<(), Box<dyn s
 			"events_agent",
 			"--example",
 			"profiling_agent",
+			"--example",
+			"shutdown_agent",
 			"--target-dir",
 		])
 		.arg(&target)
@@ -32,11 +34,7 @@ fn agents_receive_vm_thread_and_compiled_method_events() -> Result<(), Box<dyn s
 		"agent build failed:\n{}",
 		String::from_utf8_lossy(&build.stderr)
 	);
-	let agent: PathBuf = target.join("debug/examples").join(format!(
-		"{}events_agent{}",
-		std::env::consts::DLL_PREFIX,
-		std::env::consts::DLL_SUFFIX
-	));
+	let agent: PathBuf = agent_library(&target, "events_agent");
 	let home: PathBuf = PathBuf::from(std::env::var_os("JAVA_HOME").expect("Set JAVA_HOME to JDK 25"));
 	let directory: tempfile::TempDir = tempfile::tempdir()?;
 	// Compile once to Java 8 bytecode; older runtimes do not support source-file launch.
@@ -44,6 +42,7 @@ fn agents_receive_vm_thread_and_compiled_method_events() -> Result<(), Box<dyn s
 		.args(["-source", "8", "-target", "8", "-d"])
 		.arg(directory.path())
 		.arg(manifest.join("tests/java/AgentSmoke.java"))
+		.arg(manifest.join("tests/java/ShutdownTarget.java"))
 		.arg(manifest.join("tests/java/AgentFeatures.java"))
 		.arg(manifest.join("tests/java/FeatureTarget.java"))
 		.arg(manifest.join("tests/java/ProfileTarget.java"))
@@ -59,14 +58,15 @@ fn agents_receive_vm_thread_and_compiled_method_events() -> Result<(), Box<dyn s
 		!homes.is_empty(),
 		"JVMTI_TEST_JAVA_HOMES must contain at least one runtime"
 	);
-	let profiler: PathBuf = target.join("debug/examples").join(format!(
-		"{}profiling_agent{}",
-		std::env::consts::DLL_PREFIX,
-		std::env::consts::DLL_SUFFIX
-	));
+	let profiler: PathBuf = agent_library(&target, "profiling_agent");
+	let shutdown: PathBuf = agent_library(&target, "shutdown_agent");
+
 	for home in homes {
 		run_agent(&home, &agent, directory.path(), false)?;
 		run_agent(&home, &agent, directory.path(), true)?;
+		let shutdown_output: String = run_java(&home, &shutdown, directory.path(), "", "ShutdownTarget", &[], &[])?;
+		assert!(shutdown_output.contains("JVMTI_SHUTDOWN_OK"), "{shutdown_output}");
+		assert!(shutdown_output.contains("SHUTDOWN_TARGET_OK"), "{shutdown_output}");
 		let markers: [&str; 3] = ["JVMTI_COMPILED", "JVMTI_INLINE", "PROFILE_TARGET_OK"];
 		let output: String = run_java(
 			&home,
@@ -83,6 +83,14 @@ fn agents_receive_vm_thread_and_compiled_method_events() -> Result<(), Box<dyn s
 		assert!(!output.contains("JVMTI_PROFILE_ERROR"), "{output}");
 	}
 	Ok(())
+}
+
+fn agent_library(target: &Path, name: &str) -> PathBuf {
+	target.join("debug/examples").join(format!(
+		"{}{name}{}",
+		std::env::consts::DLL_PREFIX,
+		std::env::consts::DLL_SUFFIX
+	))
 }
 
 fn run_java(

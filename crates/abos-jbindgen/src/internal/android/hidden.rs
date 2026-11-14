@@ -36,7 +36,6 @@ pub fn parse_hiddenapi_flags(path: &Path, filter: &HiddenApiFilter) -> Result<Ha
 	Ok(allowed_apis)
 }
 
-/// Check if an API should be allowed based on its flags and filter configuration
 pub fn is_api_allowed(flags: &[&str], filter: &HiddenApiFilter) -> bool {
 	if flags.iter().any(|f| *f == "public-api" || *f == "sdk") {
 		return true;
@@ -86,7 +85,7 @@ pub fn compare_target_levels(a: &str, b: &str) -> i32 {
 	}
 }
 
-/// Filter classes to remove hidden APIs based on hiddenapi-flags
+/// Keep only members whose DEX signatures are in the filtered allowlist.
 pub fn filter_hidden_apis(classes: Vec<ClassInfo>, hidden_apis: &HashSet<String>) -> Vec<ClassInfo> {
 	let mut result: Vec<crate::ClassInfo> = Vec::new();
 
@@ -98,7 +97,6 @@ pub fn filter_hidden_apis(classes: Vec<ClassInfo>, hidden_apis: &HashSet<String>
 	result
 }
 
-/// Filter a single class's members based on hidden API flags
 pub fn filter_class_hidden_apis(class: ClassInfo, hidden_apis: &HashSet<String>) -> ClassInfo {
 	let class_name_dex: String = class.class_name.replace('.', "/");
 

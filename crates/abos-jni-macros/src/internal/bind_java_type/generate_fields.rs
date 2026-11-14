@@ -29,6 +29,7 @@ struct FieldContext<'a> {
 	mappings: &'a TypeMappings,
 	jni: &'a syn::Path,
 	field_id: TokenStream,
+	id_access: TokenStream,
 	self_param: TokenStream,
 	receiver: TokenStream,
 	class_def: TokenStream,
@@ -37,6 +38,7 @@ struct FieldContext<'a> {
 impl<'a> FieldContext<'a> {
 	fn new(field: &'a Field, api_name: &'a Ident, mappings: &'a TypeMappings, jni: &'a syn::Path) -> Self {
 		let id: Ident = format_ident!("{}_field_id", field.rust_name);
+		let local_id: Ident = super::Requirement::local_id(&id);
 		let (self_param, receiver, class_def) = if field.is_static {
 			(
 				quote! {},
@@ -54,7 +56,8 @@ impl<'a> FieldContext<'a> {
 			api_name,
 			mappings,
 			jni,
-			field_id: quote! { api.#id.into_raw() },
+			field_id: quote! { #local_id.into_raw() },
+			id_access: field.requirement.access_id(&id, &field.java_name, jni),
 			self_param,
 			receiver,
 			class_def,
@@ -68,6 +71,7 @@ impl<'a> FieldContext<'a> {
 			mappings,
 			jni,
 			field_id,
+			id_access,
 			self_param,
 			receiver,
 			class_def,
@@ -88,6 +92,7 @@ impl<'a> FieldContext<'a> {
 			#(#attributes)*
 			#visibility fn #name<'env_local>(#self_param env: #env_type) -> #jni::errors::Result<#return_type> {
 				let api = #api_name::get(env, &#jni::refs::LoaderContext::None)?;
+				#id_access
 				#class_def
 				#call
 			}
@@ -101,6 +106,7 @@ impl<'a> FieldContext<'a> {
 			mappings,
 			jni,
 			field_id,
+			id_access,
 			self_param,
 			receiver,
 			class_def,
@@ -155,6 +161,7 @@ impl<'a> FieldContext<'a> {
 			#(#attributes)*
 			#visibility fn #name #lifetime_declaration (#self_param env: &#jni::Env<'env_local>, val: #arg_type) -> #jni::errors::Result<()> {
 				let api = #api_name::get(env, &#jni::refs::LoaderContext::None)?;
+				#id_access
 				#class_def
 				#reference_binding
 				#null_check

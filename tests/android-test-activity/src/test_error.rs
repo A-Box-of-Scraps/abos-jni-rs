@@ -26,12 +26,6 @@ impl std::error::Error for TestError {}
 
 pub type TestResult = Result<String, TestError>;
 
-#[cfg(any(
-	feature = "sdk_net_uri",
-	feature = "sdk_os_build",
-	feature = "sdk_content_intent",
-	feature = "sdk_util_time_utils"
-))]
 pub fn require(condition: bool, message: impl Into<String>) -> Result<(), TestError> {
 	if condition {
 		Ok(())

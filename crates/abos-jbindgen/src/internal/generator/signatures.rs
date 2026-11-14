@@ -5,8 +5,7 @@ use super::{
 use crate::{BindgenOptions, Error, MethodInfo, Result, TypeMap};
 use std::collections::HashSet;
 use std::fmt::Write as _;
-/// Generate a JNI-style signature string for a method for sorting purposes
-/// Format: (`arg1_type,arg2_type,...)return_type`
+/// Sorting key in `(type1,type2,...)return_type` form, using Java names rather than JNI descriptors.
 pub fn generate_jni_signature_for_sorting(method: &MethodInfo) -> String {
 	let params: Vec<String> = method
 		.signature
@@ -22,7 +21,6 @@ pub fn generate_jni_signature_for_sorting(method: &MethodInfo) -> String {
 	)
 }
 
-/// Format a type for sorting purposes
 pub fn format_type_for_sorting(type_info: &crate::api::types::TypeInfo) -> String {
 	let base: String = type_info.name.clone();
 	if type_info.array_dimensions > 0 {
@@ -32,7 +30,6 @@ pub fn format_type_for_sorting(type_info: &crate::api::types::TypeInfo) -> Strin
 	}
 }
 
-/// Convert a `TypeInfo` to DEX signature format
 pub fn type_to_dex_signature(type_info: &crate::api::types::TypeInfo) -> String {
 	let mut sig = String::new();
 
@@ -63,8 +60,7 @@ pub fn type_to_dex_signature(type_info: &crate::api::types::TypeInfo) -> String 
 	sig
 }
 
-/// Generate a DEX signature for a method
-/// Format: L<`class_path`>;-><`method_name`>(<params>)<`return_type`>
+/// DEX member key: `Lclass/path;->method(params)return_type`.
 pub fn generate_dex_signature(class_name: &str, method: &MethodInfo) -> String {
 	let mut sig = String::new();
 
@@ -85,8 +81,7 @@ pub fn generate_dex_signature(class_name: &str, method: &MethodInfo) -> String {
 	sig
 }
 
-/// Generate a DEX signature for a field
-/// Format: L<`class_path`>;-><`field_name>`:<type>
+/// DEX member key: `Lclass/path;->field:type`.
 pub fn generate_field_dex_signature(class_name: &str, field: &crate::api::types::FieldInfo) -> String {
 	let mut sig = String::new();
 

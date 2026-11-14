@@ -89,7 +89,7 @@ fn contents(module: &Module) -> String {
 }
 
 fn root_contents(bindings: &Bindings) -> String {
-	let mut output: String = bindings.root_modules.get("").map(contents).unwrap_or_default();
+	let mut output: String = bindings.root_modules.get("").map_or_else(String::new, contents);
 	if bindings.generate_jni_init && !bindings.is_empty() {
 		let defaults: &[BindingInfo] = bindings.root_modules.get("").map_or(&[], |module| &module.bindings);
 		output.push_str(&initialization(

@@ -173,6 +173,9 @@ impl Env<'_> {
 
 	/// Disposes the native environment. Dropping an ordinary handle does not do this.
 	///
+	/// See the [explicit shutdown example](crate#explicit-shutdown-coordination) for
+	/// admission control, draining, and cleanup before disposal. It is not a library-unload protocol.
+	///
 	/// # Errors
 	/// Returns the native JVMTI error or a missing-function error.
 	///

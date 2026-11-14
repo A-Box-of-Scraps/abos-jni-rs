@@ -17,7 +17,7 @@ For native methods loaded into an existing JVM, use the default features:
 
 ```toml
 [dependencies]
-abos-jni = "0.1.0"
+abos-jni = "0.2.0"
 ```
 
 Build the Rust library as a `cdylib`, as shown below. The Java application supplies the JVM; the Rust library does not
@@ -29,7 +29,7 @@ To start a desktop JVM from Rust, enable `invocation`:
 
 ```toml
 [dependencies]
-abos-jni = { version = "0.1.0", features = ["invocation"] }
+abos-jni = { version = "0.2.0", features = ["invocation"] }
 ```
 
 The crate does not install or bundle Java. Starting a JVM requires an installed, compatible JVM shared library. Set
@@ -76,8 +76,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 # fn main() {}
 ```
 
-Run it with `cargo run`. This uses the standard Java `Math.abs(int)` method, so no Java source compilation or custom
-classpath is needed. `-Xcheck:jni` enables additional JVM checks useful during development.
+Run with `cargo run`; no Java compilation or custom classpath is needed. `-Xcheck:jni` enables extra JVM diagnostics.
 
 ### Call Rust from Java
 
@@ -100,7 +99,7 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-abos-jni = "0.1.0"
+abos-jni = "0.2.0"
 ```
 
 Replace `src/lib.rs` with:
@@ -125,8 +124,7 @@ fn add(
 }
 ```
 
-The macro exports the JNI symbol for `HelloRust.add` and wraps the Rust function with the native-call ABI and default
-error/panic handling. No manual native-method registration is needed for this exported method.
+The macro exports `HelloRust.add` with JNI ABI and error/panic handling; no manual registration is needed.
 
 Create `HelloRust.java` in the Cargo package root:
 
@@ -221,9 +219,9 @@ See the
 
 ### Checked and unchecked APIs
 
-Start with checked calls such as `call_static_method` or typed bindings. Checked calls resolve names and signatures and
-validate arguments. The `_unchecked` methods require the caller to uphold their safety contracts; incorrect IDs,
-signatures, or arguments can cause undefined behavior. They are not a general-purpose shortcut around checked calls.
+Checked calls such as `call_static_method` and typed bindings resolve names and signatures and validate arguments. The
+`_unchecked` methods require you to uphold their safety contracts; incorrect IDs, signatures, or arguments can cause
+undefined behavior.
 
 The crate assumes JNI 1.4 or later and one JVM per process. Destroying and recreating the VM is not a supported
 workflow.

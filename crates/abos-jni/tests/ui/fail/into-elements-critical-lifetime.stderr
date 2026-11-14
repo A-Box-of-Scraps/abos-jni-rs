@@ -1,0 +1,10 @@
+error: lifetime may not live long enough
+ --> tests/ui/fail/into-elements-critical-lifetime.rs:6:12
+  |
+4 |     let guard = env.with_local_frame(1, |inner| {
+  |                                          ------ return type of closure is Result<AutoElementsCritical<'2, i32, JPrimitiveArray<'_, i32>>, abos_jni::errors::Error>
+  |                                          |
+  |                                          has type `&mut Env<'1>`
+5 |         let array = inner.new_int_array(1)?;
+6 |         unsafe { array.into_elements_critical(inner, ReleaseMode::CopyBack) }
+  |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ returning this value requires that `'1` must outlive `'2`

@@ -13,7 +13,7 @@ Add the dependency:
 
 ```toml
 [dependencies]
-abos-cafebabe = "0.1.0"
+abos-cafebabe = "0.1.1"
 ```
 
 ## Quick Start
@@ -38,21 +38,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Scope and limitations
 
-### Supported input
-
-The crate has no runtime dependencies and parses one complete class file from bytes. It does not read JAR archives or
-Java source files.
+The crate has no runtime dependencies and reads one complete class file, not JAR archives or Java sources.
 
 Class-file major versions 45 through 71 are accepted. For major versions 56 and above, the minor version must be 0 or
 65535 (preview).
 
-### Extracted metadata
-
-The result owns its metadata: versions, class and superclass names, direct interfaces, declared fields and methods, and
-raw access flags. Methods include constructors (`<init>`) and class initializers (`<clinit>`). Descriptors remain JVM
-strings rather than parsed types.
-
-Attribute payloads are skipped, so bytecode, annotations, and generic signatures are not extracted.
+The result owns versions, class/superclass names, direct interfaces, declared fields and methods, and raw access flags.
+Methods include constructors (`<init>`) and class initializers (`<clinit>`). Descriptors remain JVM strings. Attribute
+payloads, including bytecode, annotations, and generic signatures, are skipped.
 
 ### Validation and errors
 

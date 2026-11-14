@@ -13,17 +13,8 @@ use super::{Global, JNIStr, JNIString, JObject};
 ///
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub enum AttachmentExceptionPolicy {
-	/// Pending exceptions are not checked before or after any attachment
-	/// closure
-	///
-	/// This will expose your closure to any pending exception which it should
-	/// be prepared to handle.
-	///
-	/// For example this could be used to make purely exception-safe JNI calls.
-	///
-	/// Note: It should be very rare to use this, since attachment closures are
-	/// normally written as orthogonal code that is not expected to handle the
-	/// side effects of external code.
+	/// Runs the closure without checking exceptions before or after it.
+	/// The closure must handle any pre-existing exception or use only exception-safe JNI calls.
 	Ignore,
 
 	/// Temporarily clears a pre-existing exception before running the attachment closure,

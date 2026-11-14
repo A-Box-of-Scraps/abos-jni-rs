@@ -362,6 +362,10 @@ mod test;
 /// struct but with the additional constraint that it can only be constructed via an `unsafe`
 /// [`Self::from_raw_parts`] method that requires the caller to ensure that the function pointer is
 /// valid and matches the signature.
+///
+/// The `'desc` lifetime covers only the borrowed name and signature strings, not the executable
+/// code. This descriptor does not own or keep a native library loaded. Registering it requires
+/// the separate code-lifetime guarantees documented on [`Env::register_native_methods`].
 pub struct NativeMethod<'desc> {
 	desc: JNINativeMethod,
 	_phantom: PhantomData<&'desc JNIStr>,
@@ -436,6 +440,10 @@ impl Drop for MonitorGuard<'_> {
 mod array_regions;
 mod arrays;
 mod buffers;
+mod call_args;
+#[cfg(test)]
+#[path = "../../../tests/unit/api/env/call_args.rs"]
+mod call_args_tests;
 mod calls;
 mod classes;
 mod exceptions;

@@ -5,6 +5,10 @@ pub type jthreadGroup = jobject;
 pub type jlocation = jlong;
 
 #[derive(Debug)]
+#[allow(
+	clippy::empty_enums,
+	reason = "Opaque FFI handle tags must be distinct and cannot be instantiated."
+)]
 pub enum _jrawMonitorID {}
 pub type jrawMonitorID = *mut _jrawMonitorID;
 pub type jniNativeInterface = JNINativeInterface_;

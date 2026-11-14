@@ -6,6 +6,7 @@
 
 ### Changed
 
+- Streamline the crate README.
 - Replace internal parser magic numbers with named constants.
 - Expand regression coverage for class-file version and modified UTF-8 encoding boundaries.
 

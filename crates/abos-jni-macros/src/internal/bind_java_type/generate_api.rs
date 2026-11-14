@@ -3,7 +3,6 @@ use super::{
 	generate_is_instance_of_assignable_checks, generate_type_mapping_checks, path_to_string_no_spaces, quote,
 };
 
-/// Generate the type struct definition
 pub(super) fn generate_type_struct(
 	type_name: &Ident,
 	type_visibility: &VisibilitySpec,
@@ -70,7 +69,6 @@ pub(super) fn generate_type_struct(
 	}
 }
 
-/// Generate the API struct definition
 pub(super) fn generate_api_struct(
 	api_name: &Ident,
 	type_visibility: &VisibilitySpec,
@@ -94,7 +92,6 @@ pub(super) fn generate_api_struct(
 	}
 }
 
-/// Generate the `API::get()` method
 #[allow(
 	clippy::too_many_arguments,
 	reason = "Code generation needs the independent binding metadata and JNI paths."
@@ -158,6 +155,7 @@ pub(super) fn generate_api_get_method(
 		quote! {}
 	};
 
+	let requirement_checker: TokenStream = super::requirements::generate_requirement_checker(jni);
 	let private_field: Option<TokenStream> = priv_type.map(|_| quote! { private, });
 	let api_construction: TokenStream = quote! {
 		// Compile-time encoded modified UTF-8 names are valid JNIStr values.
@@ -169,6 +167,8 @@ pub(super) fn generate_api_get_method(
 		#init_priv_wrapper
 
 		impl #api_name {
+			#requirement_checker
+
 			pub fn get(
 				env: &#jni::Env,
 				loader: &#jni::refs::LoaderContext,
@@ -183,7 +183,8 @@ pub(super) fn generate_api_get_method(
 				// must run without holding a lock. Concurrent callers may repeat this work.
 
 				let api = env.with_local_frame(4, |env| -> #jni::errors::Result<#api_name> {
-					// Cache the class before initialization can re-enter get().
+					// Cache the class before initialization can re-enter get(). This retains the
+					// target class, not necessarily the loader that owns our native library.
 					static CLASS: ::std::sync::OnceLock<#jni::objects::Global<#jni::objects::JClass>> = ::std::sync::OnceLock::new();
 
 					let class = if let Some(class) = CLASS.get() {
@@ -207,9 +208,7 @@ pub(super) fn generate_api_get_method(
 
 					#type_mapping_runtime_checks
 
-					let api = #api_construction;
-
-					Ok(api)
+					Ok(#api_construction)
 				})?;
 				let _ = API.set(api);
 				Ok(API.get().unwrap())

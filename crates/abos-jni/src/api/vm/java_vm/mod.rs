@@ -21,21 +21,11 @@ use {
 	crate::objects,
 };
 
-/// The capacity of local frames, allocated for attached threads by default. Same as the default
-/// value Hotspot uses when calling native Java methods.
+/// Default capacity of local frames created by the thread attachment APIs.
 pub const DEFAULT_LOCAL_FRAME_CAPACITY: usize = 32;
 
-/// The `jni-rs` crate makes the assumption that it's not possible to create more than one Java VM
-/// per-process, or even re-initialize a `JavaVM` that is "destroyed".
-///
-/// This allows us to save a global pointer for the `JavaVM`.
-///
-/// We also guarantee that if you currently have an [`AttachGuard`] thread attachment (or a `Env`
-/// reference), that implies that [`JavaVM::singleton()`] has been initialized and will return a
-/// valid [`JavaVM`].
-///
-/// For example, this guarantee is relied on internally to avoid redundantly saving `JavaVM` pointers
-/// if know we can assume that `JavaVM::singleton()` will return a `JavaVM` when needed.
+// One VM per process; destruction and recreation are not supported.
+// An AttachGuard or Env from this crate implies that the singleton is initialized.
 static JAVA_VM_SINGLETON: std::sync::OnceLock<JavaVM> = std::sync::OnceLock::new();
 
 /// The Java VM API, including (optional) [Invocation API][invocation-api] support.
@@ -44,37 +34,17 @@ static JAVA_VM_SINGLETON: std::sync::OnceLock<JavaVM> = std::sync::OnceLock::new
 /// in an already attached thread, or a new VM can be [launched](#launching-jvm-from-rust) via
 /// [`JavaVM::new`].
 ///
-/// ## Minimum supported JNI version is 1.4
-///
-/// The implementation of this crate assumes your Java VM supports at least JNI >= 1.4
-///
-/// The implementation wouldn't be able to call `ExceptionCheck` without JNI 1.2 and requiring >=
-/// 1.4 means we don't need any runtime version checks for the direct byte buffer APIs.
-///
-/// Since `GetVersion` requires a [`Env`] and is not one of the JNI APIs that is safe to use with
-/// pending exceptions then the implementation is not always able to explicitly assert the supported
-/// version.
-///
 /// ## Attaching Native Threads
 ///
-/// Your application always needs to explicitly attach `jni-rs` to the current thread before it can
-/// access the [`Env`] API (most of the interesting APIs are under [`Env`]).
+/// The VM must support JNI 1.4 or later. This requirement cannot always be checked
+/// at runtime because `GetVersion` is not safe with a pending exception.
 ///
-/// If you're implementing a native/foreign method then JNI will pass a thread attachment (in the
-/// form of a raw [`sys::JNIEnv`] pointer that should be captured using the
-/// [`env::EnvUnowned`] type) and converted into a [`Env`] reference via
-/// [`env::EnvUnowned::with_env`])
+/// Attach a native thread before using [`Env`]. Java native methods receive an
+/// existing attachment as [`env::EnvUnowned`]; use [`env::EnvUnowned::with_env`]
+/// to borrow an [`Env`]. `Env` itself is not an FFI-safe JNI pointer wrapper.
 ///
-/// Note: [`Env`] is not a `#[transparent]` wrapper over a [`sys::JNIEnv`] pointer.
-///
-/// The attachment of the current thread is always represented via an [`AttachGuard`] which blocks
-/// the thread from being detached and acts as a marker for a JNI stack frame.
-///
-/// [`Env`] is only ever exposed in the public API by-reference, and will always borrow from an
-/// [`AttachGuard`] such that it's lifetime is tied to a fixed JNI stack frame.
-///
-/// Unless you are using `unsafe` APIs though, the [`AttachGuard`] itself will usually be hidden,
-/// and you will get a [`Env`] reference (that borrows from a hidden [`AttachGuard`]).
+/// An [`Env`] borrows an [`AttachGuard`], tying it to a fixed JNI frame and preventing
+/// detachment while in use. Safe closure-based APIs manage the guard for you.
 ///
 /// This library supports these modes of attachment:
 /// * A permanent attachment with [`JavaVM::attach_current_thread`]. The thread will automatically
@@ -103,7 +73,7 @@ static JAVA_VM_SINGLETON: std::sync::OnceLock<JavaVM> = std::sync::OnceLock::new
 /// Cargo.toml:
 ///
 /// ```toml
-/// abos-jni = { version = "0.1", features = ["invocation"] }
+/// abos-jni = { version = "0.2.0", features = ["invocation"] }
 /// ```
 ///
 /// The application will be able to use [`JavaVM::new`] which will dynamically load a `jvm` library
@@ -271,7 +241,10 @@ fn windows_is_shutdown_in_progress() -> bool {
 	unsafe { RtlDllShutdownInProgress() != 0 }
 }
 
-/// Detach a thread from the JVM.
+/// Detach a thread from the JVM without invoking the logger.
+///
+/// This runs during TLS/FLS destruction, when a logger's TLS may already be destroyed.
+/// Keep diagnostics outside this routine and its teardown callers.
 ///
 /// If `cross_check_env` is provided, this function will verify that the env pointer matches the
 /// current thread's attachment before detaching. This provides a defensive check that we "own" the
@@ -284,10 +257,7 @@ fn windows_is_shutdown_in_progress() -> bool {
 /// was already detached by other means (e.g., manual `DetachCurrentThread` call via raw JNI API,
 /// or by another fiber on Windows). This maintains correct logical accounting - we track how many
 /// times *we* attached, not the actual JVM attachment state.
-pub unsafe fn sys_detach_current_thread(
-	cross_check_env: Option<*mut abos_jni_sys::JNIEnv>,
-	thread: &Thread,
-) -> Result<()> {
+pub unsafe fn sys_detach_current_thread(cross_check_env: Option<*mut abos_jni_sys::JNIEnv>) -> Result<()> {
 	assert_eq!(JavaVM::thread_attach_guard_level(), 0);
 
 	let vm: JavaVM = JavaVM::singleton()?;
@@ -355,18 +325,6 @@ pub unsafe fn sys_detach_current_thread(
 			unsafe {
 				java_vm_call_unchecked!(vm, v1_1, DetachCurrentThread);
 			}
-			debug!(
-				"Detached thread {} ({:?})",
-				thread.name().unwrap_or_default(),
-				thread.id()
-			);
-		} else {
-			// Thread already detached (e.g., by another fiber on Windows, or manual DetachCurrentThread)
-			debug!(
-				"Thread {} ({:?}) already detached (skipping DetachCurrentThread)",
-				thread.name().unwrap_or_default(),
-				thread.id()
-			);
 		}
 	}
 
@@ -375,11 +333,6 @@ pub unsafe fn sys_detach_current_thread(
 	// - On Windows with FLS: each fiber attachment increments this counter
 	// - On other platforms with TLS: each thread attachment increments this counter
 	ATTACHED_THREADS.fetch_sub(1, Ordering::SeqCst);
-
-	debug!(
-		"{} attachments remain (logical count)",
-		ATTACHED_THREADS.load(Ordering::SeqCst)
-	);
 
 	Ok(())
 }

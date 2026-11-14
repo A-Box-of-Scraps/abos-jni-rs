@@ -10,49 +10,13 @@ use crate::{
 
 use super::Reference;
 
-/// A wrapper to `Auto` delete local references early (before the JNI stack
-/// frame unwinds).
+/// Deletes an owned local reference when dropped, before its JNI frame ends.
 ///
-/// ---
+/// Local references are otherwise released when their frame ends. Use `Auto` for
+/// temporary references in long-running loops, or [`Env::with_local_frame`] to
+/// release a group of references together. [`Env::delete_local_ref`] deletes one explicitly.
 ///
-/// _**Note** that it's often not necessary, or even recommended, to create an
-/// `Auto` wrapper for local JNI references if you can instead rely on the
-/// references being deleted when the current JNI stack frame unwinds._
-///
-/// ---
-///
-/// ## Overview
-///
-/// Anything passed to a foreign method or returned from JNI methods that refers
-/// to a `JObject` is considered a local reference.
-///
-/// JNI local references belong to a JNI stack frame (the top frame at the time
-/// they are created).
-///
-/// These JNI references are normally automatically deleted once the their JNI
-/// stack frame unwinds, such as when a foreign method implementation returns
-/// back to the `JavaVM`.
-///
-/// In some situations you don't want to wait until the current JNI stack frame
-/// unwinds before you delete a local reference and you can wrap then with
-/// `Auto` so they are deleted earlier, when they are dropped.
-///
-/// For example, you might be creating a very large number of temporary
-/// references in a loop that can lead to running out of memory if they aren't
-/// explicitly deleted before the JNI stack frame unwinds.
-///
-/// This wrapper type provides automatic local reference deletion when it goes
-/// out of scope and gets dropped.
-///
-/// See also the [JNI specification][spec-references] for details on referencing
-/// Java objects and some [extra information][android-jni-references].
-///
-/// ## `IntoAuto` trait (`.auto()`)
-///
-/// As a convenience, the `IntoAuto` trait is implemented for all reference
-/// types (like `JObject`, `JClass`, `JString` etc). This allows you to easily
-/// create an `Auto` wrapper by calling the `.auto()` method on any local
-/// reference.
+/// Wrap a local reference with [`Auto::new`] or the [`super::IntoAuto::auto`] method:
 ///
 /// For example:
 ///
@@ -69,25 +33,6 @@ use super::Reference;
 /// # }
 /// ```
 ///
-/// ## Alternatives
-///
-/// It is usually more efficient to rely on stack frame unwinding to release
-/// local references in bulk instead of creating [`Auto`] wrappers that are then
-/// deleted one-by-one.
-///
-/// If you aren't sure whether it's OK to create new local references in the
-/// current JNI frame (perhaps because you don't know when it will unwind) you
-/// can also consider using APIs like [`crate::Env::with_local_frame()`] which
-/// can run your code in a temporary stack frame that will release all local
-/// references in bulk, without needing to use [`Auto`].
-///
-/// You can also explicitly delete a local reference with
-/// [`crate::Env::delete_local_ref`].
-///
-/// [spec-references]:
-///     https://docs.oracle.com/en/java/javase/12/docs/specs/jni/design.html#referencing-java-objects
-/// [android-jni-references]:
-///     https://developer.android.com/training/articles/perf-jni#local-and-global-references
 #[derive(Debug)]
 pub struct Auto<'local, T>
 where
@@ -97,7 +42,7 @@ where
 	_lifetime: PhantomData<&'local T>,
 }
 
-/// A temporary alias to sign post that `AutoLocal` has been renamed to [`Auto`]
+/// Deprecated alias for [`Auto`].
 #[deprecated(since = "0.22.0", note = "AutoLocal has been renamed to `Auto`")]
 pub type AutoLocal<'local, T> = Auto<'local, T>;
 
@@ -120,50 +65,16 @@ where
 		}
 	}
 
-	/// Unwrap the RAII, auto-delete wrapper, returning the original local
-	/// reference.
+	/// Returns the local reference without deleting it.
 	///
-	/// This prevents the local reference from being automatically deleted when
-	/// this guard is dropped, and the local reference will instead get deleted
-	/// when the JNI local frame holding the reference gets unwound.
-	///
-	/// # Leaking References
-	///
-	/// When unwrapping an [`Auto`] you should consider how else you will
-	/// ensure that the local reference will get released.
-	///
-	/// If you are implementing a native method then you may not need to keep
-	/// an [`Auto`] wrapper since you can assume that when you return back to
-	/// the Java VM then the local JNI stack frame will unwind and delete all
-	/// local references.
-	///
-	/// Another option can be to use `Env::with_local_frame` or similar APIs
-	/// that create a temporary JNI local frame where you can assume that all
-	/// local references will be deleted when that local frame is unwound, after
-	/// the given closure is called.
-	///
+	/// The reference remains owned by its JNI frame. Release it explicitly or let
+	/// the frame end; repeated unwrapping in a long-lived frame can exhaust local references.
 	pub fn unwrap(self) -> T {
-		// We need to move `self.obj` out of `self`. Normally that's trivial, but moving out of a
-		// type with a `Drop` implementation is not allowed. We'll have to do it manually (and
-		// carefully) with `unsafe`.
-		//
-		// This could be done without `unsafe` by adding `where T: Default` and using
-		// `std::mem::replace` to extract `self.obj`, but doing it this way avoids unnecessarily
-		// running the drop routine on `self`.
-
-		// Before we mutilate `self`, make sure its drop code will not be automatically run. That
-		// would cause undefined behavior.
+		// Suppress the wrapper's destructor before moving out the reference.
 		let self_md: ManuallyDrop<Auto<'_, T>> = ManuallyDrop::new(self);
 
 		// SAFETY: ManuallyDrop prevents a second drop, and the consumed wrapper is not accessed after moving out its object.
-		unsafe {
-			// Move `obj` out of `self` and return it.
-			//
-			// Safety: The `&mut` proves that `self_md.obj` is valid and not aliased. It is not
-			// accessed again after this point. It is wrapped inside `ManuallyDrop`, and will
-			// therefore not be dropped after it is moved.
-			ptr::read(&raw const *self_md.obj)
-		}
+		unsafe { ptr::read(&raw const *self_md.obj) }
 	}
 
 	/// Unwrap the RAII, auto-delete wrapper, returning the original local reference.

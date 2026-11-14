@@ -19,73 +19,22 @@ use super::Reference;
 // wrap it in `Auto`, which would cause undefined behavior upon drop as a result of calling
 // the wrong JNI function to delete the reference.
 
-/// A global reference to a Java object.
+/// An owned global reference that keeps a Java object alive until dropped.
 ///
-/// Global references are slower to create and delete than ordinary local
-/// references, but have several properties that distinguish them:
+/// Global references outlive local JNI frames and implement [`Send`] and [`Sync`].
+/// Use them to retain objects across native calls or share references between threads.
+/// Each thread still needs an attachment to call JNI; sharing a reference does not
+/// make the Java object's operations thread-safe. See [`Weak`] for a reference that
+/// permits garbage collection.
 ///
-/// * Global references are not bound to the lifetime of a [`Env`].
+/// Create one with [`Env::new_global_ref`] or adopt an owned raw global reference
+/// with [`Env::global_from_raw`]. For a borrowed raw reference, use [`Env::as_cast_raw`]
+/// instead so the wrapper does not delete a reference it does not own.
 ///
-/// * Global references are not bound to any particular thread; they have the
-///   [`Send`] and [`Sync`] traits.
+/// # Drop and thread attachment
 ///
-/// * Until a global reference is dropped, it will prevent the referenced Java
-///   object from being garbage collected.
-///
-/// * It takes more time to create or delete a global reference than to create
-///   or delete a local reference.
-///
-/// These properties make global references useful in a few specific situations:
-///
-/// * When you need to keep a reference to the same Java object across multiple
-///   invocations of a native method, especially if you need a guarantee that
-///   it's the exact same object every time, one way to do it is by storing a
-///   global reference to it in a Rust `static` variable.
-///
-/// * When you need to send a Java object reference to a different thread, or
-///   use a Java object reference from several different threads at the same
-///   time, a global reference can be used to do so.
-///
-/// * When you need a Java object to not be garbage collected too soon, because
-///   some side effect will happen (via `java.lang.Object::finalize`,
-///   `java.lang.ref.Cleaner`, or the like) when it is garbage collected, a
-///   global reference can be used to prevent it from being garbage collected.
-///   (This hold is released when the global reference is dropped.)
-///
-/// See also [`Weak`], a global reference that does *not* prevent the underlying
-/// Java object from being garbage collected.
-///
-///
-/// # Creating and Deleting
-///
-/// To create a global reference, use the [`Env::new_global_ref`] method or wrap
-/// an existing global reference (that you own) with [`Env::global_from_raw`].
-/// To delete it, simply drop the [`Global`].
-///
-/// If you have a raw `jobject` global reference that you do not own, you can
-/// use [`Env::as_cast_raw`] to create a temporary wrapper that will not delete
-/// the reference when dropped.
-///
-/// Note that, because global references take more time to create or delete than
-/// local references do, they should only be used when their benefits outweigh
-/// this drawback. Also note that this performance penalty does not apply to
-/// *using* a global reference (such as calling methods on the underlying Java
-/// object), only to creation and deletion of the reference.
-///
-///
-/// # Warning: Drop On an Attached Thread If Possible
-///
-/// When a `Global` is dropped, a JNI call is made to delete the global
-/// reference. If this frequently happens on a thread that is not already
-/// attached to the JVM, the thread will be temporarily attached using
-/// [`JavaVM::attach_current_thread_for_scope`], causing a severe performance
-/// penalty.
-///
-/// To avoid this performance penalty, ensure that `Global`s are only dropped on
-/// a thread that is already attached (or never dropped at all).
-///
-/// In the event that a global reference is dropped on an unattached thread, a
-/// message is [logged][log] at [`log::Level::Warn`].
+/// Drop deletes the JNI reference. Prefer dropping on an attached thread: otherwise
+/// cleanup temporarily attaches the thread and logs a warning, adding attachment overhead.
 #[repr(transparent)]
 #[derive(Debug)]
 pub struct Global<T>
@@ -227,9 +176,7 @@ where
 		// initialized (and can't return an error) because ::new() takes a Env reference.
 		let vm: JavaVM = JavaVM::singleton().expect("JavaVM singleton uninitialized");
 
-		// Note: we use `attach_current_thread_guard` and avoid using
-		// `AttachGuard::detach_with_catch` because we need to be exception safe and must
-		// not interfere with any currently-pending exception
+		// Use a raw attachment guard so cleanup leaves pending exceptions untouched.
 		let exception_safe_delete = || -> abos_jni::errors::Result<()> {
 			let mut scope: crate::ScopeToken = abos_jni::ScopeToken::default();
 			let mut guard: crate::AttachGuard<'_> =

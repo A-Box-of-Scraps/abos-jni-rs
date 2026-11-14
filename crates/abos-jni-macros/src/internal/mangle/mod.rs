@@ -232,20 +232,8 @@ pub fn snake_case_to_lower_camel_case(s: &str) -> String {
 	final_result
 }
 
-/// Creates a JNI-compatible function name from the given namespace, function name, and optional signature.
-/// Preserves the method name's casing.
-///
-/// Any underscores in the original namespace or function name need to be replaced by "_1", and
-/// then dot separators need to be turned into underscores.
-///
-/// For signatures (if provided), only the argument types (between parentheses) are encoded:
-/// - '_' -> "_1"
-/// - ';' -> "_2"
-/// - '[' -> "_3"
-/// - '/' -> "_"
-/// - Other characters, including '$', -> "_0xxxx" with the lowercase hex Unicode codepoint
-///
-/// The return type is ignored, and parentheses are not included in the mangled name.
+/// Build a JNI export name without changing method-name casing.
+/// Overload suffixes encode only parameter types, not parentheses or the return type.
 pub fn create_jni_fn_name(namespace: &str, fn_name: &str, signature: Option<&str>) -> String {
 	fn mangle_identifier(s: &str) -> String {
 		let mut result = String::new();
@@ -287,7 +275,7 @@ pub fn create_jni_fn_name(namespace: &str, fn_name: &str, signature: Option<&str
 		&& let Some(end) = sig.find(')')
 	{
 		let args: &str = &sig[start + 1..end];
-		// Always add __ when signature is provided (indicates overloaded method)
+		// Zero-argument overloads still need the suffix separator.
 		result.push_str("__");
 		if !args.is_empty() {
 			result.push_str(&mangle_signature_args(args));

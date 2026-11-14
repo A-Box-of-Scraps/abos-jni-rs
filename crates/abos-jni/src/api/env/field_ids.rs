@@ -206,8 +206,6 @@ impl<'local> Env<'local> {
 	where
 		O: AsRef<JObject<'other_local>>,
 	{
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let obj: &JObject<'_> = obj.as_ref();
 		let obj: &JObject<'_> = null_check!(obj, "get_object_class")?;

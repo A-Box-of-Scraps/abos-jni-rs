@@ -15,7 +15,7 @@ import build_apk
 PROJECT = Path(__file__).resolve().parents[1]
 APPLICATION = "io.github.jni_rs.jbindgen.testactivity"
 EVENT_PREFIX = "ABOS_TEST_EVENT:"
-SMOKE_TESTS = {"jni_callback", "jni_string", "jni_integer"}
+SMOKE_TESTS = {"jni_callback", "jni_string", "jni_integer", "jni_array_map_iterator"}
 SDK_TESTS = {
     "sdk_bluetooth": "sdk_bluetooth_resolution",
     "sdk_content_intent": "sdk_content_intent",

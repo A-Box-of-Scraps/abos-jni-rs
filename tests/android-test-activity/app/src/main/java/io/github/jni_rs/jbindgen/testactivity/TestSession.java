@@ -54,11 +54,11 @@ final class TestSession {
             return "Java-to-Rust integer result passed";
         }));
         int count = api.nativeGetTestCount();
-        require(count >= 0 && count <= 6, "invalid SDK test count: " + count);
+        require(count >= 0 && count <= 7, "invalid native test count: " + count);
         for (int index = 0; index < count; index++) {
             final int testIndex = index;
             String name = api.nativeGetTestName(index);
-            require(name != null && !name.isEmpty(), "empty SDK test name");
+            require(name != null && !name.isEmpty(), "empty native test name");
             require(cases.stream().noneMatch(test -> test.name.equals(name)), "duplicate test name: " + name);
             cases.add(new Case(name, () -> api.nativeRunTest(testIndex)));
         }

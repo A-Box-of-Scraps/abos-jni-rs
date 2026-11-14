@@ -4,21 +4,14 @@ use super::{
 };
 
 impl JavaVM {
-	/// Returns the current number of threads attached to the JVM.
-	///
-	/// This only counts the thread attachments made via this library's API.
-	///
-	/// This method is provided mostly for diagnostic purposes / unit tests.
-	///
-	/// Check the docs for `ATTACHED_THREADS` for more details - including caveats for Windows with FLS.
+	/// Diagnostic count of this crate's attachment records; see `ATTACHED_THREADS`
+	/// for Windows fiber-counting semantics.
 	#[doc(hidden)]
 	pub fn threads_attached(&self) -> usize {
 		ATTACHED_THREADS.load(Ordering::SeqCst)
 	}
 
-	/// Returns the current nesting level for [`AttachGuard`]s
-	///
-	/// This is only really public since it's useful for unit tests
+	/// Returns the current nesting level for [`AttachGuard`]s.
 	#[doc(hidden)]
 	#[must_use]
 	pub fn thread_attach_guard_level() -> usize {
@@ -62,27 +55,13 @@ impl JavaVM {
 		.expect("Auto local reference outlived its thread attachment");
 	}
 
-	/// Get an [`AttachGuard`] for the [`Env`] associated with the current thread or, if JNI is
-	/// not attached to the Java VM, this will return [`Error::JniCall`] with
-	/// [`JniError::ThreadDetached`].
+	/// Borrow the current thread's attachment, or return `JniError::ThreadDetached`.
 	///
-	/// Note: jni-rs is implemented based on an assumption that all real-world implementations of
-	/// JNI `GetEnv` will return the same pointer for any given version (so long as the version is
-	/// supported).
-	///
-	/// Hypothetically the JNI spec allows for the possibility for an implementation to return a
-	/// different Env pointer that nulls out functions that aren't valid for that version (or
-	/// dispatches calls differently).
-	///
-	/// If we ever find a JVM implementation that in fact returns a different pointer then we could
-	/// just repeat the `GetEnv` call with the maximum supported version after querying the version.
+	/// Assumes `GetEnv` returns the same environment pointer for all supported JNI versions.
 	///
 	/// # Safety
 	///
-	/// You must know that the [`JavaVM`] supports at least JNI >= 1.2 (we require >= 1.4 but
-	/// we couldn't even call `GetEnv` without 1.2)
-	///
-	/// See the 'Safety' rules for [`AttachGuard`]
+	/// The VM must support JNI 1.4. The caller must uphold [`AttachGuard`]'s scope rules.
 	pub(crate) unsafe fn sys_get_env_attachment<'local>(&self) -> Result<AttachGuard<'local>> {
 		// SAFETY: The caller upholds the guard scope rules; GetEnv initializes a thread-local pointer on success.
 		unsafe {
@@ -260,78 +239,23 @@ impl JavaVM {
 		}
 	}
 
-	/// Unloads the `JavaVM` and frees all it's associated resources
-	///
-	/// Firstly if this thread is not already attached to the `JavaVM` then it
-	/// will be attached.
-	///
-	/// This thread will then wait until there are no other non-daemon threads
-	/// attached to the `JavaVM` before unloading it (including threads spawned
-	/// by Java and those that are attached via JNI)
+	/// Destroys the VM, attaching the calling thread if necessary and waiting for
+	/// other non-daemon threads, including Java threads, to exit.
 	///
 	/// # Safety
 	///
-	/// IF YOU ARE USING DAEMON THREADS THIS MAY BE DIFFICULT TO USE SAFELY!
+	/// - No Java methods may be on the calling thread's stack. Do not call from a
+	///   Java native method.
+	/// - Release all JNI resources before calling. Rust lifetimes do not enforce
+	///   the VM's lifetime. In particular, drop guards, `Auto`, `Global`, `Weak`,
+	///   array-element guards, and `MUTF8Chars`, whose destructors call JNI.
+	/// - Coordinate with daemon threads: destruction does not wait for them, and
+	///   they must neither use JNI nor attempt detachment after destruction. This
+	///   crate does not manage daemon attachments created outside its APIs.
+	/// - After success, do not use this handle, any copy, or the cached singleton
+	///   for JNI calls. The singleton is not reset; creating another VM is unsupported.
 	///
-	/// ## Daemon thread rules
-	///
-	/// Since the JNI spec makes it clear that [`DestroyJavaVM`][destroy] will
-	/// not wait for attached daemon threads to exit, this also means that if
-	/// you do have any attached daemon threads it is your responsibility to
-	/// ensure that they don't try and use JNI after the `JavaVM` is destroyed
-	/// and you won't be able to detach them after the `JavaVM` has been
-	/// destroyed.
-	///
-	/// This creates a very unsafe hazard if using `jni-rs` due to the various
-	/// RAII types that will automatically make JNI calls within their `Drop`
-	/// implementation.
-	///
-	/// For this reason `jni-rs` doesn't directly support attaching or detaching
-	/// 'daemon' threads and it's assumed you will manage their safety yourself
-	/// if you're using them.
-	///
-	/// Note: [`JavaVM::detach_current_thread()`] is a no-op for daemon threads
-	/// because it will only detach threads that were attached via `jni-rs` APIs.
-	///
-	/// ## Don't call from a Java native function
-	///
-	/// There must be no Java methods on the call stack when `JavaVM::destroy()`
-	/// is called.
-	///
-	/// ## Drop all JNI state, including auto-release types before calling `JavaVM::destroy()`
-	///
-	/// There is currently no `'vm` lifetime associated with a `JavaVM` that
-	/// would allow the borrow checker to enforce that all `jni` resources
-	/// associated with the `JavaVM` have been released.
-	///
-	/// Since these JNI resources could lead to undefined behaviour through any
-	/// use after the `JavaVM` has been destroyed then it is your responsibility
-	/// to release these resources.
-	///
-	/// In particular, there are numerous auto-release types in the `jni` API
-	/// that will automatically make JNI calls within their `Drop`
-	/// implementation. All such types _must_ be dropped before `destroy()` is
-	/// called to avoid undefined behaviour.
-	///
-	/// Here is an non-exhaustive list of auto-release types to consider:
-	/// - `AttachGuard`
-	/// - `AutoElements`
-	/// - `AutoElementsCritical`
-	/// - `Auto`
-	/// - `Global`
-	/// - `Weak`
-	/// - `MUTF8Chars`
-	///
-	/// ## Invalid `JavaVM` on return
-	///
-	/// After successful destruction, this handle and every copy of it are invalid for
-	/// further JNI calls. Dropping a `JavaVM` handle does not call JNI or destroy the VM.
-	///
-	/// This method borrows rather than consumes the handle, so the caller must ensure
-	/// that no other copy, including the cached singleton, is used after destruction.
-	///
-	/// [destroy]:
-	///     https://docs.oracle.com/en/java/javase/12/docs/specs/jni/invocation.html#unloading-the-vm
+	/// Dropping a `JavaVM` handle does not call JNI or destroy the VM.
 	///
 	/// # Errors
 	///

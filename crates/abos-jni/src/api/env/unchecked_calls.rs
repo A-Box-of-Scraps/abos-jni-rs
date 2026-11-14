@@ -6,12 +6,7 @@ use super::{
 };
 
 impl<'local> Env<'local> {
-	/// Call a static method in an unsafe manner. This does nothing to check
-	/// whether the method is valid to call on the class, whether the return
-	/// type is correct, or whether the number of args is valid for the method.
-	///
-	/// Under the hood, this simply calls the `CallStatic<Type>MethodA` method
-	/// with the provided arguments.
+	/// Call a static method without validating its class, signature, or arguments.
 	///
 	/// # Safety
 	///
@@ -37,8 +32,6 @@ impl<'local> Env<'local> {
 		use crate::signature::Primitive::{Boolean, Byte, Char, Double, Float, Int, Long, Short, Void};
 		use JavaType::{Array, Object, Primitive};
 
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 
 		let class: <T as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
@@ -84,12 +77,7 @@ impl<'local> Env<'local> {
 		Ok(ret)
 	}
 
-	/// Call an object method in an unsafe manner. This does nothing to check
-	/// whether the method is valid to call on the object, whether the return
-	/// type is correct, or whether the number of args is valid for the method.
-	///
-	/// Under the hood, this simply calls the `Call<Type>MethodA` method with
-	/// the provided arguments.
+	/// Call an instance method without validating its receiver, signature, or arguments.
 	///
 	/// # Safety
 	///
@@ -113,8 +101,6 @@ impl<'local> Env<'local> {
 		use crate::signature::Primitive::{Boolean, Byte, Char, Double, Float, Int, Long, Short, Void};
 		use JavaType::{Array, Object, Primitive};
 
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 
 		let method_id: crate::sys::jmethodID = method_id.lookup(self)?.as_ref().into_raw();
@@ -156,12 +142,7 @@ impl<'local> Env<'local> {
 		Ok(ret)
 	}
 
-	/// Call an non-virtual object method in an unsafe manner. This does nothing to check
-	/// whether the method is valid to call on the object, whether the return
-	/// type is correct, or whether the number of args is valid for the method.
-	///
-	/// Under the hood, this simply calls the `CallNonvirtual<Type>MethodA` method with
-	/// the provided arguments.
+	/// Call a non-virtual method without validating its receiver, class, signature, or arguments.
 	///
 	/// # Safety
 	///
@@ -187,8 +168,6 @@ impl<'local> Env<'local> {
 		use crate::signature::Primitive::{Boolean, Byte, Char, Double, Float, Int, Long, Short, Void};
 		use JavaType::{Array, Object, Primitive};
 
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 
 		let method_id: crate::sys::jmethodID = method_id.lookup(self)?.as_ref().into_raw();

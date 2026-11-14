@@ -5,8 +5,7 @@
 [![MIT license](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge&labelColor=555555)](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/A-Box-of-Scraps/abos-jni-rs/cross-platform.yml?style=for-the-badge&labelColor=555555&label=CI)](https://github.com/A-Box-of-Scraps/abos-jni-rs/actions/workflows/cross-platform.yml)
 
-A build-time dependency for Cargo build scripts and unit tests to assist in invoking the native Java compiler to compile
-Java source files into class files.
+Compile Java sources with `javac` from Cargo build scripts, tests, or Rust applications.
 
 ## Installation
 
@@ -16,7 +15,7 @@ For a Cargo build script, add:
 
 ```toml
 [build-dependencies]
-abos-javac = "0.1.0"
+abos-javac = "0.1.1"
 ```
 
 Use `[dev-dependencies]` for tests or `[dependencies]` for Rust applications instead.
@@ -87,20 +86,6 @@ An empty source selection is an error. A successful compiler invocation that rep
 (`Error::NoClassFilesGenerated`).
 
 ## Examples
-
-### Compile one file
-
-In a build script, select a single source instead of scanning a directory:
-
-```rust,no_run
-fn main() -> abos_javac::Result<()> {
-    abos_javac::Build::new()
-        .file("java/Example.java")
-        .try_compile()?;
-
-    Ok(())
-}
-```
 
 ### Configure a classpath and target release
 

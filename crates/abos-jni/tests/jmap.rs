@@ -95,3 +95,28 @@ fn jmap_iterator_rejects_non_entry() {
 	})
 	.expect("malformed map entries are rejected without a Java exception");
 }
+
+#[test]
+fn runtime_optional_map_methods_work_when_present() {
+	attach_current_thread(|env| {
+		let object: JObject<'_> = env.new_object(jni_str!("java/util/HashMap"), jni_sig!("()V"), &[])?;
+		let map: JMap<'_> = JMap::cast_local(env, object)?;
+		let key: JString<'_> = env.new_string("key")?;
+		let first: JString<'_> = env.new_string("first")?;
+		let second: JString<'_> = env.new_string("second")?;
+
+		let value: JObject<'_> = map.get_or_default(env, &key, &first)?;
+		assert!(env.is_same_object(value, &first)?);
+		assert!(map.put_if_absent(env, &key, &first)?.is_null());
+		let value: JObject<'_> = map.put_if_absent(env, &key, &second)?;
+		assert!(env.is_same_object(value, &first)?);
+		let value: JObject<'_> = map.replace(env, &key, &second)?;
+		assert!(env.is_same_object(value, &first)?);
+		assert!(map.replace_value(env, &key, &second, &first)?);
+		let value: JObject<'_> = map.get(env, key.as_ref())?.expect("the key remains present");
+		assert!(env.is_same_object(value, &first)?);
+		assert_eq!(map.size(env)?, 1);
+		Ok(())
+	})
+	.expect("runtime-optional map methods remain callable when present");
+}

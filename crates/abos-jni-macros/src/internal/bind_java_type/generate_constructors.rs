@@ -13,7 +13,7 @@ pub(super) fn generate_id_fields_and_inits(
 
 	for lookup in lookups {
 		let field_name: Ident = lookup.field_name;
-		let field_type: TokenStream = lookup.field_type;
+		let field_type: TokenStream = lookup.requirement.id_type(&lookup.field_type);
 		let java_name: &String = &lookup.java_name;
 		let signature: &String = &lookup.signature;
 		let lookup_fn: Ident = lookup.lookup_fn;
@@ -26,16 +26,19 @@ pub(super) fn generate_id_fields_and_inits(
 			#field_name: #field_type,
 		});
 
+		let lookup_call: TokenStream = quote! {
+			env.#lookup_fn(class, #jni::strings::JNIStr::from_cstr_unchecked(#name_cstr), #jni::jni_sig!(jni=#jni, #signature))
+		};
+		let initializer: TokenStream = lookup.requirement.initialize_id(&lookup_call, jni);
 		inits.push(quote! {
-            #(#cfg_attrs)*
-            #field_name: env.#lookup_fn(class, #jni::strings::JNIStr::from_cstr_unchecked(#name_cstr), #jni::jni_sig!(jni=#jni, #signature))?,
-        });
+			#(#cfg_attrs)*
+			#field_name: #initializer,
+		});
 	}
 
 	(fields, inits)
 }
 
-/// Generate constructor method ID fields and initialization code
 pub(super) fn generate_constructor_method_ids(
 	constructors: &[Constructor],
 	type_mappings: &TypeMappings,
@@ -57,6 +60,7 @@ pub(super) fn generate_constructor_method_ids(
 		let cfg_attrs: Vec<syn::Attribute> = extract_cfg_attrs(&constructor.attrs);
 
 		lookups.push(IdLookup {
+			requirement: constructor.requirement.clone(),
 			field_name: method_id_field,
 			field_type: quote! { #jni::ids::JMethodID },
 			java_name: "<init>".to_string(),
@@ -106,7 +110,6 @@ pub(super) fn sig_type_to_rust_return_type(
 	sig_type_to_rust_type_core(sig_type, lifetime, type_mappings, jni)
 }
 
-/// Generate constructor implementations.
 pub(super) fn generate_constructors(
 	type_name: &Ident,
 	api_name: &Ident,
@@ -133,11 +136,13 @@ fn generate_constructor(
 ) -> TokenStream {
 	let name: &Ident = &constructor.name;
 	let method_id_field: Ident = format_ident!("{}_method_id", name);
+	let local_id: Ident = super::Requirement::local_id(&method_id_field);
 
 	let args: crate::internal::bind_java_type::JniCallArgs =
 		generate_jni_call_args(&constructor.signature.parameters, type_mappings, jni);
 
-	let validation: TokenStream = args.reference_validation(&method_id_field, false, jni);
+	let id_access: TokenStream = constructor.requirement.access_id(&method_id_field, "<init>", jni);
+	let validation: TokenStream = args.reference_validation(&local_id, false, jni);
 	let lifetimes: &Vec<TokenStream> = &args.lifetimes;
 	let decls: &Vec<TokenStream> = &args.decls;
 	let jvalue_conversions: &Vec<TokenStream> = &args.jvalue_conversions;
@@ -164,6 +169,7 @@ fn generate_constructor(
 			#(#decls),*
 		) -> #jni::errors::Result<#type_name<'env_local>> {
 			let api = #api_name::get(env, &#jni::refs::LoaderContext::None)?;
+			#id_access
 			#validation
 			let jni_args #jni_args_type = [#(#jvalue_conversions),*];
 
@@ -185,7 +191,7 @@ fn generate_constructor(
 				let ret_obj: #jni::sys::jobject = ((*interface).v1_1.NewObjectA)(
 					env_ptr,
 					class.as_raw(),
-					api.#method_id_field.into_raw(),
+					#local_id.into_raw(),
 					jni_args.as_ptr()
 				);
 

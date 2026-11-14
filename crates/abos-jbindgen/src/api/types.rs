@@ -1,9 +1,6 @@
-//! Shared intermediate representation types for Java class parsing
-//!
-//! These types are used by both the class-file metadata parser and the
-//! Java source parser to represent parsed Java API information.
+//! Java metadata used for binding generation from source or bytecode.
 
-/// Intermediate representation of a Java class for binding generation
+/// Java class metadata for binding generation.
 #[derive(Debug, Clone)]
 pub struct ClassInfo {
 	/// Fully qualified class name (e.g., "com/example/MyClass")
@@ -33,8 +30,7 @@ pub struct ClassInfo {
 pub struct InstanceOfInfo {
 	/// Fully qualified Java type name (e.g., "android.app.Activity")
 	pub java_type: String,
-	/// Optional stem name for generating as_*() method (e.g., "activity" generates "`as_activity()`")
-	/// If None, only From trait implementations are generated
+	/// Stem for an `as_<stem>()` accessor; `None` omits the named accessor.
 	pub stem: Option<String>,
 }
 
@@ -88,9 +84,8 @@ pub struct ArgInfo {
 /// Java type information
 #[derive(Debug, Clone)]
 pub struct TypeInfo {
-	/// Fully qualified type name (e.g., "java.lang.String", "int", "boolean")
-	/// For primitives, uses Java primitive names: boolean, byte, char, short, int, long, float, double, void
-	/// For arrays, this is the element type WITHOUT [] suffix
+	/// Java binary name or primitive name, such as `java.lang.String` or `int`.
+	/// Arrays store the element name without `[]`; see [`Self::array_dimensions`].
 	pub name: String,
 	/// Number of array dimensions (0 for non-arrays, 1 for T[], 2 for T[][], etc.)
 	pub array_dimensions: usize,

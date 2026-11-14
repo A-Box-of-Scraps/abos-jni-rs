@@ -89,7 +89,6 @@ impl ::std::ops::Deref for JObject<'_> {
 
 pub struct JObjectAPI {
 	class: Global<JClass<'static>>,
-	// no methods cached for now
 }
 impl JObjectAPI {
 	pub(crate) fn get(env: &Env<'_>) -> Result<&'static Self> {

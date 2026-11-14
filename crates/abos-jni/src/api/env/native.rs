@@ -84,12 +84,27 @@ impl<'local> Env<'local> {
 	///
 	/// Although `NativeMethod` has an `unsafe` constructor that requires the caller to ensure that
 	/// the function pointer is valid and matches the signature, this API is still marked as
-	/// `unsafe` to reflect the additional risk that the signature matches but the second parameter
-	/// is not consistent with whether the method is static or instance.
+	/// `unsafe` because registration also requires the correct static/instance receiver and
+	/// a code lifetime that covers all possible calls.
 	///
 	/// - **Static native methods** must have a `class: JClass<'local>` parameter as the second parameter.
 	///
 	/// - **Instance native methods** must have a `this: JObject<'local>` or `this: MyType<'local>` parameter as the second parameter.
+	///
+	/// The registered code must remain executable for as long as the JVM can call it, including
+	/// until all in-flight calls have returned. In particular, the caller must keep any native
+	/// library containing that code loaded for this entire period. The lifetime of the `methods`
+	/// slice or its descriptors does not bound the registration lifetime. This API does not retain
+	/// the library, and dropping the descriptors does not unregister the methods.
+	///
+	/// A global reference to the target class is not a general library keepalive: the library may
+	/// belong to a different class loader, which that reference does not keep alive. The caller
+	/// must retain the library's owning loader or otherwise prevent library unloading.
+	///
+	/// Before unloading, prevent new calls and concurrent registration, remove the registrations,
+	/// and ensure that all in-flight calls have returned. Unregistration alone, including from a
+	/// destructor, does not establish this synchronization. These obligations also apply to any
+	/// registrations already installed when registration or later initialization returns an error.
 	///
 	/// # Throws
 	///
@@ -118,8 +133,10 @@ impl<'local> Env<'local> {
 	///
 	/// # Safety
 	///
-	/// The caller must satisfy the function-pointer, signature, and static/instance
-	/// requirements of [`Self::register_native_methods`].
+	/// The caller must satisfy all requirements of [`Self::register_native_methods`], including
+	/// function-pointer validity, matching signatures and static/instance receivers, and keeping
+	/// the registered code and its native library alive until no new calls can occur and all
+	/// in-flight calls have returned.
 	///
 	/// # Errors
 	///
@@ -134,6 +151,8 @@ impl<'local> Env<'local> {
 		//  - NativeMethod is a #[transparent] / repr(C)] wrapper around sys::JNINativeMethod
 		//  - NativeMethod only has an `unsafe` constructor that requires the caller to ensure that
 		//    the function pointer is valid and matches the signature
+		//  - The caller guarantees the receiver kind and keeps the code executable for all calls,
+		//    including in-flight calls after unregistration.
 		let res: i32 = unsafe {
 			jni_call_with_catch!(
 				catch |env| {
@@ -157,6 +176,12 @@ impl<'local> Env<'local> {
 	}
 
 	/// Unbind all native methods of class.
+	///
+	/// This is not a synchronization barrier for native calls and does not guarantee that
+	/// in-flight calls have returned. Calling this method, even from a destructor, is not by
+	/// itself sufficient to safely unload a native library. The application must also prevent
+	/// new calls and concurrent registration and wait for all in-flight calls to return before
+	/// unloading code. See the lifetime requirements of [`Self::register_native_methods`].
 	///
 	/// # Errors
 	///
