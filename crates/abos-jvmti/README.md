@@ -195,6 +195,55 @@ not recover from aborting panics, double panics, or foreign exceptions. The proc
 catching the unwind and must be appropriate for the callback's context. An allocation-free or lock-free panic path is
 not guaranteed.
 
+### Explicit shutdown coordination
+
+The `shutdown_agent` example and its `ShutdownTarget` Java driver demonstrate explicit shutdown in the live phase, from
+an attached Java native call. The example is intentionally not a public `Env::shutdown()` abstraction: copies of `Env`
+and arbitrary agent workers cannot be made safe by a generic disposer.
+
+The example performs these steps:
+
+1. **Close admission before disabling delivery.** A static gate stores its closed bit and active count in one atomic
+   word. Admission cannot race past closure with a late increment. Every callback acquires a guard before constructing
+   an `Env` or reading agent resources and holds it through its last access. No environment-local-storage lookup is
+   needed to reach the gate.
+2. **Disable event delivery and clear the callback table.** This example enables only global `VMInit` and `ThreadStart`
+   events. A real agent must also account for any per-thread enables. Neither disabling nor replacing callbacks waits
+   for already-running callbacks to finish.
+3. **Poll for admitted work to drain.** `pollShutdown()` returns pending rather than blocking inside a callback.
+   Callbacks may close the gate to request shutdown, but must return and leave cleanup to a coordinator in a permitted
+   context. They must never wait for their own admission to disappear.
+4. **Release environment-dependent resources.** Only after draining does the coordinator reclaim and free the shared
+   JVMTI allocation. This example owns no agent worker threads, raw monitors, or suspended threads. Extensions must also
+   stop worker admission, request termination, join workers, release monitors, and resume suspended threads before
+   disposing the environment.
+5. **Dispose and retire handles.** The serialized coordinator calls `Env::dispose()` once, clears its stored handle, and
+   makes subsequent shutdown polls idempotent without accessing the disposed environment.
+
+Errors or panics during disabling, resource release, or disposal permanently fail this example's shutdown. It does not
+retry an operation with possibly partial effects or dispose after failed cleanup. Already-completed cleanup is not
+rolled back; unreleased resources and the environment remain pinned for VM teardown and failed deallocation may leak. A
+timeout likewise does not authorize cleanup: leave admission closed and keep outstanding state alive.
+
+**This is not a library-unload protocol.** A callback can be delayed before its first admission attempt, or still be
+returning through native code after dropping its guard. The library, static gate, and registered JNI entry points must
+remain resident through VM termination. Late callbacks only observe the closed gate and return without touching the
+environment or freed resources. The gate is never reopened or recycled for another environment.
+
+From the workspace root, with a JDK available:
+
+```sh
+cargo build --locked -p abos-jvmti --example shutdown_agent
+javac -d target/shutdown-java crates/abos-jvmti/tests/java/ShutdownTarget.java
+java -Xcheck:jni "-agentpath:$PWD/target/debug/examples/libshutdown_agent.so" -cp target/shutdown-java ShutdownTarget
+```
+
+These commands use Linux's library naming; adjust the prefix/suffix and absolute library path for your platform. The
+Java driver checks delivery before shutdown, repeated shutdown calls, and continued Java thread creation after
+successful disposal. Automated protocol tests cover admitted and late callbacks, callback-requested closure,
+cleanup/disposal ordering, and terminal error/panic handling. No shutdown is attempted from `VMDeath` or
+`Agent_OnUnload`.
+
 ### Supported operations
 
 The wrappers cover instrumentation and bytecodes, breakpoints and stepping, typed local-variable access, stack traces,

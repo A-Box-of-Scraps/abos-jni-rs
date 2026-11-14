@@ -45,3 +45,7 @@ crate-type = ["cdylib"]
 [[example]]
 name = "profiling_agent"
 crate-type = ["cdylib"]
+
+[[example]]
+name = "shutdown_agent"
+crate-type = ["cdylib"]
