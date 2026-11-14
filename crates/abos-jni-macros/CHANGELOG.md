@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Emit custom type-mapping checks in stable order, independent of hash iteration and mapping insertion order (#852).
+
 ### Changed
 
 - Use local property-name enums in the `bind_java_type!` and `native_method!` parsers while preserving existing syntax
