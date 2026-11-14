@@ -27,6 +27,7 @@ impl Accessor {
 }
 
 struct FieldParser {
+	requirement: super::Requirement,
 	rust_name: Ident,
 	java_name: String,
 	signature: Option<FieldSignature>,
@@ -44,6 +45,7 @@ pub(super) fn parse_field(input: ParseStream, type_mappings: &TypeMappings) -> R
 	let (is_static, non_null) = parse_qualifiers(input)?;
 	let rust_name: Ident = input.parse()?;
 	let mut parser = FieldParser {
+		requirement: super::Requirement::default(),
 		java_name: snake_case_to_lower_camel_case(&rust_name.to_string()),
 		rust_name,
 		signature: None,
@@ -128,6 +130,8 @@ impl FieldParser {
 			self.signature = Some(parse_field_sig(input, mappings)?);
 		} else if lookahead.peek(Token![static]) {
 			self.is_static = super::parse_bool_property::<Token![static]>(input)?;
+		} else if lookahead.peek(super::requires) {
+			self.requirement = super::Requirement::parse_property(input)?;
 		} else if lookahead.peek(non_null) {
 			self.non_null = super::parse_bool_property::<non_null>(input)?;
 		} else {
@@ -158,6 +162,7 @@ impl FieldParser {
 			));
 		}
 		Ok(Field {
+			requirement: self.requirement,
 			java_name: self.java_name,
 			rust_name: self.rust_name,
 			getter_name: self.getter.name,

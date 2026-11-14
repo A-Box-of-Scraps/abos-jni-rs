@@ -158,6 +158,7 @@ pub(super) fn generate_api_get_method(
 		quote! {}
 	};
 
+	let requirement_checker: TokenStream = super::requirements::generate_requirement_checker(jni);
 	let private_field: Option<TokenStream> = priv_type.map(|_| quote! { private, });
 	let api_construction: TokenStream = quote! {
 		// Compile-time encoded modified UTF-8 names are valid JNIStr values.
@@ -169,6 +170,8 @@ pub(super) fn generate_api_get_method(
 		#init_priv_wrapper
 
 		impl #api_name {
+			#requirement_checker
+
 			pub fn get(
 				env: &#jni::Env,
 				loader: &#jni::refs::LoaderContext,
@@ -207,9 +210,7 @@ pub(super) fn generate_api_get_method(
 
 					#type_mapping_runtime_checks
 
-					let api = #api_construction;
-
-					Ok(api)
+					Ok(#api_construction)
 				})?;
 				let _ = API.set(api);
 				Ok(API.get().unwrap())

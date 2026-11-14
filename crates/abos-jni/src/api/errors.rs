@@ -96,6 +96,11 @@ pub enum Error {
 		requested: String,
 		cause: Option<abos_jni::refs::Global<abos_jni::objects::JThrowable<'static>>>,
 	},
+	/// A generated binding's runtime requirement was not met, or an optional member was absent.
+	///
+	/// No JNI invocation or field access is attempted for an unavailable member.
+	#[error("Binding member is unavailable on this runtime: {name}")]
+	MemberUnavailable { name: &'static str },
 	#[error("Method not found: {name} {sig}")]
 	MethodNotFound { name: String, sig: String },
 	/// Represents a `NoSuchMethodError` exception

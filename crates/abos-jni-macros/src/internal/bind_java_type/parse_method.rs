@@ -63,6 +63,7 @@ pub(super) fn parse_name_spec(input: ParseStream) -> Result<String> {
 
 #[derive(Default)]
 struct MethodOptions {
+	requirement: super::Requirement,
 	java_name: Option<String>,
 	signature: Option<MethodSignature>,
 	error_policy: Option<syn::Path>,
@@ -154,6 +155,8 @@ impl MethodOptions {
 			self.abi_check = Some(input.parse()?);
 		} else if lookahead.peek(catch_unwind) {
 			self.catch_unwind = Some(super::parse_bool_property::<catch_unwind>(input)?);
+		} else if lookahead.peek(super::requires) {
+			self.requirement = super::Requirement::parse_property(input)?;
 		} else if lookahead.peek(non_null) {
 			self.non_null = super::parse_bool_property::<non_null>(input)?;
 		} else {
@@ -184,6 +187,7 @@ impl MethodOptions {
 			.java_name
 			.unwrap_or_else(|| snake_case_to_lower_camel_case(&rust_name.to_string()));
 		Ok(ParsedMethod {
+			requirement: self.requirement,
 			rust_name,
 			java_name,
 			signature,
@@ -344,6 +348,7 @@ pub(super) fn parse_constructors(input: ParseStream, type_mappings: &TypeMapping
 		let parsed: ParsedMethod = parse_method(input, type_mappings, MethodKind::Constructor)?;
 
 		constructors.push(Constructor {
+			requirement: parsed.requirement,
 			name: parsed.rust_name,
 			signature: parsed.signature,
 			attrs: parsed.attrs,
@@ -365,6 +370,7 @@ pub(super) fn parse_methods(input: ParseStream, type_mappings: &TypeMappings) ->
 		let parsed: ParsedMethod = parse_method(input, type_mappings, MethodKind::Method)?;
 
 		methods.push(Method {
+			requirement: parsed.requirement,
 			visibility: parsed.visibility.unwrap_or(VisibilitySpec::Public),
 			java_name: parsed.java_name,
 			rust_name: parsed.rust_name,
@@ -395,6 +401,7 @@ pub(super) fn parse_native_methods(
 
 		if let Some(visibility) = parsed.visibility {
 			methods.push(Method {
+				requirement: parsed.requirement.for_native_call(&parsed.rust_name),
 				visibility,
 				java_name: parsed.java_name.clone(),
 				rust_name: parsed.rust_name.clone(),
@@ -405,6 +412,7 @@ pub(super) fn parse_native_methods(
 			});
 		}
 		native_methods.push(NativeMethod {
+			requirement: parsed.requirement,
 			java_name: parsed.java_name,
 			rust_name: parsed.rust_name,
 			signature: parsed.signature,

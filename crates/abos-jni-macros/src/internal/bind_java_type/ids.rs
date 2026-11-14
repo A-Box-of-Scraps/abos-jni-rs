@@ -39,6 +39,7 @@ pub(super) fn generate_method_ids(
 		let cfg_attrs: Vec<syn::Attribute> = extract_cfg_attrs(&method.attrs);
 
 		lookups.push(IdLookup {
+			requirement: method.requirement.clone(),
 			field_name: method_id_field,
 			field_type,
 			java_name: java_name.clone(),
@@ -86,6 +87,7 @@ pub(super) fn generate_field_ids(
 		let cfg_attrs: Vec<syn::Attribute> = extract_cfg_attrs(&field.attrs);
 
 		lookups.push(IdLookup {
+			requirement: field.requirement.clone(),
 			field_name: field_id_field,
 			field_type,
 			java_name: java_name.clone(),

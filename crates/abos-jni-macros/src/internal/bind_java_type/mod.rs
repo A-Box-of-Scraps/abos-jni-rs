@@ -54,6 +54,7 @@ custom_keyword!(is_instance_of);
 custom_keyword!(__jni_core);
 custom_keyword!(raw);
 custom_keyword!(non_null);
+custom_keyword!(requires);
 
 /// Represents a visibility modifier
 #[derive(Clone)]
@@ -105,6 +106,7 @@ impl VisibilitySpec {
 /// Represents a constructor definition
 #[derive(Clone)]
 struct Constructor {
+	requirement: Requirement,
 	name: Ident,
 	signature: MethodSignature,
 	attrs: Vec<syn::Attribute>,
@@ -113,6 +115,7 @@ struct Constructor {
 /// Represents a method definition
 #[derive(Clone)]
 struct Method {
+	requirement: Requirement,
 	visibility: VisibilitySpec,
 	java_name: String,
 	rust_name: Ident,
@@ -125,6 +128,7 @@ struct Method {
 /// Represents a field definition
 #[derive(Clone)]
 struct Field {
+	requirement: Requirement,
 	java_name: String,
 	#[allow(
 		dead_code,
@@ -155,6 +159,7 @@ struct IsInstanceOfEntry {
 /// Represents a native method definition
 #[derive(Clone)]
 struct NativeMethod {
+	requirement: Requirement,
 	java_name: String,
 	rust_name: Ident,
 	signature: MethodSignature,
@@ -181,6 +186,7 @@ enum MethodKind {
 
 /// Intermediate representation for a parsed method (after validation)
 struct ParsedMethod {
+	requirement: Requirement,
 	rust_name: Ident,
 	java_name: String,          // Always set (either explicit or derived from rust_name)
 	signature: MethodSignature, // Always present after parsing
@@ -224,6 +230,7 @@ struct BindClassInput {
 
 /// Intermediate representation for ID lookups (method IDs or field IDs)
 struct IdLookup {
+	requirement: Requirement,
 	/// The field name in the API struct (e.g., "`new_method_id`", "`get_value_field_id`")
 	field_name: Ident,
 	/// The field type (`JMethodID` or `JFieldID`)
@@ -246,6 +253,9 @@ struct JniCallArgs {
 	reference_bindings: Vec<TokenStream>,
 	decls: Vec<TokenStream>,
 }
+
+mod requirements;
+use requirements::Requirement;
 
 mod parse_method;
 use parse_method::{parse_constructors, parse_methods, parse_name_spec, parse_native_methods, parse_visibility};

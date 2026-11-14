@@ -184,12 +184,14 @@ pub(super) fn generate_methods(
 fn generate_method(api_name: &Ident, method: &Method, type_mappings: &TypeMappings, jni: &syn::Path) -> TokenStream {
 	let rust_name: &Ident = &method.rust_name;
 	let method_id_field: Ident = format_ident!("{}_method_id", rust_name);
+	let local_id: Ident = super::Requirement::local_id(&method_id_field);
+	let id_access: TokenStream = method.requirement.access_id(&method_id_field, &method.java_name, jni);
 	let visibility: TokenStream = method.visibility.to_tokens();
 	let is_static: bool = method.is_static;
 
 	let args: JniCallArgs = generate_jni_call_args(&method.signature.parameters, type_mappings, jni);
 
-	let validation: TokenStream = args.reference_validation(&method_id_field, is_static, jni);
+	let validation: TokenStream = args.reference_validation(&local_id, is_static, jni);
 	let decls: &Vec<TokenStream> = &args.decls;
 	let jvalue_conversions: &Vec<TokenStream> = &args.jvalue_conversions;
 
@@ -229,7 +231,7 @@ fn generate_method(api_name: &Ident, method: &Method, type_mappings: &TypeMappin
 		is_static,
 		jni,
 		&this_or_class,
-		&quote! { api.#method_id_field.into_raw() },
+		&quote! { #local_id.into_raw() },
 		&quote! { jni_args },
 		type_mappings,
 	);
@@ -255,6 +257,7 @@ fn generate_method(api_name: &Ident, method: &Method, type_mappings: &TypeMappin
 			#(#decls),*
 		) -> #jni::errors::Result<#return_type> {
 			let api = #api_name::get(env, &#jni::refs::LoaderContext::None)?;
+			#id_access
 			#validation
 			let jni_args #jni_args_type = [#(#jvalue_conversions),*];
 
@@ -298,7 +301,7 @@ impl JniCallArgs {
 			// process-wide API retains the resolved class for the cache's lifetime.
 			unsafe {
 				__JNI_REFERENCE_TYPES.validate(
-					env, api.class.as_ref(), api.#method_id.into_raw(), #is_static, &[#(#references),*],
+					env, api.class.as_ref(), #method_id.into_raw(), #is_static, &[#(#references),*],
 				)?;
 			}
 		}

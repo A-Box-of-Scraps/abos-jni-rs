@@ -76,6 +76,56 @@ literals, not runtime variables; use `abos_jni::strings::JNIString` for dynamic 
 automatically generated declarations, use
 [abos-jbindgen](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jbindgen/README.md).
 
+### Runtime-optional members
+
+Members are required by default: a failed lookup prevents the binding's API from initializing. Add `requires` to a
+constructor, method, field, or native-method **property block** to make it runtime-dependent:
+
+```rust,ignore
+bind_java_type! {
+    Example => "com.example.Example",
+    constructors {
+        fn new(),
+        fn with_capacity { sig = (capacity: jint), requires = available },
+    },
+    methods {
+        fn newer_method { sig = () -> jint, requires = available },
+        fn library_feature { sig = () -> jint, requires = |env| supports_library_feature(env) },
+    },
+    fields {
+        newer_field { sig = jint, requires = available },
+    },
+    native_methods {
+        pub static fn newer_native { sig = (value: jint) -> jint, requires = available },
+    },
+}
+```
+
+- `requires = available` attempts member lookup and treats only `MethodNotFound` or `FieldNotFound` as absence. Native
+  methods are registered individually; only `NoSuchMethod` (including a non-native declaration) is treated as
+  unavailable. Other errors, including class initialization failures, still fail API initialization.
+- `requires = predicate` accepts a function or closure taking `&mut Env` and returning `errors::Result<bool>`. `false`
+  skips lookup or registration entirely; `true` requires success. Errors propagate. Predicates may query application
+  capabilities or runtime library versions. They must not leave a pending Java exception on success.
+- Calling an unavailable constructor, method, or field accessor returns `Error::MemberUnavailable`, without invoking the
+  member or using a missing JNI ID. An unavailable native is not registered; any generated Rust call wrapper returns the
+  same error. Rust signatures and native implementations are still compiled and type-checked.
+
+Availability is cached with the binding's API for the process lifetime. Predicates must describe stable capabilities and
+tolerate repeated evaluation during concurrent initialization or retries after an initialization error. A native call
+wrapper reuses its registration decision rather than evaluating the predicate again. Avoid initialization cycles:
+predicates must not call back into the same binding, and native predicates must not initialize the class being
+registered. Native registration completes before ordinary member ID lookup can initialize the class.
+
+Runtime-gated natives suppress default symbol exports, even with `native_methods_export = true`. Explicit `export`
+requests on gated natives are rejected: JNI symbol lookup would bypass the registration requirement. These natives must
+be reached through registration.
+
+Android API levels, Java library versions, and JNI interface versions are separate capabilities. `Env::version()`
+reports the JNI interface version, not an Android API level or the availability of a Java library method. Prefer
+`requires = available` for member presence, or a predicate that checks the particular platform/library requirement.
+There is no automatic conversion between these version spaces.
+
 ## Scope and limitations
 
 ### Compile-time and runtime checks

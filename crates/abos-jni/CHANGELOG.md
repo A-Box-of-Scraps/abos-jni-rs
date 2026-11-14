@@ -6,6 +6,9 @@
 
 ### Fixed
 
+- Make version-sensitive `JMap` methods optional at runtime; missing methods return `Error::MemberUnavailable` without
+  preventing basic map operations from initializing.
+
 - Avoid invoking loggers during automatic TLS/FLS thread detachment, when logger TLS may already be destroyed.
 
 - Preserve NULs, supplementary characters, and unpaired UTF-16 surrogates when borrowing Android Java strings. ART's

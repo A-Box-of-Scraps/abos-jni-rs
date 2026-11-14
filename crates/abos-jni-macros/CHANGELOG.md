@@ -17,6 +17,8 @@
 
 ### Added
 
+- Support runtime member requirements on constructors, methods, fields, and native registration without making
+  unavailable members block unrelated bindings.
 - Regression tests for property parsing, diagnostics, and `is_instance_of` generation, including custom type mappings,
   JNI crate overrides, and pending-exception guards.
 

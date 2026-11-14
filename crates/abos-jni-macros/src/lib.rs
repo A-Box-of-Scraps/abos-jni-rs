@@ -53,6 +53,20 @@ pub fn native_method(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 
 /// Generate Rust bindings for a Java type.
 ///
+/// Member property blocks accept `requires = available` to tolerate an absent constructor,
+/// method, field, or native declaration without disabling unrelated members. They also
+/// accept `requires = predicate`, where the function or closure takes `&mut Env` and returns
+/// `errors::Result<bool>`: false skips lookup/registration, while true requires it to succeed.
+/// Unavailable Rust calls return `Error::MemberUnavailable` before using a JNI ID.
+/// Other lookup, registration, and predicate errors still fail API initialization.
+///
+/// Availability is cached with the API. Predicates must describe stable capabilities and
+/// tolerate retries and concurrent initialization. They must not re-enter this binding;
+/// native predicates must not initialize its Java class before registration completes.
+/// Gated natives suppress default exports and reject explicit exports, which would bypass
+/// registration requirements. Their Rust implementations are still required at compile time.
+/// Android API levels and Java library versions must not be inferred from JNI interface versions.
+///
 /// Generated methods and constructors check non-null reference arguments against
 /// their resolved Java parameter classes. These classes are cached lazily per
 /// binding, with the same process lifetime as the binding's cached class and
