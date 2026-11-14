@@ -13,11 +13,11 @@ Most applications should use the macros re-exported by `abos-jni`:
 
 ```toml
 [dependencies]
-abos-jni = "0.1.0"
+abos-jni = "0.2.0"
 ```
 
 Import them from `abos_jni`, for example `use abos_jni::{jni_sig, jni_str};`. A separate dependency on this proc-macro
-crate is not required. When importing from `abos_jni_macros` directly, add `abos-jni-macros = "0.1.0"` as well;
+crate is not required. When importing from `abos_jni_macros` directly, add `abos-jni-macros = "0.2.0"` as well;
 expansions that use JNI runtime types still need `abos-jni`.
 
 Compilation requires no JVM. To start one at runtime, enable `abos-jni`'s `invocation` feature; existing-VM integrations
@@ -264,7 +264,7 @@ When Cargo names the runtime dependency differently, configure it explicitly:
 
 ```toml
 [dependencies]
-jni_runtime = { package = "abos-jni", version = "0.1.0" }
+jni_runtime = { package = "abos-jni", version = "0.2.0" }
 ```
 
 Pass `jni = <path>` as the first property in string, signature, and binding macro invocations:

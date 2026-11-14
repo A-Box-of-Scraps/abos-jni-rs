@@ -15,7 +15,7 @@ For a Cargo build script, add:
 
 ```toml
 [build-dependencies]
-abos-javac = "0.1.0"
+abos-javac = "0.1.1"
 ```
 
 Use `[dev-dependencies]` for tests or `[dependencies]` for Rust applications instead.

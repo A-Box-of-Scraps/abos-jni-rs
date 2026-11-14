@@ -13,7 +13,7 @@ For an agent loaded into an existing JVM:
 
 ```toml
 [dependencies]
-abos-jvmti = "0.1.0"
+abos-jvmti = "0.2.0"
 ```
 
 The crate targets JVMTI 1.2 or newer (Java 8+) and interoperates with
@@ -48,7 +48,7 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-abos-jvmti = "0.1.0"
+abos-jvmti = "0.2.0"
 ```
 
 Replace `src/lib.rs` with an agent that observes VM initialization:

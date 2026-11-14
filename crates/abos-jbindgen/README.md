@@ -19,11 +19,11 @@ For the build-script workflow below, add these dependencies to your Cargo packag
 
 ```toml
 [dependencies]
-abos-jni = { version = "0.1.0", features = ["invocation"] }
+abos-jni = { version = "0.2.0", features = ["invocation"] }
 
 [build-dependencies]
-abos-javac = "0.1.0"
-abos-jbindgen = "0.1.0"
+abos-javac = "0.1.1"
+abos-jbindgen = "0.1.1"
 ```
 
 The `invocation` feature is needed here because the Rust application starts its own JVM. Use `abos-jbindgen` under

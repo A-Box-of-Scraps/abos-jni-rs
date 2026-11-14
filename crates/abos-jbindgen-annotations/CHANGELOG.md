@@ -4,4 +4,8 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Streamline the crate README.
+
 ## [0.1.0] - 2026-11-11

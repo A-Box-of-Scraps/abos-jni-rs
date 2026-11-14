@@ -13,7 +13,7 @@ Add the dependency:
 
 ```toml
 [dependencies]
-abos-cafebabe = "0.1.0"
+abos-cafebabe = "0.1.1"
 ```
 
 ## Quick Start

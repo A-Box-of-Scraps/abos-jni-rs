@@ -13,7 +13,7 @@ Add the crate to the Rust application that exports your annotation sources:
 
 ```toml
 [dependencies]
-abos-jbindgen-annotations = "0.1.0"
+abos-jbindgen-annotations = "0.1.1"
 ```
 
 Use `[build-dependencies]` when exporting from `build.rs`. Exporting sources requires no runtime dependencies, JDK, or

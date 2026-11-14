@@ -17,7 +17,7 @@ For native methods loaded into an existing JVM, use the default features:
 
 ```toml
 [dependencies]
-abos-jni = "0.1.0"
+abos-jni = "0.2.0"
 ```
 
 Build the Rust library as a `cdylib`, as shown below. The Java application supplies the JVM; the Rust library does not
@@ -29,7 +29,7 @@ To start a desktop JVM from Rust, enable `invocation`:
 
 ```toml
 [dependencies]
-abos-jni = { version = "0.1.0", features = ["invocation"] }
+abos-jni = { version = "0.2.0", features = ["invocation"] }
 ```
 
 The crate does not install or bundle Java. Starting a JVM requires an installed, compatible JVM shared library. Set
@@ -99,7 +99,7 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-abos-jni = "0.1.0"
+abos-jni = "0.2.0"
 ```
 
 Replace `src/lib.rs` with:

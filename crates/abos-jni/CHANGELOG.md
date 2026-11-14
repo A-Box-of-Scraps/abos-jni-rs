@@ -14,6 +14,8 @@
 
 ### Changed
 
+- `InitArgsBuilder` no longer implements `Send` or `Sync` because JVM options can now contain raw `extraInfo` pointers.
+
 - Use stack-backed raw argument storage for dynamic calls with up to eight arguments, retaining a heap fallback and all
   existing argument, receiver, reference-assignability, and exception checks. Add packing and end-to-end benchmarks.
 

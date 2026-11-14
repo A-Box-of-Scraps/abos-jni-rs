@@ -4,11 +4,11 @@ version = 4
 
 [[package]]
 name = "abos-cafebabe"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "abos-javac"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "tempfile",
  "thiserror",
@@ -17,7 +17,7 @@ dependencies = [
 
 [[package]]
 name = "abos-jbindgen"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "abos-cafebabe",
  "abos-javac",
@@ -31,11 +31,11 @@ dependencies = [
 
 [[package]]
 name = "abos-jbindgen-annotations"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "abos-jni"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "abos-jni-macros",
  "abos-jni-sys",
@@ -50,7 +50,7 @@ dependencies = [
 
 [[package]]
 name = "abos-jni-macros"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "indoc",
  "proc-macro2",
@@ -62,14 +62,14 @@ dependencies = [
 
 [[package]]
 name = "abos-jni-sys"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "abos-jni-sys-macros",
 ]
 
 [[package]]
 name = "abos-jni-sys-macros"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "proc-macro2",
  "quote",

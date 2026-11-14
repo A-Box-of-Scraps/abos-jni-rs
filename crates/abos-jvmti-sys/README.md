@@ -11,7 +11,7 @@ Raw Rust definitions corresponding to `jvmti.h`.
 
 ```toml
 [dependencies]
-abos-jvmti-sys = "0.1.0"
+abos-jvmti-sys = "0.1.1"
 ```
 
 This `no_std` crate provides the JVMTI 25 declaration set and shares/re-exports JNI types from `abos-jni-sys`. Normal

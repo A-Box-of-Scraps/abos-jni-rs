@@ -16,7 +16,7 @@ this proc-macro crate directly when defining or maintaining versioned function-t
 
 ```toml
 [dependencies]
-abos-jni-sys-macros = "0.1.0"
+abos-jni-sys-macros = "0.1.1"
 ```
 
 Expansion does not require a JDK or a running JVM. Generated views use `core` types and can be used in `no_std` crates.

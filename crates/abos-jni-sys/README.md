@@ -11,7 +11,7 @@ Raw Rust definitions corresponding to `jni.h`.
 
 ```toml
 [dependencies]
-abos-jni-sys = "0.1.0"
+abos-jni-sys = "0.1.1"
 ```
 
 This is a `no_std` crate containing raw JNI declarations. Building it does not require a JDK or `jni.h`. Calls through
