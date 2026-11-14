@@ -313,8 +313,7 @@ impl<'a> InitArgsBuilder<'a> {
 		}
 
 		#[cfg(windows)]
-		let encoded: Cow<'a, CStr> =
-			char_encoding_windows::str_to_cstr_win32_default_codepage(opt_string)?;
+		let encoded: Cow<'a, CStr> = char_encoding_windows::str_to_cstr_win32_default_codepage(opt_string)?;
 		#[cfg(not(windows))]
 		// Assume UTF-8 on all other platforms.
 		let encoded: Cow<'a, CStr> = char_encoding_generic::utf8_to_cstr(opt_string)?;
