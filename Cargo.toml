@@ -34,7 +34,6 @@ thiserror = "2"
 # Crate-specific external dependencies
 assert_matches = "1.5"
 bytemuck = "1"
-cfg-if = "1"
 clap = { version = "4", features = ["derive"] }
 criterion = { version = "0.8", features = ["html_reports"] }
 libloading = "0.9"
@@ -56,6 +55,9 @@ zip = { version = "9", default-features = false, features = ["deflate"] }
 git = "https://github.com/A-Box-of-Scraps/abos-dylint-rules"
 rev = "2eb1cc27102ea7d9225cb90eab4929ae7f443ee2"
 pattern = ["explicit_binding_types", "file_length", "tests_outside_src"]
+
+[workspace.lints.cargo]
+unused_dependencies = "deny"
 
 [workspace.lints.rust]
 missing_docs = "warn"

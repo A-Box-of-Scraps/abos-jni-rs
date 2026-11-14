@@ -53,7 +53,6 @@ dependencies = [
  "abos-jni-sys",
  "assert_matches",
  "bytemuck",
- "cfg-if",
  "criterion",
  "indoc",
  "libloading",

@@ -39,7 +39,6 @@ version = "0.2.0"
 dependencies = [
  "abos-jni-macros",
  "abos-jni-sys",
- "cfg-if",
  "indoc",
  "libloading",
  "log",

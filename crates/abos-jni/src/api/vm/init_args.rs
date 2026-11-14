@@ -7,8 +7,6 @@ use crate::{
 	sys::{JavaVMInitArgs, JavaVMOption},
 };
 
-use cfg_if::cfg_if;
-
 mod char_encoding_generic;
 
 #[cfg(windows)]
@@ -314,17 +312,12 @@ impl<'a> InitArgsBuilder<'a> {
 			return Ok(());
 		}
 
-		let encoded: Cow<'a, CStr> = {
-			cfg_if! {
-				if #[cfg(windows)] {
-					char_encoding_windows::str_to_cstr_win32_default_codepage(opt_string)?
-				}
-				else {
-					// Assume UTF-8 on all other platforms.
-					char_encoding_generic::utf8_to_cstr(opt_string)?
-				}
-			}
-		};
+		#[cfg(windows)]
+		let encoded: Cow<'a, CStr> =
+			char_encoding_windows::str_to_cstr_win32_default_codepage(opt_string)?;
+		#[cfg(not(windows))]
+		// Assume UTF-8 on all other platforms.
+		let encoded: Cow<'a, CStr> = char_encoding_generic::utf8_to_cstr(opt_string)?;
 
 		opts.push(encoded, extra_info);
 		Ok(())
