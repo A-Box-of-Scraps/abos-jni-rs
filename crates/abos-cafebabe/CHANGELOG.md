@@ -6,7 +6,7 @@
 
 ### Changed
 
-- Replace internal parser magic numbers with named constants and explicit byte widths without changing behavior.
+- Replace internal parser magic numbers with named constants.
 - Expand regression coverage for class-file version and modified UTF-8 encoding boundaries.
 
 ## [0.1.0] - 2026-11-11
