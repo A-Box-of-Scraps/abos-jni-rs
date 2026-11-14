@@ -5,17 +5,18 @@ use std::{
 	process::{Command, Output},
 };
 
+const JAVAC: &str = "javac";
+
 pub fn find_javac() -> Result<PathBuf> {
 	if let Some(home) = env::var_os("JAVA_HOME") {
 		let path: PathBuf = PathBuf::from(home)
 			.join("bin")
-			.join(if cfg!(windows) { "javac.exe" } else { "javac" });
+			.join(if cfg!(windows) { "javac.exe" } else { JAVAC });
 		if path.is_file() {
 			return Ok(path);
 		}
 	}
-	which::which("javac")
-		.map_err(|error| Error::CompilerNotFound(format!("{error}; set JAVA_HOME or add javac to PATH")))
+	which::which(JAVAC).map_err(|error| Error::CompilerNotFound(format!("{error}; set JAVA_HOME or add javac to PATH")))
 }
 
 pub fn version(path: &Path) -> Result<u32> {
