@@ -11,6 +11,9 @@
 
 ### Fixed
 
+- Include the Java exception class name in `CaughtJavaException` diagnostics and display null or empty messages as `<no
+  message>` instead of a null-string placeholder or a blank message.
+
 - Check `JIterator::has_next` before advancing for compatibility with Android iterators that return invalid entries on
   exhaustion, while preserving pending exceptions and the `next` exception fallback. Add Android `ArrayMap` coverage and
   iterator benchmarks that include the additional JNI call.
