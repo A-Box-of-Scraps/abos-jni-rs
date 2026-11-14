@@ -132,7 +132,7 @@ impl TypeMappings {
 			self.insert_alias(simple_name, &jni_full_path)
 				.expect("Failed to insert built-in jni crate type alias");
 			if is_core {
-				self.core_java.insert(java_class.clone());
+				self.core_java.insert(java_class);
 			}
 		}
 	}

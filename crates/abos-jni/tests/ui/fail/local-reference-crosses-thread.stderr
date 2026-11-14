@@ -4,7 +4,7 @@ error[E0521]: borrowed data escapes outside of function
 3 | fn move_to_thread(env: &mut Env<'_>) -> Result<()> {
   |                   ---
   |                   |
-  |                   `env` is a reference that is only valid in the function body
+  |                   `env` is only valid in the function body
   |                   has type `&mut Env<'1>`
 ...
 6 |         scope.spawn(move || drop(string));

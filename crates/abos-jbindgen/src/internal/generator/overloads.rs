@@ -104,7 +104,8 @@ pub fn generate_unique_overload_names(
 						(&ty.name, ty.array_dimensions, ty.is_primitive)
 					})
 					.collect::<HashSet<_>>()
-					.len() > 1
+					.len()
+					> 1
 			})
 			.collect();
 		for (index, method) in &group {

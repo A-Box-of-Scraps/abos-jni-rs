@@ -10,8 +10,9 @@ error[E0277]: the trait bound `abos_jni::refs::Weak<JObject<'_>>: AsRef<JObject<
 note: required by a bound in `abos_jni::api::env::field_ids::<impl Env<'local>>::get_object_class`
  --> src/api/env/field_ids.rs
   |
+  | impl<'local> Env<'local> {
+...
   |     pub fn get_object_class<'other_local, O>(&mut self, obj: O) -> Result<JClass<'local>>
-  |            ---------------- required by a bound in this associated function
   |     where
   |         O: AsRef<JObject<'other_local>>,
   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `abos_jni::api::env::field_ids::<impl Env<'local>>::get_object_class`
@@ -28,8 +29,9 @@ error[E0277]: the trait bound `abos_jni::refs::Weak<JObject<'_>>: AsRef<JObject<
 note: required by a bound in `abos_jni::api::env::local_refs::<impl Env<'local>>::new_cast_local_ref`
  --> src/api/env/local_refs.rs
   |
+  | impl<'local> Env<'local> {
+...
   |     pub fn new_cast_local_ref<'any_local, To>(
-  |            ------------------ required by a bound in this associated function
   |         &mut self,
   |         obj: impl Reference + AsRef<JObject<'any_local>>,
   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `abos_jni::api::env::local_refs::<impl Env<'local>>::new_cast_local_ref`
@@ -46,8 +48,9 @@ error[E0277]: the trait bound `abos_jni::refs::Weak<JObject<'_>>: AsRef<JObject<
 note: required by a bound in `abos_jni::api::env::global_refs::<impl Env<'_>>::new_cast_global_ref`
   --> src/api/env/global_refs.rs
    |
+   | impl Env<'_> {
+...
    |     pub fn new_cast_global_ref<'any_local, To>(
-   |            ------------------- required by a bound in this associated function
    |         &self,
    |         obj: impl Reference + AsRef<JObject<'any_local>>,
    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `abos_jni::api::env::global_refs::<impl Env<'_>>::new_cast_global_ref`

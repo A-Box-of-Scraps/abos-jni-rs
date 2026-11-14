@@ -6,7 +6,7 @@ publish = false
 
 [workspace]
 
-[dependencies]
+[dev-dependencies]
 abos-jvmti-sys = { path = "../../crates/abos-jvmti-sys" }
 
 [build-dependencies]
