@@ -4,8 +4,7 @@ use super::{
 	sig_type_to_rust_native_trait_arg_type, sig_type_to_rust_return_type,
 };
 
-/// Generate all native method related code (trait, wrappers, registration)
-/// Returns: (`trait_and_impl_struct`, `registration_code`)
+/// Return the trait, wrapper impl and exports, plus the API initialization registration code.
 #[allow(
 	clippy::too_many_arguments,
 	reason = "Code generation needs the independent binding metadata and JNI paths."
@@ -83,7 +82,6 @@ pub(super) fn generate_native_methods_code(
 	Ok((trait_and_impl, registration_code))
 }
 
-/// Generate the native methods trait
 pub(super) fn generate_native_trait(
 	trait_name: &Ident,
 	type_name: &Ident,

@@ -39,7 +39,6 @@ pub(super) fn generate_id_fields_and_inits(
 	(fields, inits)
 }
 
-/// Generate constructor method ID fields and initialization code
 pub(super) fn generate_constructor_method_ids(
 	constructors: &[Constructor],
 	type_mappings: &TypeMappings,
@@ -111,7 +110,6 @@ pub(super) fn sig_type_to_rust_return_type(
 	sig_type_to_rust_type_core(sig_type, lifetime, type_mappings, jni)
 }
 
-/// Generate constructor implementations.
 pub(super) fn generate_constructors(
 	type_name: &Ident,
 	api_name: &Ident,

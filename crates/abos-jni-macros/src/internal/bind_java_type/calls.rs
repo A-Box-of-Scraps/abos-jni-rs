@@ -87,7 +87,6 @@ pub(super) fn generate_jni_call_args(
 	}
 }
 
-/// Generate JNI call code for a given return type
 #[allow(
 	clippy::too_many_arguments,
 	reason = "Code generation needs the independent binding metadata and JNI paths."
@@ -162,7 +161,6 @@ pub(super) fn primitive_return(
 	}
 }
 
-/// Generate method implementations (instance or static methods)
 pub(super) fn generate_methods(
 	api_name: &Ident,
 	methods: &[Method],

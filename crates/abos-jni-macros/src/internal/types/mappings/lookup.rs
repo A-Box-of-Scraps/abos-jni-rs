@@ -201,7 +201,7 @@ impl TypeMappings {
 		Ok(())
 	}
 
-	/// Get the Java class name and canonical Rust type for a Rust type alias
+	/// Resolve an alias to its primitive representation or Java class and reference wrapper.
 	pub fn map_alias(&self, alias: &str) -> Option<ConcreteType> {
 		self.alias_to_rust.get(alias).map(|rust_type| match &rust_type.target {
 			RustTypeTarget::Primitive {
@@ -226,12 +226,10 @@ impl TypeMappings {
 		})
 	}
 
-	/// Get the canonical Rust type path for a Java class name
 	pub fn map_java_class_to_rust_type(&self, java_class: &JavaClassName) -> Option<&RustType> {
 		self.java_to_rust.get(java_class).map(std::convert::AsRef::as_ref)
 	}
 
-	/// Get an iterator over all Java class names
 	#[allow(
 		unused,
 		reason = "Expose the Java-class side of the internal mapping for generator extensions."
@@ -240,22 +238,18 @@ impl TypeMappings {
 		self.java_to_rust.keys()
 	}
 
-	/// Get an iterator over all Rust types
 	pub fn rust_types(&self) -> impl Iterator<Item = &Rc<RustType>> {
 		self.rust_types.iter()
 	}
 
-	/// Get an iterator over `rust_path` -> `java_class` mappings
 	pub fn rust_to_java_iter(&self) -> impl Iterator<Item = (&Rc<RustType>, &Rc<JavaClassName>)> {
 		self.rust_to_java.iter()
 	}
 
-	/// Get the jni crate path
 	pub const fn jni_crate(&self) -> &syn::Path {
 		&self.jni_crate
 	}
 
-	/// Check if a Java class is a core type that cannot normally be bound
 	pub fn is_core_java_type(&self, java_class: &JavaClassName) -> bool {
 		self.core_java.contains(java_class)
 	}

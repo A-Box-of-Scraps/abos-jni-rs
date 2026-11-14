@@ -21,7 +21,6 @@ pub fn macro_java_name(name: &str) -> String {
 	}
 }
 
-/// Builtin JNI type information
 pub struct BuiltinType {
 	/// Simple Rust type name (e.g., "`JString`")
 	pub(crate) rust_name: &'static str,
@@ -31,7 +30,6 @@ pub struct BuiltinType {
 	pub(crate) is_core: bool,
 }
 
-/// Get the list of builtin JNI types from the `abos-jni` crate
 pub const fn builtin_jni_types() -> &'static [BuiltinType] {
 	&[
 		BuiltinType {
@@ -115,11 +113,7 @@ pub fn core_jni_type(java_name: &str) -> Option<&'static BuiltinType> {
 		.find(|builtin| builtin.is_core && builtin.java_name == java_name)
 }
 
-/// Derive a Rust type name from a Java class simple name, applying transformations
-/// to handle inner classes and applying optional prefix.
-///
-/// - Strips '$' characters used for inner classes (e.g., "ColorSpace$Rgb" -> "`ColorSpaceRgb`")
-/// - Applies optional name prefix
+/// Remove inner-class separators, apply the optional prefix, and normalize as a Rust identifier.
 pub fn derive_rust_type_name(class_name: &str, rust_type_override: Option<&str>, name_prefix: Option<&str>) -> String {
 	let class_part: &str = class_name.split('/').next_back().unwrap_or(class_name);
 

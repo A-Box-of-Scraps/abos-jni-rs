@@ -3,7 +3,6 @@ use super::{
 	generate_id_fields_and_inits, quote,
 };
 
-/// Generate method ID fields and initialization code for methods
 pub(super) fn generate_method_ids(
 	methods: &[Method],
 	type_mappings: &TypeMappings,
@@ -52,7 +51,6 @@ pub(super) fn generate_method_ids(
 	Ok(generate_id_fields_and_inits(lookups, jni))
 }
 
-/// Generate field ID fields and initialization code for fields
 pub(super) fn generate_field_ids(
 	fields: &[Field],
 	type_mappings: &TypeMappings,

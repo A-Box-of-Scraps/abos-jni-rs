@@ -16,15 +16,12 @@ pub struct TypeMappings {
 	/// Full-path built-in aliases retain the `abos_jni` prefix after a crate rename;
 	/// only the resolved Rust path uses the override.
 	alias_to_rust: std::collections::HashMap<String, Rc<RustType>>,
-	/// Set of all known Rust types
 	rust_types: std::collections::HashSet<Rc<RustType>>,
 	/// Canonical reference types to Java classes; aliases must be resolved first.
 	rust_to_java: std::collections::HashMap<Rc<RustType>, Rc<JavaClassName>>,
-	/// Reverse mapping from Java class names to the canonical `RustType` path
 	java_to_rust: std::collections::HashMap<Rc<JavaClassName>, Rc<RustType>>,
 	/// Core Java classes that cannot be remapped to third-party types.
 	core_java: std::collections::HashSet<Rc<JavaClassName>>,
-	/// The path to the jni crate (e.g., `jni` or `::jni` or `crate::jni`)
 	jni_crate: syn::Path,
 }
 

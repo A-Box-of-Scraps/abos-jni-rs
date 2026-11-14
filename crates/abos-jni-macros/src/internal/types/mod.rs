@@ -16,12 +16,10 @@ custom_keyword!(Always);
 custom_keyword!(UnsafeDebugOnly);
 custom_keyword!(UnsafeNever);
 
-/// Format a `syn::Path` as a string without spaces (for rustdoc links)
 pub fn path_to_string_no_spaces(path: &syn::Path) -> String {
 	quote!(#path).to_string().replace(' ', "")
 }
 
-/// Represents a primitive Java type
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PrimitiveType {
 	Void,
@@ -50,7 +48,6 @@ impl PrimitiveType {
 		}
 	}
 
-	/// Convert primitive type to JNI descriptor character
 	pub const fn to_jni_descriptor(&self) -> &'static str {
 		match self {
 			Self::Void => "V",
@@ -66,7 +63,6 @@ impl PrimitiveType {
 	}
 }
 
-/// Represents a Java class name (package + class)
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct JavaClassName {
 	/// Package segments (e.g., `["java", "lang"]`)
@@ -121,15 +117,8 @@ impl JavaClassName {
 }
 
 impl Parse for JavaClassName {
-	/// Parse a Java class name from a `ParseStream` or string literal
-	/// Supports:
-	/// - Dotted package.Class syntax (e.g., `java.lang.String`)
-	/// - Inner classes with :: separator (e.g., `java.lang.Outer::Inner`)
-	/// - String literals with dotted syntax
-	/// - Special case for default-package classes starting with `.` (e.g., `.NoPackage`)
-	///
-	/// The parser requires at least one dot in the input to differentiate from Rust types,
-	/// except for the special default-package case which starts with a `.`
+	/// A dot distinguishes Java names from Rust aliases; default-package names start with `.`.
+	/// Token syntax uses `::` for inner classes; string literals use binary names with `$`.
 	fn parse(input: ParseStream) -> Result<Self> {
 		if input.peek(syn::LitStr) {
 			let lit: syn::LitStr = input.parse::<syn::LitStr>()?;
@@ -213,20 +202,16 @@ impl Parse for JavaClassName {
 		))
 	}
 }
-/// Represents a type in the signature
 #[derive(Debug, Clone, PartialEq)]
 pub enum SigType {
-	/// A type alias that must be mapped via `TypeMappings`
-	/// into a Java class name or a primitive type
+	/// Resolved through `TypeMappings` to a class or primitive.
 	Alias(String),
-	/// Object type (Java class)
 	Object(JavaClassName),
 	/// Array type with element type and dimensions
 	Array(Box<Self>, usize),
 }
 
 impl SigType {
-	/// Convert to JNI descriptor
 	pub fn to_jni_descriptor(&self, type_mappings: &TypeMappings) -> Result<String> {
 		match self {
 			Self::Alias(name) => match type_mappings.map_alias(name) {
@@ -258,7 +243,6 @@ impl SigType {
 	}
 }
 
-/// Parse a type (can be primitive, object, rust reference, or array)
 pub fn parse_type(input: ParseStream, type_mappings: &TypeMappings) -> Result<SigType> {
 	if input.peek(Token![&]) {
 		input.parse::<Token![&]>()?;
@@ -336,21 +320,15 @@ pub fn parse_type(input: ParseStream, type_mappings: &TypeMappings) -> Result<Si
 
 #[derive(Clone, Debug, Eq)]
 enum RustTypeTarget {
-	/// A primitive type that maps to a `abos_jni::sys` type
 	Primitive {
-		/// Is this a standard primitive type or a user-defined mapping?
 		is_builtin: bool,
-		/// The primitive type
 		primitive: PrimitiveType,
 		/// Rust primitive name or JNI type path, honoring the crate-path override.
 		path: String,
 	},
 	Reference {
-		/// Is this a built-in `jni` crate Reference type?
 		is_builtin: bool,
-		/// The full path for a `jni` `Reference` type (e.g., "`abos_jni::objects::JString`")
-		///
-		/// If the jni crate is renamed, this path will reflect the renamed crate path.
+		/// Reference wrapper path, honoring the crate-path override.
 		path: String,
 	},
 }
@@ -422,7 +400,6 @@ pub enum ConcreteType {
 		/// Resolved Rust path, honoring the crate-path override. Rust aliases such as `i32`
 		/// retain their spelling; Java aliases such as `int` resolve to the JNI type path.
 		path: String,
-		/// Whether this is a built-in primitive type mapping or a user-defined one
 		is_builtin: bool,
 	},
 	Object {

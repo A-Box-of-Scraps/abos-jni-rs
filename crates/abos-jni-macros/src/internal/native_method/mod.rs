@@ -33,20 +33,15 @@ custom_keyword!(raw);
 custom_keyword!(abi_check);
 custom_keyword!(catch_unwind);
 
-/// Represents the export behavior for a native method
 #[derive(Clone)]
 pub enum NativeMethodExport {
-	/// Use the default behavior
 	Default,
 	/// Don't export this method (override global setting)
 	No,
-	/// Export with automatically mangled JNI name
 	WithAutoMangle,
-	/// Export with explicitly provided name
 	WithName(String),
 }
 
-/// Input structure for `native_method`!
 struct NativeMethodStructInput {
 	is_static: bool,
 	jni_crate: syn::Path,

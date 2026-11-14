@@ -1,10 +1,6 @@
 use super::{JavaClassName, PrimitiveType, Rc, RustType, RustTypeTarget, TypeMappings, path_to_string_no_spaces};
 
 impl TypeMappings {
-	/// Create a new `TypeMappings` with default JNI type mappings
-	///
-	/// # Arguments
-	/// * `jni_crate` - The path to the jni crate (e.g., `jni` or `::jni` or `crate::jni`)
 	pub fn new(jni_crate: &syn::Path) -> Self {
 		let mut type_mappings: Self = Self {
 			alias_to_rust: std::collections::HashMap::new(),

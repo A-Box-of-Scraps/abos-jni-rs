@@ -56,7 +56,6 @@ custom_keyword!(raw);
 custom_keyword!(non_null);
 custom_keyword!(requires);
 
-/// Represents a visibility modifier
 #[derive(Clone)]
 enum VisibilitySpec {
 	Public,
@@ -103,7 +102,6 @@ impl VisibilitySpec {
 	}
 }
 
-/// Represents a constructor definition
 #[derive(Clone)]
 struct Constructor {
 	requirement: Requirement,
@@ -112,7 +110,6 @@ struct Constructor {
 	attrs: Vec<syn::Attribute>,
 }
 
-/// Represents a method definition
 #[derive(Clone)]
 struct Method {
 	requirement: Requirement,
@@ -125,7 +122,6 @@ struct Method {
 	non_null: bool,
 }
 
-/// Represents a field definition
 #[derive(Clone)]
 struct Field {
 	requirement: Requirement,
@@ -147,7 +143,6 @@ struct Field {
 	non_null: bool,
 }
 
-/// Represents an entry in the `is_instance_of` list
 #[derive(Clone)]
 struct IsInstanceOfEntry {
 	/// The Rust type alias (e.g., "`JObject`" or "`abos_jni::objects::JObject`")
@@ -156,7 +151,6 @@ struct IsInstanceOfEntry {
 	stem: Option<String>,
 }
 
-/// Represents a native method definition
 #[derive(Clone)]
 struct NativeMethod {
 	requirement: Requirement,
@@ -170,7 +164,6 @@ struct NativeMethod {
 	native_fn: Option<syn::Path>,
 	/// Whether this is a raw JNI function (takes `EnvUnowned` directly, no `with_env` wrapper)
 	is_raw: bool,
-	/// Whether this is a static method
 	is_static: bool,
 	abi_check: Option<AbiCheck>,
 	catch_unwind: Option<bool>,
@@ -188,8 +181,8 @@ enum MethodKind {
 struct ParsedMethod {
 	requirement: Requirement,
 	rust_name: Ident,
-	java_name: String,          // Always set (either explicit or derived from rust_name)
-	signature: MethodSignature, // Always present after parsing
+	java_name: String,
+	signature: MethodSignature,
 	visibility: Option<VisibilitySpec>,
 	error_policy: Option<syn::Path>,    // Only set for NativeMethod
 	export: Option<NativeMethodExport>, // Only set for NativeMethod
@@ -202,7 +195,6 @@ struct ParsedMethod {
 	non_null: bool,               // Set for Method and NativeMethod (not Constructor)
 }
 
-/// The main input structure for `bind_java_type`!
 struct BindClassInput {
 	type_name: Ident,
 	type_visibility: Option<VisibilitySpec>,
@@ -233,19 +225,15 @@ struct IdLookup {
 	requirement: Requirement,
 	/// The field name in the API struct (e.g., "`new_method_id`", "`get_value_field_id`")
 	field_name: Ident,
-	/// The field type (`JMethodID` or `JFieldID`)
 	field_type: TokenStream,
 	/// The Java name to look up (e.g., "<init>", "getValue", "myField")
 	java_name: String,
-	/// The JNI signature string
 	signature: String,
 	/// The function to call for lookup (e.g., "`get_method_id`", "`get_static_field_id`")
 	lookup_fn: Ident,
-	/// The cfg attributes to apply to this ID (e.g., #[cfg(feature = "foo")])
 	cfg_attrs: Vec<syn::Attribute>,
 }
 
-/// Helper struct to hold processed JNI call arguments data
 struct JniCallArgs {
 	lifetimes: Vec<TokenStream>,
 	jvalue_conversions: Vec<TokenStream>,

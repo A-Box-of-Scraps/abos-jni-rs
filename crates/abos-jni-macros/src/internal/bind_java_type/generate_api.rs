@@ -3,7 +3,6 @@ use super::{
 	generate_is_instance_of_assignable_checks, generate_type_mapping_checks, path_to_string_no_spaces, quote,
 };
 
-/// Generate the type struct definition
 pub(super) fn generate_type_struct(
 	type_name: &Ident,
 	type_visibility: &VisibilitySpec,
@@ -70,7 +69,6 @@ pub(super) fn generate_type_struct(
 	}
 }
 
-/// Generate the API struct definition
 pub(super) fn generate_api_struct(
 	api_name: &Ident,
 	type_visibility: &VisibilitySpec,
@@ -94,7 +92,6 @@ pub(super) fn generate_api_struct(
 	}
 }
 
-/// Generate the `API::get()` method
 #[allow(
 	clippy::too_many_arguments,
 	reason = "Code generation needs the independent binding metadata and JNI paths."

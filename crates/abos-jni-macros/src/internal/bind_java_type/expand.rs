@@ -5,7 +5,6 @@ use super::{
 	generate_native_methods_code, generate_reference_impl, generate_type_struct, quote,
 };
 
-/// Generate code for the `bind_java_type` macro
 pub fn bind_java_type_impl(input: TokenStream) -> Result<TokenStream> {
 	let input: BindClassInput = syn::parse2(input)?;
 

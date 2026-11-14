@@ -5,7 +5,6 @@ use super::{
 	generate_native_method_abi_check, quote,
 };
 
-/// Generate wrapper functions for native methods as API struct methods
 #[allow(
 	clippy::too_many_arguments,
 	reason = "Code generation needs the independent binding metadata and JNI paths."
@@ -44,7 +43,6 @@ pub(super) fn generate_native_wrappers(
 	}
 }
 
-/// Generate a single native method wrapper as an API struct method
 #[allow(
 	clippy::too_many_arguments,
 	reason = "Code generation needs the independent binding metadata and JNI paths."

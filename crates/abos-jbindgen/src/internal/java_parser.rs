@@ -169,7 +169,6 @@ fn get_parser_jvm() -> Result<&'static JavaVM> {
 	.map_err(|message| Error::Parse(message.clone()))
 }
 
-/// Parse Java source files using the Java parser
 pub fn parse_java_sources(
 	source_paths: &[PathBuf],
 	class_path_entries: &[PathBuf],
@@ -238,7 +237,6 @@ fn parse_sources(
 	result.map_err(|e| Error::Parse(format!("JNI error: {e}")))
 }
 
-/// Create a `JString` array from `PathBuf` slice
 fn create_string_array<'a>(
 	env: &mut Env<'a>,
 	paths: &[PathBuf],
@@ -256,7 +254,6 @@ fn create_string_array<'a>(
 	Ok(array)
 }
 
-/// Convert Java `ClassDescription` to `ClassInfo`
 fn java_to_class_info(
 	env: &mut Env,
 	class_desc: &ClassDescription,
@@ -330,7 +327,6 @@ fn java_to_class_info(
 	})
 }
 
-/// Convert Java `MethodDescription` array to Vec<MethodInfo>
 fn java_array_to_methods(
 	env: &mut Env,
 	array: &JObjectArray<MethodDescription>,
@@ -347,7 +343,6 @@ fn java_array_to_methods(
 	Ok(methods)
 }
 
-/// Convert Java `MethodDescription` to `MethodInfo`
 fn java_to_method_info(
 	env: &mut Env,
 	method_desc: &MethodDescription,
@@ -394,7 +389,6 @@ fn java_to_method_info(
 	})
 }
 
-/// Convert Java `ParameterDescription` to `ArgInfo`
 fn java_to_arg_info(
 	env: &mut Env,
 	param_desc: &ParameterDescription,
@@ -423,7 +417,6 @@ fn java_to_arg_info(
 	})
 }
 
-/// Convert Java `TypeDescription` to `TypeInfo`
 fn java_to_type_info(
 	env: &mut Env,
 	type_desc: &TypeDescription,
@@ -440,7 +433,6 @@ fn java_to_type_info(
 	})
 }
 
-/// Convert Java `FieldDescription` array to Vec<FieldInfo>
 fn java_array_to_fields(
 	env: &mut Env,
 	array: &JObjectArray<FieldDescription>,
@@ -457,7 +449,6 @@ fn java_array_to_fields(
 	Ok(fields)
 }
 
-/// Convert Java `FieldDescription` to `FieldInfo`
 fn java_to_field_info(
 	env: &mut Env,
 	field_desc: &FieldDescription,

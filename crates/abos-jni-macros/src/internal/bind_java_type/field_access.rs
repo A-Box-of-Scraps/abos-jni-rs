@@ -1,6 +1,5 @@
 use super::{PrimitiveType, SigType, TokenStream, TypeMappings, format_ident, quote, sig_type_to_rust_return_type};
 
-/// Generate JNI get field call code for a given field type
 pub(super) fn generate_jni_get_field_call(
 	debug_name: &str,
 	field_type: &SigType,
@@ -54,7 +53,6 @@ pub(super) fn generate_jni_get_field_call(
 	)
 }
 
-/// Generate JNI set field call code for a given field type
 #[allow(
 	clippy::too_many_arguments,
 	reason = "Code generation needs the independent binding metadata and JNI paths."

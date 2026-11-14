@@ -16,7 +16,6 @@ pub fn intersect_classes(
 	result
 }
 
-/// Intersect members of two `ClassInfo` instances
 pub fn intersect_class_members(jar_class: &ClassInfo, stub_class: &ClassInfo) -> ClassInfo {
 	let jar_constructor_sigs: HashSet<String> = jar_class.constructors.iter().map(method_signature_key).collect();
 
@@ -102,7 +101,6 @@ pub fn field_signature_key(field: &FieldInfo) -> String {
 	)
 }
 
-/// Format a type signature for comparison
 pub fn format_type_signature(type_info: &crate::api::types::TypeInfo) -> String {
 	if type_info.array_dimensions > 0 {
 		format!("{}{}", type_info.name, "[]".repeat(type_info.array_dimensions))

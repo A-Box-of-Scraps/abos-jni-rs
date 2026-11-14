@@ -100,7 +100,6 @@ pub(super) fn generate_native_registration_code(
 	})
 }
 
-/// Generate exported native method functions for methods marked with export = true
 #[allow(
 	clippy::too_many_arguments,
 	reason = "Code generation needs the independent binding metadata and JNI paths."
@@ -155,7 +154,6 @@ pub(super) fn generate_native_exports(
 	})
 }
 
-/// Generate a single exported native method function
 #[allow(
 	clippy::too_many_arguments,
 	reason = "Code generation needs the independent binding metadata and JNI paths."
