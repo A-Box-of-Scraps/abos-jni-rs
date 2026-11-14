@@ -50,13 +50,21 @@ impl Requirement {
 	pub(super) fn initialize_id(&self, lookup: &TokenStream, jni: &syn::Path) -> TokenStream {
 		match self {
 			Self::Required => quote! { #lookup? },
-			Self::Available => quote! {
-				match #lookup {
+			Self::Available => quote! {{
+				// Get*ID also initializes the class. An initializer can throw NoSuchMethodError
+				// or NoSuchFieldError, so confirm absence with one more lookup. A failed class
+				// initializer leaves the class erroneous: the second lookup fails with
+				// NoClassDefFoundError instead, which must not be cached as an absent member.
+				let result = match #lookup {
+					Err(#jni::errors::Error::MethodNotFound { .. } | #jni::errors::Error::FieldNotFound { .. }) => #lookup,
+					result => result,
+				};
+				match result {
 					Ok(id) => Some(id),
 					Err(#jni::errors::Error::MethodNotFound { .. } | #jni::errors::Error::FieldNotFound { .. }) => None,
 					Err(error) => return Err(error),
 				}
-			},
+			}},
 			Self::Predicate(_) | Self::RegisteredNative(_) => {
 				let enabled: TokenStream = self.condition();
 				quote! { if #enabled { Some(#lookup?) } else { None } }

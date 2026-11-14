@@ -144,6 +144,48 @@ bind_java_type! {
 	methods { static fn present { sig = () -> jint, requires = available } },
 }
 
+bind_java_type! {
+	MethodInitializerFailure => "com.example.TestOptionalMethodInitializerFailure",
+	methods { static fn present { sig = () -> jint, requires = available } },
+}
+
+bind_java_type! {
+	InstanceMethodInitializerFailure => "com.example.TestOptionalMethodInitializerFailure",
+	methods { fn instance_present { sig = () -> jint, requires = available } },
+}
+
+bind_java_type! {
+	ConstructorInitializerFailure => "com.example.TestOptionalMethodInitializerFailure",
+	constructors { fn new { sig = (), requires = available } },
+}
+
+bind_java_type! {
+	FieldInitializerFailure => "com.example.TestOptionalFieldInitializerFailure",
+	fields { static present { sig = jint, requires = available } },
+}
+
+bind_java_type! {
+	InstanceFieldInitializerFailure => "com.example.TestOptionalFieldInitializerFailure",
+	fields { instance_present { sig = jint, requires = available } },
+}
+
+fn assert_initializer_failure_not_cached(class_name: &str, mut initialize: impl FnMut(&mut Env<'_>) -> Result<()>) {
+	util::attach_current_thread(|env| {
+		util::load_test_class(env, &util::java_fixtures(), class_name)?;
+		// A failed initializer must fail API initialization, including on subsequent attempts.
+		for _ in 0..2 {
+			let error: Error = initialize(env).expect_err("initializer failure must not initialize the binding API");
+			assert!(!matches!(
+				error,
+				Error::MemberUnavailable { .. } | Error::MethodNotFound { .. } | Error::FieldNotFound { .. }
+			));
+			assert!(!env.exception_check());
+		}
+		Ok(())
+	})
+	.expect("initializer linkage errors are not cached as absent members");
+}
+
 fn assert_unavailable<T: std::fmt::Debug>(result: Result<T>, name: &str) {
 	let error: Error = result.expect_err("member must be unavailable");
 	assert!(matches!(error, Error::MemberUnavailable { name: member } if member == name));
@@ -275,5 +317,40 @@ rusty_fork_test! {
 			assert!(!env.exception_check());
 			Ok(())
 		}).expect("initializer failure is not treated as absence");
+	}
+
+	#[test]
+	fn optional_static_method_does_not_hide_initializer_linkage_error() {
+		assert_initializer_failure_not_cached("TestOptionalMethodInitializerFailure", |env| {
+			MethodInitializerFailure::present(env).map(|_| ())
+		});
+	}
+
+	#[test]
+	fn optional_instance_method_does_not_hide_initializer_linkage_error() {
+		assert_initializer_failure_not_cached("TestOptionalMethodInitializerFailure", |env| {
+			InstanceMethodInitializerFailureAPI::get(env, &LoaderContext::None).map(|_| ())
+		});
+	}
+
+	#[test]
+	fn optional_constructor_does_not_hide_initializer_linkage_error() {
+		assert_initializer_failure_not_cached("TestOptionalMethodInitializerFailure", |env| {
+			ConstructorInitializerFailure::new(env).map(|_| ())
+		});
+	}
+
+	#[test]
+	fn optional_static_field_does_not_hide_initializer_linkage_error() {
+		assert_initializer_failure_not_cached("TestOptionalFieldInitializerFailure", |env| {
+			FieldInitializerFailure::present(env).map(|_| ())
+		});
+	}
+
+	#[test]
+	fn optional_instance_field_does_not_hide_initializer_linkage_error() {
+		assert_initializer_failure_not_cached("TestOptionalFieldInitializerFailure", |env| {
+			InstanceFieldInitializerFailureAPI::get(env, &LoaderContext::None).map(|_| ())
+		});
 	}
 }

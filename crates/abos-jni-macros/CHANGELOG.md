@@ -6,6 +6,9 @@
 
 ### Fixed
 
+- Confirm optional member absence before caching it, so initializer-thrown `NoSuchMethodError` and `NoSuchFieldError`
+  fail binding initialization rather than silently marking existing members unavailable.
+
 - Document automatic native registration lifetime obligations, cross-loader library ownership, and registrations
   retained after initialization errors; clarify that generated bindings do not coordinate library unloading.
 
