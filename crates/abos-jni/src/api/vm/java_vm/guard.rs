@@ -259,7 +259,7 @@ impl<'local> AttachGuard<'local> {
 				"Spurious AttachGuard that owns its attachment but is nested under another guard"
 			);
 			// SAFETY: This outermost owning guard has popped its level and will not use the environment after detaching.
-			unsafe { sys_detach_current_thread(Some(self.env.raw), &std::thread::current()) }
+			unsafe { sys_detach_current_thread(Some(self.env.raw)) }
 		} else {
 			Ok(())
 		};

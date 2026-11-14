@@ -385,13 +385,16 @@ impl JavaVM {
 		}
 
 		#[cfg(use_tls_attach_guard)]
-		{
-			tls_attach_guard::tls_detach_current_thread()
-		}
-
+		let result: Result<()> = tls_attach_guard::tls_detach_current_thread();
 		#[cfg(use_fls_attach_guard)]
-		{
-			fls_attach_guard::fls_detach_current_thread()
-		}
+		let result: Result<()> = fls_attach_guard::fls_detach_current_thread();
+
+		// Only explicit detachment logs, after the cleanup record and bookkeeping are
+		// finalized. TLS/FLS destructors must never invoke arbitrary logger code.
+		log::debug!(
+			"Explicit thread detach: {result:?}. {} attachments remain (logical count)",
+			self.threads_attached(),
+		);
+		result
 	}
 }

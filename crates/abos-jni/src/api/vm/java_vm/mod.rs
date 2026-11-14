@@ -271,7 +271,10 @@ fn windows_is_shutdown_in_progress() -> bool {
 	unsafe { RtlDllShutdownInProgress() != 0 }
 }
 
-/// Detach a thread from the JVM.
+/// Detach a thread from the JVM without invoking the logger.
+///
+/// This runs during TLS/FLS destruction, when a logger's TLS may already be destroyed.
+/// Keep diagnostics outside this routine and its teardown callers.
 ///
 /// If `cross_check_env` is provided, this function will verify that the env pointer matches the
 /// current thread's attachment before detaching. This provides a defensive check that we "own" the
@@ -284,10 +287,7 @@ fn windows_is_shutdown_in_progress() -> bool {
 /// was already detached by other means (e.g., manual `DetachCurrentThread` call via raw JNI API,
 /// or by another fiber on Windows). This maintains correct logical accounting - we track how many
 /// times *we* attached, not the actual JVM attachment state.
-pub unsafe fn sys_detach_current_thread(
-	cross_check_env: Option<*mut abos_jni_sys::JNIEnv>,
-	thread: &Thread,
-) -> Result<()> {
+pub unsafe fn sys_detach_current_thread(cross_check_env: Option<*mut abos_jni_sys::JNIEnv>) -> Result<()> {
 	assert_eq!(JavaVM::thread_attach_guard_level(), 0);
 
 	let vm: JavaVM = JavaVM::singleton()?;
@@ -355,18 +355,6 @@ pub unsafe fn sys_detach_current_thread(
 			unsafe {
 				java_vm_call_unchecked!(vm, v1_1, DetachCurrentThread);
 			}
-			debug!(
-				"Detached thread {} ({:?})",
-				thread.name().unwrap_or_default(),
-				thread.id()
-			);
-		} else {
-			// Thread already detached (e.g., by another fiber on Windows, or manual DetachCurrentThread)
-			debug!(
-				"Thread {} ({:?}) already detached (skipping DetachCurrentThread)",
-				thread.name().unwrap_or_default(),
-				thread.id()
-			);
 		}
 	}
 
@@ -375,11 +363,6 @@ pub unsafe fn sys_detach_current_thread(
 	// - On Windows with FLS: each fiber attachment increments this counter
 	// - On other platforms with TLS: each thread attachment increments this counter
 	ATTACHED_THREADS.fetch_sub(1, Ordering::SeqCst);
-
-	debug!(
-		"{} attachments remain (logical count)",
-		ATTACHED_THREADS.load(Ordering::SeqCst)
-	);
 
 	Ok(())
 }
