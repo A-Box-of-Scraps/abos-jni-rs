@@ -31,16 +31,16 @@ impl<'a> Reader<'a> {
 	}
 
 	pub(super) fn u8(&mut self) -> Result<u8> {
-		Ok(self.take(1)?[0])
+		Ok(self.take(size_of::<u8>())?[0])
 	}
 
 	pub(super) fn u16(&mut self) -> Result<u16> {
-		let bytes: &[u8] = self.take(2)?;
+		let bytes: &[u8] = self.take(size_of::<u16>())?;
 		Ok(u16::from_be_bytes([bytes[0], bytes[1]]))
 	}
 
 	pub(super) fn u32(&mut self) -> Result<u32> {
-		let bytes: &[u8] = self.take(4)?;
+		let bytes: &[u8] = self.take(size_of::<u32>())?;
 		Ok(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 	}
 }

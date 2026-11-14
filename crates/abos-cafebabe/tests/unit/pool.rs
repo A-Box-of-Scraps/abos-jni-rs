@@ -23,3 +23,22 @@ fn modified_utf8() {
 		assert_eq!(decode_modified_utf8(invalid), None, "{invalid:?}");
 	}
 }
+
+#[test]
+fn modified_utf8_encoding_boundaries() {
+	for text in ["\u{1}", "\u{7f}", "\u{80}", "\u{7ff}", "\u{800}", "\u{ffff}"] {
+		assert_eq!(decode_modified_utf8(text.as_bytes()).as_deref(), Some(text));
+	}
+	for invalid in [
+		&[0xc0, 0x81][..],
+		&[0xc1, 0xbf],
+		&[0xe0, 0x9f, 0xbf],
+		&[0xdf, 0x7f],
+		&[0xdf, 0xc0],
+		&[0xe0, 0xa0, 0x7f],
+		&[0xe0, 0xa0, 0xc0],
+		&[0xff],
+	] {
+		assert_eq!(decode_modified_utf8(invalid), None, "{invalid:?}");
+	}
+}

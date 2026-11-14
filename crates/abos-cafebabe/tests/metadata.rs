@@ -63,7 +63,9 @@ fn versions_and_metadata() {
 		65535
 	);
 	assert!(parse_class(&fixture(55, 42)).is_ok());
-	for (major, minor) in [(44, 0), (72, 0), (71, 1)] {
+	assert!(parse_class(&fixture(56, 0)).is_ok());
+	assert!(parse_class(&fixture(56, 65535)).is_ok());
+	for (major, minor) in [(44, 0), (72, 0), (56, 1), (56, 65534), (71, 1)] {
 		assert!(parse_class(&fixture(major, minor)).is_err());
 	}
 }

@@ -1,24 +1,36 @@
 use super::{pool::Pool, reader::Reader};
 use crate::{AccessFlags, ClassFile, Member, Result};
 
+const CLASS_FILE_MAGIC: u32 = 0xCAFE_BABE;
+const MIN_SUPPORTED_MAJOR_VERSION: u16 = 45;
+const MAX_SUPPORTED_MAJOR_VERSION: u16 = 71;
+// From this version onward, only release and preview minor versions are valid.
+const PREVIEW_FEATURES_MAJOR_VERSION: u16 = 56;
+const RELEASE_MINOR_VERSION: u16 = 0;
+const PREVIEW_MINOR_VERSION: u16 = u16::MAX;
+const NO_SUPER_CLASS_INDEX: u16 = 0;
+
 pub fn parse_class(bytes: &[u8]) -> Result<ClassFile> {
 	let mut reader: Reader<'_> = Reader::new(bytes);
-	if reader.u32()? != 0xCAFE_BABE {
+	if reader.u32()? != CLASS_FILE_MAGIC {
 		return Err(reader.error("invalid class-file magic"));
 	}
 	let minor_version: u16 = reader.u16()?;
 	let major_version: u16 = reader.u16()?;
-	if !(45..=71).contains(&major_version) {
+	if !(MIN_SUPPORTED_MAJOR_VERSION..=MAX_SUPPORTED_MAJOR_VERSION).contains(&major_version) {
 		return Err(reader.error("unsupported class-file major version (expected 45..=71)"));
 	}
-	if major_version >= 56 && minor_version != 0 && minor_version != u16::MAX {
+	if major_version >= PREVIEW_FEATURES_MAJOR_VERSION
+		&& minor_version != RELEASE_MINOR_VERSION
+		&& minor_version != PREVIEW_MINOR_VERSION
+	{
 		return Err(reader.error("invalid class-file minor version"));
 	}
 	let pool: Pool<'_> = Pool::read(&mut reader)?;
 	let access_flags: AccessFlags = AccessFlags(reader.u16()?);
 	let this_class: String = pool.class_name(&mut reader)?;
 	let parent_index: u16 = reader.u16()?;
-	let super_class: Option<String> = if parent_index == 0 {
+	let super_class: Option<String> = if parent_index == NO_SUPER_CLASS_INDEX {
 		None
 	} else {
 		Some(pool.class(parent_index, &reader)?)
