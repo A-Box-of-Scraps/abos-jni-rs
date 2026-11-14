@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add consuming `JPrimitiveArray::into_elements` and `into_elements_critical` methods whose guards own the array
+  reference, preserving local-frame lifetimes and all existing safety and critical-section restrictions.
+
 ### Fixed
 
 - Check `JIterator::has_next` before advancing for compatibility with Android iterators that return invalid entries on

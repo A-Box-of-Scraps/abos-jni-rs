@@ -16,7 +16,7 @@ pub fn main() {
                 // it is only constrained by the `env1` lifetime of it's array reference
                 let elems1 = env1.with_local_frame(10, |env2| -> abos_jni::errors::Result<_> {
                     let elems2 = unsafe {
-                        env2.get_array_elements(java_array, ReleaseMode::CopyBack)
+                        java_array.into_elements(env2, ReleaseMode::CopyBack)
                             .unwrap()
                     };
                     Ok(elems2)

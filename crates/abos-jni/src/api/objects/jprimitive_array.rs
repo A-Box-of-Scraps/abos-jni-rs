@@ -151,6 +151,7 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 	/// Returns an [`AutoElements`] to access the elements of the given Java `array`.
 	///
 	/// The elements are accessible until the returned auto-release guard is dropped.
+	/// Use [`Self::into_elements`] to move this array reference into the guard instead of borrowing it.
 	///
 	/// The returned array may be a copy of the Java array and changes made to
 	/// the returned array will not necessarily be reflected in the original
@@ -212,11 +213,33 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 		AutoElements::new(env, self, mode)
 	}
 
+	/// Consumes this array reference and returns an [`AutoElements`] guard that owns it.
+	///
+	/// Unlike [`Self::get_elements`], the guard does not borrow the Rust array wrapper, so it
+	/// can outlive that wrapper's binding. It remains tied to the array's JNI local reference
+	/// frame. This does not create a new JNI reference or extend the frame's lifetime.
+	/// Element access, copy-back, and release behavior are the same as [`Self::get_elements`].
+	///
+	/// # Safety
+	///
+	/// All requirements of [`Self::get_elements`] apply, including preventing data races and
+	/// aliased element guards and storing only `0` or `1` in boolean arrays. Consuming this
+	/// reference does not guarantee exclusive access to the Java array: other references to
+	/// the same array may still exist.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array is null, its elements cannot be acquired, or a Java exception is pending.
+	pub unsafe fn into_elements(self, env: &Env, mode: ReleaseMode) -> Result<AutoElements<'local, T, Self>> {
+		AutoElements::new(env, self, mode)
+	}
+
 	/// Returns an [`AutoElementsCritical`] to access the elements of this
 	/// array.
 	///
 	/// The elements are accessible during the critical section that exists
 	/// until the returned auto-release guard is dropped.
+	/// Use [`Self::into_elements_critical`] to move this array reference into the guard instead of borrowing it.
 	///
 	/// This API imposes some strict restrictions that help the JNI
 	/// implementation avoid any need to copy the underlying array elements
@@ -314,6 +337,35 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 		env: &Env<'_>,
 		mode: ReleaseMode,
 	) -> Result<AutoElementsCritical<'local, T, &Self>> {
+		AutoElementsCritical::new(env, self, mode)
+	}
+
+	/// Consumes this array reference and returns an [`AutoElementsCritical`] guard that owns it.
+	///
+	/// Unlike [`Self::get_elements_critical`], the guard does not borrow the Rust array wrapper.
+	/// It remains tied to the array's JNI local reference frame; moving the reference does not
+	/// create a new JNI reference or extend the frame's lifetime. Element access, copy-back,
+	/// and release behavior are the same as [`Self::get_elements_critical`].
+	///
+	/// # Safety
+	///
+	/// All requirements of [`Self::get_elements_critical`] apply, including preventing data
+	/// races and aliased element guards and storing only `0` or `1` in boolean arrays.
+	/// Consuming this reference does not guarantee exclusive access to the Java array.
+	///
+	/// Until the guard is dropped, do not make other JNI calls on this thread (including
+	/// reference cleanup or popping local frames), or system calls that may wait for another
+	/// Java thread. Moving the guard does not end the critical section. Keep it short and
+	/// drop the guard before resuming JNI work.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the array is null, a critical element pointer cannot be acquired, or a Java exception is pending.
+	pub unsafe fn into_elements_critical(
+		self,
+		env: &Env<'_>,
+		mode: ReleaseMode,
+	) -> Result<AutoElementsCritical<'local, T, Self>> {
 		AutoElementsCritical::new(env, self, mode)
 	}
 

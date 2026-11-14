@@ -1,0 +1,33 @@
+error[E0382]: use of moved value: `array`
+ --> tests/ui/fail/into-elements-moves-array.rs:6:7
+  |
+3 | fn regular(env: &Env, array: JIntArray) -> Result<()> {
+  |                       ----- move occurs because `array` has type `JPrimitiveArray<'_, i32>`, which does not implement the `Copy` trait
+4 |     let guard = unsafe { array.into_elements(env, ReleaseMode::CopyBack)? };
+  |                                ----------------------------------------- `array` moved due to this method call
+5 |     drop(guard);
+6 |     drop(array);
+  |          ^^^^^ value used here after move
+  |
+note: `abos_jni::objects::JPrimitiveArray::<'local, T>::into_elements` takes ownership of the receiver `self`, which moves `array`
+ --> src/api/objects/jprimitive_array.rs
+  |
+  |     pub unsafe fn into_elements(self, env: &Env, mode: ReleaseMode) -> Result<AutoElements<'local, T, Self>> {
+  |                                 ^^^^
+
+error[E0382]: use of moved value: `array`
+  --> tests/ui/fail/into-elements-moves-array.rs:13:7
+   |
+10 | fn critical(env: &Env, array: JIntArray) -> Result<()> {
+   |                        ----- move occurs because `array` has type `JPrimitiveArray<'_, i32>`, which does not implement the `Copy` trait
+11 |     let guard = unsafe { array.into_elements_critical(env, ReleaseMode::CopyBack)? };
+   |                                -------------------------------------------------- `array` moved due to this method call
+12 |     drop(guard);
+13 |     drop(array);
+   |          ^^^^^ value used here after move
+   |
+note: `abos_jni::objects::JPrimitiveArray::<'local, T>::into_elements_critical` takes ownership of the receiver `self`, which moves `array`
+  --> src/api/objects/jprimitive_array.rs
+   |
+   |         self,
+   |         ^^^^
