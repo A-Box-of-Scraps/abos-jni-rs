@@ -288,8 +288,6 @@ impl<'local, E: Reference + 'local> JObjectArray<'local, E> {
 	///
 	/// Panics if the environment is not associated with the current top JNI frame.
 	pub fn get_element<'env_local>(&self, env: &mut Env<'env_local>, index: usize) -> Result<E::Kind<'env_local>> {
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		assert_eq!(env.level, JavaVM::thread_attach_guard_level());
 		let array: crate::sys::jobject =
 			null_check!(self.as_raw() as jobjectArray, "get_object_array_element array argument")?;

@@ -20,10 +20,9 @@ Import them from `abos_jni`, for example `use abos_jni::{jni_sig, jni_str};`. A 
 crate is not required. When importing from `abos_jni_macros` directly, add `abos-jni-macros = "0.1.0"` as well;
 expansions that use JNI runtime types still need `abos-jni`.
 
-The macros do not require a running JVM during compilation. Starting a desktop JVM from the resulting program requires
-`abos-jni`'s `invocation` feature; calling into an existing JVM does not. See the
-[abos-jni README](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jni/README.md) for complete
-runtime setup and examples in both call directions.
+Compilation requires no JVM. To start one at runtime, enable `abos-jni`'s `invocation` feature; existing-VM integrations
+do not need it. See [abos-jni](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jni/README.md) for
+setup.
 
 ## Quick Start
 
@@ -111,28 +110,23 @@ bind_java_type! {
   member or using a missing JNI ID. An unavailable native is not registered; any generated Rust call wrapper returns the
   same error. Rust signatures and native implementations are still compiled and type-checked.
 
-Availability is cached with the binding's API for the process lifetime. Predicates must describe stable capabilities and
-tolerate repeated evaluation during concurrent initialization or retries after an initialization error. A native call
-wrapper reuses its registration decision rather than evaluating the predicate again. Avoid initialization cycles:
-predicates must not call back into the same binding, and native predicates must not initialize the class being
-registered. Native registration completes before ordinary member ID lookup can initialize the class.
+Availability is cached for the process lifetime. Predicates must describe stable capabilities and tolerate repeated
+evaluation during concurrent initialization or retries. They must not re-enter the same binding; native predicates must
+not initialize the target class before registration completes. Native call wrappers reuse the registration decision.
 
 Runtime-gated natives suppress default symbol exports, even with `native_methods_export = true`. Explicit `export`
 requests on gated natives are rejected: JNI symbol lookup would bypass the registration requirement. These natives must
 be reached through registration.
 
-Android API levels, Java library versions, and JNI interface versions are separate capabilities. `Env::version()`
-reports the JNI interface version, not an Android API level or the availability of a Java library method. Prefer
-`requires = available` for member presence, or a predicate that checks the particular platform/library requirement.
-There is no automatic conversion between these version spaces.
+`Env::version()` reports the JNI interface version, not the Android API level or Java library version. Use `requires =
+available` for member presence or a predicate that checks the relevant platform/library requirement.
 
 ## Scope and limitations
 
 ### Compile-time and runtime checks
 
-The macros validate supported syntax and generate Rust code. Class loading, member lookup, and Java assignability checks
-happen when the resulting bindings run. Compilation alone does not establish that the declarations match the Java API.
-These macros do not compile Java sources or package Java classes.
+Class loading, member lookup, and Java assignability checks happen at runtime. Successful macro expansion does not
+verify the Java API, compile Java sources, or package classes.
 
 ### Java names and string encoding
 
@@ -172,10 +166,9 @@ including until all in-flight calls return. Use process-lifetime native code or 
 loaded. The cached global reference to the target class is **not** a general library keepalive: a different class loader
 may own the library. The macro neither identifies nor retains that owning loader or a native library handle.
 
-Unloadable-library integrations need their own lifecycle protocol: prevent new calls and concurrent registration, remove
-registrations, and wait for all in-flight calls to return before unloading. Automatic unregistration in a `Drop`
-implementation would not, by itself, make unloading safe. The generated binding cache has no teardown or in-flight-call
-tracking; do not treat automatic registration as support for unloading and reloading libraries.
+Unloadable-library integrations must prevent new calls and concurrent registration, remove registrations, and wait for
+in-flight calls before unloading. The binding cache provides neither teardown nor in-flight-call tracking; automatic
+registration does not support library unloading and reloading.
 
 `native_method!` generates a descriptor but does not register it or retain its library. The descriptor's string lifetime
 is unrelated to the executable code's lifetime. Explicit registration must satisfy the safety contract of

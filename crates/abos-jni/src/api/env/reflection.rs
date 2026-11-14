@@ -147,8 +147,6 @@ impl<'local> Env<'local> {
 		M: Copy,
 		C: Desc<'local, JClass<'other_local>>,
 	{
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let class: C::Output = class.lookup(self)?;
 

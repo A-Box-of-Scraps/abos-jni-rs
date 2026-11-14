@@ -103,8 +103,6 @@ impl<'local> Env<'local> {
 	where
 		O: Reference,
 	{
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 
 		// By checking for `null` before calling `NewLocalRef` we can recognise

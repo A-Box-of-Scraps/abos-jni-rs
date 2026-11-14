@@ -40,9 +40,8 @@ pub unsafe fn jni_version(env: *mut sys::JNIEnv) -> sys::jint {
 This function does not create a JVM or attach a thread. It must be called with an environment obtained from a native
 method or the invocation API, not a null or fabricated pointer.
 
-`JNIEnv` is itself a pointer alias (`*const JNINativeInterface_`), so JNI functions receive `*mut JNIEnv`. `JavaVM` is
-likewise a table-pointer alias, and invocation functions receive `*mut JavaVM`. The two dereferences in the example
-access the environment's function table; they are not an extra layer to remove.
+`JNIEnv` aliases `*const JNINativeInterface_`; JNI calls receive `*mut JNIEnv`. `JavaVM` is likewise a table-pointer
+alias, used as `*mut JavaVM` by invocation functions. Both require two dereferences to reach the function table.
 
 ## Scope and limitations
 
@@ -166,19 +165,7 @@ pub unsafe fn call_two_ints(
 
 Inspect the environment for a Java exception after the call before treating the returned integer as a successful result.
 
-## Tests and API reference
-
-From a repository checkout, run the layout and compile-fail tests:
-
-```sh
-cargo test --locked --package abos-jni-sys
-```
-
-The raw JVM integration test is opt-in and requires `JAVA_HOME` pointing to a host JDK with its platform JVM library:
-
-```sh
-cargo test --locked --package abos-jni-sys --test invocation -- --ignored
-```
+## API reference
 
 See the
 [integration test](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jni-sys/tests/invocation.rs) for

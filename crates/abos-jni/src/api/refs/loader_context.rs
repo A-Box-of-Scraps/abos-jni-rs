@@ -39,53 +39,20 @@ pub enum LoaderContext<'any_local, 'a> {
 }
 
 impl LoaderContext<'_, '_> {
-	/// Loads the class with the given name using the loader context.
+	/// Loads a class using this context's loader search order.
 	///
-	/// `name` should be a binary name like `"java.lang.String"` or an array descriptor like
-	/// `"[Ljava.lang.String;"`.
-	///
-	/// **Note:** that unlike [`crate::api::env::Env::find_class`], the name uses **dots instead of
-	/// slashes** and should conform to the format that `Class.getName()` returns and that
-	/// `Class.forName()` expects.
-	///
-	/// **Note**: see [`Self::find_class`] if you need to load a class by its internal name, with
-	/// slashes, instead of dots (compatible with [`crate::api::env::Env::find_class`]). If you have a
-	/// choice, then prefer using [`Self::load_class`] because in the common case `Class.forName` will
-	/// be called first, and that requires a **binary** name (so you can avoid a format conversion).
-	///
-	/// `initialize` indicates whether a newly loaded class should be initialized (has no effect on
-	/// already initialized classes).
-	///
-	/// - Returns a reference to loaded class on success
-	/// - Returns [`Error::NoClassDefFound`] if a `NoClassDefFoundError` or `ClassNotFoundException`
-	///   exception occurs, indicating that no definition for a requested class or interface can be
-	///   found (most common failure)
-	/// - Returns [`Error::ClassFormatError`] if a `ClassFormatError` exception occurs, indicating
-	///   that the class data does not specify a valid class.
-	/// - Returns [`Error::ClassCircularityError`] if a `ClassCircularityError` exception occurs,
-	///   indicating that a class or interface would be its own superclass or superinterface.
-	/// - May Return [`Error::LinkageError`] for various failures to link the requested class.
-	/// - May Return [`Error::ExceptionInInitializer`] if an exception occurs during class
-	///   initialization.
-	/// - Returns [`Error::JniCall`] + [`JniError::NoMemory`] if an `OutOfMemoryError` exception
-	///   occurs, indicating that the JVM reports running out of memory.
-	/// - Returns [`Error::NullPtr`] for any other unknown error condition
-	///
-	/// *Note:* In order for this API to be consistent with [`abos_jni::Env::find_class`], this API does
-	/// _not_ directly return [`Error::ClassNotFound`] errors that may come directly from the
-	/// loader.
-	///
-	/// *Note:* Any [`Error::NoClassDefFound`], [`Error::LinkageError`] or
-	/// [`Error::ExceptionInInitializer`] errors include the original `cause` exception if more
-	/// details are needed.
-	///
-	///
-	/// The strategy for loading the class depends on the loader context (See [Self]).
+	/// `name` is a binary name such as `"java.lang.String"` or an array descriptor such
+	/// as `"[Ljava.lang.String;"`. Use [`Self::find_class`] for slash-separated names.
+	/// `initialize` requests class initialization unless the class is already initialized.
 	///
 	/// # Errors
 	///
-	/// Returns an error if the class cannot be found, linked or initialized, or a JNI operation fails during loading.
 	/// Returns [`Error::JavaException`] without clearing an already pending exception.
+	/// Lookup exceptions are caught and mapped to Rust errors. `ClassNotFoundException`
+	/// maps to [`Error::NoClassDefFound`], matching [`crate::Env::find_class`].
+	/// Linkage and initialization errors retain the original exception when available.
+	/// Security failures return [`Error::SecurityViolation`]; allocation failures return
+	/// [`Error::JniCall`] with [`JniError::NoMemory`]. Unexpected exceptions return [`Error::NullPtr`].
 	pub fn load_class<'env_local>(
 		&self,
 		env: &mut crate::api::env::Env<'env_local>,
@@ -109,13 +76,8 @@ impl LoaderContext<'_, '_> {
 		}
 	}
 
-	/// Loads the class with the given "internal" name using the loader context.
-	///
-	/// This behaves the same as [`Self::load_class`] except that it uses the so-called "internal"
-	/// name format that `FindClass` or [`crate::Env::find_class`] accepts, with slashes instead of
-	/// dots.
-	///
-	/// If possible, prefer to use [`Self::load_class`] to avoid a redundant name format conversion.
+	/// Like [`Self::load_class`], but accepts slash-separated names such as
+	/// `"java/lang/String"` or `"[Ljava/lang/String;"`.
 	///
 	/// # Errors
 	///
@@ -131,15 +93,9 @@ impl LoaderContext<'_, '_> {
 		self.load_class(env, &internal_name, initialize)
 	}
 
-	/// Loads the class associated with the [`Reference`] type `T`, using the given loader context.
+	/// Loads [`Reference::class_name`] for `T` using [`Self::load_class`].
 	///
-	/// `initialize` indicates whether a newly loaded class should be initialized (has no effect
-	/// on already initialized classes).
-	///
-	/// Returns a local reference to the loaded class, or [`Error::NoClassDefFound`] if the
-	/// class could not be found, matching [`Self::load_class`].
-	///
-	/// The strategy for loading the class depends on the loader context (See [Self]).
+	/// `initialize` requests initialization unless the class is already initialized.
 	///
 	/// # Errors
 	///

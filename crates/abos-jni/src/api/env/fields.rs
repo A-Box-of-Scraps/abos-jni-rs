@@ -28,8 +28,6 @@ impl<'local> Env<'local> {
 		use crate::signature::Primitive::{Boolean, Byte, Char, Double, Float, Int, Long, Short, Void};
 		use JavaType::{Array, Object, Primitive};
 
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 
 		let obj: &JObject<'_> = obj.as_ref();
@@ -125,8 +123,6 @@ impl<'local> Env<'local> {
 		N: AsRef<JNIStr>,
 		S: AsRef<FieldSignature<'sig>>,
 	{
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let obj: &JObject<'_> = obj.as_ref();
 		let obj: &JObject<'_> = null_check!(obj, "get_field obj argument")?;
@@ -201,8 +197,6 @@ impl<'local> Env<'local> {
 		use crate::signature::Primitive::{Boolean, Byte, Char, Double, Float, Int, Long, Short, Void};
 		use JavaType::{Array, Object, Primitive};
 
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 
 		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
@@ -323,8 +317,6 @@ impl<'local> Env<'local> {
 		N: AsRef<JNIStr>,
 		S: AsRef<FieldSignature<'sig>>,
 	{
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let sig: &FieldSignature<'_> = sig.as_ref();
 		let field_ty: JavaType = sig.ty();

@@ -76,8 +76,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 # fn main() {}
 ```
 
-Run it with `cargo run`. This uses the standard Java `Math.abs(int)` method, so no Java source compilation or custom
-classpath is needed. `-Xcheck:jni` enables additional JVM checks useful during development.
+Run with `cargo run`; no Java compilation or custom classpath is needed. `-Xcheck:jni` enables extra JVM diagnostics.
 
 ### Call Rust from Java
 
@@ -125,8 +124,7 @@ fn add(
 }
 ```
 
-The macro exports the JNI symbol for `HelloRust.add` and wraps the Rust function with the native-call ABI and default
-error/panic handling. No manual native-method registration is needed for this exported method.
+The macro exports `HelloRust.add` with JNI ABI and error/panic handling; no manual registration is needed.
 
 Create `HelloRust.java` in the Cargo package root:
 
@@ -221,9 +219,9 @@ See the
 
 ### Checked and unchecked APIs
 
-Start with checked calls such as `call_static_method` or typed bindings. Checked calls resolve names and signatures and
-validate arguments. The `_unchecked` methods require the caller to uphold their safety contracts; incorrect IDs,
-signatures, or arguments can cause undefined behavior. They are not a general-purpose shortcut around checked calls.
+Checked calls such as `call_static_method` and typed bindings resolve names and signatures and validate arguments. The
+`_unchecked` methods require you to uphold their safety contracts; incorrect IDs, signatures, or arguments can cause
+undefined behavior.
 
 The crate assumes JNI 1.4 or later and one JVM per process. Destroying and recreating the VM is not a supported
 workflow.

@@ -150,8 +150,6 @@ impl<'local> Env<'local> {
 		T: Reference,
 		E: From<Error>,
 	{
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 
 		let capacity: abos_jni_sys::jint = capacity

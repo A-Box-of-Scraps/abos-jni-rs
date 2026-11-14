@@ -345,40 +345,19 @@ impl JavaVM {
 		Ok(guard)
 	}
 
-	/// Explicitly detaches the current thread from the JVM, **IFF** it was previously attached
-	/// using [`JavaVM::attach_current_thread`] **AND** if there is no [`AttachGuard`] also keeping
-	/// the current thread attached (I.e. you have no [`Env`] reference in scope).
+	/// Detaches the current thread if this crate owns its permanent attachment.
 	///
-	/// This will always return an error if there are currently any active [`AttachGuard`]s
-	/// (detaching the thread in this case would effectively turn guards into invalid, dangling
-	/// pointers).
+	/// Does nothing for detached threads or attachments owned by other code. Active
+	/// [`AttachGuard`]s prevent detachment, including inside scoped attachment callbacks.
+	/// On Windows, only the current fiber's attachment record is affected.
 	///
-	/// Detaching a non-attached thread is a no-op that won't return an error (assuming there's no
-	/// active [`AttachGuard`] as noted above).
-	///
-	/// This API has no effect on thread attachments that were created outside of this crate's API
-	/// (such as other JNI language bindings).
-	///
-	/// This API is not applicable to scoped attachments because it's an error to call while there
-	/// are active [`AttachGuard`]s.
-	///
-	/// **Windows Note**: On Windows, in the unlikely event that you have multiple fibers scheduled
-	/// on the same thread, this API only has an effect within the context of a fiber that previously
-	/// attached the thread to the JVM via [`JavaVM::attach_current_thread`].
-	///
-	/// _**Note**: It's _rarely_ necessary to use this API because a thread that is attached via
-	/// [`JavaVM::attach_current_thread`] will automatically detach when that thread terminates.
-	///
-	/// Explicitly detaching the thread could lead to overheads later if the same thread needs to
-	/// get re-attached.
-	///
-	/// If there is a need to detach a thread before it terminates, then it's possible that a scoped
-	/// attachment via [`JavaVM::attach_current_thread_for_scope`] could be used so that the
-	/// detachment would happen automatically.
+	/// Permanent attachments detach automatically at thread exit. Prefer
+	/// [`Self::attach_current_thread_for_scope`] when earlier detachment is needed.
 	///
 	/// # Errors
 	///
-	/// Returns an error if active attachment guards prevent detachment or JNI detachment fails.
+	/// Returns [`Error::ThreadAttachmentGuarded`] if a guard is active, or an error if
+	/// JNI detachment fails.
 	pub fn detach_current_thread(&self) -> Result<()> {
 		if THREAD_GUARD_NEST_LEVEL.get() != 0 {
 			return Err(Error::ThreadAttachmentGuarded);

@@ -16,10 +16,9 @@ Add the crate to the Rust application that exports your annotation sources:
 abos-jbindgen-annotations = "0.1.0"
 ```
 
-Use `[build-dependencies]` instead when exporting from `build.rs`. The crate has no runtime dependencies, and exporting
-its embedded sources requires neither a JDK nor a JVM. Compiling Java and generating bindings have separate
-requirements; see the
-[abos-jbindgen README](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jbindgen/README.md).
+Use `[build-dependencies]` when exporting from `build.rs`. Exporting sources requires no runtime dependencies, JDK, or
+JVM. For compilation and binding generation, see
+[abos-jbindgen](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jbindgen/README.md).
 
 ## Quick Start
 
@@ -150,17 +149,6 @@ impl From<Handle> for abos_jni::sys::jlong {
 Custom primitive types must have the same size and alignment as their JNI primitive and provide the conversions used by
 the generated bindings. The mapping is unsafe because those representation and conversion requirements are the caller's
 responsibility; the annotation does not establish them.
-
-### Read the embedded sources without writing files
-
-Use the constants when integrating with an existing source-generation or packaging pipeline:
-
-```rust
-println!("package: {}", abos_jbindgen_annotations::PACKAGE);
-for &(name, source) in abos_jbindgen_annotations::ANNOTATION_FILES {
-    println!("{name}: {} bytes", source.len());
-}
-```
 
 ## Changelog
 

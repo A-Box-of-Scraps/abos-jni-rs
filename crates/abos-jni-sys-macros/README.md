@@ -153,20 +153,12 @@ fn main() {
 `ToolTable_9` exposes `modules`, and `ToolTable_11` also exposes `sampling`. Like the quick-start table, this is a
 layout example rather than a complete JVMTI interface.
 
-## Tests and API reference
-
-From a repository checkout, run the layout, version-parsing, and compile-fail tests:
-
-```sh
-cargo test --locked --package abos-jni-sys-macros
-```
+## API reference
 
 The [JNI declarations](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jni-sys/src/api/native.rs)
 and
 [JVMTI declarations](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jvmti-sys/src/api/interface.rs)
-show the attributes on complete function tables. The
-[layout tests](https://github.com/A-Box-of-Scraps/abos-jni-rs/blob/HEAD/crates/abos-jni-sys-macros/tests/layout.rs)
-cover interior padding, bounded views, and invalid input diagnostics. Generate the Rust reference locally with:
+show the attributes on complete function tables. Generate the Rust reference with:
 
 ```sh
 cargo doc --package abos-jni-sys-macros --no-deps --open

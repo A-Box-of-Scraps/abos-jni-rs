@@ -17,62 +17,25 @@ use super::Reference;
 // would allow object access without first preventing collection. Into<JObject> would
 // also allow Auto to release the weak reference with the wrong JNI deletion function.
 
-/// A global reference to a Java object that does *not* prevent it from being
-/// garbage collected.
-///
-/// <dfn>Weak global references</dfn> have the same properties as [ordinary
-/// “strong” global references][Global], with one exception: a weak global
-/// reference does not prevent the referenced Java object from being garbage
-/// collected. In other words, the Java object can be garbage collected even if
-/// there is a weak global reference to it.
-///
+/// An owned weak global reference that allows its Java object to be garbage collected.
 ///
 /// # Upgrading
 ///
-/// Because the Java object referred to by a weak global reference may be
-/// garbage collected at any moment, it cannot be directly used (such as
-/// calling methods on the referenced Java object). Instead, it must first be
-/// <dfn>upgraded</dfn> to a local or strong global reference, using the
-/// [`Weak::upgrade_local`] or [`Weak::upgrade_global`] method,
-/// respectively.
+/// Before accessing the object, use [`Weak::upgrade_local`] or [`Weak::upgrade_global`].
+/// They return `Ok(Some(reference))` if the object is still alive, `Ok(None)` if it
+/// was collected, or an error if reference creation fails. Upgrading does not consume
+/// the weak reference; it may be upgraded repeatedly.
 ///
-/// Both upgrade methods return an [`Option`]. If, when the upgrade method is
-/// called, the Java object has not yet been garbage collected, then the
-/// `Option` will be [`Some`] containing a newly created strong reference that
-/// can be used as normal. If not, the `Option` will be [`None`].
+/// `Weak` implements [`Reference`] for reference management, but not [`Deref`] or
+/// [`AsRef`] to an object wrapper. Reference creation and [`Env::is_same_object`]
+/// accept it directly; class, field, method, and content access require an upgrade.
 ///
-/// Upgrading a weak global reference does not delete it. It is only deleted
-/// when the `Weak` is dropped, and it can be upgraded more than once.
+/// # Creating and deleting
 ///
-/// `Weak` implements [`Reference`] for reference management, but does not implement
-/// [`Deref`] or [`AsRef`] to an object wrapper. APIs that access an object's class,
-/// fields, methods, or contents require an upgraded reference. Reference creation
-/// and [`Env::is_same_object`] can accept a `Weak` directly.
-///
-///
-/// # Creating and Deleting
-///
-/// To create a weak global reference, use the [`Env::new_weak_ref`] method.
-/// To delete it, simply drop the `Weak` (but be sure to do so on an attached
-/// thread if possible; see the warning below).
-///
-/// It is also possible to create a new JNI weak global reference from an
-/// existing one. To do that, use the [`Weak::clone_in_jvm`] method.
-///
-///
-/// # Warning: Drop On an Attached Thread If Possible
-///
-/// When a `Weak` is dropped, a JNI call is made to delete the global
-/// reference. If this frequently happens on a thread that is not already
-/// attached to the JVM, the thread will be temporarily attached using
-/// [`JavaVM::attach_current_thread_for_scope`], causing a severe performance
-/// penalty.
-///
-/// To avoid this performance penalty, ensure that `Weak`s are only dropped
-/// on a thread that is already attached (or never dropped at all).
-///
-/// In the event that a global reference is dropped on an unattached thread, a
-/// message is [logged][log] at [`log::Level::Warn`].
+/// Use [`Env::new_weak_ref`] to create a weak reference or [`Weak::clone_in_jvm`] to
+/// create another weak reference to the same object. Drop deletes the JNI reference.
+/// Prefer dropping on an attached thread: otherwise cleanup temporarily attaches
+/// the thread and logs a warning, adding attachment overhead.
 #[repr(transparent)]
 #[derive(Debug)]
 pub struct Weak<T>
@@ -266,9 +229,7 @@ where
 		// initialized (and can't return an error) because ::new() takes a Env reference.
 		let vm: JavaVM = JavaVM::singleton().expect("JavaVM singleton uninitialized");
 
-		// Note: we use `attach_current_thread_guard` and avoid using
-		// `AttachGuard::detach_with_catch` because we need to be exception safe and must
-		// not interfere with any currently-pending exception
+		// Use a raw attachment guard so cleanup leaves pending exceptions untouched.
 		let exception_safe_delete = || -> abos_jni::errors::Result<()> {
 			let mut scope: crate::ScopeToken = abos_jni::ScopeToken::default();
 			let mut guard: crate::AttachGuard<'_> =

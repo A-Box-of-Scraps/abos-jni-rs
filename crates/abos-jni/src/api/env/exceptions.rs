@@ -199,8 +199,6 @@ impl<'local> Env<'local> {
 	/// An exception is in this state from the time it gets thrown and
 	/// not caught in a java function until `exception_clear` is called.
 	pub fn exception_occurred(&mut self) -> Option<JThrowable<'local>> {
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		// SAFETY: ExceptionOccurred is valid with a pending exception and returns a local throwable reference.
 		let throwable: crate::sys::jobject =

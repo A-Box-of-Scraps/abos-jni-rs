@@ -68,8 +68,6 @@ impl<'local> Env<'local> {
 		N: AsRef<JNIStr>,
 		S: AsRef<MethodSignature<'sig, 'sig_args>>,
 	{
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let obj: &JObject<'_> = obj.as_ref();
 		let obj: &JObject<'_> = null_check!(obj, "call_method obj argument")?;
@@ -119,8 +117,6 @@ impl<'local> Env<'local> {
 		N: AsRef<JNIStr>,
 		S: AsRef<MethodSignature<'sig, 'sig_args>>,
 	{
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let sig: &MethodSignature<'_, '_> = sig.as_ref();
 		validate_call_args(sig, args)?;
@@ -172,8 +168,6 @@ impl<'local> Env<'local> {
 		N: AsRef<JNIStr>,
 		S: AsRef<MethodSignature<'sig, 'sig_args>>,
 	{
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let obj: &JObject<'_> = obj.as_ref();
 		let obj: &JObject<'_> = null_check!(obj, "call_nonvirtual_method obj argument")?;
@@ -219,8 +213,6 @@ impl<'local> Env<'local> {
 		C: Desc<'local, JClass<'other_local>>,
 		S: AsRef<MethodSignature<'sig, 'sig_args>>,
 	{
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let ctor_sig: &MethodSignature<'_, '_> = ctor_sig.as_ref();
 
@@ -276,8 +268,6 @@ impl<'local> Env<'local> {
 		C: Desc<'local, JClass<'other_local>>,
 		M: Desc<'local, JMethodID>,
 	{
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let class: <C as Desc<'_, JClass<'_>>>::Output = class.lookup(self)?;
 

@@ -92,8 +92,6 @@ impl<'local, T: TypeArray> JPrimitiveArray<'local, T> {
 	pub fn new<'env_local>(env: &mut Env<'env_local>, length: usize) -> Result<JPrimitiveArray<'env_local, T>> {
 		let length: i32 = crate::sys::jsize::try_from(length)
 			.map_err(|_| crate::errors::Error::JniCall(crate::errors::JniError::InvalidArguments))?;
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		env.assert_top();
 		// SAFETY: TypeArray selects the matching JNI primitive allocator, and the checked length fits jsize.
 		let raw_array: crate::sys::jobject = unsafe { T::new_array(env, length)? };

@@ -30,8 +30,6 @@ impl<'local> Env<'local> {
 	///
 	/// Returns an error if the data pointer is null, the length is too large, or JNI cannot create the direct buffer.
 	pub unsafe fn new_direct_byte_buffer(&mut self, data: *mut u8, len: usize) -> Result<JByteBuffer<'local>> {
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		self.assert_top();
 		let data: *mut u8 = null_check!(data, "new_direct_byte_buffer data argument")?;
 		let len: i64 = jlong::try_from(len).map_err(|_| Error::JniCall(JniError::InvalidArguments))?;

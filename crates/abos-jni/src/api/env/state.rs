@@ -62,8 +62,6 @@ impl Env<'_> {
 	///
 	/// Panics if the environment is not associated with the current top JNI frame.
 	pub fn assert_top(&self) {
-		// Runtime check that the 'local reference lifetime will be tied to
-		// Env lifetime for the top JNI stack frame
 		assert_eq!(
 			self.level,
 			JavaVM::thread_attach_guard_level(),
