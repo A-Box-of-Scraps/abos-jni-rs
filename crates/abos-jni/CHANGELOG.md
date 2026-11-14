@@ -6,6 +6,10 @@
 
 ### Fixed
 
+- Check `JIterator::has_next` before advancing for compatibility with Android iterators that return invalid entries on
+  exhaustion, while preserving pending exceptions and the `next` exception fallback. Add Android `ArrayMap` coverage and
+  iterator benchmarks that include the additional JNI call.
+
 - Document the native registration code-lifetime contract, descriptor lifetime limits, and the need to coordinate
   in-flight calls before unloading a library.
 

@@ -23,6 +23,8 @@ mod arrays;
 mod calls;
 #[path = "api_calls/comparisons.rs"]
 mod comparisons;
+#[path = "api_calls/iterators.rs"]
+mod iterators;
 #[path = "api_calls/reference_calls.rs"]
 mod reference_calls;
 #[path = "support/strings.rs"]
@@ -522,7 +524,8 @@ criterion_group!(
 	comparisons::calls,
 	reference_calls::reference_calls,
 	comparisons::references,
-	comparisons::attachment
+	comparisons::attachment,
+	iterators::iterators
 );
 
 criterion_main!(benches);

@@ -27,7 +27,7 @@ final class TestSessionTest {
         }
 
         public String nativeGetTestName(int index) {
-            return "sdk_" + index;
+            return index == 0 ? "jni_array_map_iterator" : "sdk_" + index;
         }
 
         public String callbackMessage() {
@@ -90,13 +90,16 @@ final class TestSessionTest {
         TestSession second = new TestSession(api);
         check(second.executed() == 0 && second.passed() == 0 && second.failed() == 0, "state leaked across sessions");
         check(second.runNext().name.equals("jni_callback"), "session did not restart");
-        api.count = 0;
+        api.count = 1;
         TestSession smoke = new TestSession(api);
-        check(smoke.selected() == 3, "smoke suite should have three cases");
+        check(smoke.selected() == 4, "smoke suite should include ArrayMap iteration");
     }
 
     private static void verifiesInvalidRegistry() {
-        for (int count : new int[] {-1, 7}) {
+        FakeApi full = new FakeApi();
+        full.count = 7;
+        check(new TestSession(full).selected() == 10, "full suite should include all native cases");
+        for (int count : new int[] {-1, 8}) {
             FakeApi api = new FakeApi();
             api.count = count;
             boolean rejected = false;

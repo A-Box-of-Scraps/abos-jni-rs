@@ -35,9 +35,12 @@ impl JIterator<'_> {
 	/// This is like [`std::iter::Iterator::next`], but requires a parameter of
 	/// type `&mut Env` in order to call into Java.
 	///
-	/// A `NoSuchElementException` thrown by the iterator is caught and cleared
-	/// before returning `None`. Other Java exceptions remain pending and are
-	/// propagated as [`Error::JavaException`].
+	/// Checks [`Self::has_next`] before calling Java's `next`, since some Android
+	/// iterators return invalid entries instead of throwing on exhaustion. Each
+	/// successful step therefore calls both `hasNext` and `next` through JNI.
+	/// A `NoSuchElementException` thrown by `next` is still caught and cleared
+	/// before returning `None`. Exceptions from `hasNext` and other exceptions
+	/// from `next` remain pending and are propagated as [`Error::JavaException`].
 	///
 	/// ## Beware of creating excessive local references in the current JNI stack frame
 	///
@@ -51,12 +54,17 @@ impl JIterator<'_> {
 	///
 	/// # Errors
 	///
-	/// Propagates JNI failures and Java exceptions other than iterator exhaustion.
+	/// Propagates JNI failures, all exceptions from `hasNext`, and exceptions from `next`
+	/// other than `NoSuchElementException`.
 	/// An exception already pending on entry is propagated without advancing the iterator.
 	pub fn next<'env_local>(&self, env: &mut Env<'env_local>) -> Result<Option<JObject<'env_local>>> {
 		// A pre-existing exception must not be mistaken for iterator exhaustion.
 		if env.exception_check() {
 			return Err(Error::JavaException);
+		}
+
+		if !self.has_next(env)? {
+			return Ok(None);
 		}
 
 		match self._next(env) {
