@@ -14,3 +14,4 @@ fi
 
 mise install
 mise run setup:android -- --accept-licenses
+mise run setup:fuzz
