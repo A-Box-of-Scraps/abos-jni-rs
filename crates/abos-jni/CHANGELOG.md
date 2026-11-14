@@ -6,6 +6,9 @@
 
 ### Added
 
+- Add unsafe `InitArgsBuilder` option methods accepting JNI `extraInfo` pointers, with callback ABI and lifetime
+  documentation, raw argument regression tests, and a subprocess JVM exit-hook test.
+
 - Add consuming `JPrimitiveArray::into_elements` and `into_elements_critical` methods whose guards own the array
   reference, preserving local-frame lifetimes and all existing safety and critical-section restrictions.
 

@@ -98,13 +98,27 @@ const SPECIAL_OPTIONS: &[&str] = &["vfprintf", "abort", "exit"];
 
 const SPECIAL_OPTIONS_C: &[&CStr] = &[c"vfprintf", c"abort", c"exit"];
 
+#[derive(Debug, Default)]
+struct Options<'a> {
+	// Keep strings separate so `InitArgsBuilder::options` can expose its existing slice API.
+	strings: Vec<Cow<'a, CStr>>,
+	extra_info: Vec<*mut c_void>,
+}
+
+impl<'a> Options<'a> {
+	fn push(&mut self, string: Cow<'a, CStr>, extra_info: *mut c_void) {
+		self.strings.push(string);
+		self.extra_info.push(extra_info);
+	}
+}
+
 /// Builder for `JavaVM` `InitArgs`.
 ///
 /// *This API requires "invocation" feature to be enabled,
 /// see [Launching JVM from Rust](struct.JavaVM.html#launching-jvm-from-rust).*
 #[derive(Debug)]
 pub struct InitArgsBuilder<'a> {
-	opts: Result<Vec<Cow<'a, CStr>>, JvmError>,
+	opts: Result<Options<'a>, JvmError>,
 	ignore_unrecognized: bool,
 	version: JNIVersion,
 }
@@ -112,7 +126,7 @@ pub struct InitArgsBuilder<'a> {
 impl Default for InitArgsBuilder<'_> {
 	fn default() -> Self {
 		InitArgsBuilder {
-			opts: Ok(vec![]),
+			opts: Ok(Options::default()),
 			ignore_unrecognized: false,
 			version: JNIVersion::V1_8,
 		}
@@ -130,8 +144,8 @@ impl<'a> InitArgsBuilder<'a> {
 	///
 	/// See [the JNI specification][jni-options] for details on which options are accepted.
 	///
-	/// The `vfprintf`, `abort`, and `exit` options are unsupported at this time. Setting one of
-	/// these options has no effect.
+	/// The `vfprintf`, `abort`, and `exit` options are ignored by this safe method. Use
+	/// [`Self::option_with_extra_info`] to supply a callback explicitly.
 	///
 	/// The option must not contain any U+0000 code points except one at the end. A U+0000 code
 	/// point at the end is not required, but on platforms where UTF-8 is the default character
@@ -161,6 +175,73 @@ impl<'a> InitArgsBuilder<'a> {
 		self
 	}
 
+	/// Adds a JVM option with an explicit JNI `extraInfo` pointer.
+	///
+	/// Unlike [`Self::option`], this accepts `vfprintf`, `abort`, and `exit`. The pointer is
+	/// passed unchanged to the JVM, including when it is null. String encoding and deferred
+	/// error handling are the same as for [`Self::option`].
+	///
+	/// # Safety
+	///
+	/// `extra_info` must satisfy the target JVM's requirements for this option. A non-null
+	/// callback pointer must point to a function with the exact signature and calling convention
+	/// expected by the JVM, not to a Rust closure or a pointer containing a function pointer.
+	/// HotSpot uses these C signatures, with `JNICALL` corresponding to Rust's `extern "system"`
+	/// (see the [OpenJDK hook declarations][hooks]):
+	///
+	/// ```text
+	/// jint JNICALL vfprintf(FILE *stream, const char *format, va_list args);
+	/// void JNICALL exit(jint status);
+	/// void JNICALL abort(void);
+	/// ```
+	///
+	/// In particular, `vfprintf` takes a platform-specific `va_list`, not Rust variadic
+	/// arguments or a portable `*mut c_void`. Use an ABI-correct binding or a C shim compiled
+	/// for the target JVM. Do not assume `extern "C"` matches `JNICALL` on every target.
+	///
+	/// The caller retains ownership of the pointer. Any referenced data, callback code (and
+	/// its library), and callback state must remain valid for every JVM use, potentially from
+	/// JVM creation through shutdown and until all in-flight callbacks have finished. This
+	/// lifetime is not tied to `'a`, the builder, or `InitArgs`, which may be dropped as soon
+	/// as JVM creation returns. Callbacks must tolerate the JVM's calling threads and any
+	/// concurrent or reentrant calls, and must not unwind across the FFI boundary.
+	///
+	/// # Errors
+	///
+	/// Defers the same string conversion errors as [`Self::option`] until [`Self::build`].
+	///
+	/// [hooks]: https://github.com/openjdk/jdk/blob/jdk-25-ga/src/hotspot/share/runtime/arguments.hpp
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use abos_jni::{InitArgsBuilder, sys::jint};
+	/// use std::ffi::c_void;
+	///
+	/// extern "system" fn on_exit(_status: jint) {
+	///     // Avoid panics and access only state that remains valid during JVM shutdown.
+	/// }
+	///
+	/// // Safety: The function has the JVM's exit-hook ABI, has static code lifetime,
+	/// // accesses no state, and cannot unwind.
+	/// let args = unsafe {
+	///     InitArgsBuilder::new().option_with_extra_info("exit", on_exit as *mut c_void)
+	/// }.build()?;
+	/// # Ok::<(), abos_jni::JvmError>(())
+	/// ```
+	#[must_use]
+	pub unsafe fn option_with_extra_info(
+		mut self,
+		opt_string: impl AsRef<str> + Into<Cow<'a, str>>,
+		extra_info: *mut c_void,
+	) -> Self {
+		// Safety: The caller guarantees the pointer's ABI and lifetime requirements.
+		if let Err(error) = unsafe { self.try_option_with_extra_info(opt_string, extra_info) } {
+			self.opts = Err(error);
+		}
+		self
+	}
+
 	/// Adds a JVM option, such as `-Djavax.net.debug=all`. Returns an error immediately upon
 	/// failure.
 	///
@@ -169,8 +250,8 @@ impl<'a> InitArgsBuilder<'a> {
 	///
 	/// See [the JNI specification][jni-options] for details on which options are accepted.
 	///
-	/// The `vfprintf`, `abort`, and `exit` options are unsupported at this time. Setting one of
-	/// these options has no effect.
+	/// The `vfprintf`, `abort`, and `exit` options are ignored by this safe method. Use
+	/// [`Self::option_with_extra_info`] to supply a callback explicitly.
 	///
 	/// The option must not contain any U+0000 code points except one at the end. A U+0000 code
 	/// point at the end is not required, but on platforms where UTF-8 is the default character
@@ -194,6 +275,33 @@ impl<'a> InitArgsBuilder<'a> {
 	/// [jni-options]: https://docs.oracle.com/en/java/javase/11/docs/specs/jni/invocation.html#jni_createjavavm
 	pub fn try_option(&mut self, opt_string: impl Into<Cow<'a, str>>) -> Result<(), JvmError> {
 		let opt_string: Cow<'_, str> = opt_string.into();
+		let name: &str = opt_string.strip_suffix('\0').unwrap_or(&opt_string);
+		if SPECIAL_OPTIONS.contains(&name) {
+			return Ok(());
+		}
+
+		// Safety: Callback options were excluded, and ordinary options use null extraInfo.
+		unsafe { self.try_option_with_extra_info(opt_string, ptr::null_mut()) }
+	}
+
+	/// Adds an option with an explicit JNI `extraInfo` pointer, returning encoding errors
+	/// immediately. Unlike [`Self::try_option`], callback options are not filtered out.
+	///
+	/// # Safety
+	///
+	/// The pointer, callback ABI, and lifetime requirements of [`Self::option_with_extra_info`]
+	/// apply equally to this method.
+	///
+	/// # Errors
+	///
+	/// Returns the same errors as [`Self::try_option`], leaving the builder unchanged on
+	/// failure. Does nothing if the builder already has a deferred error.
+	pub unsafe fn try_option_with_extra_info(
+		&mut self,
+		opt_string: impl Into<Cow<'a, str>>,
+		extra_info: *mut c_void,
+	) -> Result<(), JvmError> {
+		let opt_string: Cow<'_, str> = opt_string.into();
 
 		// If there is already a deferred error, do nothing.
 		let Ok(opts) = &mut self.opts else { return Ok(()) };
@@ -202,15 +310,7 @@ impl<'a> InitArgsBuilder<'a> {
 		// C string. This isn't just an optimization; Win32 `WideCharToMultiByte` will **fail** if
 		// passed an empty string, so we have to do this check first.
 		if matches!(opt_string.as_ref(), "" | "\0") {
-			opts.push(Cow::Borrowed(
-				// Safety: This string not only is null-terminated without any interior null bytes,
-				// it's nothing but a null terminator.
-				c"",
-			));
-			return Ok(());
-		}
-		// If this is one of the special options, do nothing.
-		else if SPECIAL_OPTIONS.contains(&&*opt_string) {
+			opts.push(Cow::Borrowed(c""), extra_info);
 			return Ok(());
 		}
 
@@ -226,7 +326,7 @@ impl<'a> InitArgsBuilder<'a> {
 			}
 		};
 
-		opts.push(encoded);
+		opts.push(encoded, extra_info);
 		Ok(())
 	}
 
@@ -240,27 +340,42 @@ impl<'a> InitArgsBuilder<'a> {
 	///
 	/// See [the JNI specification][jni-options] for details on which options are accepted.
 	///
-	/// The `vfprintf`, `abort`, and `exit` options are unsupported at this time. Setting one of
-	/// these options has no effect.
+	/// The `vfprintf`, `abort`, and `exit` options are ignored by this safe method. Use
+	/// [`Self::option_with_extra_info`] to supply a callback explicitly.
 	///
 	/// This method does not fail, and will neither return nor defer an error.
 	///
 	/// [jni-options]: https://docs.oracle.com/en/java/javase/11/docs/specs/jni/invocation.html#jni_createjavavm
 	#[must_use]
-	pub fn option_encoded(mut self, opt_string: impl Into<Cow<'a, CStr>>) -> Self {
+	pub fn option_encoded(self, opt_string: impl Into<Cow<'a, CStr>>) -> Self {
 		let opt_string: Cow<'_, CStr> = opt_string.into();
 
-		// If there is already a deferred error, do nothing.
-		let Ok(opts) = &mut self.opts else { return self };
-
-		// If this is one of the special options, do nothing.
 		if SPECIAL_OPTIONS_C.contains(&&*opt_string) {
 			return self;
 		}
 
-		// Add the option.
-		opts.push(opt_string);
+		// Safety: Callback options were excluded, and ordinary options use null extraInfo.
+		unsafe { self.option_encoded_with_extra_info(opt_string, ptr::null_mut()) }
+	}
 
+	/// Adds a platform-encoded option with an explicit JNI `extraInfo` pointer.
+	/// Unlike [`Self::option_encoded`], callback options are not filtered out.
+	/// This method neither returns nor defers errors, and does nothing after a deferred error.
+	///
+	/// # Safety
+	///
+	/// The pointer, callback ABI, and lifetime requirements of [`Self::option_with_extra_info`]
+	/// apply equally to this method. The string must use the target JVM's platform encoding.
+	#[must_use]
+	pub unsafe fn option_encoded_with_extra_info(
+		mut self,
+		opt_string: impl Into<Cow<'a, CStr>>,
+		extra_info: *mut c_void,
+	) -> Self {
+		let opt_string: Cow<'_, CStr> = opt_string.into();
+		if let Ok(opts) = &mut self.opts {
+			opts.push(opt_string, extra_info);
+		}
 		self
 	}
 
@@ -292,17 +407,21 @@ impl<'a> InitArgsBuilder<'a> {
 	///
 	/// # Errors
 	///
-	/// If a call to [`InitArgsBuilder::option`] caused a deferred error, it is returned from this
-	/// method. Also returns [`JvmError::TooManyOptions`] if the option count does not fit JNI.
+	/// If a call to [`Self::option`] or [`Self::option_with_extra_info`] caused a deferred error,
+	/// it is returned from this method. Also returns [`JvmError::TooManyOptions`] if the option count does not fit JNI.
 	pub fn build(self) -> Result<InitArgs<'a>, JvmError> {
-		let opt_strings: Vec<Cow<'_, CStr>> = self.opts?;
+		let Options {
+			strings: opt_strings,
+			extra_info,
+		} = self.opts?;
 		let option_count: i32 = checked_option_count(opt_strings.len())?;
 
 		let opts: Vec<JavaVMOption> = opt_strings
 			.iter()
-			.map(|opt_string| JavaVMOption {
+			.zip(extra_info)
+			.map(|(opt_string, extra_info)| JavaVMOption {
 				optionString: opt_string.as_ptr().cast_mut(),
-				extraInfo: ptr::null_mut(),
+				extraInfo: extra_info,
 			})
 			.collect();
 
@@ -318,16 +437,16 @@ impl<'a> InitArgsBuilder<'a> {
 		})
 	}
 
-	/// Returns collected options.
+	/// Returns collected option strings, including those added with explicit `extraInfo` pointers.
 	///
-	/// If a call to [`InitArgsBuilder::option`] caused a deferred error, then this method returns
-	/// a reference to that error.
+	/// If a call to [`Self::option`] or [`Self::option_with_extra_info`] caused a deferred error,
+	/// this method returns a reference to that error.
 	///
 	/// # Errors
 	///
 	/// Returns the deferred error from an earlier attempt to add an invalid JVM option.
 	pub fn options(&self) -> Result<&[Cow<'a, CStr>], &JvmError> {
-		self.opts.as_ref().map(Vec::as_slice)
+		self.opts.as_ref().map(|opts| opts.strings.as_slice())
 	}
 }
 
