@@ -5,6 +5,41 @@ use super::{
 };
 use proc_macro2::Span;
 
+// `sig` and `type_map` use dedicated parsers rather than ordinary property values.
+enum PropertyName {
+	RustType,
+	JavaType,
+	Name,
+	Static,
+	Raw,
+	Export,
+	AbiCheck,
+	CatchUnwind,
+	Fn,
+	ErrorPolicy,
+}
+
+impl PropertyName {
+	fn from_ident(property: &Ident) -> Result<Self> {
+		match property.to_string().as_str() {
+			"rust_type" => Ok(Self::RustType),
+			"java_type" => Ok(Self::JavaType),
+			"name" => Ok(Self::Name),
+			"static" => Ok(Self::Static),
+			"raw" => Ok(Self::Raw),
+			"export" => Ok(Self::Export),
+			"abi_check" => Ok(Self::AbiCheck),
+			"catch_unwind" => Ok(Self::CatchUnwind),
+			"fn" => Ok(Self::Fn),
+			"error_policy" => Ok(Self::ErrorPolicy),
+			_ => Err(syn::Error::new(
+				property.span(),
+				format!("Unknown native method property: {property}"),
+			)),
+		}
+	}
+}
+
 struct MethodParser {
 	jni_crate: syn::Path,
 	type_mappings: TypeMappings,
@@ -51,23 +86,17 @@ impl MethodParser {
 			return self.type_mappings.parse_mappings(input);
 		}
 		input.parse::<Token![=]>()?;
-		match property.to_string().as_str() {
-			"rust_type" => self.rust_type = Some(input.parse()?),
-			"java_type" => self.java_type = Some(input.parse()?),
-			"name" => self.method_name = Some(input.parse::<syn::LitStr>()?.value()),
-			"static" => self.is_static = input.parse::<syn::LitBool>()?.value(),
-			"raw" => self.is_raw = input.parse::<syn::LitBool>()?.value(),
-			"export" => self.export = parse_export(input)?,
-			"abi_check" => self.abi_check = input.parse()?,
-			"catch_unwind" => self.catch_unwind = Some(input.parse::<syn::LitBool>()?.value()),
-			"fn" => self.fn_path = Some(input.parse()?),
-			"error_policy" => self.error_policy = Some(input.parse()?),
-			_ => {
-				return Err(syn::Error::new(
-					property.span(),
-					format!("Unknown native method property: {property}"),
-				));
-			}
+		match PropertyName::from_ident(&property)? {
+			PropertyName::RustType => self.rust_type = Some(input.parse()?),
+			PropertyName::JavaType => self.java_type = Some(input.parse()?),
+			PropertyName::Name => self.method_name = Some(input.parse::<syn::LitStr>()?.value()),
+			PropertyName::Static => self.is_static = input.parse::<syn::LitBool>()?.value(),
+			PropertyName::Raw => self.is_raw = input.parse::<syn::LitBool>()?.value(),
+			PropertyName::Export => self.export = parse_export(input)?,
+			PropertyName::AbiCheck => self.abi_check = input.parse()?,
+			PropertyName::CatchUnwind => self.catch_unwind = Some(input.parse::<syn::LitBool>()?.value()),
+			PropertyName::Fn => self.fn_path = Some(input.parse()?),
+			PropertyName::ErrorPolicy => self.error_policy = Some(input.parse()?),
 		}
 		Ok(())
 	}

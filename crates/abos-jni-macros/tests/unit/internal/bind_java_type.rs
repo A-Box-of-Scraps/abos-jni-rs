@@ -1,4 +1,4 @@
-use super::{TokenStream, bind_java_type_impl};
+use super::{AbiCheck, BindClassInput, TokenStream, VisibilitySpec, bind_java_type_impl};
 use quote::quote;
 use std::collections::BTreeMap;
 
@@ -128,4 +128,119 @@ fn reference_cache_type(method: &syn::ImplItemFn) -> Option<&syn::Type> {
 		syn::Stmt::Item(syn::Item::Static(item)) if item.ident == "__JNI_REFERENCE_TYPES" => Some(item.ty.as_ref()),
 		_ => None,
 	})
+}
+
+#[test]
+fn class_properties_parse_type_names_and_blocks() {
+	let binding: BindClassInput = syn::parse2(quote! {
+		jni = ::renamed_jni,
+		#[doc = "Example binding"]
+		rust_type = Example,
+		rust_type_vis = pub,
+		java_type = "com.example.Example",
+		api = ExampleApi,
+		priv_type = ExamplePriv,
+		native_trait = ExampleNative,
+		is_instance_of = { list = JList },
+		type_map = {},
+		constructors {},
+		methods = {},
+		fields {},
+		native_methods = {},
+	})
+	.expect("type names and blocks should parse");
+	assert_eq!(binding.type_name, "Example");
+	assert!(matches!(binding.type_visibility, Some(VisibilitySpec::Public)));
+	assert_eq!(documentation(&binding.type_attrs), "Example binding");
+	assert_eq!(binding.api_name.expect("API name"), "ExampleApi");
+	assert_eq!(binding.priv_type.expect("private type"), "ExamplePriv");
+	assert_eq!(binding.native_trait_name.expect("native trait"), "ExampleNative");
+	assert_eq!(binding.is_instance_of.len(), 1);
+	assert_eq!(binding.is_instance_of[0].stem.as_deref(), Some("list"));
+	let jni_crate: syn::Path = binding.jni_crate;
+	assert_eq!(quote!(#jni_crate).to_string(), ":: renamed_jni");
+}
+
+#[test]
+fn class_properties_parse_options_and_private_names() {
+	let binding: BindClassInput = syn::parse2(quote! {
+		Example => com.example.Example,
+		hooks { load_class = |env| env, init_priv = || () },
+		native_methods_export = false,
+		native_methods_error_policy = crate::ErrorPolicy,
+		abi_check = Always,
+		native_methods_catch_unwind = false,
+		__jni_core = true,
+		__sys_type = jobject,
+	})
+	.expect("options and private properties should parse");
+	assert!(binding.load_class_closure.is_some());
+	assert!(binding.init_priv_closure.is_some());
+	assert!(!binding.native_methods_export);
+	assert!(!binding.native_methods_catch_unwind);
+	assert!(matches!(binding.abi_check, AbiCheck::Always));
+	let error_policy: syn::Path = binding.native_methods_error_policy.expect("error policy");
+	assert_eq!(quote!(#error_policy).to_string(), "crate :: ErrorPolicy");
+	assert!(binding.jni_core);
+	assert_eq!(binding.sys_type.expect("JNI type"), "jobject");
+}
+
+#[test]
+fn unknown_class_properties_suggest_only_public_names() {
+	let error: syn::Error = syn::parse2::<BindClassInput>(quote! { unknown = true })
+		.err()
+		.expect("unknown property should fail");
+	assert_eq!(
+		error.to_string(),
+		concat!(
+			"expected one of: `rust_type`, `rust_type_vis`, `java_type`, `api`, `priv_type`, ",
+			"`native_trait`, `is_instance_of`, `type_map`, `hooks`, `constructors`, `methods`, ",
+			"`fields`, `native_methods`, `native_methods_export`, `native_methods_error_policy`, ",
+			"`abi_check`, `native_methods_catch_unwind`"
+		)
+	);
+}
+
+#[test]
+fn class_properties_preserve_duplicate_and_misplaced_jni_errors() {
+	for (tokens, expected) in [
+		(
+			quote! { rust_type = Example, rust_type = Other },
+			"Rust type name already specified",
+		),
+		(
+			quote! { java_type = "com.example.Example", java_type = "com.example.Other" },
+			"Java class name already specified",
+		),
+		(
+			quote! { rust_type_vis = pub, rust_type_vis = pub(crate) },
+			"Type visibility already specified",
+		),
+		(
+			quote! { rust_type = Example, jni = ::renamed_jni },
+			"jni property must be the first property if specified",
+		),
+	] {
+		let error: syn::Error = syn::parse2::<BindClassInput>(tokens)
+			.err()
+			.expect("invalid property should fail");
+		assert_eq!(error.to_string(), expected);
+	}
+}
+
+#[test]
+fn class_property_keywords_preserve_identifier_errors() {
+	for (tokens, keyword) in [
+		(quote! { static = true }, "static"),
+		(quote! { fn {} }, "fn"),
+		(quote! { self = Example }, "self"),
+	] {
+		let error: syn::Error = syn::parse2::<BindClassInput>(tokens)
+			.err()
+			.expect("keyword property should fail");
+		assert_eq!(
+			error.to_string(),
+			format!("expected identifier, found keyword `{keyword}`")
+		);
+	}
 }

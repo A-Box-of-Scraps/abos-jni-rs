@@ -1,4 +1,4 @@
-use super::{NativeMethodExport, NativeMethodStructInput, native_method_impl};
+use super::{AbiCheck, NativeMethodExport, NativeMethodStructInput, native_method_impl};
 use quote::quote;
 
 #[test]
@@ -90,4 +90,82 @@ fn missing_function_reports_a_parse_error() {
 	.err()
 	.expect("a method must identify an implementation");
 	assert!(error.to_string().contains("Missing 'fn'"));
+}
+
+#[test]
+fn named_properties_parse_values_and_keyword_names() {
+	let parsed: NativeMethodStructInput = syn::parse2(quote! {
+		rust_type = Example,
+		java_type = "com.example.Example",
+		name = "javaMethod",
+		sig = (jint) -> jlong,
+		static = true,
+		raw = false,
+		export = true,
+		abi_check = UnsafeNever,
+		catch_unwind = false,
+		fn = implementation,
+		error_policy = Policy,
+	})
+	.expect("valid named properties");
+	assert!(parsed.rust_type.expect("Rust type").is_ident("Example"));
+	assert_eq!(
+		parsed.java_type.expect("Java type").to_java_dotted(),
+		"com.example.Example"
+	);
+	assert_eq!(parsed.java_method_name, "javaMethod");
+	assert_eq!(
+		parsed
+			.signature
+			.to_jni_signature(&parsed.type_mappings)
+			.expect("signature"),
+		"(I)J"
+	);
+	assert!(parsed.is_static);
+	assert!(!parsed.is_raw_fn);
+	assert!(matches!(parsed.export, NativeMethodExport::WithAutoMangle));
+	assert_eq!(parsed.abi_check, AbiCheck::UnsafeNever);
+	assert!(!parsed.catch_unwind);
+	assert!(parsed.fn_path.is_ident("implementation"));
+	assert_eq!(parsed.error_policy.expect("error policy"), "Policy");
+}
+
+#[test]
+fn named_raw_property_enables_raw_mode() {
+	let parsed: NativeMethodStructInput = syn::parse2(quote! {
+		name = "method", sig = () -> void, fn = implementation, raw = true,
+	})
+	.expect("raw method without wrapper options");
+	assert!(parsed.is_raw_fn);
+}
+
+#[test]
+fn type_map_preserves_optional_equals_before_signature() {
+	for type_map in [quote! { type_map {} }, quote! { type_map = {} }] {
+		let parsed: NativeMethodStructInput = syn::parse2(quote! {
+			#type_map, name = "method", sig = () -> void, fn = implementation,
+		})
+		.expect("type mapping block followed by a signature");
+		assert_eq!(
+			parsed
+				.signature
+				.to_jni_signature(&parsed.type_mappings)
+				.expect("signature"),
+			"()V"
+		);
+	}
+}
+
+#[test]
+fn unknown_properties_preserve_diagnostics_and_separator_precedence() {
+	for (tokens, expected) in [
+		(quote! { unknown = true }, "Unknown native method property: unknown"),
+		(quote! { async = true }, "Unknown native method property: async"),
+		(quote! { unknown {} }, "expected `=`"),
+	] {
+		let error: syn::Error = syn::parse2::<NativeMethodStructInput>(tokens)
+			.err()
+			.expect("invalid property should fail");
+		assert_eq!(error.to_string(), expected);
+	}
 }
