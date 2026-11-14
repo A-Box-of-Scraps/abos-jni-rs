@@ -1,4 +1,4 @@
-use super::reference_validation::reference_args;
+use super::{call_args::with_jni_args, reference_validation::reference_args};
 #[cfg(doc)]
 use crate::jni_sig;
 
@@ -85,13 +85,13 @@ impl<'local> Env<'local> {
 			self.__validate_method_reference_args(&class, method_id.into_raw(), false, &reference_args(args))?;
 		}
 
-		let args: Vec<jvalue> = args.iter().map(super::super::jvalue::JValue::as_jni).collect();
-
 		// SAFETY: We've ensured that the Desc trait will be used to dynamically look up a valid
 		// method ID for the object's class, method name, and signature (or else it will return an
 		// Err). We've also validated the argument counts and types using the same type signature we
 		// fetched the original method ID from.
-		unsafe { self.call_method_unchecked(obj, method_id, sig.ret(), &args) }
+		with_jni_args(args, |args| unsafe {
+			self.call_method_unchecked(obj, method_id, sig.ret(), args)
+		})
 	}
 
 	/// Calls a static method safely. This comes with a number of
@@ -135,12 +135,12 @@ impl<'local> Env<'local> {
 			self.__validate_method_reference_args(class, method_id.into_raw(), true, &reference_args(args))?;
 		}
 
-		let args: Vec<jvalue> = args.iter().map(super::super::jvalue::JValue::as_jni).collect();
-
 		// SAFETY: We've obtained the method_id above, so it is valid for this class.
 		// We've also validated the argument counts and types using the same type signature
 		// we fetched the original method ID from.
-		unsafe { self.call_static_method_unchecked(class, method_id, sig.ret(), &args) }
+		with_jni_args(args, |args| unsafe {
+			self.call_static_method_unchecked(class, method_id, sig.ret(), args)
+		})
 	}
 
 	/// Calls a non-virtual method safely. This comes with a number of
@@ -194,12 +194,12 @@ impl<'local> Env<'local> {
 			self.__validate_method_reference_args(class, method_id.into_raw(), false, &reference_args(args))?;
 		}
 
-		let args: Vec<jvalue> = args.iter().map(super::super::jvalue::JValue::as_jni).collect();
-
 		// SAFETY: The receiver is an instance of class, and the method ID is resolved from that same class.
 		// We've also validated the argument counts and types using the same type signature
 		// we fetched the original method ID from.
-		unsafe { self.call_nonvirtual_method_unchecked(obj, class, method_id, sig.ret(), &args) }
+		with_jni_args(args, |args| unsafe {
+			self.call_nonvirtual_method_unchecked(obj, class, method_id, sig.ret(), args)
+		})
 	}
 
 	/// Create a new object using a constructor. This is done safely using
@@ -242,11 +242,12 @@ impl<'local> Env<'local> {
 			self.__validate_method_reference_args(class, method_id.into_raw(), false, &reference_args(ctor_args))?;
 		}
 
-		let ctor_args: Vec<jvalue> = ctor_args.iter().map(super::super::jvalue::JValue::as_jni).collect();
 		// SAFETY: We've obtained the method_id above, so it is valid for this class.
 		// We've also validated the argument counts and types using the same type signature
 		// we fetched the original method ID from.
-		unsafe { self.new_object_unchecked(class, method_id, &ctor_args) }
+		with_jni_args(ctor_args, |args| unsafe {
+			self.new_object_unchecked(class, method_id, args)
+		})
 	}
 
 	/// Create a new object using a constructor. Arguments aren't checked

@@ -5,6 +5,9 @@ use std::hint::black_box;
 use abos_jni::{signature::RuntimeMethodSignature, strings::JNIString};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 
+#[path = "rust_utilities/call_args.rs"]
+mod call_args;
+
 #[path = "support/strings.rs"]
 mod string_inputs;
 use string_inputs::{STRING_CASES, STRING_REPEATS};
@@ -46,5 +49,5 @@ fn signatures(c: &mut Criterion) {
 	}
 }
 
-criterion_group!(benches, modified_utf8, signatures);
+criterion_group!(benches, modified_utf8, signatures, call_args::call_args);
 criterion_main!(benches);

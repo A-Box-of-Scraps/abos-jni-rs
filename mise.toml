@@ -20,6 +20,10 @@ task.quiet = true
 [tasks."bench:abos-jni"]
 run = "cargo bench --locked --package abos-jni --features invocation --bench api_calls --bench rust_utilities"
 
+[tasks."bench:abos-jni:dynamic"]
+description = "Benchmark dynamic JNI arguments with full validation (requires a JDK)"
+run = "cargo bench --locked --package abos-jni --features invocation --bench dynamic_calls"
+
 [tasks."bench:abos-jni:rust"]
 run = "cargo bench --locked --package abos-jni --bench rust_utilities"
 

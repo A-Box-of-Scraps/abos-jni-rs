@@ -440,6 +440,10 @@ impl Drop for MonitorGuard<'_> {
 mod array_regions;
 mod arrays;
 mod buffers;
+mod call_args;
+#[cfg(test)]
+#[path = "../../../tests/unit/api/env/call_args.rs"]
+mod call_args_tests;
 mod calls;
 mod classes;
 mod exceptions;

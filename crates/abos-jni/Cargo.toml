@@ -50,6 +50,11 @@ harness = false
 required-features = ["invocation"]
 
 [[bench]]
+name = "dynamic_calls"
+harness = false
+required-features = ["invocation"]
+
+[[bench]]
 name = "rust_utilities"
 harness = false
 

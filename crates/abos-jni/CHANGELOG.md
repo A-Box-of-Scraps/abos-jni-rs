@@ -9,6 +9,11 @@
 - Add consuming `JPrimitiveArray::into_elements` and `into_elements_critical` methods whose guards own the array
   reference, preserving local-frame lifetimes and all existing safety and critical-section restrictions.
 
+### Changed
+
+- Use stack-backed raw argument storage for dynamic calls with up to eight arguments, retaining a heap fallback and all
+  existing argument, receiver, reference-assignability, and exception checks. Add packing and end-to-end benchmarks.
+
 ### Fixed
 
 - Include the Java exception class name in `CaughtJavaException` diagnostics and display null or empty messages as `<no
