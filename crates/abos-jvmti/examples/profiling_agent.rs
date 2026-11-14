@@ -13,10 +13,12 @@
 use std::{
 	ffi::{CStr, c_char, c_void},
 	io::Write,
-	panic::{AssertUnwindSafe, catch_unwind},
 };
 
-use abos_jvmti::{CompiledMethodError, CompiledMethodRecords, Env, OwnedCompiledMethodRecord, Result, sys};
+use abos_jvmti::{
+	CompiledMethodError, CompiledMethodRecords, Env, OwnedCompiledMethodRecord, Result, catch_callback,
+	catch_callback_with, sys,
+};
 
 fn report(message: std::fmt::Arguments<'_>) {
 	let _result: std::io::Result<()> = writeln!(std::io::stderr().lock(), "{message}");
@@ -31,33 +33,36 @@ unsafe extern "system" fn compiled_method_load(
 	_map: *const sys::jvmtiAddrLocationMap,
 	compile_info: *const c_void,
 ) {
-	let result: std::thread::Result<()> = catch_unwind(AssertUnwindSafe(|| {
-		// SAFETY: The agent is explicitly opted into HotSpot's metadata ABI, and
-		// all decoding/copying occurs before this CompiledMethodLoad returns.
-		let records: std::result::Result<Vec<OwnedCompiledMethodRecord>, CompiledMethodError> = unsafe {
-			CompiledMethodRecords::with(compile_info, |records| {
-				records
-					.map(|record| record.map(|value| value.to_owned()))
-					.collect::<std::result::Result<Vec<_>, _>>()
-			})
-		};
-		match records {
-			Ok(records) => {
-				report(format_args!(
-					"JVMTI_COMPILED method={method:p} start={code_addr:p} size={code_size}"
-				));
-				// These deep copies can outlive the decoding scope. No callback array
-				// pointers escape, and no copied method IDs are dereferenced here.
-				for record in &records {
-					report_record(record);
+	catch_callback_with(
+		(),
+		|| {
+			// SAFETY: The agent is explicitly opted into HotSpot's metadata ABI, and
+			// all decoding/copying occurs before this CompiledMethodLoad returns.
+			let records: std::result::Result<Vec<OwnedCompiledMethodRecord>, CompiledMethodError> = unsafe {
+				CompiledMethodRecords::with(compile_info, |records| {
+					records
+						.map(|record| record.map(|value| value.to_owned()))
+						.collect::<std::result::Result<Vec<_>, _>>()
+				})
+			};
+			match records {
+				Ok(records) => {
+					report(format_args!(
+						"JVMTI_COMPILED method={method:p} start={code_addr:p} size={code_size}"
+					));
+					// These deep copies can outlive the decoding scope. No callback array
+					// pointers escape, and no copied method IDs are dereferenced here.
+					for record in &records {
+						report_record(record);
+					}
 				}
+				Err(error) => report(format_args!("JVMTI_PROFILE_ERROR: {error}")),
 			}
-			Err(error) => report(format_args!("JVMTI_PROFILE_ERROR: {error}")),
-		}
-	}));
-	if result.is_err() {
-		report(format_args!("JVMTI_PROFILE_ERROR: callback panicked"));
-	}
+		},
+		|| {
+			report(format_args!("JVMTI_PROFILE_ERROR: callback panicked"));
+		},
+	);
 }
 
 fn report_record(record: &OwnedCompiledMethodRecord) {
@@ -101,29 +106,31 @@ pub unsafe extern "system" fn Agent_OnLoad(
 	options: *mut c_char,
 	_reserved: *mut c_void,
 ) -> sys::jint {
-	let result: std::thread::Result<Result<bool>> = catch_unwind(|| {
-		// SAFETY: Native OnLoad arguments are valid for this call.
-		unsafe {
-			if options.is_null() || CStr::from_ptr(options) != c"hotspot" {
-				report(format_args!(
-					"profiling_agent requires =hotspot on a jvmticmlr.h-compatible VM"
-				));
-				return Ok(false);
+	catch_callback(sys::JNI_ERR, || {
+		let result: Result<bool> = (|| {
+			// SAFETY: Native OnLoad arguments are valid for this call.
+			unsafe {
+				if options.is_null() || CStr::from_ptr(options) != c"hotspot" {
+					report(format_args!(
+						"profiling_agent requires =hotspot on a jvmticmlr.h-compatible VM"
+					));
+					return Ok(false);
+				}
+				let env: Env<'_> = Env::from_raw_vm(vm)?;
+				if let Err(error) = configure(env) {
+					let _cleanup: Result<()> = env.dispose();
+					return Err(error);
+				}
+				Ok(true)
 			}
-			let env: Env<'_> = Env::from_raw_vm(vm)?;
-			if let Err(error) = configure(env) {
-				let _cleanup: Result<()> = env.dispose();
-				return Err(error);
+		})();
+		match result {
+			Ok(true) => sys::JNI_OK,
+			Err(error) => {
+				report(format_args!("JVMTI_PROFILE_ERROR: {error}"));
+				sys::JNI_ERR
 			}
-			Ok(true)
+			Ok(false) => sys::JNI_ERR,
 		}
-	});
-	match result {
-		Ok(Ok(true)) => sys::JNI_OK,
-		Ok(Err(error)) => {
-			report(format_args!("JVMTI_PROFILE_ERROR: {error}"));
-			sys::JNI_ERR
-		}
-		_ => sys::JNI_ERR,
-	}
+	})
 }

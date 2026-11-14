@@ -56,16 +56,15 @@ Replace `src/lib.rs` with an agent that observes VM initialization:
 ```rust
 use std::ffi::{c_char, c_void};
 use std::io::Write;
-use std::panic::catch_unwind;
 
-use abos_jvmti::{Env, Result, sys};
+use abos_jvmti::{Env, Result, catch_callback, sys};
 
 unsafe extern "system" fn vm_init(
     _env: *mut sys::jvmtiEnv,
     _jni: *mut sys::JNIEnv,
     _thread: sys::jthread,
 ) {
-    let _ = catch_unwind(|| {
+    catch_callback((), || {
         let _ = writeln!(std::io::stderr().lock(), "JVMTI agent initialized");
     });
 }
@@ -79,29 +78,28 @@ pub unsafe extern "system" fn Agent_OnLoad(
     _options: *mut c_char,
     _reserved: *mut c_void,
 ) -> sys::jint {
-    let result = catch_unwind(|| -> Result<()> {
-        // SAFETY: The JVM supplies the live VM and permits environment creation
-        // and event configuration during OnLoad. Callback code stays loaded.
-        unsafe {
-            let env = Env::from_raw_vm(vm)?;
-            let callbacks = sys::jvmtiEventCallbacks {
-                VMInit: Some(vm_init),
-                ..Default::default()
-            };
-            let setup = env.set_event_callbacks(&callbacks)
-                .and_then(|()| env.set_event_enabled(sys::JVMTI_EVENT_VM_INIT, true));
-            if let Err(error) = setup {
-                // VMInit cannot run before this OnLoad returns; no other users exist.
-                let _ = env.dispose();
-                return Err(error);
+    catch_callback(sys::JNI_ERR, || {
+        let result: Result<()> = (|| {
+            // SAFETY: The JVM supplies the live VM and permits environment creation
+            // and event configuration during OnLoad. Callback code stays loaded.
+            unsafe {
+                let env = Env::from_raw_vm(vm)?;
+                let callbacks = sys::jvmtiEventCallbacks {
+                    VMInit: Some(vm_init),
+                    ..Default::default()
+                };
+                let setup = env.set_event_callbacks(&callbacks)
+                    .and_then(|()| env.set_event_enabled(sys::JVMTI_EVENT_VM_INIT, true));
+                if let Err(error) = setup {
+                    // VMInit cannot run before this OnLoad returns; no other users exist.
+                    let _ = env.dispose();
+                    return Err(error);
+                }
             }
-        }
-        Ok(())
-    });
-    match result {
-        Ok(Ok(())) => sys::JNI_OK,
-        _ => sys::JNI_ERR,
-    }
+            Ok(())
+        })();
+        if result.is_ok() { sys::JNI_OK } else { sys::JNI_ERR }
+    })
 }
 ```
 
@@ -109,8 +107,8 @@ pub unsafe extern "system" fn Agent_OnLoad(
 callback table, but the callback functions must remain executable. Dropping the Rust `Env` handle does not dispose the
 native environment, so the registration remains active after `Agent_OnLoad` returns.
 
-This example catches unwinding panics at both native entry points and avoids panicking on output failures. It does not
-recover from `panic = "abort"`. Returning `JNI_ERR` from `Agent_OnLoad` reports initialization failure to the VM.
+This example uses `catch_callback` at both native entry points and avoids panicking on output failures. Returning
+`JNI_ERR` from `Agent_OnLoad` reports initialization failure to the VM. See the panic-boundary limitations below.
 
 ### Load the agent from Java
 
@@ -168,6 +166,34 @@ particular, heap, GC, and `ObjectFree` callbacks cannot perform arbitrary JNI/JV
 
 Callbacks can be concurrent and reentrant. Synchronize agent state and never unwind into the VM. Replacing a callback
 table or disabling an event is not a substitute for coordinating with callbacks already in flight.
+
+### Callback panic boundaries
+
+`catch_callback(fallback, body)` contains unwinding Rust panics without attaching threads, accessing JNI/JVMTI, throwing
+Java exceptions, logging, or installing panic hooks. `catch_callback_with(fallback, body, on_panic)` also protects a
+caller-supplied panic handler and destruction of its unused captures. Both require `Copy` results, so no result/fallback
+destructor runs outside the boundary.
+
+Choose a fallback for the callback's contract, not a generic default:
+
+| Callback                          | Typical panic fallback                             |
+| --------------------------------- | -------------------------------------------------- |
+| Event notification                | `()`; record failure for later reporting if needed |
+| Modern heap visitor               | `sys::JVMTI_VISIT_ABORT`                           |
+| Legacy heap visitor               | `sys::JVMTI_ITERATION_ABORT`                       |
+| `Agent_OnLoad` / `Agent_OnAttach` | `sys::JNI_ERR`                                     |
+
+Bodies, handlers, and their destructors must obey the original callback's context restrictions. For restricted
+callbacks, prefer an atomic failure flag over synchronous logging or Java calls. Handle ordinary errors inside the body,
+including any potentially panicking formatting/reporting. Construct captures without panicking and keep other
+potentially panicking work inside the boundary. Publish output pointers and lengths only after fallible work succeeds;
+catching a panic does not undo mutations or repair shared state.
+
+Caught panic payloads are deliberately leaked: their destructors could panic again or execute context-forbidden code.
+Repeated panics can leak memory, so these helpers are a last-resort FFI boundary, not ordinary error handling. They do
+not recover from aborting panics, double panics, or foreign exceptions. The process-wide panic hook still runs before
+catching the unwind and must be appropriate for the callback's context. An allocation-free or lock-free panic path is
+not guaranteed.
 
 ### Supported operations
 

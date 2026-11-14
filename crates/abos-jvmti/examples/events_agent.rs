@@ -8,12 +8,14 @@
 use std::{
 	ffi::{CStr, c_char, c_void},
 	io::Write,
-	panic::{AssertUnwindSafe, catch_unwind},
 	sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
 use abos_jni::jni_str;
-use abos_jvmti::{Allocation, Env, Error, JvmtiString, JvmtiStringList, JvmtiVersion, Result, sys};
+use abos_jvmti::{
+	Allocation, Env, Error, JvmtiString, JvmtiStringList, JvmtiVersion, Result, catch_callback, catch_callback_with,
+	sys,
+};
 
 #[path = "events_agent/features.rs"]
 mod features;
@@ -30,17 +32,20 @@ fn report(message: std::fmt::Arguments<'_>) {
 }
 
 fn callback(body: impl FnOnce() -> Result<()>) {
-	match catch_unwind(AssertUnwindSafe(body)) {
-		Ok(Ok(())) => {}
-		Ok(Err(error)) => {
+	catch_callback_with(
+		(),
+		|| {
+			if let Err(error) = body() {
+				FAILED.store(true, Ordering::SeqCst);
+				report(format_args!("JVMTI_AGENT_ERROR: {error}"));
+			}
+		},
+		|| {
 			FAILED.store(true, Ordering::SeqCst);
-			report(format_args!("JVMTI_AGENT_ERROR: {error}"));
-		}
-		Err(_) => {
-			FAILED.store(true, Ordering::SeqCst);
+			// This helper is for the example's unrestricted callbacks, not heap/GC callbacks.
 			report(format_args!("JVMTI_AGENT_ERROR: callback panicked"));
-		}
-	}
+		},
+	);
 }
 
 unsafe extern "system" fn vm_init(raw: *mut sys::jvmtiEnv, jni: *mut sys::JNIEnv, _thread: sys::jthread) {
@@ -169,26 +174,27 @@ pub unsafe extern "system" fn Agent_OnLoad(
 	options: *mut c_char,
 	_reserved: *mut c_void,
 ) -> sys::jint {
-	let result: std::thread::Result<Result<()>> = catch_unwind(|| {
-		// SAFETY: This export is called by the JVM in the `OnLoad` phase. No environment
-		// users exist on setup failure; successful setup leaves the environment alive.
-		unsafe {
-			let feature_tests: bool = !options.is_null() && CStr::from_ptr(options) == c"features";
-			FEATURE_TESTS.store(feature_tests, Ordering::SeqCst);
-			let env: Env<'_> = Env::from_raw_vm(vm)?;
-			if let Err(error) = configure(env).and_then(|()| verify_connections(vm, env)) {
-				let _cleanup: Result<()> = env.dispose();
-				return Err(error);
+	catch_callback(sys::JNI_ERR, || {
+		let result: Result<()> = (|| {
+			// SAFETY: This export is called by the JVM in the `OnLoad` phase. No environment
+			// users exist on setup failure; successful setup leaves the environment alive.
+			unsafe {
+				let feature_tests: bool = !options.is_null() && CStr::from_ptr(options) == c"features";
+				FEATURE_TESTS.store(feature_tests, Ordering::SeqCst);
+				let env: Env<'_> = Env::from_raw_vm(vm)?;
+				if let Err(error) = configure(env).and_then(|()| verify_connections(vm, env)) {
+					let _cleanup: Result<()> = env.dispose();
+					return Err(error);
+				}
+			}
+			Ok(())
+		})();
+		match result {
+			Ok(()) => sys::JNI_OK,
+			Err(error) => {
+				report(format_args!("JVMTI_AGENT_ERROR: {error}"));
+				sys::JNI_ERR
 			}
 		}
-		Ok(())
-	});
-	match result {
-		Ok(Ok(())) => sys::JNI_OK,
-		Ok(Err(error)) => {
-			report(format_args!("JVMTI_AGENT_ERROR: {error}"));
-			sys::JNI_ERR
-		}
-		Err(_) => sys::JNI_ERR,
-	}
+	})
 }
