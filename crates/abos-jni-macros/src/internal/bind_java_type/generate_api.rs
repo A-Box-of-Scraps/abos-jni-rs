@@ -186,7 +186,8 @@ pub(super) fn generate_api_get_method(
 				// must run without holding a lock. Concurrent callers may repeat this work.
 
 				let api = env.with_local_frame(4, |env| -> #jni::errors::Result<#api_name> {
-					// Cache the class before initialization can re-enter get().
+					// Cache the class before initialization can re-enter get(). This retains the
+					// target class, not necessarily the loader that owns our native library.
 					static CLASS: ::std::sync::OnceLock<#jni::objects::Global<#jni::objects::JClass>> = ::std::sync::OnceLock::new();
 
 					let class = if let Some(class) = CLASS.get() {

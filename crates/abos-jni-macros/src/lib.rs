@@ -46,12 +46,33 @@ pub fn jni_mangle(attr: proc_macro::TokenStream, item: proc_macro::TokenStream) 
 }
 
 /// Generate a native method wrapper.
+///
+/// A generated descriptor does not retain the native library containing its wrapper or
+/// implementation. When registering it, satisfy the code-lifetime requirements of
+/// `Env::register_native_methods`; wrapper generation does not manage library unloading.
 #[proc_macro]
 pub fn native_method(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	api::native_method(input)
 }
 
 /// Generate Rust bindings for a Java type.
+///
+/// # Native library lifetime
+///
+/// `native_methods` are registered automatically during binding initialization, before Java
+/// class initialization. The application must keep the generated wrappers and their native
+/// implementations executable while calls can occur, including until all in-flight calls return.
+/// The macro does not retain a native library handle or its owning class loader. Its cached
+/// global reference to the target class is not sufficient if a different loader owns the library.
+///
+/// Use process-lifetime native code or independently prevent the library from unloading.
+/// Automatic registration does not support coordinated unloading: it neither unregisters on
+/// drop nor waits for active calls, and later initialization errors do not roll back earlier
+/// registrations. Required and runtime-gated natives have the same lifetime obligation.
+/// Manual unregistration alone is not a safe unloading protocol; new calls and concurrent
+/// registration must also be prevented and all in-flight calls must have returned.
+///
+/// # Runtime member requirements
 ///
 /// Member property blocks accept `requires = available` to tolerate an absent constructor,
 /// method, field, or native declaration without disabling unrelated members. They also

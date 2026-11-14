@@ -6,6 +6,9 @@
 
 ### Fixed
 
+- Document the native registration code-lifetime contract, descriptor lifetime limits, and the need to coordinate
+  in-flight calls before unloading a library.
+
 - Make version-sensitive `JMap` methods optional at runtime; missing methods return `Error::MemberUnavailable` without
   preventing basic map operations from initializing.
 

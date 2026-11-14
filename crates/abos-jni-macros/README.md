@@ -160,6 +160,27 @@ function, supplies or checks `extern "system"`, and does not validate the Rust p
 supplied Java descriptor. You must use FFI-safe types such as `EnvUnowned`, not `Env`, and provide exception and panic
 handling. Prefer `native_method!` unless you need a handwritten entry point.
 
+### Native registration and library lifetime
+
+`bind_java_type!` registers required and enabled runtime-gated native methods during binding initialization, before Java
+class initialization. These registrations are not scoped to a Rust wrapper or descriptor. Earlier registrations are not
+rolled back if a later registration, hook, or member lookup fails, and initialization may retry registration. The macro
+does not unregister on drop or coordinate library unloading.
+
+The application must keep the generated wrappers and their implementations executable while the JVM can call them,
+including until all in-flight calls return. Use process-lifetime native code or independently keep the native library
+loaded. The cached global reference to the target class is **not** a general library keepalive: a different class loader
+may own the library. The macro neither identifies nor retains that owning loader or a native library handle.
+
+Unloadable-library integrations need their own lifecycle protocol: prevent new calls and concurrent registration, remove
+registrations, and wait for all in-flight calls to return before unloading. Automatic unregistration in a `Drop`
+implementation would not, by itself, make unloading safe. The generated binding cache has no teardown or in-flight-call
+tracking; do not treat automatic registration as support for unloading and reloading libraries.
+
+`native_method!` generates a descriptor but does not register it or retain its library. The descriptor's string lifetime
+is unrelated to the executable code's lifetime. Explicit registration must satisfy the safety contract of
+`Env::register_native_methods`, including when using `register_native_methods_from_class`.
+
 ### Custom type mappings
 
 `type_map` entries associate Rust wrapper paths with Java classes; `typealias` entries provide alternative names for an

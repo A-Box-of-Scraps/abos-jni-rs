@@ -6,6 +6,9 @@
 
 ### Fixed
 
+- Document automatic native registration lifetime obligations, cross-loader library ownership, and registrations
+  retained after initialization errors; clarify that generated bindings do not coordinate library unloading.
+
 - Emit custom type-mapping checks in stable order, independent of hash iteration and mapping insertion order (#852).
 
 ### Changed

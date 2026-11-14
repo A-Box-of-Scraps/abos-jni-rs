@@ -3,7 +3,12 @@ use super::{
 	format_ident, lit_cstr_mutf8, quote,
 };
 
-/// Generate the native methods registration code for `API::get()`
+/// Generate the native methods registration code for `API::get()`.
+///
+/// Required and gated registrations rely on the application's library-lifetime guarantee
+/// documented on `bind_java_type!`. Generated wrappers check the ABI, not the library lifetime.
+/// The cached target class need not belong to the loader that owns the native library.
+/// Earlier registrations remain installed if a later registration or API initialization fails.
 pub(super) fn generate_native_registration_code(
 	_api_name: &Ident,
 	native_methods: &[NativeMethod],
@@ -67,6 +72,9 @@ pub(super) fn generate_native_registration_code(
 				let #flag = if #condition {
 					// Register one optional native at a time: a missing declaration must
 					// not prevent other natives from being registered before class initialization.
+					// SAFETY: Generated wrappers match the declared signatures and receivers.
+					// The application must keep their library loaded for all possible calls,
+					// including after a later initialization error (see bind_java_type! docs).
 					unsafe { #outcome }
 				} else { false };
 			});
@@ -76,6 +84,9 @@ pub(super) fn generate_native_registration_code(
 	Ok(quote! {
 		{
 			// SAFETY: Name and signature literals are validated and encoded as modified UTF-8 at compile time.
+			// Generated wrappers match the declared signatures and receivers. The application
+			// must keep their library loaded for all possible calls, including after a later
+			// initialization error (see bind_java_type! docs); the cached class is not sufficient.
 			unsafe {
 				let native_methods = &[
 					#(#native_method_descriptors),*
