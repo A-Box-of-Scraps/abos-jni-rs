@@ -187,5 +187,5 @@ class EnvironmentTests(unittest.TestCase):
         config = tomllib.loads((tools.PROJECT.parents[1] / "mise.toml").read_text(encoding="utf-8"))
         self.assertEqual(list(config["tasks"]), sorted(config["tasks"]))
         self.assertTrue(config["tasks"]["setup:android"]["raw"])
-        self.assertEqual(config["tools"]["android-cli"], "1.1.16717390")
+        self.assertEqual(config["tools"]["android-cli"], "1.1.16919734")
         self.assertEqual(config["tools"]["cargo:cargo-ndk"], "4.1.2")

@@ -1,17 +1,17 @@
 [tools]
-android-cli = "1.1.16717390"
-"cargo:cargo-dylint" = "6.3.2"
+android-cli = "1.1.16919734"
+"cargo:cargo-dylint" = "6.4.0"
 "cargo:cargo-fuzz" = "0.13.2"
 "cargo:cargo-ndk" = "4.1.2"
-"cargo:dylint-link" = "6.3.2"
-"cargo:jscpd" = "5.4.2"
-dprint = "0.64.3"
-fd = "10.5.1"
-java = "zulu-25.38.109.0"
-maven = "3.10.0"
+"cargo:dylint-link" = "6.4.0"
+"cargo:jscpd" = "5.4.3"
+dprint = "0.65.0"
+fd = "10.5.2"
+java = "zulu-25.38.201.0"
+maven = "3.10.1"
 mold = { version = "3.0.0", os = ["linux"] }
 python = "3.15.2"
-ruff = "0.17.4"
+ruff = "0.17.6"
 
 [settings]
 task.output = "interleave"
